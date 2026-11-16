@@ -4,6 +4,7 @@ import { db } from '@/db/client'
 import { assertCan } from '@/lib/access'
 import { getAccessContext } from '@/lib/session'
 import { listFacilities } from '@/features/facilities/service'
+import { getSettings } from '@/features/settings/service'
 import { searchTenants } from '@/features/tenants/service'
 import { TenantSearch } from '@/features/tenants/components/tenant-search'
 import { TenantTable } from '@/features/tenants/components/tenant-table'
@@ -23,7 +24,7 @@ export default async function TenantsPage({ searchParams }: { searchParams: Prom
         <Link href="/tenants/new" className={buttonVariants()}>Thêm khách</Link>
       </div>
       <TenantSearch facilities={facs.map((f) => ({ id: f.id, name: f.name }))} />
-      <TenantTable tenants={list} />
+      <TenantTable tenants={list} visaWarningDays={(await getSettings(db)).visaWarningDays} />
     </div>
   )
 }
