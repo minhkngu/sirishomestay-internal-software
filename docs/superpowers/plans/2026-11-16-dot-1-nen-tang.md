@@ -77,6 +77,34 @@ Quy ước: mỗi `features/<x>/actions.ts` là `"use server"`, mỗi action **b
 
 ---
 
+### Task 0: Bản xem thử giao diện với dữ liệu giả (làm trước, chờ người dùng duyệt)
+
+Mục đích: người dùng bấm thử các màn hình chính với dữ liệu giả để góp ý bố cục và luồng thao tác **trước khi** xây thật. Đây là bản nháp để xem rồi bỏ: không cơ sở dữ liệu, không đăng nhập thật, không test tự động. Góp ý của người dùng được ghi lại và cập nhật vào spec/plan trước khi bắt đầu Task 1.
+
+**Files:**
+- Create: `prototype/index.html` (một trang HTML + CSS + JS thuần, mở trực tiếp bằng trình duyệt, không cần build), `prototype/mock-data.js`, `prototype/README.md` (cách mở, ghi rõ "bản xem thử, dữ liệu giả")
+
+**Interfaces:**
+- Produces: `prototype/mock-data.js` export `facilities`, `rooms`, `tenants`, `users` — dùng lại làm nguồn cho script dữ liệu mẫu ở các đợt sau.
+
+- [ ] **Step 1: Dữ liệu giả** (`mock-data.js`), tên và số giấy tờ đều bịa:
+  - 2 cơ sở: Thảo Điền (24 phòng, tầng 1–4 × 6 phòng) và Bình Thạnh (16 phòng, tầng 1–4 × 4 phòng); loại phòng Studio / 1PN / 2PN, giá 7.500.000–18.000.000.
+  - 30 khách: 14 nước ngoài (nhiều quốc tịch; ngày hết hạn visa tính tương đối so với hôm nay: −5, 0, 3, 9, 16, 24, 29, 30, 45, 70, 120, 200, 260, 330 ngày), 12 Việt Nam (CCCD 12 số), 4 công ty (mã số thuế 10 số). Số điện thoại có đủ kiểu nhập để minh hoạ chuẩn hoá.
+  - Trạng thái phòng minh hoạ: đang ở, trống, đã cọc chờ, sắp trả.
+  - 5 người dùng với các tổ hợp cơ sở + nhóm quyền khác nhau (Admin; Quản lý Thảo Điền có Khách & hợp đồng + Hoá đơn; Kỹ thuật Bình Thạnh có Ghi điện nước + Tài sản + Sự cố; …).
+- [ ] **Step 2: Các màn hình** (giao diện tiếng Việt, dùng tốt trên điện thoại):
+  - **Nhắc việc**: thẻ "Visa sắp hết hạn" chạy thật theo dữ liệu giả và ngưỡng trong Cài đặt; các thẻ của đợt sau (hoá đơn quá hạn, hợp đồng sắp hết hạn, chưa ký, sự cố đang mở) hiển thị minh hoạ, gắn nhãn "Đợt 2/3/4".
+  - **Cơ sở & phòng**: thẻ cơ sở → sơ đồ phòng theo tầng, màu theo trạng thái, lọc trạng thái; bấm phòng mở panel chi tiết (thông tin phòng, khách đang ở; tài sản và chỉ số điện nước minh hoạ); form "Thêm phòng" và "Tạo nhanh nhiều phòng" (thêm vào dữ liệu trong trang).
+  - **Khách thuê**: bảng có tìm không dấu, lọc loại khách và cơ sở, cột visa tô màu theo số ngày còn lại; panel chi tiết theo từng loại khách với ảnh giấy tờ giả; form "Thêm khách" chọn loại trước, hiện số điện thoại đã chuẩn hoá ngay khi gõ, báo trùng số điện thoại/giấy tờ.
+  - **Người dùng**: bảng + form tick "Cơ sở được truy cập" và "Nhóm quyền".
+  - **Nhập dữ liệu**: 3 bước tải file → ghép cột → xem trước dòng lỗi, dùng dữ liệu mẫu cố định.
+  - **Cài đặt**: số ngày cảnh báo visa / hợp đồng, cách tính lẻ ngày; đổi ngưỡng visa thì Nhắc việc cập nhật ngay.
+  - **Bộ chọn "Xem với vai trò"** ở đầu trang (Admin / Quản lý Thảo Điền / Kỹ thuật Bình Thạnh) để thấy menu, cơ sở và thông tin khách thay đổi theo phân quyền.
+  - Dải thông báo cố định: "Bản xem thử — dữ liệu giả, không lưu lại".
+- [ ] **Step 3:** Mở `prototype/index.html` trên trình duyệt ở cỡ máy tính và điện thoại; bấm qua mọi màn hình, không lỗi console.
+- [ ] **Step 4:** Commit `proto: bản xem thử giao diện đợt 1 với dữ liệu giả`, gửi người dùng xem.
+- [ ] **Step 5: Điểm dừng.** Thu góp ý của người dùng, cập nhật spec và các task bên dưới cho khớp, rồi mới làm Task 1.
+
 ### Task 1: Khởi tạo dự án và hạ tầng test
 
 **Files:**
