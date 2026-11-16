@@ -1,4 +1,7 @@
 import Link from 'next/link'
+import { activeLeaseForBilling, listDepositEntries } from '@/server/charges/service'
+import { DepositLedger } from '@/features/deposits/components/deposit-ledger'
+import { OneOffDialog } from '@/features/charges/components/one-off-dialog'
 import { buttonVariants } from '@/components/ui/button'
 import { db } from '@/db/client'
 import { can, canViewTenantIdentity } from '@/domain/access'
@@ -22,6 +25,8 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
   const deposit = showContracts ? await getPendingDepositContract(db, ctx, id) : null
   const roomAssets = can(ctx, 'assets', r.facilityId) ? await listAssets(db, ctx, { location: { kind: 'room', id } }) : null
   const meterInfo = can(ctx, 'meters', r.facilityId) ? await roomMeterHistory(db, ctx, id) : null
+  const billingLease = can(ctx, 'billing', r.facilityId) ? await activeLeaseForBilling(db, ctx, id) : null
+  const depositLedger = billingLease ? await listDepositEntries(db, ctx, billingLease) : []
   const active = history.find((l) => l.status === 'active')
   return (
     <div className="space-y-4">
@@ -36,6 +41,7 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
         <dt className="text-muted-foreground">Ghi chú</dt><dd>{r.note}</dd>
       </dl>
       {detail.money && <section className="space-y-1 rounded-lg border p-4 text-sm"><h2 className="font-medium">Thông tin thanh toán</h2>{detail.money.monthlyRent != null && <p>Tiền thuê: {formatVND(detail.money.monthlyRent)}</p>}<p>Số dư cọc: {formatVND(detail.money.depositBalance)}</p></section>}
+      {billingLease && <section className="space-y-3 rounded-lg border p-4"><OneOffDialog leaseId={billingLease} /><h2 className="font-medium">Sổ cọc</h2><DepositLedger leaseId={billingLease} entries={depositLedger} canEdit /></section>}
       {showContracts && (
         <section className="space-y-3 rounded-lg border p-4">
           <h2 className="font-medium">Hợp đồng</h2>

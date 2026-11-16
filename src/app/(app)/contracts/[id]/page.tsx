@@ -1,4 +1,8 @@
 import Link from 'next/link'
+import { can } from '@/domain/access'
+import { listOneOffs } from '@/server/charges/service'
+import { OneOffDialog } from '@/features/charges/components/one-off-dialog'
+import { DepositLedger } from '@/features/deposits/components/deposit-ledger'
 import { notFound } from 'next/navigation'
 import { buttonVariants } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -76,6 +80,8 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
     )
   }
 
+  const billing = can(ctx, 'billing', lease.facilityId)
+  const charges = billing ? await listOneOffs(db, ctx, lease.id) : []
   const handoverList = await listHandovers(db, ctx, lease.id)
   const [templates, exports] = await Promise.all([
     listTemplates(db, ctx, 'lease').then((t) => t.filter((x) => x.fileId)),
@@ -100,6 +106,7 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
             <dt className="text-muted-foreground">Số người ở</dt><dd>{lease.occupantCount}</dd>
             <dt className="text-muted-foreground">Phí dịch vụ</dt><dd>{lease.fees.map((f) => `${f.name} ${formatVND(f.unitPrice)}`).join(', ') || '—'}</dd>
           </dl>
+          {billing && <OneOffDialog leaseId={lease.id} charges={charges} />}
         </TabsContent>
         <TabsContent value="addenda"><p className="py-3 text-sm text-muted-foreground">Phụ lục gia hạn, chuyển phòng, thanh lý sẽ có ở bước sau.</p></TabsContent>
         <TabsContent value="handover">
@@ -110,7 +117,7 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
           </div>
         </TabsContent>
         <TabsContent value="invoices"><p className="py-3 text-sm text-muted-foreground">Hoá đơn sẽ có ở bước sau.</p></TabsContent>
-        <TabsContent value="deposit"><div className="py-3"><Ledger entries={lease.depositEntries} /></div></TabsContent>
+        <TabsContent value="deposit"><div className="py-3"><DepositLedger entries={lease.depositEntries} canEdit={billing} leaseId={lease.id} /></div></TabsContent>
         <TabsContent value="docs">
           <div className="space-y-3 py-3">
             <SignStatus kind="lease" id={lease.id} status={lease.signStatus as 'draft'} signedFileId={lease.signedFileId} />
