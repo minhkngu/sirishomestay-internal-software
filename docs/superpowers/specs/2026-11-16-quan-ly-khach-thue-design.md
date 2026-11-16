@@ -186,11 +186,15 @@ Lọc theo cơ sở người dùng được thấy, chỉ hiện mục người 
 
 ## 10. Lộ trình (người dùng đã quyết định)
 
-Một kế hoạch duy nhất, dùng **Supabase ngay từ đầu**:
+Dùng **Supabase ngay từ đầu**, dữ liệu giả nạp bằng script (`db:seed`) cùng các tài khoản mẫu. Chia **5 đợt**; mỗi đợt kết thúc bằng điểm dừng: bản thử trên Vercel + checklist để người dùng test, góp ý, rồi mới sang đợt sau.
 
-1. Dựng giao diện và luồng cho **toàn bộ hệ thống** (cơ sở/phòng, khách, người dùng, mẫu Word, hợp đồng/phụ lục, bàn giao, điện nước, phí phát sinh, sổ cọc, hoá đơn, thanh lý, tài sản, sự cố, nhắc việc, nhập Excel, cài đặt) trên Supabase thật, với **dữ liệu giả** nạp bằng script (`db:seed`) và các tài khoản người dùng mẫu. Logic tính tiền và phân quyền viết thật, có test.
-2. **Điểm dừng:** người dùng bấm thử toàn bộ luồng với dữ liệu giả, góp ý → sửa tới khi ổn.
-3. Hoàn thiện để chạy thật: xuất PDF/PNG (Gotenberg), chuyển file sang R2, tự xoá ảnh sau thanh lý, sao lưu ra Google Drive, xoá dữ liệu giả, nhập dữ liệu thật từ Excel.
+1. Nền tảng: đăng nhập, phân quyền, người dùng, cơ sở/phòng, cài đặt, loại phí, đơn giá, lưu file, khách thuê, nhắc visa.
+2. Mẫu Word, hợp đồng cọc/thuê, tài sản & kho, điện nước, bàn giao.
+3. Tài chính: tính tiền, phí phát sinh, sổ cọc, hoá đơn, thu tiền, phụ lục gia hạn / chuyển phòng / thanh lý.
+4. Sự cố, nhắc việc đầy đủ, nhập Excel, test toàn hệ thống.
+5. Chạy thật: PDF/ảnh (Gotenberg), chuyển file sang R2 + tự xoá ảnh, sao lưu Drive, xoá dữ liệu giả, nhập dữ liệu thật.
+
+Kế hoạch chi tiết: `docs/superpowers/plans/README.md`.
 
 ## 11. Để builder quyết định
 
