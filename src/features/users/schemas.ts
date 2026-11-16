@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { PERMISSIONS } from '@/lib/access'
+import { PERMISSIONS } from '@/domain/access'
 
 export const userInput = z.object({
   email: z.string().trim().toLowerCase().email('Email không hợp lệ'),

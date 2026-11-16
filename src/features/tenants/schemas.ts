@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { normalizePhone } from '@/lib/phone'
-import { parseFlexibleDate } from '@/lib/dates'
+import { normalizePhone } from '@/domain/phone'
+import { parseFlexibleDate } from '@/domain/dates'
 
 const optText = z.string().trim().nullish().transform((v) => (v ? v : null))
 const reqText = (msg: string) => z.string({ error: msg }).trim().min(1, msg)

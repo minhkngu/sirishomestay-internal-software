@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizePhone } from '@/lib/phone'
+import { normalizePhone } from '@/domain/phone'
 
 describe('normalizePhone', () => {
   it.each([

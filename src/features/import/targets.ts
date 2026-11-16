@@ -1,4 +1,4 @@
-import { removeDiacritics } from '@/lib/text'
+import { removeDiacritics } from '@/domain/text'
 
 export type ImportTarget = 'rooms' | 'tenants'
 export type ImportField = { key: string; label: string; required: boolean; aliases: string[] }

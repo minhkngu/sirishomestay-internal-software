@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { todayVN, parseFlexibleDate, formatDateVN, addDays } from '@/lib/dates'
+import { todayVN, parseFlexibleDate, formatDateVN, addDays } from '@/domain/dates'
 
 describe('dates', () => {
   it('todayVN theo múi giờ Việt Nam', () => {

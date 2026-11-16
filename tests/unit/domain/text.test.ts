@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { removeDiacritics, buildSearchText } from '@/lib/text'
+import { removeDiacritics, buildSearchText } from '@/domain/text'
 
 describe('text', () => {
   it('removeDiacritics xử lý đ/Đ', () => {

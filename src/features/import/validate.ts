@@ -1,7 +1,7 @@
 import { normHeader, type ImportTarget } from './targets'
 import { tenantInput, type TenantInput } from '../tenants/schemas'
 import { roomInput } from '../rooms/schemas'
-import { removeDiacritics } from '@/lib/text'
+import { removeDiacritics } from '@/domain/text'
 
 export const PLACEHOLDER_FACILITY_ID = '00000000-0000-4000-8000-000000000000'
 

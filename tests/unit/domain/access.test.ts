@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   can, assertCan, facilityScope, NotFoundError, ForbiddenError, PERMISSIONS, PERMISSION_LABELS,
   type AccessContext, type Permission,
-} from '@/lib/access'
+} from '@/domain/access'
 
 const A = 'facility-a'
 const B = 'facility-b'

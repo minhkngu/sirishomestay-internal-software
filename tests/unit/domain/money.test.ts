@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatVND } from '@/lib/money'
+import { formatVND } from '@/domain/money'
 
 describe('formatVND', () => {
   it('dùng dấu chấm phân tách hàng nghìn', () => {
