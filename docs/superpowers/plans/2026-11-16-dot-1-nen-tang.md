@@ -254,6 +254,8 @@ expect(numberToVietnameseWords(2005000)).toBe('Hai triệu không trăm linh nă
 
 ### Điểm dừng đợt 1: người dùng test
 
+> **16/11/2026:** Các bước chưa làm (Step 1, 3, 6) chuyển sang [kiểm thử tổng thể](2026-11-16-kiem-thu-tong-the.md); người dùng duyệt một lần ở Task K5.
+
 - [ ] **Step 1:** `npm test` → PASS toàn bộ; `npm run lint` sạch; `npm run build` OK.
 - [x] **Step 2:** Playwright (chạy trên Supabase dev, bỏ qua nếu thiếu `E2E_BASE_URL`) cho các luồng: đăng nhập nhanh bằng Admin thấy Nhắc việc; Hùng mở `/tenants` → "Không tìm thấy"; Admin tick thêm quyền cho Vy rồi Vy thấy menu mới; tạo nhanh phòng 501–503; thêm khách nước ngoài với SĐT trùng → báo lỗi, đổi số → lưu; tìm `nguyen van an`. `npx playwright test` → PASS.
 - [ ] **Step 3:** Dữ liệu giả đã nạp lên Supabase `siris-pms` ngày 16/11 — không nạp lại (không dùng `--reset`), chỉ chạy `npm run db:migrate` nếu có migration mới; triển khai bản thử lên Vercel (preview) với `NEXT_PUBLIC_DEMO_MODE=1`.

@@ -105,6 +105,8 @@ it('function Vercel chạy cùng vùng với Supabase', () => {
 
 ### Task 3: Đo lại, kiểm tra và đẩy lên main
 
+> **16/11/2026:** Chuyển sang [kiểm thử tổng thể](2026-11-16-kiem-thu-tong-the.md), Task K4 (đo, kiểm bằng tay) và K3 (`npm test`, e2e). Các bước dưới giữ để tham khảo.
+
 - [ ] **Step 1: Đo** — `npm run build && npm run start` (đo bản build, không đo `next dev` vì có thời gian biên dịch). Mở `http://localhost:3000` trong trình duyệt, đăng nhập nhanh bằng Admin (demo mode), bấm lần lượt Cơ sở & phòng → Khách thuê → Hợp đồng → Điện nước → Nhắc việc, mỗi vòng 2 lần. Lấy thời gian các request `?_rsc=` (tab Network). Ghi trung vị vào mục "Số đo".
 - [ ] **Step 2:** Đạt khi trung vị sau sửa ≤ 600 ms và giảm ít nhất 60% so với mốc. Không đạt → dừng, quay lại systematic-debugging với số đo mới, không đoán thêm.
 - [ ] **Step 3:** Kiểm Review Focus 1 và 4 bằng tay: đăng xuất → mở `/tenants` → về `/login`; Admin bỏ quyền `meters` của Vy, Vy chuyển tab → menu Điện nước biến mất; xoá cookie access token (giữ refresh token) rồi chuyển tab → vẫn vào được.

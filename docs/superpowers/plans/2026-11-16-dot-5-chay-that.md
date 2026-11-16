@@ -11,7 +11,9 @@
 **Spec:** `docs/superpowers/specs/2026-11-16-quan-ly-khach-thue-design.md`
 **Tổng quan các đợt:** `docs/superpowers/plans/README.md` · Số Task giữ theo thứ tự chung của toàn dự án.
 
-**Điều kiện bắt đầu:** Toàn bộ giao diện đã được người dùng duyệt (điểm dừng Task 19).
+**Điều kiện bắt đầu:** Đợt 4 đã cài đặt xong (không chờ duyệt giao diện). Các bước chạy thật trong `go-live.md` chỉ làm sau khi người dùng duyệt ở Task K5 của kế hoạch kiểm thử tổng thể.
+> **16/11/2026:** Các task chưa làm không còn bước test và không còn điểm dừng theo đợt. Ca test được chuyển sang [kiểm thử tổng thể](2026-11-16-kiem-thu-tong-the.md), chạy một lần sau khi cài đặt xong.
+
 
 ## Global Constraints
 
@@ -79,20 +81,19 @@ tests/helpers/db.ts  tests/unit/**  tests/integration/**  tests/e2e/**
 **Files:**
 - Create: `src/server/convert/{gotenberg.ts,index.ts}`, `docs/operations/gotenberg.md`
 - Modify: `src/server/templates/service.ts`, các menu xuất
-- Test: `tests/integration/convert.test.ts` (dùng fetch giả)
+- Test (viết ở [kiểm thử tổng thể](2026-11-16-kiem-thu-tong-the.md), Task K1): `tests/integration/convert.test.ts` (dùng fetch giả)
 
 **Interfaces:**
 - Produces: `convertDocxToPdf(docx: Blob): Promise<Blob>` gọi `POST {GOTENBERG_URL}/forms/libreoffice/convert`; `convertPdfToPng(pdf: Blob): Promise<Blob>` lấy trang đầu, dùng `/forms/chromium/screenshot/html` với pdf.js hoặc `pdftoppm` trong cùng container (builder chọn); `exportDocument(..., format: 'docx'|'pdf'|'png')`.
-- [ ] **Step 1:** Test: format `pdf` gọi đúng endpoint và lưu file `application/pdf`; Gotenberg lỗi → `ValidationError('Không chuyển được sang PDF, thử lại sau')`.
-- [ ] **Step 2:** Chạy → FAIL. **Step 3:** Cài đặt. Tài liệu `gotenberg.md`: chạy image `gotenberg/gotenberg:8` (Vercel container function hoặc dịch vụ nhỏ), cài font Times New Roman và Arial, đặt `GOTENBERG_URL`. **Step 4:** Chạy → PASS.
-- [ ] **Step 5:** Commit `feat: xuất PDF và ảnh qua Gotenberg`.
+- [ ] **Step 1:** Cài đặt. Tài liệu `gotenberg.md`: chạy image `gotenberg/gotenberg:8` (Vercel container function hoặc dịch vụ nhỏ), cài font Times New Roman và Arial, đặt `GOTENBERG_URL`.
+- [ ] **Step 2:** Commit `feat: xuất PDF và ảnh qua Gotenberg`.
 
 ### Task 21: Chuyển file sang R2 và tự xoá ảnh sau thanh lý
 
 **Files:**
 - Create: `src/app/api/cron/purge-files/route.ts`, `vercel.ts` (cron), `scripts/migrate-storage.ts`, `docs/operations/r2.md`
 - Modify: `src/server/storage/r2.ts`, trang hợp đồng (nút "Giữ lại ảnh")
-- Test: `tests/integration/purge.test.ts`
+- Test (viết ở [kiểm thử tổng thể](2026-11-16-kiem-thu-tong-the.md), Task K1): `tests/integration/purge.test.ts`
 
 **Interfaces:**
 - Produces:
@@ -100,9 +101,8 @@ tests/helpers/db.ts  tests/unit/**  tests/integration/**  tests/e2e/**
   - Cột `leases.keep_photos bool default false`.
   - Route cron chạy mỗi ngày, có bảo vệ bằng `CRON_SECRET`.
   - `scripts/migrate-storage.ts`: chép file từ Supabase Storage sang R2 rồi đổi `STORAGE_DRIVER=r2`.
-- [ ] **Step 1:** Test: file có `delete_after` hôm qua bị xoá; hợp đồng `keep_photos` thì không xoá; biên bản đã xuất (`ownerType = 'export'`) không bao giờ bị xoá; ảnh passport của khách đã ký hợp đồng mới sau khi đặt `delete_after` → không xoá và `delete_after` về null.
-- [ ] **Step 2:** Chạy → FAIL. **Step 3:** Cài đặt. Tài liệu `r2.md` gồm cách tạo bucket, CORS, khoá truy cập. **Step 4:** Chạy → PASS.
-- [ ] **Step 5:** Commit `feat: R2, tự xoá ảnh sau thanh lý, nút giữ lại`.
+- [ ] **Step 1:** Cài đặt. Tài liệu `r2.md` gồm cách tạo bucket, CORS, khoá truy cập.
+- [ ] **Step 2:** Commit `feat: R2, tự xoá ảnh sau thanh lý, nút giữ lại`.
 
 ### Task 22: Sao lưu cơ sở dữ liệu ra Google Drive ✅ (commit `6b58172`; còn chạy thử khôi phục — Task 23 bước 7)
 
@@ -115,7 +115,7 @@ tests/helpers/db.ts  tests/unit/**  tests/integration/**  tests/e2e/**
   - Tải lên Drive bằng `rclone` (service account, `root_folder_id`), rồi chỉ giữ 30 file mới nhất.
   - Bước nào lỗi thì workflow fail (GitHub gửi email). Secrets: `BACKUP_DATABASE_URL`, `GDRIVE_SERVICE_ACCOUNT_JSON`, `GDRIVE_FOLDER_ID`.
 - [x] **Step 2:** Viết `backup-restore.md` bằng tiếng Việt: tạo service account, chia sẻ thư mục Drive cho service account, thêm secrets, chạy tay, khôi phục bằng `pg_restore --clean --if-exists --no-owner`, và checklist chạy thử khôi phục trước khi dùng thật.
-- [ ] **Step 3:** Chạy `npx --yes action-validator .github/workflows/backup.yml` → không lỗi.
+- [ ] **Step 3:** ~~Kiểm tra workflow~~ — chuyển sang [kiểm thử tổng thể](2026-11-16-kiem-thu-tong-the.md), Task K3.
 - [x] **Step 4:** Commit `ops: sao lưu cơ sở dữ liệu mỗi đêm ra Google Drive, giữ 30 bản`.
 
 ### Task 23: Chuyển sang chạy thật
@@ -133,7 +133,6 @@ tests/helpers/db.ts  tests/unit/**  tests/integration/**  tests/e2e/**
   6. Cài đơn giá, loại phí.
   7. Bật sao lưu và chạy thử khôi phục.
   8. Chuyển file sang R2.
-- [ ] **Step 2:** Cài đặt `db:seed --purge-demo` và `seed:admin` kèm test: sau khi purge không còn bản ghi nào có `is_demo = true`, tài khoản mẫu bị xoá khỏi Supabase Auth, cài đặt và mẫu Word người dùng đã tải lên vẫn còn.
-- [ ] **Step 3:** `npm test` → PASS; `npm run build` → OK.
-- [ ] **Step 4:** Commit `ops: hướng dẫn chuyển sang chạy thật, xoá dữ liệu giả`.
+- [ ] **Step 2:** Cài đặt `db:seed --purge-demo` (xoá mọi bản ghi `is_demo = true` và tài khoản mẫu trong Supabase Auth; giữ cài đặt và mẫu Word người dùng đã tải lên) và `seed:admin`. Test ở [kiểm thử tổng thể](2026-11-16-kiem-thu-tong-the.md), Task K1.
+- [ ] **Step 3:** Commit `ops: hướng dẫn chuyển sang chạy thật, xoá dữ liệu giả`.
 
