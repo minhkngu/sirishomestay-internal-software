@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
+import { BankAccountFields, emptyBankAccount } from '@/components/bank-account/bank-account-fields'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -71,6 +72,16 @@ function GeneralTab({ s }: { s: Settings }) {
       }))}>Lưu</Button>
     </div>
   )
+}
+
+function BankAccountTab({ settings }: { settings: Settings }) {
+  const { pending, error, ok, run } = useRun()
+  const [account, setAccount] = useState(settings.bankAccount ?? emptyBankAccount)
+  return <div className="max-w-md space-y-4">
+    <BankAccountFields value={account} onChange={setAccount} prefix="shared-bank" />
+    <Msg error={error} ok={ok} />
+    <Button disabled={pending} onClick={() => run(() => updateSettingsAction({ bankAccount: account }))}>Lưu tài khoản</Button>
+  </div>
 }
 
 function FacilitiesTab({ facilities }: { facilities: Fac[] }) {
@@ -183,11 +194,13 @@ export function SettingsTabs({ settings, facilities, units, feeTypes, rates }: P
     <Tabs defaultValue="general">
       <TabsList>
         <TabsTrigger value="general">Chung</TabsTrigger>
+        <TabsTrigger value="bank">Tài khoản nhận tiền</TabsTrigger>
         <TabsTrigger value="facilities">Cơ sở</TabsTrigger>
         <TabsTrigger value="fees">Đơn vị & loại phí</TabsTrigger>
         <TabsTrigger value="rates">Đơn giá điện nước</TabsTrigger>
       </TabsList>
       <TabsContent value="general"><GeneralTab s={settings} /></TabsContent>
+      <TabsContent value="bank"><BankAccountTab settings={settings} /></TabsContent>
       <TabsContent value="facilities"><FacilitiesTab facilities={facilities} /></TabsContent>
       <TabsContent value="fees"><FeesTab units={units} feeTypes={feeTypes} /></TabsContent>
       <TabsContent value="rates"><RatesTab facilities={facilities} rates={rates} /></TabsContent>

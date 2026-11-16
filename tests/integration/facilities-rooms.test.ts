@@ -26,6 +26,14 @@ describe('facilities & rooms', () => {
     fb = (await createFacility(db, admin, { code: 'B', name: 'Cơ sở B' })).id
   })
 
+  it('lưu tài khoản riêng của toà rồi xoá về null', async () => {
+    const account = { bankBin: '970418', bankName: 'giả', accountNumber: '123456', accountName: '  chu nha ' }
+    const updated = await updateFacility(db, admin, fa, { bankAccount: account })
+    expect(updated.bankAccount).toEqual({ ...account, bankName: 'Ngân hàng TMCP Đầu tư và Phát triển Việt Nam', accountName: 'CHU NHA' })
+    await updateFacility(db, admin, fa, { bankAccount: null })
+    expect((await getFacility(db, admin, fa)).bankAccount).toBeNull()
+  })
+
   it('listFacilities chỉ trả cơ sở trong phạm vi', async () => {
     const staff = ctxOf(['meters'], [fa])
     expect((await listFacilities(db, staff)).map((f) => f.code)).toEqual(['A'])

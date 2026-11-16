@@ -12,6 +12,14 @@ describe('settings', () => {
   let db: DB
   beforeEach(async () => { db = await createTestDb() })
 
+  it('lưu tài khoản chung, chuẩn hoá chủ tài khoản và từ chối số sai', async () => {
+    const account = { bankBin: '970436', bankName: 'giả', accountNumber: '0123456789', accountName: '  Nguyen Van A  ' }
+    await updateSettings(db, ctxOf(['settings']), { bankAccount: account })
+    expect((await getSettings(db)).bankAccount).toEqual({ ...account, bankName: 'Ngân hàng TMCP Ngoại thương Việt Nam', accountName: 'NGUYEN VAN A' })
+    await expect(updateSettings(db, ctxOf(['settings']), { bankAccount: { ...account, accountNumber: '12abc' } })).rejects.toThrow('Số tài khoản chỉ gồm 6–19 chữ số')
+    await expect(updateSettings(db, ctxOf(['billing']), { bankAccount: account })).rejects.toThrow(ForbiddenError)
+  })
+
   it('trả mặc định khi chưa lưu, rồi gộp giá trị đã lưu', async () => {
     expect(await getSettings(db)).toEqual(SETTINGS_DEFAULTS)
     await updateSettings(db, ctxOf(['settings']), { visaWarningDays: 60 })

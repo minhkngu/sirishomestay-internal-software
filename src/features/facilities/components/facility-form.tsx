@@ -5,7 +5,9 @@ import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { createFacilityAction } from '@/server/facilities/actions'
+import { createFacilityAction, updateFacilityAction } from '@/server/facilities/actions'
+import { BankAccountFields, emptyBankAccount } from '@/components/bank-account/bank-account-fields'
+import type { BankAccount } from '@/domain/types'
 
 export function NewFacilityButton() {
   const router = useRouter()
@@ -37,4 +39,22 @@ export function NewFacilityButton() {
       </div>
     </div>
   )
+}
+
+export function FacilityBankAccount({ id, account }: { id: string; account: BankAccount | null }) {
+  const router = useRouter()
+  const [enabled, setEnabled] = useState(account !== null)
+  const [value, setValue] = useState(account ?? emptyBankAccount)
+  const [pending, start] = useTransition()
+  const [message, setMessage] = useState<string | null>(null)
+  return <section className="max-w-md space-y-3 rounded-md border p-4">
+    <label className="flex items-center gap-2"><input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Dùng tài khoản riêng</label>
+    {enabled && <BankAccountFields value={value} onChange={setValue} prefix="facility-bank" />}
+    {message && <p role="status" className="text-sm">{message}</p>}
+    <Button disabled={pending} onClick={() => start(async () => {
+      const result = await updateFacilityAction(id, { bankAccount: enabled ? value : null })
+      setMessage(result.ok ? 'Đã lưu tài khoản' : result.error)
+      if (result.ok) router.refresh()
+    })}>Lưu tài khoản</Button>
+  </section>
 }

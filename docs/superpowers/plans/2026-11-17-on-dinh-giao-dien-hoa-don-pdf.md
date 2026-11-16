@@ -200,17 +200,17 @@ Thứ tự trường TLV: `00`=`01`, `01`=`12`, `38`=[`00` `A000000727`, `01`=[`
     - `accountName` được trim, viết hoa, không rỗng.
     - `bankName` lấy từ `VN_BANKS` theo bin; không nhận giá trị client gửi lên.
 
-- [ ] **Step 1: Viết test**
+- [x] **Step 1: Viết test**
 
 - `it('lưu và đọc tài khoản chung; số TK có chữ → báo "Số tài khoản chỉ gồm 6–19 chữ số"')`
 - `it('toà lưu tài khoản riêng rồi xoá về null')`
 - `it('chỉ nhóm settings được sửa tài khoản chung')`
 
-- [ ] **Step 2: Chạy test, xác nhận FAIL.**
+- [x] **Step 2: Chạy test, xác nhận FAIL.**
 
-- [ ] **Step 3: Sửa schema, chạy `npm run db:generate`, viết service.**
+- [x] **Step 3: Sửa schema, chạy `npm run db:generate`, viết service.**
 
-- [ ] **Step 4: Làm giao diện**
+- [x] **Step 4: Làm giao diện**
 
 - Tab "Tài khoản nhận tiền":
   - Ô chọn ngân hàng từ `VN_BANKS`, hiện `shortName — name`.
@@ -218,9 +218,9 @@ Thứ tự trường TLV: `00`=`01`, `01`=`12`, `38`=[`00` `A000000727`, `01`=[`
   - Nút "Lưu tài khoản".
 - Form toà: công tắc "Dùng tài khoản riêng". Tắt công tắc thì lưu `null`.
 
-- [ ] **Step 5: Chạy `npm test && npm run lint && npm run build`, xác nhận PASS.**
+- [x] **Step 5: Chạy `npm test && npm run lint && npm run build`, xác nhận PASS.**
 
-- [ ] **Step 6: Commit** — `feat: tài khoản nhận tiền chung và riêng theo toà`
+- [x] **Step 6: Commit** — `feat: tài khoản nhận tiền chung và riêng theo toà`
 
 ### Task 5: Bộ dựng PDF hoá đơn và phiếu thu
 
