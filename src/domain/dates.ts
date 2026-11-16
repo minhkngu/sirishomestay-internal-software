@@ -51,3 +51,19 @@ export function addDays(iso: string, n: number): string {
   const dt = new Date(Date.UTC(y, m - 1, d + n))
   return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`
 }
+
+const toUtc = (iso: string) => {
+  const [y, m, d] = iso.split('-').map(Number)
+  return Date.UTC(y, m - 1, d)
+}
+
+/** Số ngày từ `a` đến `b` (b − a; âm nếu b trước a). */
+export function diffDays(a: string, b: string): number {
+  return Math.round((toUtc(b) - toUtc(a)) / 86400000)
+}
+
+/** Số ngày của tháng 'YYYY-MM'. */
+export function daysInMonth(ym: string): number {
+  const [y, m] = ym.split('-').map(Number)
+  return new Date(Date.UTC(y, m, 0)).getUTCDate()
+}

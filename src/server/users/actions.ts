@@ -5,7 +5,8 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/db/client'
 import { getAccessContext } from '@/server/session'
 import { assertCan } from '@/domain/access'
-import { runAction, UserError, type ActionResult } from '@/lib/action-result'
+import { toActionResult, type ActionResult } from '@/lib/action-result'
+import { ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/server/audit'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { userInput, userUpdateInput } from './schemas'
@@ -23,15 +24,15 @@ function fieldErrorsOf(error: import('zod').ZodError): Record<string, string> {
 
 export async function createUser(input: unknown): Promise<ActionResult<{ id: string; password: string }>> {
   const ctx = await getAccessContext()
-  return runAction(async () => {
+  return toActionResult(async () => {
     assertCan(ctx, 'settings')
     const parsed = userInput.safeParse(input)
-    if (!parsed.success) throw new UserError('Thông tin chưa hợp lệ', fieldErrorsOf(parsed.error))
+    if (!parsed.success) throw new ValidationError('Thông tin chưa hợp lệ', fieldErrorsOf(parsed.error))
     const password = tempPassword()
     const admin = supabaseAdmin()
     const { data, error } = await admin.auth.admin.createUser({ email: parsed.data.email, password, email_confirm: true })
     if (error || !data.user) {
-      throw new UserError(/already|registered/i.test(error?.message ?? '') ? 'Email đã được sử dụng' : 'Không tạo được tài khoản đăng nhập', { email: 'Email đã được sử dụng' })
+      throw new ValidationError(/already|registered/i.test(error?.message ?? '') ? 'Email đã được sử dụng' : 'Không tạo được tài khoản đăng nhập', { email: 'Email đã được sử dụng' })
     }
     try {
       await createUserProfile(db, ctx, data.user.id, parsed.data)
@@ -46,9 +47,9 @@ export async function createUser(input: unknown): Promise<ActionResult<{ id: str
 
 export async function updateUser(id: string, input: unknown): Promise<ActionResult> {
   const ctx = await getAccessContext()
-  return runAction(async () => {
+  return toActionResult(async () => {
     const parsed = userUpdateInput.safeParse(input)
-    if (!parsed.success) throw new UserError('Thông tin chưa hợp lệ', fieldErrorsOf(parsed.error))
+    if (!parsed.success) throw new ValidationError('Thông tin chưa hợp lệ', fieldErrorsOf(parsed.error))
     await saveUserAccess(db, ctx, id, parsed.data)
     revalidatePath('/users')
   })
@@ -56,11 +57,11 @@ export async function updateUser(id: string, input: unknown): Promise<ActionResu
 
 export async function setUserActive(id: string, active: boolean): Promise<ActionResult> {
   const ctx = await getAccessContext()
-  return runAction(async () => {
+  return toActionResult(async () => {
     assertCan(ctx, 'settings')
     const { listUsers } = await import('./queries')
     const user = (await listUsers(db, ctx)).find((u) => u.id === id)
-    if (!user) throw new UserError('Không tìm thấy người dùng')
+    if (!user) throw new ValidationError('Không tìm thấy người dùng')
     await saveUserAccess(db, ctx, id, { fullName: user.fullName, facilityIds: user.facilityIds, permissions: user.permissions, isActive: active })
     revalidatePath('/users')
   })
@@ -68,11 +69,11 @@ export async function setUserActive(id: string, active: boolean): Promise<Action
 
 export async function resetUserPassword(id: string): Promise<ActionResult<{ password: string }>> {
   const ctx = await getAccessContext()
-  return runAction(async () => {
+  return toActionResult(async () => {
     assertCan(ctx, 'settings')
     const password = tempPassword()
     const { error } = await supabaseAdmin().auth.admin.updateUserById(id, { password })
-    if (error) throw new UserError('Không đặt lại được mật khẩu')
+    if (error) throw new ValidationError('Không đặt lại được mật khẩu')
     await recordAudit(db, ctx, { action: 'update', entity: 'user_password', entityId: id })
     return { password }
   })

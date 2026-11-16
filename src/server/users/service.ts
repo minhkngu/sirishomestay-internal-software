@@ -2,7 +2,8 @@ import { eq } from 'drizzle-orm'
 import { userProfiles, userFacilities, userPermissions } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext, type Permission } from '@/domain/access'
-import { UserError } from '@/lib/action-result'
+import {  } from '@/lib/action-result'
+import { ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/server/audit'
 
 export type UserAccessInput = {
@@ -18,11 +19,11 @@ const SELF_LOCK = 'Không thể tự gỡ quyền quản trị của chính bạ
 export async function saveUserAccess(db: DB, ctx: AccessContext, userId: string, input: UserAccessInput): Promise<void> {
   assertCan(ctx, 'settings')
   if (userId === ctx.userId && (!input.permissions.includes('settings') || !input.isActive)) {
-    throw new UserError(SELF_LOCK)
+    throw new ValidationError(SELF_LOCK)
   }
   await db.transaction(async (tx) => {
     const [before] = await tx.select().from(userProfiles).where(eq(userProfiles.id, userId))
-    if (!before) throw new UserError('Không tìm thấy người dùng')
+    if (!before) throw new ValidationError('Không tìm thấy người dùng')
     const oldFacilities = await tx.select().from(userFacilities).where(eq(userFacilities.userId, userId))
     const oldPermissions = await tx.select().from(userPermissions).where(eq(userPermissions.userId, userId))
 

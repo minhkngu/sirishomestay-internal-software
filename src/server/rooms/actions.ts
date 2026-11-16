@@ -4,14 +4,15 @@ import { revalidatePath } from 'next/cache'
 import { ZodError } from 'zod'
 import { db } from '@/db/client'
 import { getAccessContext } from '@/server/session'
-import { runAction, UserError, type ActionResult } from '@/lib/action-result'
+import { toActionResult, type ActionResult } from '@/lib/action-result'
+import { ValidationError } from '@/domain/errors'
 import { fieldErrorsOf } from '@/lib/zod-errors'
 import { createRoom, createRoomsBulk, setRoomActive, updateRoom } from './service'
 
 async function guard<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
-  return runAction(async () => {
+  return toActionResult(async () => {
     try { return await fn() } catch (e) {
-      if (e instanceof ZodError) throw new UserError('Thông tin chưa hợp lệ', fieldErrorsOf(e))
+      if (e instanceof ZodError) throw new ValidationError('Thông tin chưa hợp lệ', fieldErrorsOf(e))
       throw e
     }
   })

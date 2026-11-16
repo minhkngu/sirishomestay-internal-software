@@ -2,7 +2,8 @@ import { eq, or, asc } from 'drizzle-orm'
 import { tenantDocuments, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, NotFoundError, type AccessContext } from '@/domain/access'
-import { UserError } from '@/lib/action-result'
+import {  } from '@/lib/action-result'
+import { ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/server/audit'
 import type { StorageAdapter } from '@/server/storage/types'
 
@@ -20,7 +21,7 @@ async function tenantFacility(db: Pick<DB, 'select'>, tenantId: string): Promise
 export async function requestTenantDocUpload(db: DB, ctx: AccessContext, storage: StorageAdapter, tenantId: string, contentType: string) {
   assertCan(ctx, 'tenants_contracts', await tenantFacility(db, tenantId))
   const ext = EXT[contentType]
-  if (!ext) throw new UserError('Chỉ nhận ảnh (WebP hoặc JPEG)')
+  if (!ext) throw new ValidationError('Chỉ nhận ảnh (WebP hoặc JPEG)')
   const id = crypto.randomUUID()
   const key = `tenants/${tenantId}/docs/${id}.${ext}`
   const thumbKey = `tenants/${tenantId}/docs/${id}_thumb.${ext}`
@@ -43,8 +44,8 @@ export async function confirmTenantDoc(
 ): Promise<TenantDocument> {
   const facilityId = await tenantFacility(db, tenantId)
   assertCan(ctx, 'tenants_contracts', facilityId)
-  if (!validKey(tenantId, input.key, false) || !validKey(tenantId, input.thumbKey, true)) throw new UserError('Khoá tệp không hợp lệ')
-  if (!EXT[input.contentType]) throw new UserError('Chỉ nhận ảnh (WebP hoặc JPEG)')
+  if (!validKey(tenantId, input.key, false) || !validKey(tenantId, input.thumbKey, true)) throw new ValidationError('Khoá tệp không hợp lệ')
+  if (!EXT[input.contentType]) throw new ValidationError('Chỉ nhận ảnh (WebP hoặc JPEG)')
   return db.transaction(async (tx) => {
     const [doc] = await tx.insert(tenantDocuments).values({
       tenantId, storageKey: input.key, thumbKey: input.thumbKey, contentType: input.contentType, label: input.label.trim(), uploadedBy: ctx.userId,

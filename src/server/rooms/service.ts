@@ -2,7 +2,8 @@ import { and, asc, eq, ilike, inArray } from 'drizzle-orm'
 import { rooms } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, facilityScope, NotFoundError, type AccessContext } from '@/domain/access'
-import { UserError } from '@/lib/action-result'
+import {  } from '@/lib/action-result'
+import { ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/server/audit'
 import { getFacility } from '../facilities/service'
 import { bulkInput, roomInput, roomUpdateInput, type BulkInput, type RoomInput } from './schemas'
@@ -45,7 +46,7 @@ export async function createRoom(db: DB, ctx: AccessContext, input: RoomInput): 
   await getFacility(db, ctx, data.facilityId)
   return db.transaction(async (tx) => {
     const [dup] = await tx.select({ id: rooms.id }).from(rooms).where(and(eq(rooms.facilityId, data.facilityId), eq(rooms.code, data.code)))
-    if (dup) throw new UserError(DUP, { code: DUP })
+    if (dup) throw new ValidationError(DUP, { code: DUP })
     const [r] = await tx.insert(rooms).values({ ...data, areaM2: data.areaM2?.toString() ?? null }).returning()
     await recordAudit(tx, ctx, { action: 'create', entity: 'room', entityId: r.id, facilityId: r.facilityId, after: r })
     return r
@@ -60,7 +61,7 @@ export async function updateRoom(db: DB, ctx: AccessContext, id: string, input: 
     if (!before) throw new NotFoundError()
     if (data.code && data.code !== before.code) {
       const [dup] = await tx.select({ id: rooms.id }).from(rooms).where(and(eq(rooms.facilityId, before.facilityId), eq(rooms.code, data.code)))
-      if (dup) throw new UserError(DUP, { code: DUP })
+      if (dup) throw new ValidationError(DUP, { code: DUP })
     }
     const { areaM2, ...rest } = data
     const [after] = await tx.update(rooms)
@@ -87,7 +88,7 @@ export async function setRoomActive(db: DB, ctx: AccessContext, id: string, isAc
 export async function createRoomsBulk(db: DB, ctx: AccessContext, facilityId: string, input: BulkInput): Promise<{ created: number; skipped: string[] }> {
   assertCan(ctx, 'settings')
   const data = bulkInput.parse(input)
-  if (data.from > data.to || data.to - data.from + 1 > MAX_BULK) throw new UserError('Dải phòng không hợp lệ')
+  if (data.from > data.to || data.to - data.from + 1 > MAX_BULK) throw new ValidationError('Dải phòng không hợp lệ')
   await getFacility(db, ctx, facilityId)
   return db.transaction(async (tx) => {
     const existing = new Set((await tx.select({ code: rooms.code }).from(rooms).where(eq(rooms.facilityId, facilityId))).map((r) => r.code))

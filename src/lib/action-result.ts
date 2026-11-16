@@ -1,16 +1,8 @@
-import { ForbiddenError, NotFoundError } from '@/domain/access'
+import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 
 export type ActionResult<T = void> =
   | { ok: true; data: T }
   | { ok: false; error: string; fieldErrors?: Record<string, string> }
-
-/** Lỗi nghiệp vụ có thông báo tiếng Việt hiển thị cho người dùng. */
-export class UserError extends Error {
-  constructor(message: string, public fieldErrors?: Record<string, string>) {
-    super(message)
-    this.name = 'UserError'
-  }
-}
 
 const UNIQUE_MESSAGES: Record<string, { message: string; field?: string }> = {
   tenants_phone_unique: { message: 'Số điện thoại đã thuộc về khách khác', field: 'phone' },
@@ -33,13 +25,13 @@ function uniqueViolation(e: unknown): { message: string; field?: string } | null
 }
 
 /** Chạy một thao tác và đổi lỗi đã biết thành ActionResult (lỗi lạ vẫn ném tiếp). */
-export async function runAction<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
+export async function toActionResult<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
   try {
     return { ok: true, data: await fn() }
   } catch (e) {
     if (e instanceof NotFoundError) return { ok: false, error: 'Không tìm thấy' }
     if (e instanceof ForbiddenError) return { ok: false, error: e.message }
-    if (e instanceof UserError) return { ok: false, error: e.message, fieldErrors: e.fieldErrors }
+    if (e instanceof ValidationError) return { ok: false, error: e.message, fieldErrors: e.fieldErrors }
     const dup = uniqueViolation(e)
     if (dup) return { ok: false, error: dup.message, fieldErrors: dup.field ? { [dup.field]: dup.message } : undefined }
     throw e

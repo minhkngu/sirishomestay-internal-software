@@ -2,7 +2,8 @@ import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm'
 import { tenants } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, facilityScope, NotFoundError, type AccessContext } from '@/domain/access'
-import { UserError } from '@/lib/action-result'
+import {  } from '@/lib/action-result'
+import { ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/server/audit'
 import { normalizePhone } from '@/domain/phone'
 import { buildSearchText, removeDiacritics } from '@/domain/text'
@@ -18,7 +19,7 @@ export function displayName(t: Pick<Tenant, 'kind' | 'fullName' | 'companyName'>
 
 export function parseTenantInput(input: unknown): TenantInput {
   const r = tenantInput.safeParse(input)
-  if (!r.success) throw new UserError('Thông tin chưa hợp lệ', fieldErrorsOf(r.error))
+  if (!r.success) throw new ValidationError('Thông tin chưa hợp lệ', fieldErrorsOf(r.error))
   return r.data
 }
 
@@ -90,7 +91,7 @@ export async function findDuplicateField(db: Pick<DB, 'select'>, row: Row, excep
 }
 
 function dupError(field: keyof typeof DUP_MESSAGES) {
-  return new UserError(DUP_MESSAGES[field], { [field]: DUP_MESSAGES[field] })
+  return new ValidationError(DUP_MESSAGES[field], { [field]: DUP_MESSAGES[field] })
 }
 
 export async function createTenant(db: DB, ctx: AccessContext, input: unknown): Promise<Tenant> {

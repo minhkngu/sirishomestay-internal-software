@@ -27,19 +27,9 @@ export const PERMISSION_DESCRIPTIONS: Record<Permission, string> = {
   settings: 'Người dùng, giá, loại phí, mẫu giấy tờ, nhập dữ liệu — thấy mọi cơ sở',
 }
 
-export class NotFoundError extends Error {
-  constructor(message = 'Không tìm thấy') {
-    super(message)
-    this.name = 'NotFoundError'
-  }
-}
+import { ForbiddenError, NotFoundError } from './errors'
 
-export class ForbiddenError extends Error {
-  constructor(message = 'Bạn không có quyền thực hiện thao tác này') {
-    super(message)
-    this.name = 'ForbiddenError'
-  }
-}
+export { ForbiddenError, NotFoundError }
 
 export type AccessContext = {
   userId: string

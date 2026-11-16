@@ -2,7 +2,8 @@ import { and, eq } from 'drizzle-orm'
 import { facilities, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
-import { UserError } from '@/lib/action-result'
+import {  } from '@/lib/action-result'
+import { ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/server/audit'
 import { findDuplicateField, toTenantRow } from '../tenants/service'
 import type { Tenant } from '../tenants/service'
@@ -115,10 +116,10 @@ export async function runImport(db: DB, ctx: AccessContext, target: ImportTarget
         }
       } else if (r.target === 'tenants' && target === 'tenants') {
         const fac = facByCode.get(r.facilityCode)
-        if (!fac) throw new UserError(`Dòng ${r.row}: Không tìm thấy cơ sở "${r.facilityCode}"`)
+        if (!fac) throw new ValidationError(`Dòng ${r.row}: Không tìm thấy cơ sở "${r.facilityCode}"`)
         const row = toTenantRow({ ...r.data, homeFacilityId: fac.id })
         const { existing, conflict } = await resolveTenant(tx, row)
-        if (conflict) throw new UserError(`Dòng ${r.row}: ${conflict.message}`, { [conflict.field]: conflict.message })
+        if (conflict) throw new ValidationError(`Dòng ${r.row}: ${conflict.message}`, { [conflict.field]: conflict.message })
 
         if (!existing) {
           const [t] = await tx.insert(tenants).values(row).returning()

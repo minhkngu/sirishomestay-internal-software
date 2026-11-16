@@ -2,7 +2,8 @@ import { z } from 'zod'
 import { appSettings } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
-import { UserError } from '@/lib/action-result'
+import {  } from '@/lib/action-result'
+import { ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/server/audit'
 
 export const SETTINGS_DEFAULTS = {
@@ -32,7 +33,7 @@ export async function updateSettings(db: DB, ctx: AccessContext, partial: Partia
   const parsed = settingsPatch.safeParse(partial)
   if (!parsed.success) {
     const key = String(parsed.error.issues[0].path[0] ?? '_')
-    throw new UserError(parsed.error.issues[0].message, { [key]: parsed.error.issues[0].message })
+    throw new ValidationError(parsed.error.issues[0].message, { [key]: parsed.error.issues[0].message })
   }
   return db.transaction(async (tx) => {
     const before = await getSettings(tx)
