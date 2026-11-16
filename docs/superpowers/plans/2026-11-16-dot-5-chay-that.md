@@ -96,27 +96,27 @@ tests/helpers/db.ts  tests/unit/**  tests/integration/**  tests/e2e/**
 
 **Interfaces:**
 - Produces:
-  - `purgeExpiredFiles(db, storage, today)`: xoá file có `delete_after ≤ today` khi hợp đồng không bật `keep_photos`, rồi ghi audit.
+  - `purgeExpiredFiles(db, storage, today)`: xoá file có `delete_after ≤ today` khi hợp đồng không bật `keep_photos`, rồi ghi audit. Với ảnh giấy tờ (`tenant_document`), kiểm lại ngay lúc xoá: khách còn hợp đồng `active` hoặc cọc `pending` → bỏ `delete_after`, không xoá.
   - Cột `leases.keep_photos bool default false`.
   - Route cron chạy mỗi ngày, có bảo vệ bằng `CRON_SECRET`.
   - `scripts/migrate-storage.ts`: chép file từ Supabase Storage sang R2 rồi đổi `STORAGE_DRIVER=r2`.
-- [ ] **Step 1:** Test: file có `delete_after` hôm qua bị xoá; hợp đồng `keep_photos` thì không xoá; biên bản đã xuất (`ownerType = 'export'`) không bao giờ bị xoá.
+- [ ] **Step 1:** Test: file có `delete_after` hôm qua bị xoá; hợp đồng `keep_photos` thì không xoá; biên bản đã xuất (`ownerType = 'export'`) không bao giờ bị xoá; ảnh passport của khách đã ký hợp đồng mới sau khi đặt `delete_after` → không xoá và `delete_after` về null.
 - [ ] **Step 2:** Chạy → FAIL. **Step 3:** Cài đặt. Tài liệu `r2.md` gồm cách tạo bucket, CORS, khoá truy cập. **Step 4:** Chạy → PASS.
 - [ ] **Step 5:** Commit `feat: R2, tự xoá ảnh sau thanh lý, nút giữ lại`.
 
-### Task 22: Sao lưu cơ sở dữ liệu ra Google Drive
+### Task 22: Sao lưu cơ sở dữ liệu ra Google Drive ✅ (commit `6b58172`; còn chạy thử khôi phục — Task 23 bước 7)
 
 **Files:**
 - Create: `.github/workflows/backup.yml`, `docs/operations/backup-restore.md`
 
-- [ ] **Step 1:** Workflow chạy `cron: '0 19 * * *'` (2h sáng giờ Việt Nam), kèm `workflow_dispatch`.
+- [x] **Step 1:** Workflow chạy `cron: '0 19 * * *'` (2h sáng giờ Việt Nam), kèm `workflow_dispatch`.
   - Cài `postgresql-client` major 17.
   - Chạy `pg_dump --format=custom --no-owner --no-privileges "$BACKUP_DATABASE_URL" -f siris-backup-$(TZ=Asia/Ho_Chi_Minh date +%F).dump`, có cả schema `auth` để giữ tài khoản đăng nhập.
   - Tải lên Drive bằng `rclone` (service account, `root_folder_id`), rồi chỉ giữ 30 file mới nhất.
   - Bước nào lỗi thì workflow fail (GitHub gửi email). Secrets: `BACKUP_DATABASE_URL`, `GDRIVE_SERVICE_ACCOUNT_JSON`, `GDRIVE_FOLDER_ID`.
-- [ ] **Step 2:** Viết `backup-restore.md` bằng tiếng Việt: tạo service account, chia sẻ thư mục Drive cho service account, thêm secrets, chạy tay, khôi phục bằng `pg_restore --clean --if-exists --no-owner`, và checklist chạy thử khôi phục trước khi dùng thật.
+- [x] **Step 2:** Viết `backup-restore.md` bằng tiếng Việt: tạo service account, chia sẻ thư mục Drive cho service account, thêm secrets, chạy tay, khôi phục bằng `pg_restore --clean --if-exists --no-owner`, và checklist chạy thử khôi phục trước khi dùng thật.
 - [ ] **Step 3:** Chạy `npx --yes action-validator .github/workflows/backup.yml` → không lỗi.
-- [ ] **Step 4:** Commit `ops: sao lưu cơ sở dữ liệu mỗi đêm ra Google Drive, giữ 30 bản`.
+- [x] **Step 4:** Commit `ops: sao lưu cơ sở dữ liệu mỗi đêm ra Google Drive, giữ 30 bản`.
 
 ### Task 23: Chuyển sang chạy thật
 

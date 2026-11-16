@@ -126,12 +126,22 @@ tests/helpers/db.ts  tests/unit/**  tests/integration/**  tests/e2e/**
   - `IMPORT_TARGETS` cho `rooms`, `tenants`, `leases`, `deposits` (số dư cọc), `debts` (công nợ đầu kỳ thành hoá đơn `manual` "Công nợ chuyển từ hệ thống cũ"), `meter_readings`, `assets`. Mỗi trường có `aliases` không dấu.
   - `suggestMapping(headers, target)`.
   - `validateRows(target, rows, mapping)`: dùng lại zod schema của các module, không viết lại luật.
-  - `runImport(db, ctx, target, rows) → { created; updated }`: một transaction; upsert theo khoá tự nhiên — phòng: mã cơ sở + mã phòng; khách: passport → CCCD → mã số thuế → SĐT; hợp đồng: mã phòng + ngày bắt đầu. Ghi audit `import`. Chỉ người có quyền `settings`.
+  - Thêm cột `leases.legacy_code text null unique` (mã hợp đồng ở phần mềm cũ; hiện trên trang hợp đồng).
+  - `runImport(db, ctx, target, rows) → { created; updated }`: một transaction; upsert theo khoá tự nhiên:
+    - phòng: mã cơ sở + mã phòng (cơ sở phải có sẵn, không thì lỗi dòng "Chưa có cơ sở mã X");
+    - khách: passport → CCCD → mã số thuế → SĐT;
+    - hợp đồng: `legacy_code` (mã hợp đồng cũ, spec 8) nếu cột có giá trị, không thì mã phòng + ngày bắt đầu;
+    - số dư cọc: một dòng `deposit_entries` `collect` `done` cho mỗi hợp đồng với `note = 'Số dư chuyển từ hệ thống cũ'`, nhập lại thì sửa số tiền của chính dòng đó;
+    - công nợ đầu kỳ: một hoá đơn `manual` mỗi hợp đồng với `invoices.source = 'import:debt'`, nhập lại thì sửa dòng của hoá đơn đó (nếu đã có khoản thu → lỗi dòng "Công nợ đã có khoản thu, sửa tay trên hoá đơn");
+    - chỉ số: `(meter, period)` (đã unique); tài sản: mã tài sản.
+  - Ghi audit `import`. Chỉ người có quyền `settings`.
 - [ ] **Step 1:** Test:
   - `suggestMapping(['Số điện thoại','Họ tên','Hết hạn visa'])` → `phone, fullName, visaExpiry`.
   - `05/03/2027` và số Excel 46451 đều thành `2027-03-05`.
   - Dòng thiếu passport → `{ row: 3, field: 'passportNumber' }`.
   - Chạy cùng file 2 lần → lần 2 `created 0`; sửa SĐT trong file rồi chạy lại → `updated 1`.
+  - Nhập file công nợ 2 lần → mỗi hợp đồng vẫn chỉ có 1 hoá đơn `import:debt`; nhập file số dư cọc 2 lần → `depositBalance` không đổi.
+  - Hai dòng hợp đồng cùng `legacy_code` khác ngày bắt đầu → lần 2 là `updated`, không tạo hợp đồng thứ hai.
 - [ ] **Step 2:** Chạy → FAIL.
 - [ ] **Step 3:** Cài đặt UI 3 bước:
   1. Chọn loại dữ liệu, file và sheet.

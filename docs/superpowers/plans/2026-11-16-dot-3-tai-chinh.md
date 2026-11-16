@@ -134,6 +134,49 @@ expect(computeDueDate({kind:'day_of_next_month',day:31},'2027-01-20')).toBe('202
 - [x] **Step 2:** Chạy → FAIL. **Step 3:** Cài đặt. **Step 4:** Chạy → PASS.
 - [x] **Step 5:** Commit `feat(domain): lõi tính tiền — lẻ ngày, điện nước, điều chỉnh, sổ cọc, thanh lý`.
 
+### Task 4b: Bổ sung lõi tính tiền (sau rà soát spec 16/11)
+
+Task 4 chưa xử lý: thay đổi điều khoản *bên trong* kỳ của hoá đơn chưa duyệt (spec 6.3 "hoá đơn kỳ đó tách theo ngày ở mỗi phòng"), đổi số người ở giữa kỳ (spec 6.5), nước tính theo người thay cho đồng hồ (spec 6.6), và trạng thái của hoá đơn âm (hoàn khách).
+
+**Files:**
+- Modify: `src/domain/types.ts`, `src/domain/contract-terms.ts`, `src/domain/invoice-builder.ts`, `src/domain/adjustments.ts`
+- Test: `tests/unit/domain/billing.test.ts` (thêm ca)
+
+**Interfaces:**
+- Consumes: `contractTermsAt`, `prorate`, `meterUsage`, `rateFor` (Task 4).
+- Produces:
+  - `Addendum.type` thêm `'occupants'` (đổi người ở; chỉ dùng `newOccupantIds`).
+  - `Lease` và `LeaseTerms` thêm `billingCycleMonths: number` (1–12, mặc định 1) và `billWaterByMeter: boolean` (mặc định true).
+  - `termSegments(lease, addenda, from, to): { from: ISODate; to: ISODate; terms: LeaseTerms }[]` trong `contract-terms.ts` — cắt khoảng `from..to` tại mỗi `effectiveDate` của phụ lục rơi vào trong khoảng.
+  - `MonthlyInvoiceInput`: thay `terms` + `occupantsCount` bằng `lease: Lease` + `addenda: Addendum[]`; `meters` gồm đồng hồ của **mọi phòng** hợp đồng đã ở trong tháng N−1. Tiền phòng và phí cố định tính theo từng đoạn của `termSegments` (mỗi đoạn một dòng, mô tả ghi phòng và khoảng ngày); điện nước N−1 cộng `meterUsage` của từng phòng trong đoạn ở phòng đó; `billWaterByMeter = false` → không có dòng nước đồng hồ.
+  - `nextBillingPeriod(lease, lastBilledEnd: ISODate | null, period: 'YYYY-MM'): { start; end } | null` trong `invoice-builder.ts` — kỳ kế tiếp dài `billingCycleMonths` tháng bắt đầu từ `lastBilledEnd + 1` (hoặc `startDate`); trả `null` nếu kỳ đó bắt đầu sau cuối tháng `period` (khách đã trả trước, hoặc đã có hoá đơn kỳ đó); `end` không vượt `endDate` của hợp đồng.
+  - `midPeriodAdjustments` tính cả chênh lệch phí `quantityFrom: 'occupants'` khi phụ lục `occupants` có hiệu lực trong kỳ đã duyệt.
+  - `invoiceStatus` (Task 14) dùng `settlementState(total, paid): 'unpaid'|'partial'|'paid'|'refund_pending'|'refunded'` trong `invoice-builder.ts`: `total < 0` → khoản thu âm (tiền đã hoàn) so với `total`.
+
+- [ ] **Step 1: Viết test (days_30)**
+
+```ts
+// chuyển phòng 15/11 từ phòng 9tr sang 11tr, hoá đơn tháng 11 CHƯA tạo
+//   → 2 dòng tiền phòng: 9.000.000 × 14/30 = 4.200.000 và 11.000.000 × 16/30 = 5.866.667
+// hoá đơn tháng 12 sau chuyển phòng: phòng cũ tiêu thụ 60 kWh tới 15/11 + phòng mới 40 kWh → điện 100 kWh
+// phí 200.000/người, 2 → 3 người từ 16/11, hoá đơn tháng 11 đã duyệt → điều chỉnh +100.000
+// billWaterByMeter = false → không có dòng 'water'
+const q = { ...lease, billingCycleMonths: 3, startDate: '2026-10-01' }
+expect(nextBillingPeriod(q, null, '2026-10')).toEqual({ start: '2026-10-01', end: '2026-12-31' })
+expect(nextBillingPeriod(q, '2026-12-31', '2026-11')).toBeNull()          // đã trả tới hết tháng 12
+expect(nextBillingPeriod(q, '2026-12-31', '2027-01')).toEqual({ start: '2027-01-01', end: '2027-03-31' })
+expect(nextBillingPeriod({ ...q, billingCycleMonths: 1 }, '2027-02-28', '2027-01')).toBeNull() // sửa tay kỳ tới 28/02
+expect(nextBillingPeriod({ ...q, billingCycleMonths: 1 }, '2026-11-30', '2026-11')).toBeNull() // đã có hoá đơn tháng 11
+expect(nextBillingPeriod({ ...q, endDate: '2027-02-15' }, '2026-12-31', '2027-01')).toEqual({ start: '2027-01-01', end: '2027-02-15' }) // không vượt ngày kết thúc HĐ
+expect(settlementState(-11_080_000, 0)).toBe('refund_pending')
+expect(settlementState(-11_080_000, -11_080_000)).toBe('refunded')
+```
+
+- [ ] **Step 2:** Chạy `npx vitest run tests/unit/domain/billing.test.ts` → FAIL.
+- [ ] **Step 3:** Cài đặt. Các test cũ của Task 4 phải vẫn đúng (chỉ đổi cách truyền đầu vào).
+- [ ] **Step 4:** Chạy → PASS toàn bộ `billing.test.ts`.
+- [ ] **Step 5:** Commit `feat(domain): tách kỳ theo phụ lục, đổi người ở, kỳ thanh toán nhiều tháng, hoá đơn hoàn khách`.
+
 ### Task 13: Phí phát sinh theo lần
 
 **Files:**
@@ -142,8 +185,8 @@ expect(computeDueDate({kind:'day_of_next_month',day:31},'2027-01-20')).toBe('202
 
 **Interfaces:**
 - Bảng: `one_off_charges(lease_id, fee_type_id null, kind 'service'|'penalty', description, date, quantity, unit_price, invoice_id null, source text null)`, `pending_adjustments(lease_id, description, amount, source_key unique, invoice_id null)`.
-- Produces: `addOneOff`, `listOneOffs`, `removeOneOff` (không xoá được nếu đã vào hoá đơn đã duyệt); `listDepositEntries(leaseId)`, `markDepositDone(entryId, { date, method })`, `addDepositEntry`.
-- [ ] **Step 1:** Test: thêm "Giặt ủi 3kg × 25.000" → ở trạng thái chưa tính; đánh dấu khoản cọc bổ sung đã thu → `depositBalance` tăng 1.000.000.
+- Produces: `addOneOff`, `listOneOffs`, `removeOneOff` (không xoá được nếu đã vào hoá đơn đã duyệt); `listDepositEntries(leaseId)`, `markDepositDone(entryId, { date, method })`, `addDepositEntry`. Tất cả có dạng `(db, ctx, …)` và cần quyền `billing` tại cơ sở của hợp đồng.
+- [ ] **Step 1:** Test: thêm "Giặt ủi 3kg × 25.000" → ở trạng thái chưa tính; đánh dấu khoản cọc bổ sung đã thu → `depositBalance` tăng 1.000.000; người chỉ có `meters` gọi `addOneOff` → `ForbiddenError`.
 - [ ] **Step 2:** Chạy → FAIL.
 - [ ] **Step 3:** Cài đặt UI: nút "Thêm phí phát sinh" ở trang hợp đồng và trang phòng; sổ cọc dạng bảng (ngày, loại, số tiền, trạng thái, số dư luỹ kế).
 - [ ] **Step 4:** Chạy → PASS.
@@ -158,25 +201,29 @@ expect(computeDueDate({kind:'day_of_next_month',day:31},'2027-01-20')).toBe('202
 
 **Interfaces:**
 - Bảng:
-  - `invoices(code unique, lease_id, facility_id, kind 'monthly'|'first'|'termination'|'manual', period_start, period_end, coefficient numeric null, full_month bool, issue_date, due_date, status 'draft'|'approved', note)`
+  - `invoices(code unique, lease_id, facility_id, kind 'monthly'|'first'|'termination'|'manual', period_start, period_end, coefficient numeric null, full_month bool, proration 'days_30'|'actual_days' null, issue_date, due_date, status 'draft'|'approved', source text null, note)` — `proration` ghi đè cách tính lẻ ngày cho riêng hoá đơn này (spec 6.5); thứ tự ưu tiên: hoá đơn > hợp đồng > cài đặt. `source` dùng cho nhập Excel (Task 18).
+  - Thêm cột vào `leases` (migration của task này): `billing_cycle_months int not null default 1` (check 1–12) — "kỳ thanh toán mặc định" của spec 6.3; `bill_water_by_meter bool not null default true`. Wizard hợp đồng (Task 9) bước 4 thêm hai ô này.
   - `invoice_lines(invoice_id, type 'rent'|'fee'|'electric'|'water'|'one_off'|'penalty'|'adjustment'|'deposit'|'deposit_offset'|'refund', description, quantity numeric, unit_price, amount, meta jsonb)`
   - `payments(invoice_id, paid_on, amount, method 'cash'|'transfer'|'other', received_by, note)`
   - Mã hoá đơn *(Claude quyết)*: `<mã cơ sở>-HD-<YYYYMM>-<số thứ tự 4 chữ số>`.
 - Produces:
   - `previewBatch(db, ctx, { facilityId, period })` → mỗi hợp đồng: `{ leaseId, lines, warnings }` (cảnh báo khi chưa ghi điện nước hoặc chưa có đơn giá).
-  - `createDrafts(...)`: bỏ qua hợp đồng đã có hoá đơn kỳ đó; đánh dấu các phí phát sinh và điều chỉnh đã dùng.
+  - `createDrafts(...)`: kỳ của mỗi hợp đồng lấy từ `nextBillingPeriod(lease, max(period_end) các hoá đơn của hợp đồng, period)`; `null` (đã trả trước tới sau tháng này, hoặc đã có hoá đơn kỳ đó) → bỏ qua và ghi vào danh sách "Đã trả trước tới dd/mm/yyyy" ở bước xem trước. Đánh dấu các phí phát sinh và điều chỉnh đã dùng.
   - `updateLines`: nháp hay đã duyệt đều sửa được; sửa hoá đơn đã duyệt thì ghi audit kèm trước/sau.
-  - `setPeriod(id, { start, end, coefficient?, fullMonth? })`: tính lại dòng tiền phòng và phí cố định.
+  - `setPeriod(id, { start, end, coefficient?, fullMonth?, proration? })`: tính lại dòng tiền phòng và phí cố định.
   - `approveInvoice(id, { dueRule? , dueDate? })`: thứ tự ưu tiên hạn thanh toán là hoá đơn > hợp đồng > cài đặt.
   - `deleteInvoice(id)`: nếu đã có khoản thu → `ValidationError('Gỡ các khoản đã thu trước khi xoá')`; xoá xong thì trả phí phát sinh và điều chỉnh về trạng thái chưa tính.
-  - `addPayment`, `removePayment`, `invoiceStatus(invoice, payments, today)` → Nháp / Chưa thu / Thu một phần / Đã thu đủ / Quá hạn.
-  - `listInvoices(db, ctx, { facilityId?, status?, period?, overdue? })`, `tenantBalance(tenantId)`.
+  - `addPayment`, `removePayment`, `invoiceStatus(invoice, payments, today)` → Nháp / Chưa thu / Thu một phần / Đã thu đủ / Quá hạn / Chờ hoàn khách / Đã hoàn (hai trạng thái sau cho hoá đơn tổng âm, dựa trên `settlementState` của Task 4b). Hoá đơn tổng âm: `addPayment` nhận số âm (tiền đã hoàn cho khách); hoá đơn dương thì số âm bị từ chối.
+  - `exportReceipt(db, ctx, paymentId, templateId?) → fileId`: xuất phiếu thu (`doc_type = 'receipt'`) từ một khoản thu; nút "Xuất phiếu thu" trong danh sách khoản thu của hoá đơn.
+  - `listInvoices(db, ctx, { facilityId?, status?, period?, overdue? })`, `tenantBalance(db, ctx, tenantId)`.
   - Mỗi khi duyệt hoá đơn hoặc tạo phụ lục: tính `midPeriodAdjustments` rồi upsert vào `pending_adjustments` theo `source_key`.
   - Cần quyền `billing`.
 - [ ] **Step 1:** Viết test.
   - Tạo nháp tháng 12 → dòng tiền phòng tháng 12, điện nước tháng 11, phí phát sinh.
   - Tạo nháp lần nữa → không trùng hoá đơn, không lặp điều chỉnh.
-  - Sửa kỳ 01/12–28/02 → hệ số 3.
+  - Sửa kỳ 01/12–28/02 → hệ số 3; tạo hàng loạt tháng 01 và tháng 02 → hợp đồng đó bị bỏ qua, hiện "Đã trả trước tới 28/02/2027".
+  - Hợp đồng `billing_cycle_months = 3` bắt đầu 01/10 → nháp tháng 10 có kỳ 01/10–31/12, tháng 11 và 12 không sinh hoá đơn.
+  - Hoá đơn có `proration = 'days_30'` trong khi cài đặt là `actual_days` → dòng tiền phòng lẻ ngày tính theo 30.
   - Duyệt với "ngày 5 của tháng sau" → hạn 05/01.
   - Thu một phần → "Thu một phần"; xoá → lỗi; quá hạn → "Quá hạn".
   - Người chỉ có quyền `meters` → `ForbiddenError`.
@@ -196,21 +243,28 @@ expect(computeDueDate({kind:'day_of_next_month',day:31},'2027-01-20')).toBe('202
 - Test: `tests/integration/addenda.test.ts`
 
 **Interfaces:**
-- Bảng: `addenda(lease_id, type 'extension'|'transfer'|'termination', effective_date, new_end_date, new_room_id, new_monthly_rent, new_deposit_amount, new_fees jsonb, new_occupant_ids jsonb, deposit_forfeit jsonb, sign_status, signed_file_id)`.
+- Bảng: `addenda(lease_id, type 'extension'|'transfer'|'termination'|'occupants', effective_date, new_end_date, new_room_id, new_monthly_rent, new_deposit_amount, new_fees jsonb, new_occupant_ids jsonb, deposit_forfeit jsonb, adjustment_target 'next'|'current', sign_status, signed_file_id)`.
+- Quyền: tạo phụ lục cần `tenants_contracts`; bước "Xem trước tiền" hiện số tiền cho người đó; duyệt hoá đơn thanh lý cần `billing` (Task 14).
 - Produces:
+  - Mọi phụ lục có hiệu lực bên trong kỳ của hoá đơn đã duyệt cho chọn `adjustmentTarget` (spec 6.5): `'next'` (mặc định) → upsert `pending_adjustments`; `'current'` → thêm dòng `adjustment` thẳng vào hoá đơn đã duyệt đó, ghi audit kèm trước/sau, không tạo `pending_adjustments`.
+  - `createOccupantChange(db, ctx, leaseId, { effectiveDate, occupantIds, adjustmentTarget? })`: người ở phải là khách cá nhân (không phải công ty); cập nhật `lease_occupants` từ ngày hiệu lực và tính điều chỉnh cho phí theo người. Nút "Đổi người ở" ở tab Tổng quan của hợp đồng.
   - `createExtension(leaseId, { effectiveDate, newEndDate, newMonthlyRent?, newDepositAmount?, newFees? })`: nếu tiền cọc thay đổi thì sinh `deposit_entries` ở trạng thái pending (`depositDiffEntry`), và tính điều chỉnh giữa kỳ.
   - `createTransfer(leaseId, { effectiveDate, newRoomId, newMonthlyRent?, newFees? })`
     - Phòng đích phải trống, hoặc chỉ có cọc chờ của chính khách này.
     - Tự tạo check-out phòng cũ, check-in phòng mới, chốt chỉ số điện nước, và tính điều chỉnh.
   - `createTermination(leaseId, { endDate, forfeit })`
     - Tạo check-out rồi dựng hoá đơn thanh lý nháp bằng `buildTerminationInvoice` (lấy phạt từ check-out và nợ cũ).
-    - Khi hoá đơn thanh lý được duyệt: lease chuyển `ended`, ghi sổ cọc (deduct, forfeit, refund pending), đặt `files.delete_after = endDate + photoRetentionDays` cho ảnh bàn giao và ảnh giấy tờ của khách.
+    - Khi hoá đơn thanh lý được duyệt: lease chuyển `ended`; ghi sổ cọc `forfeit` (phần mất cọc) và `deduct` (phần cọc còn lại, đã trừ vào hoá đơn) ở trạng thái `done` để số dư cọc về 0; tiền hoàn cho khách theo dõi trên chính hoá đơn thanh lý (Chờ hoàn khách → Đã hoàn, Task 14), không ghi thêm dòng `refund` để khỏi trừ hai lần.
+    - Đặt `files.delete_after = endDate + photoRetentionDays` cho ảnh bàn giao của hợp đồng; ảnh giấy tờ của bên thuê và người ở chỉ đặt khi khách đó **không còn** hợp đồng thuê `active` hay cọc `pending` nào khác.
   - Phụ lục có trạng thái ký và xuất Word như hợp đồng.
 - [ ] **Step 1:** Viết test (cài đặt days_30).
   - Gia hạn tăng giá 9tr→10tr và cọc 9tr→10tr → sổ cọc có topup 1.000.000 pending.
-  - Chuyển phòng 15/11 sang phòng 11tr, sau khi hoá đơn tháng 11 đã duyệt → `pending_adjustments` có +1.066.667.
+  - Chuyển phòng 15/11 sang phòng 11tr, sau khi hoá đơn tháng 11 đã duyệt → `pending_adjustments` có +1.066.667; cùng ca với `adjustmentTarget: 'current'` → hoá đơn tháng 11 có thêm dòng +1.066.667, không có `pending_adjustments`.
+  - Đổi người ở 2 → 3 từ 16/11 (phí 200.000/người), hoá đơn tháng 11 đã duyệt → `pending_adjustments` có +100.000; thêm khách công ty làm người ở → `ValidationError`.
   - Thanh lý 20/11 với phạt 500.000, không mất cọc → hoá đơn tổng −11.080.000; mất cọc toàn bộ → −2.080.000.
-  - Sau khi duyệt hoá đơn thanh lý → phòng về Trống, hoặc Đã cọc nếu có cọc chờ.
+  - Sau khi duyệt hoá đơn thanh lý → phòng về Trống, hoặc Đã cọc nếu có cọc chờ; số dư cọc = 0; hoá đơn ở "Chờ hoàn khách".
+  - Khách có ảnh passport còn một hợp đồng khác đang hiệu lực → ảnh giấy tờ không bị đặt `delete_after`.
+  - Người chỉ có `billing` tạo phụ lục → `ForbiddenError`.
 - [ ] **Step 2:** Chạy → FAIL.
 - [ ] **Step 3:** Cài đặt UI: mỗi phụ lục là một wizard ngắn, có bước "Xem trước tiền" trước khi lưu.
 - [ ] **Step 4:** Chạy → PASS.
