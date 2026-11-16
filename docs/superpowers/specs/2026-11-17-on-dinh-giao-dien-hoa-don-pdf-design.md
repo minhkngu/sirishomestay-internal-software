@@ -15,7 +15,7 @@ Mục tiêu là app chạy ổn định, tải nhanh, hoá đơn ra PDF ngay (kh
 
 ## Thứ tự làm
 
-Các phần dưới đây độc lập với nhau và làm lần lượt: **sập → chậm → hoá đơn PDF → giá phí theo toà → giao diện (kèm lọc theo toà)**. Hai phần đầu có thể chung nguyên nhân (DB, layout). Phần giao diện để cuối, khi các trang đã ổn định.
+Các phần dưới đây độc lập với nhau và làm lần lượt: **sập → hoá đơn PDF → giá phí theo toà → giao diện (kèm lọc theo toà) → tăng tốc (làm sau cùng, khi mọi phần khác đã xong)**. Riêng việc bỏ ô chọn cơ sở ở thanh trên được làm trong phần giao diện. Hai phần đầu có thể chung nguyên nhân (DB, layout). Phần giao diện để cuối, khi các trang đã ổn định.
 
 ## Mục tiêu / không làm / thất bại nếu
 
@@ -105,6 +105,7 @@ Theo mockup đã duyệt, phong cách Bạc hà:
 - Theo chuẩn **VietQR** (EMVCo, NAPAS 247). Chuỗi dữ liệu do app tự dựng bằng một hàm thuần trong `src/domain/vietqr.ts`, có unit test, kể cả kiểm tra CRC16-CCITT. Không gọi dịch vụ ngoài.
 - **Số tiền** trong QR là số còn phải trả (tổng − đã thu). **Nội dung** là mã hoá đơn.
 - Khi đã trả đủ: không có QR, thay bằng dòng "Đã thanh toán".
+- Hoá đơn thanh lý hiện đầy đủ theo mẫu như hoá đơn tháng, kể cả thông tin tài khoản. Nếu tổng âm (phải hoàn tiền cho khách), chỗ QR thay bằng "Số tiền hoàn cho khách: X ₫".
 - Khi chưa cấu hình tài khoản ngân hàng: PDF vẫn xuất, không có khối QR.
 
 ### Tài khoản nhận tiền

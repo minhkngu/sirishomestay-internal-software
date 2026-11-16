@@ -36,11 +36,11 @@
 
 ## Điểm cần soi kỹ
 
-1. **Hoá đơn thanh lý có tổng âm** (phải hoàn tiền cho khách): không có QR. Thay bằng dòng "Số tiền hoàn cho khách: X ₫". → test ở Task 8.
-2. **Trả một phần:** số tiền trong QR là số còn lại, không phải tổng. Trả đủ thì thay QR bằng "Đã thanh toán". → test ở Task 8.
-3. **Tên khách hoặc địa chỉ có dấu, tên Nhật/Hàn** trong PDF: dấu tiếng Việt phải giữ nguyên, ký tự ngoài bảng font không được làm sập việc xuất. → test ở Task 8.
-4. **`?toa=` chứa id toà người dùng không có quyền, hoặc id sai định dạng:** bỏ qua id đó, không báo lỗi, không lộ dữ liệu. → test ở Task 14.
-5. **Chưa nhập tài khoản ngân hàng, hoặc toà có tài khoản riêng:** PDF vẫn xuất. Tài khoản riêng của toà được dùng thay tài khoản chung. → test ở Task 6 và Task 8.
+1. **Hoá đơn thanh lý** hiện đầy đủ như mẫu hoá đơn tháng: đầu trang, thông tin khách, mọi khoản (kể cả khoản trừ cọc), tổng, số tiền bằng chữ, khối thanh toán có thông tin tài khoản. Khách còn phải trả thì có QR như thường. Tổng âm (phải hoàn tiền cho khách) thì khối thanh toán vẫn hiện, chỉ thay chỗ QR bằng dòng "Số tiền hoàn cho khách: X ₫". → test ở Task 5.
+2. **Trả một phần:** số tiền trong QR là số còn lại, không phải tổng. Trả đủ thì thay QR bằng "Đã thanh toán". → test ở Task 5.
+3. **Tên khách hoặc địa chỉ có dấu, tên Nhật/Hàn** trong PDF: dấu tiếng Việt phải giữ nguyên, ký tự ngoài bảng font không được làm sập việc xuất. → test ở Task 5.
+4. **`?toa=` chứa id toà người dùng không có quyền, hoặc id sai định dạng:** bỏ qua id đó, không báo lỗi, không lộ dữ liệu. → test ở Task 11.
+5. **Chưa nhập tài khoản ngân hàng, hoặc toà có tài khoản riêng:** PDF vẫn xuất. Tài khoản riêng của toà được dùng thay tài khoản chung. → test ở Task 3 và Task 5.
 
 ---
 
@@ -123,97 +123,9 @@ Mỗi lỗi làm ba bước: viết test tái hiện (FAIL) → sửa → test P
 
 ---
 
-## Giai đoạn 2 — Tải nhanh hơn
+## Giai đoạn 2 — Hoá đơn PDF có QR
 
-### Task 3: Đo thời gian tải từng trang
-
-**Files:**
-- Create: `tests/e2e/perf.spec.ts`, `docs/operations/toc-do.md`
-
-- [ ] **Step 1: Viết `perf.spec.ts`**
-
-Với mỗi `href` trong `NAV_ITEMS`:
-- Mở trang 3 lần.
-- Lấy `responseStart − requestStart` (TTFB) và `loadEventEnd` qua `performance.getEntriesByType('navigation')`.
-- Ghi bảng ra console bằng `console.table`.
-
-Không assert; spec này chỉ để đo.
-
-- [ ] **Step 2: Chạy trên bản production ở máy và trên bản preview Vercel. Ghi bảng "trước" vào `docs/operations/toc-do.md`.**
-
-- [ ] **Step 3: Commit** — `docs: đo tốc độ trang trước khi tối ưu`
-
-### Task 4: Bỏ truy vấn thừa ở layout, sửa N+1 ở trang tài sản và trang tạo hợp đồng
-
-**Files:**
-- Modify: `src/app/(app)/layout.tsx`, `src/components/app-shell/app-shell.tsx`
-- Delete: `src/components/app-shell/facility-switcher.tsx` (ô chọn này chỉ lưu state, không lọc gì)
-- Modify: `src/app/(app)/assets/page.tsx:18-19`, `src/app/(app)/contracts/new/page.tsx` (đang gọi `listRoomsWithStatus` cho từng toà)
-- Modify: `src/server/rooms/service.ts`
-- Test: `tests/integration/facilities-rooms.test.ts`
-
-**Interfaces:**
-- Produces:
-  - `listRooms(db, ctx, opts: { facilityId?: string })`: không có `facilityId` thì trả mọi phòng trong phạm vi quyền, kèm `facilityId`.
-  - `listRoomsWithStatus(db, ctx, opts: { facilityId?: string })`: tương tự.
-  - Nếu chữ ký hiện tại bắt buộc `facilityId`, đổi thành tuỳ chọn.
-
-- [ ] **Step 1: Viết test**
-
-`it('listRooms không truyền toà → trả phòng của mọi toà người dùng có quyền, không trả toà khác')`:
-- Tạo 3 toà A, B, C.
-- Người dùng chỉ có `facilityIds = {A, B}`.
-- Kỳ vọng các mã phòng trả về đúng bằng phòng của A và B.
-
-Viết test tương tự cho `listRoomsWithStatus`.
-
-- [ ] **Step 2: Chạy `npx vitest run tests/integration/facilities-rooms.test.ts`, xác nhận FAIL.**
-
-- [ ] **Step 3: Sửa service theo test**
-
-Mỗi hàm chỉ chạy một truy vấn, lọc theo `inArray(rooms.facilityId, scope)`. Admin thì không lọc.
-
-- [ ] **Step 4: Cập nhật hai trang và khung app**
-
-- Hai trang gọi service một lần rồi gom phòng theo `facilityId` ở phía trang.
-- Layout bỏ `listFacilities`.
-- `AppShell` bỏ prop `facilities` và `FacilitySwitcher`.
-
-- [ ] **Step 5: Chạy `npm test && npm run lint && npm run build`, xác nhận PASS.**
-
-- [ ] **Step 6: Commit** — `perf: gộp truy vấn phòng, bỏ ô chọn cơ sở không dùng`
-
-### Task 5: Sửa các trang chậm nhất theo số đo, thêm khung chờ
-
-**Files:**
-- Create: `src/components/page-skeleton.tsx`, và `loading.tsx` trong các thư mục `tenants`, `contracts`, `invoices`, `meters`, `assets`, `incidents`, `facilities`, `invoices/[id]`, `contracts/[id]`
-- Modify: các service mà bảng đo ở Task 3 chỉ ra là chậm nhất (tối đa 3 trang)
-- Test: test integration của service đã sửa
-
-**Interfaces:**
-- Produces: `PageSkeleton({ rows?: number }): JSX.Element`. Gồm thanh tiêu đề, hàng chip và `rows` dòng bảng (mặc định 8), dùng `Skeleton` của shadcn.
-
-- [ ] **Step 1: Với mỗi trang chậm, viết test khoá hành vi hiện có trước khi sửa**
-
-Test phải trả về đúng dữ liệu như cũ, kể cả khi đổi sang truy vấn song song hoặc gộp truy vấn.
-
-- [ ] **Step 2: Sửa:**
-  - Gom truy vấn độc lập vào `Promise.all`.
-  - Bỏ N+1.
-  - Thêm index nếu `EXPLAIN` cho thấy đang quét toàn bảng (sửa schema rồi `npm run db:generate`).
-  - Đặt `DATABASE_POOL_MAX` mặc định theo pooler của Supabase và ghi lý do vào `docs/operations/toc-do.md`.
-
-- [ ] **Step 3: Thêm các `loading.tsx` render `<PageSkeleton />`.**
-
-- [ ] **Step 4: Chạy `npm test && npm run lint && npm run build`, xác nhận PASS.** Đo lại bằng `perf.spec.ts` và ghi bảng "sau" cạnh bảng "trước".
-
-- [ ] **Step 5: Commit** — `perf: tăng tốc các trang chậm, thêm khung chờ`
-
----
-
-## Giai đoạn 3 — Hoá đơn PDF có QR
-
-### Task 6: VietQR, danh sách ngân hàng, chọn tài khoản nhận tiền (domain)
+### Task 3: VietQR, danh sách ngân hàng, chọn tài khoản nhận tiền (domain)
 
 **Files:**
 - Create: `src/domain/vietqr.ts`, `src/domain/banks.ts`
@@ -267,7 +179,7 @@ Thứ tự trường TLV: `00`=`01`, `01`=`12`, `38`=[`00` `A000000727`, `01`=[`
 
 - [ ] **Step 5: Commit** — `feat: dựng mã VietQR và danh sách ngân hàng`
 
-### Task 7: Lưu tài khoản nhận tiền chung và riêng theo toà, kèm giao diện nhập
+### Task 4: Lưu tài khoản nhận tiền chung và riêng theo toà, kèm giao diện nhập
 
 **Files:**
 - Modify: `src/db/schema/facilities.ts`: thêm `bankAccount: jsonb('bank_account').$type<BankAccount | null>()`, cho phép null
@@ -278,7 +190,7 @@ Thứ tự trường TLV: `00`=`01`, `01`=`12`, `38`=[`00` `A000000727`, `01`=[`
 - Test: `tests/integration/settings.test.ts`, `tests/integration/facilities-rooms.test.ts`
 
 **Interfaces:**
-- Consumes: `BankAccount`, `VN_BANKS` (Task 6).
+- Consumes: `BankAccount`, `VN_BANKS` (Task 3).
 - Produces:
   - `getSettings(db).bankAccount: BankAccount | null`
   - `Facility.bankAccount: BankAccount | null`
@@ -310,7 +222,7 @@ Thứ tự trường TLV: `00`=`01`, `01`=`12`, `38`=[`00` `A000000727`, `01`=[`
 
 - [ ] **Step 6: Commit** — `feat: tài khoản nhận tiền chung và riêng theo toà`
 
-### Task 8: Bộ dựng PDF hoá đơn và phiếu thu
+### Task 5: Bộ dựng PDF hoá đơn và phiếu thu
 
 **Files:**
 - Install: `npm i @react-pdf/renderer qrcode && npm i -D @types/qrcode` (đã được duyệt)
@@ -320,7 +232,7 @@ Thứ tự trường TLV: `00`=`01`, `01`=`12`, `38`=[`00` `A000000727`, `01`=[`
 - Test: `tests/integration/invoice-pdf.test.ts`
 
 **Interfaces:**
-- Consumes: `buildVietQrPayload`, `toQrAddInfo`, `BankAccount` (Task 6); `formatVND`, `numberToVietnameseWords` (có sẵn); `convertPdfToPng` (có sẵn, dùng để kiểm tra).
+- Consumes: `buildVietQrPayload`, `toQrAddInfo`, `BankAccount` (Task 3); `formatVND`, `numberToVietnameseWords` (có sẵn); `convertPdfToPng` (có sẵn, dùng để kiểm tra).
 - Produces:
 
 ```ts
@@ -354,7 +266,8 @@ Tạo hàm phụ `textOf(pdf)` dùng `pdfjs-dist/legacy` để lấy chữ của
   - `total 9_380_000, paid 4_000_000` → payload chứa `'54075380000'`.
 - `it('trả đủ → "Đã thanh toán", không có QR')`
 - `it('không có tài khoản → không có khối QR, vẫn ra PDF')`
-- `it('thanh lý tổng âm → "Số tiền hoàn cho khách: 1.200.000 ₫", không có QR')`
+- `it('thanh lý tổng dương → đủ các phần như hoá đơn tháng, tiêu đề "Hoá đơn thanh lý", có QR')`
+- `it('thanh lý tổng âm → vẫn đủ bảng khoản, tổng, số bằng chữ, thông tin tài khoản; có "Số tiền hoàn cho khách: 1.200.000 ₫"; không có QR')`
 - `it('tên Nhật/Hàn không làm sập: tenant "田中 由紀 / 김민지" vẫn trả về PDF hợp lệ')`: kiểm tra byte đầu là `%PDF`.
 - `it('phiếu thu có mã phiếu, số tiền, hình thức, không có QR')`
 - `it('PDF đổi được sang PNG')`: `convertPdfToPng(new Blob([pdf]))` trả về blob có type `image/png`.
@@ -367,6 +280,7 @@ Tạo hàm phụ `textOf(pdf)` dùng `pdfjs-dist/legacy` để lấy chữ của
 - Tiêu đề: `kind === 'termination'` ghi `Hoá đơn thanh lý`; còn lại ghi `Hoá đơn tháng MM/YYYY`, lấy tháng từ `periodStart`.
 - QR:
   - Chỉ vẽ khi `bank && total − paid > 0`.
+  - Khối thanh toán (thông tin tài khoản) luôn hiện khi có `bank`, cả với hoá đơn thanh lý. Khi `total < 0`, chỗ QR thay bằng "Số tiền hoàn cho khách: {formatVND(−total)} ₫".
   - Tạo bằng `qrcode.toDataURL(payload, { errorCorrectionLevel: 'M', margin: 1, width: 360 })`, hiển thị cỡ 96pt.
   - `addInfo = toQrAddInfo(code)`.
 - Font: `Font.register` 4 độ đậm của Be Vietnam Pro. Thêm `Font.registerHyphenationCallback(w => [w])` để không ngắt chữ Việt.
@@ -375,7 +289,7 @@ Tạo hàm phụ `textOf(pdf)` dùng `pdfjs-dist/legacy` để lấy chữ của
 
 - [ ] **Step 5: Commit** — `feat: dựng PDF hoá đơn và phiếu thu có QR VietQR`
 
-### Task 9: Nối PDF vào luồng xuất; hoá đơn bỏ Word
+### Task 6: Nối PDF vào luồng xuất; hoá đơn bỏ Word
 
 **Files:**
 - Modify: `src/domain/template-fields.ts`: thêm `export const PDF_DOC_TYPES = ['invoice_monthly', 'invoice_termination', 'receipt'] as const`
@@ -390,7 +304,7 @@ Tạo hàm phụ `textOf(pdf)` dùng `pdfjs-dist/legacy` để lấy chữ của
 - Test: `tests/integration/invoice-pdf-export.test.ts`; sửa `tests/integration/convert.test.ts` và `templates.test.ts` chỗ đang xuất `invoice_monthly` bằng Word
 
 **Interfaces:**
-- Consumes: `renderInvoicePdf`, `renderReceiptPdf`, `InvoicePdfData`, `ReceiptPdfData` (Task 8); `resolveBankAccount` (Task 6); `getSettings().bankAccount`, `Facility.bankAccount` (Task 7).
+- Consumes: `renderInvoicePdf`, `renderReceiptPdf`, `InvoicePdfData`, `ReceiptPdfData` (Task 5); `resolveBankAccount` (Task 3); `getSettings().bankAccount`, `Facility.bankAccount` (Task 4).
 - Produces:
   - `registerPdfLoader(docType: PdfDocType, loader: (db, ctx, id) => Promise<{ facilityId: string; baseName: string; render: () => Promise<Uint8Array> }>)`
   - `type PdfDocType = (typeof PDF_DOC_TYPES)[number]`
@@ -420,9 +334,9 @@ Bấm "Tải PDF" → bắt sự kiện `download`, tên file kết thúc bằng
 
 ---
 
-## Giai đoạn 4 — Giá phí chung, toà nào cần thì đặt riêng
+## Giai đoạn 3 — Giá phí chung, toà nào cần thì đặt riêng
 
-### Task 10: Bảng giá theo toà và service
+### Task 7: Bảng giá theo toà và service
 
 **Files:**
 - Modify: `src/db/schema/fees.ts`: thêm `feeTypePrices = pgTable('fee_type_prices', { feeTypeId → fee_types (cascade), facilityId → facilities (cascade), price integer notNull, createdAt, updatedAt })`, ràng buộc unique `(fee_type_id, facility_id)`
@@ -457,7 +371,7 @@ Bấm "Tải PDF" → bắt sự kiện `download`, tên file kết thúc bằng
 
 - [ ] **Step 5: Commit** — `feat: giá phí riêng theo toà`
 
-### Task 11: Dùng giá theo toà khi tạo hợp đồng, phụ lục; giao diện Cài đặt
+### Task 8: Dùng giá theo toà khi tạo hợp đồng, phụ lục; giao diện Cài đặt
 
 **Files:**
 - Modify: `src/app/(app)/contracts/new/page.tsx`: truyền `facilityId` trong mỗi `roomOption` và `prices` trong mỗi `FeeOption`
@@ -467,7 +381,7 @@ Bấm "Tải PDF" → bắt sự kiện `download`, tên file kết thúc bằng
 - Test: `tests/integration/addenda.test.ts`, `tests/unit/domain/fee-price.test.ts`
 
 **Interfaces:**
-- Consumes: `resolveFeePrice`, `listFeeTypePrices`, các action ở Task 10.
+- Consumes: `resolveFeePrice`, `listFeeTypePrices`, các action ở Task 7.
 
 - [ ] **Step 1: Viết test** — `it('ngữ cảnh chuyển phòng trả giá phí theo toà của hợp đồng')`: toà A có giá riêng 250.000, giá chung 200.000 → `fees[0].defaultPrice === 250000`.
 
@@ -481,9 +395,9 @@ Mở trang tạo hợp đồng trong preview: chọn phòng ở toà có giá ri
 
 ---
 
-## Giai đoạn 5 — Giao diện Bạc hà và lọc theo toà
+## Giai đoạn 4 — Giao diện Bạc hà và lọc theo toà
 
-### Task 12: Màu, font, bo góc; khung app; trang đăng nhập
+### Task 9: Màu, font, bo góc; khung app; trang đăng nhập
 
 **Files:**
 - Modify: `src/app/globals.css`: các token `:root` và `.dark` theo bảng màu ở phần Ràng buộc chung. `--primary` là `#0E9F6E`, `--sidebar` là `#FFFFFF`, `--sidebar-primary` là `#0E9F6E`, `--radius` là `0.625rem`.
@@ -492,6 +406,7 @@ Mở trang tạo hợp đồng trong preview: chọn phòng ở toà có giá ri
   - Mục đang chọn: nền `primary`, chữ trắng, đậm 600.
   - Trên điện thoại, nút ☰ thay bằng biểu tượng `Menu` của lucide.
   - Thanh trên chỉ còn tên người dùng và nút "Đăng xuất".
+- Delete: `src/components/app-shell/facility-switcher.tsx` (ô chọn này chỉ lưu state, không lọc gì). `AppShell` bỏ prop `facilities`; `src/app/(app)/layout.tsx` bỏ `listFacilities`.
 - Modify: `src/app/login/page.tsx` theo phong cách mới
 - Test: `tests/e2e/smoke-pages.spec.ts` (đã có)
 
@@ -503,7 +418,7 @@ Mở trang tạo hợp đồng trong preview: chọn phòng ở toà có giá ri
 
 - [ ] **Step 4: Commit** — `feat: giao diện Bạc hà cho khung app và đăng nhập`
 
-### Task 13: Thành phần dùng chung cho trang danh sách
+### Task 10: Thành phần dùng chung cho trang danh sách
 
 **Files:**
 - Create: `src/lib/facility-filter.ts`
@@ -529,7 +444,7 @@ Mở trang tạo hợp đồng trong preview: chọn phòng ở toà có giá ri
 
 - [ ] **Step 3: Commit** — `feat: thành phần dùng chung cho trang danh sách và bộ lọc toà`
 
-### Task 14: Service nhận nhiều toà; áp dụng giao diện mới và bộ lọc Toà cho mọi trang danh sách
+### Task 11: Service nhận nhiều toà; áp dụng giao diện mới và bộ lọc Toà cho mọi trang danh sách
 
 **Files:**
 - Modify service (thêm `facilityIds?: string[]`; tham số `facilityId` cũ vẫn giữ):
@@ -544,7 +459,7 @@ Mở trang tạo hợp đồng trong preview: chọn phòng ở toà có giá ri
 - Test: các file integration tương ứng
 
 **Interfaces:**
-- Consumes: `parseFacilityFilter` và các thành phần ở Task 13.
+- Consumes: `parseFacilityFilter` và các thành phần ở Task 10.
 
 - [ ] **Step 1: Viết test cho mỗi service**
 
@@ -564,7 +479,7 @@ Ví dụ với `listInvoices`:
 
 - [ ] **Step 5: Commit** — `feat: hiện chung mọi toà, lọc theo toà trên các trang danh sách`
 
-### Task 15: Trang chi tiết, form, hộp thoại, trang Nhắc việc
+### Task 12: Trang chi tiết, form, hộp thoại, trang Nhắc việc
 
 **Files:**
 - Modify: các trang `[id]` (rooms, tenants, contracts, invoices, facilities, incidents, handovers); `src/features/dashboard/components/*`; các form và dialog trong `src/features/*/components`
@@ -575,6 +490,92 @@ Ví dụ với `listInvoices`:
 - [ ] **Step 2: Sau mỗi nhóm, chạy `npm run lint && npm run build`.** Chụp màn hình desktop và mobile, rồi tự soát theo `frontend-design`: một điểm nhấn, không thẻ trùng lặp vô nghĩa, focus rõ, chữ đủ tương phản.
 
 - [ ] **Step 3: Chạy lại smoke và các e2e liên quan.**
+
+## Giai đoạn 5 — Tải nhanh hơn (làm sau cùng)
+
+### Task 13: Đo thời gian tải từng trang
+
+**Files:**
+- Create: `tests/e2e/perf.spec.ts`, `docs/operations/toc-do.md`
+
+- [ ] **Step 1: Viết `perf.spec.ts`**
+
+Với mỗi `href` trong `NAV_ITEMS`:
+- Mở trang 3 lần.
+- Lấy `responseStart − requestStart` (TTFB) và `loadEventEnd` qua `performance.getEntriesByType('navigation')`.
+- Ghi bảng ra console bằng `console.table`.
+
+Không assert; spec này chỉ để đo.
+
+- [ ] **Step 2: Chạy trên bản production ở máy và trên bản preview Vercel. Ghi bảng "trước" vào `docs/operations/toc-do.md`.**
+
+- [ ] **Step 3: Commit** — `docs: đo tốc độ trang trước khi tối ưu`
+
+### Task 14: Sửa N+1 ở trang tài sản và trang tạo hợp đồng
+
+**Files:**
+- Modify: `src/app/(app)/assets/page.tsx:18-19`, `src/app/(app)/contracts/new/page.tsx` (đang gọi `listRoomsWithStatus` cho từng toà)
+- Modify: `src/server/rooms/service.ts`
+- Test: `tests/integration/facilities-rooms.test.ts`
+
+**Interfaces:**
+- Produces:
+  - `listRooms(db, ctx, opts: { facilityId?: string })`: không có `facilityId` thì trả mọi phòng trong phạm vi quyền, kèm `facilityId`.
+  - `listRoomsWithStatus(db, ctx, opts: { facilityId?: string })`: tương tự.
+  - Nếu chữ ký hiện tại bắt buộc `facilityId`, đổi thành tuỳ chọn. Nếu Task 11 đã làm phần này cho `listRoomsWithStatus` thì chỉ còn `listRooms`.
+
+- [ ] **Step 1: Viết test**
+
+`it('listRooms không truyền toà → trả phòng của mọi toà người dùng có quyền, không trả toà khác')`:
+- Tạo 3 toà A, B, C.
+- Người dùng chỉ có `facilityIds = {A, B}`.
+- Kỳ vọng các mã phòng trả về đúng bằng phòng của A và B.
+
+Viết test tương tự cho `listRoomsWithStatus`.
+
+- [ ] **Step 2: Chạy `npx vitest run tests/integration/facilities-rooms.test.ts`, xác nhận FAIL.**
+
+- [ ] **Step 3: Sửa service theo test**
+
+Mỗi hàm chỉ chạy một truy vấn, lọc theo `inArray(rooms.facilityId, scope)`. Admin thì không lọc.
+
+- [ ] **Step 4: Cập nhật hai trang:** gọi service một lần rồi gom phòng theo `facilityId` ở phía trang.
+
+- [ ] **Step 5: Chạy `npm test && npm run lint && npm run build`, xác nhận PASS.**
+
+- [ ] **Step 6: Commit** — `perf: gộp truy vấn phòng ở trang tài sản và tạo hợp đồng`
+
+### Task 15: Sửa các trang chậm nhất theo số đo, thêm khung chờ
+
+**Files:**
+- Create: `src/components/page-skeleton.tsx`, và `loading.tsx` trong các thư mục `tenants`, `contracts`, `invoices`, `meters`, `assets`, `incidents`, `facilities`, `invoices/[id]`, `contracts/[id]`
+- Modify: các service mà bảng đo ở Task 13 chỉ ra là chậm nhất (tối đa 3 trang)
+- Test: test integration của service đã sửa
+
+**Interfaces:**
+- Produces: `PageSkeleton({ rows?: number }): JSX.Element`. Gồm thanh tiêu đề, hàng chip và `rows` dòng bảng (mặc định 8), dùng `Skeleton` của shadcn.
+
+- [ ] **Step 1: Với mỗi trang chậm, viết test khoá hành vi hiện có trước khi sửa**
+
+Test phải trả về đúng dữ liệu như cũ, kể cả khi đổi sang truy vấn song song hoặc gộp truy vấn.
+
+- [ ] **Step 2: Sửa:**
+  - Gom truy vấn độc lập vào `Promise.all`.
+  - Bỏ N+1.
+  - Thêm index nếu `EXPLAIN` cho thấy đang quét toàn bảng (sửa schema rồi `npm run db:generate`).
+  - Đặt `DATABASE_POOL_MAX` mặc định theo pooler của Supabase và ghi lý do vào `docs/operations/toc-do.md`.
+
+- [ ] **Step 3: Thêm các `loading.tsx` render `<PageSkeleton />`.**
+
+- [ ] **Step 4: Chạy `npm test && npm run lint && npm run build`, xác nhận PASS.** Đo lại bằng `perf.spec.ts` và ghi bảng "sau" cạnh bảng "trước".
+
+- [ ] **Step 5: Commit** — `perf: tăng tốc các trang chậm, thêm khung chờ`
+
+---
+
+---
+
+## Kết thúc
 
 ### Task 16: Kiểm tra cuối và cập nhật tài liệu
 
