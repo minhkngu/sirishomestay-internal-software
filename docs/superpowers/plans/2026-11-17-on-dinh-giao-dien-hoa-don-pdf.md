@@ -141,7 +141,7 @@ Mỗi lỗi làm ba bước: viết test tái hiện (FAIL) → sửa → test P
   - `VN_BANKS: readonly { bin: string; shortName: string; name: string }[]`
   - `resolveBankAccount(facilityAccount: BankAccount | null, shared: BankAccount | null): BankAccount | null`
 
-- [ ] **Step 1: Viết test**
+- [x] **Step 1: Viết test**
 
 ```ts
 it('CRC chuẩn', () => expect(crc16ccitt('123456789')).toBe('29B1'))
@@ -167,17 +167,17 @@ it('tài khoản riêng của toà thay cho tài khoản chung', () => {
 
 `banks.test.ts`: mọi `bin` gồm 6 chữ số và không trùng nhau; có `970436` (Vietcombank), `970418` (BIDV), `970415` (VietinBank), `970407` (Techcombank), `970422` (MB).
 
-- [ ] **Step 2: Chạy `npx vitest run tests/unit/domain/vietqr.test.ts tests/unit/domain/banks.test.ts`, xác nhận FAIL.**
+- [x] **Step 2: Chạy `npx vitest run tests/unit/domain/vietqr.test.ts tests/unit/domain/banks.test.ts`, xác nhận FAIL.**
 
-- [ ] **Step 3: Viết code**
+- [x] **Step 3: Viết code**
 
 Thứ tự trường TLV: `00`=`01`, `01`=`12`, `38`=[`00` `A000000727`, `01`=[`00` BIN, `01` số TK], `02` `QRIBFTTA`], `53`=`704`, `54`=số tiền, `58`=`VN`, `62`=[`08` nội dung], `63`=CRC. CRC tính trên toàn chuỗi kể cả `6304`.
 
 `VN_BANKS` lấy từ danh sách công khai của NAPAS/VietQR, gồm khoảng 30 ngân hàng phổ biến.
 
-- [ ] **Step 4: Chạy lại test, xác nhận PASS.**
+- [x] **Step 4: Chạy lại test, xác nhận PASS.**
 
-- [ ] **Step 5: Commit** — `feat: dựng mã VietQR và danh sách ngân hàng`
+- [x] **Step 5: Commit** — `feat: dựng mã VietQR và danh sách ngân hàng`
 
 ### Task 4: Lưu tài khoản nhận tiền chung và riêng theo toà, kèm giao diện nhập
 

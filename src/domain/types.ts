@@ -124,3 +124,10 @@ export type DepositEntry = {
 }
 
 export type ForfeitInput = { mode: 'all' | 'partial' | 'none'; amount?: number }
+
+export type BankAccount = {
+  bankBin: string
+  bankName: string
+  accountNumber: string
+  accountName: string
+}
