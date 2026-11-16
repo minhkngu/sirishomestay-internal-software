@@ -7,6 +7,7 @@ import { formatVND } from '@/domain/money'
 import { orNotFound } from '@/lib/or-not-found'
 import { getAccessContext } from '@/server/session'
 import { getRoom } from '@/server/rooms/service'
+import { listAssets } from '@/server/assets/service'
 import { getPendingDepositContract, listLeases } from '@/server/contracts/service'
 
 export default async function RoomPage({ params }: { params: Promise<{ id: string }> }) {
@@ -16,6 +17,7 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
   const showContracts = can(ctx, 'tenants_contracts', r.facilityId)
   const history = showContracts ? await listLeases(db, ctx, { roomId: id }) : []
   const deposit = showContracts ? await getPendingDepositContract(db, ctx, id) : null
+  const roomAssets = can(ctx, 'assets', r.facilityId) ? await listAssets(db, ctx, { location: { kind: 'room', id } }) : null
   const active = history.find((l) => l.status === 'active')
   return (
     <div className="space-y-4">
@@ -44,7 +46,13 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
           )}
         </section>
       )}
-      <p className="text-xs text-muted-foreground">Tài sản, điện nước và sự cố của phòng sẽ hiện ở các bước sau.</p>
+      {roomAssets && (
+        <section className="space-y-2 rounded-lg border p-4">
+          <h2 className="font-medium">Tài sản trong phòng ({roomAssets.length})</h2>
+          <ul className="space-y-1 text-sm">{roomAssets.map((a) => <li key={a.id}><Link className="underline" href={`/assets/${a.id}`}>{a.code}</Link> — {a.name} ({a.condition})</li>)}</ul>
+        </section>
+      )}
+      <p className="text-xs text-muted-foreground">Điện nước và sự cố của phòng sẽ hiện ở các bước sau.</p>
     </div>
   )
 }

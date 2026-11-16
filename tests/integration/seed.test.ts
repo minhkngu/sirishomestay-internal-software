@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { facilities, rooms, userProfiles, userPermissions, userFacilities, feeTypes, feeUnits, utilityRates, tenants, docTemplates, files, leases, depositContracts, depositEntries, leaseOccupants } from '@/db'
+import { facilities, rooms, userProfiles, userPermissions, userFacilities, feeTypes, feeUnits, utilityRates, tenants, docTemplates, files, leases, depositContracts, depositEntries, leaseOccupants, assets } from '@/db'
 import { runSeed, type AuthAdmin } from '../../scripts/seed'
 import { addDays } from '@/domain/dates'
 import { createTestDb } from '../helpers/db'
@@ -86,6 +86,21 @@ describe('runSeed', () => {
     const entries = await db.select().from(depositEntries)
     expect(entries.filter((e) => e.leaseId).length).toBeGreaterThanOrEqual(26)
     expect((await db.select().from(leaseOccupants)).length).toBeGreaterThanOrEqual(26)
+  })
+
+  it('nạp ~120 tài sản ở phòng, khu chung và kho, nhất quán với cơ sở', async () => {
+    const db = await createTestDb()
+    await runSeed(db, fakeAuth(), { today: '2026-11-16', password: 'x' })
+    const all = await db.select().from(assets)
+    expect(all.length).toBeGreaterThanOrEqual(110)
+    expect(all.length).toBeLessThanOrEqual(170)
+    expect(new Set(all.map((a) => a.code)).size).toBe(all.length)
+    expect(new Set(all.map((a) => a.locationKind))).toEqual(new Set(['room', 'common', 'warehouse']))
+    const roomRows = await db.select().from(rooms)
+    for (const a of all.filter((x) => x.locationKind === 'room')) {
+      expect(roomRows.find((r) => r.id === a.locationId)?.facilityId).toBe(a.facilityId)
+    }
+    expect(all.every((a) => a.isDemo && a.searchText.length > 0)).toBe(true)
   })
 
   it('chạy hai lần trên hai CSDL trống cho kết quả giống hệt (PRNG cố định)', async () => {

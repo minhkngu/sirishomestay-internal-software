@@ -1,4 +1,35 @@
 CREATE TYPE "public"."tenant_kind" AS ENUM('foreign', 'vietnamese', 'company');--> statement-breakpoint
+CREATE TABLE "asset_moves" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"asset_id" uuid NOT NULL,
+	"from_kind" text NOT NULL,
+	"from_id" uuid NOT NULL,
+	"to_kind" text NOT NULL,
+	"to_id" uuid NOT NULL,
+	"moved_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"moved_by" uuid,
+	"reason" text DEFAULT '' NOT NULL,
+	"is_demo" boolean DEFAULT false NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "assets" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"code" text NOT NULL,
+	"name" text NOT NULL,
+	"category" text DEFAULT '' NOT NULL,
+	"value" integer DEFAULT 0 NOT NULL,
+	"condition" text DEFAULT 'Tốt' NOT NULL,
+	"location_kind" text NOT NULL,
+	"location_id" uuid NOT NULL,
+	"facility_id" uuid NOT NULL,
+	"status" text DEFAULT 'in_use' NOT NULL,
+	"search_text" text DEFAULT '' NOT NULL,
+	"is_demo" boolean DEFAULT false NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "assets_code_unique" UNIQUE("code")
+);
+--> statement-breakpoint
 CREATE TABLE "audit_logs" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid,
@@ -236,6 +267,8 @@ CREATE TABLE "user_profiles" (
 	CONSTRAINT "user_profiles_email_unique" UNIQUE("email")
 );
 --> statement-breakpoint
+ALTER TABLE "asset_moves" ADD CONSTRAINT "asset_moves_asset_id_assets_id_fk" FOREIGN KEY ("asset_id") REFERENCES "public"."assets"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "assets" ADD CONSTRAINT "assets_facility_id_facilities_id_fk" FOREIGN KEY ("facility_id") REFERENCES "public"."facilities"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "deposit_contracts" ADD CONSTRAINT "deposit_contracts_room_id_rooms_id_fk" FOREIGN KEY ("room_id") REFERENCES "public"."rooms"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "deposit_contracts" ADD CONSTRAINT "deposit_contracts_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "deposit_entries" ADD CONSTRAINT "deposit_entries_lease_id_leases_id_fk" FOREIGN KEY ("lease_id") REFERENCES "public"."leases"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
