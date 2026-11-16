@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { facilities, rooms, userProfiles, userPermissions, userFacilities, feeTypes, feeUnits, utilityRates, tenants, docTemplates, files } from '@/db'
+import { facilities, rooms, userProfiles, userPermissions, userFacilities, feeTypes, feeUnits, utilityRates, tenants, docTemplates, files, leases, depositContracts, depositEntries, leaseOccupants } from '@/db'
 import { runSeed, type AuthAdmin } from '../../scripts/seed'
 import { addDays } from '@/domain/dates'
 import { createTestDb } from '../helpers/db'
@@ -67,6 +67,25 @@ describe('runSeed', () => {
     expect(t.every((x) => x.isDefault && x.fileId && x.isDemo)).toBe(true)
     expect(new Set(t.map((x) => x.docType)).size).toBe(10)
     expect((await db.select().from(files)).every((f) => f.ownerType === 'template' && f.confirmedAt)).toBe(true)
+  })
+
+  it('nạp ~26 hợp đồng thuê (vài cái sắp hết hạn, 2 cái chưa ký) và 3 hợp đồng cọc chờ', async () => {
+    const db = await createTestDb()
+    await runSeed(db, fakeAuth(), { today: '2026-11-16', password: 'x' })
+    const ls = await db.select().from(leases)
+    expect(ls).toHaveLength(26)
+    expect(ls.every((l) => l.status === 'active' && l.isDemo)).toBe(true)
+    expect(new Set(ls.map((l) => l.roomId)).size).toBe(26) // mỗi phòng ≤ 1 hợp đồng đang hiệu lực
+    expect(ls.filter((l) => l.endDate <= addDays('2026-11-16', 30))).toHaveLength(3)
+    expect(ls.filter((l) => l.signStatus !== 'signed')).toHaveLength(2)
+    expect(ls.every((l) => /^(TD|BT)-HĐ-\d{4}-\d{4}$/.test(l.code))).toBe(true)
+    const deps = await db.select().from(depositContracts)
+    expect(deps).toHaveLength(3)
+    expect(deps.every((d) => d.status === 'pending')).toBe(true)
+    expect(new Set(deps.map((d) => d.roomId)).size).toBe(3)
+    const entries = await db.select().from(depositEntries)
+    expect(entries.filter((e) => e.leaseId).length).toBeGreaterThanOrEqual(26)
+    expect((await db.select().from(leaseOccupants)).length).toBeGreaterThanOrEqual(26)
   })
 
   it('chạy hai lần trên hai CSDL trống cho kết quả giống hệt (PRNG cố định)', async () => {

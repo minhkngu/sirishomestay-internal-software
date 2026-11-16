@@ -33,6 +33,19 @@ const resolvers: Partial<Record<OwnerType, OwnerResolver>> = {
     return { facilityId: t.f }
   },
   template: async () => ({ facilityId: null }),
+  // bản xuất: thử lần lượt các resolver mà từng module đăng ký (hợp đồng, bàn giao, hoá đơn…)
+  export: async (db, id) => {
+    for (const r of exportResolvers) {
+      try { return await r(db, id) } catch (e) { if (!(e instanceof NotFoundError)) throw e }
+    }
+    throw new NotFoundError()
+  },
+}
+const exportResolvers: OwnerResolver[] = []
+
+/** Module nào xuất giấy tờ thì đăng ký cách tìm cơ sở của thực thể gốc (ownerId của bản xuất). */
+export function registerExportOwnerResolver(resolver: OwnerResolver) {
+  exportResolvers.push(resolver)
 }
 
 /** Các module sau (hợp đồng, bàn giao, sự cố, xuất giấy tờ) đăng ký cách tìm cơ sở của chủ sở hữu tệp. */

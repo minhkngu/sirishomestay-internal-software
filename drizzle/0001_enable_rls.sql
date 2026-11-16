@@ -1,6 +1,16 @@
 -- Bật RLS cho mọi bảng, không tạo policy: chặn mọi truy cập qua anon key / PostgREST.
 alter table "audit_logs" enable row level security;
 --> statement-breakpoint
+alter table "deposit_contracts" enable row level security;
+--> statement-breakpoint
+alter table "deposit_entries" enable row level security;
+--> statement-breakpoint
+alter table "lease_fees" enable row level security;
+--> statement-breakpoint
+alter table "lease_occupants" enable row level security;
+--> statement-breakpoint
+alter table "leases" enable row level security;
+--> statement-breakpoint
 alter table "facilities" enable row level security;
 --> statement-breakpoint
 alter table "rooms" enable row level security;

@@ -1,12 +1,12 @@
 import { and, asc, eq, ilike, inArray } from 'drizzle-orm'
-import { rooms } from '@/db'
+import { depositContracts, leases, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, facilityScope, NotFoundError, type AccessContext } from '@/domain/access'
-import {  } from '@/lib/action-result'
 import { ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/server/audit'
 import { roomStatus, type RoomStatus } from '@/domain/room-status'
 import { todayVN } from '@/domain/dates'
+import { getSettings } from '@/server/settings/service'
 import { getFacility } from '../facilities/service'
 import { bulkInput, roomInput, roomUpdateInput, type BulkInput, type RoomInput } from './schemas'
 
@@ -110,10 +110,29 @@ export async function createRoomsBulk(db: DB, ctx: AccessContext, facilityId: st
   })
 }
 
-export type RoomWithStatus = Room & { status: RoomStatus }
+export type RoomWithStatus = Room & { status: RoomStatus; tenantName?: string | null; leaseEndDate?: string | null }
 
-/** Phòng của một cơ sở kèm trạng thái suy ra (hợp đồng được nối ở Task 9; trước đó mọi phòng là Trống). */
-export async function listRoomsWithStatus(db: DB, ctx: AccessContext, opts: { facilityId: string; q?: string; floor?: string; includeInactive?: boolean }): Promise<RoomWithStatus[]> {
+/** Phòng của một cơ sở kèm trạng thái suy ra từ hợp đồng thuê đang hiệu lực và hợp đồng cọc đang chờ. */
+export async function listRoomsWithStatus(
+  db: DB, ctx: AccessContext, opts: { facilityId: string; q?: string; floor?: string; includeInactive?: boolean; today?: string },
+): Promise<RoomWithStatus[]> {
   const list = await listRooms(db, ctx, opts)
-  return list.map((r) => ({ ...r, status: roomStatus(r, null, null, todayVN(), 30) }))
+  if (list.length === 0) return []
+  const ids = list.map((r) => r.id)
+  const [active, pending, settings] = await Promise.all([
+    db.select({ roomId: leases.roomId, endDate: leases.endDate, fullName: tenants.fullName, companyName: tenants.companyName })
+      .from(leases).innerJoin(tenants, eq(tenants.id, leases.tenantId)).where(and(inArray(leases.roomId, ids), eq(leases.status, 'active'))),
+    db.select({ roomId: depositContracts.roomId, expectedMoveIn: depositContracts.expectedMoveIn }).from(depositContracts).where(and(inArray(depositContracts.roomId, ids), eq(depositContracts.status, 'pending'))),
+    getSettings(db),
+  ])
+  const today = opts.today ?? todayVN()
+  return list.map((r) => {
+    const lease = active.find((a) => a.roomId === r.id)
+    return {
+      ...r,
+      status: roomStatus(r, lease ?? null, pending.find((p) => p.roomId === r.id) ?? null, today, settings.contractWarningDays),
+      tenantName: lease ? lease.fullName ?? lease.companyName : null,
+      leaseEndDate: lease?.endDate ?? null,
+    }
+  })
 }

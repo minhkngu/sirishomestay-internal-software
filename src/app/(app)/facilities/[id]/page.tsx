@@ -1,6 +1,7 @@
 import { db } from '@/db/client'
 import { orNotFound } from '@/lib/or-not-found'
 import { ROOM_STATUS_LABELS, type RoomStatus } from '@/domain/room-status'
+import { canViewTenantIdentity } from '@/domain/access'
 import { getAccessContext } from '@/server/session'
 import { getFacility } from '@/server/facilities/service'
 import { listRoomsWithStatus } from '@/server/rooms/service'
@@ -30,7 +31,7 @@ export default async function FacilityPage({ params }: { params: Promise<{ id: s
         ))}
       </div>
       {ctx.isAdmin && <RoomPanels facilityId={id} />}
-      <RoomMap rooms={rooms.map((r) => ({ id: r.id, code: r.code, floor: r.floor, status: r.status }))} />
+      <RoomMap rooms={rooms.map((r) => ({ id: r.id, code: r.code, floor: r.floor, status: r.status, tenantName: canViewTenantIdentity(ctx, id) ? r.tenantName : null }))} />
     </div>
   )
 }
