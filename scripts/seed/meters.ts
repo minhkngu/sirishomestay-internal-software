@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { meterReadings, meters, rooms, facilities } from '@/db'
 import { daysInMonth } from '@/domain/dates'
 import type { SeedModule } from './types'
@@ -12,12 +13,14 @@ const lastDay = (p: string) => `${p}-${String(daysInMonth(p)).padStart(2, '0')}`
 /** Đồng hồ điện + nước mỗi phòng, chỉ số 3 tháng gần nhất; 3 phòng chưa ghi kỳ vừa rồi; 1 đồng hồ điện đã thay. */
 export const meterSeed: SeedModule = {
   name: 'meters',
+  async isSeeded({ db }) { return (await db.select({ id: meters.id }).from(meters).where(eq(meters.isDemo, true)).limit(1)).length > 0 },
   async run({ db, rng, today }) {
     const current = today.slice(0, 7)
     const periods = [shift(current, -3), shift(current, -2), shift(current, -1)]
-    const facs = await db.select().from(facilities)
+    const facs = await db.select().from(facilities).where(eq(facilities.isDemo, true))
     const codeOf = new Map(facs.map((f) => [f.id, f.code]))
-    const all = (await db.select().from(rooms)).sort((a, b) => (codeOf.get(a.facilityId)! + a.code < codeOf.get(b.facilityId)! + b.code ? -1 : 1))
+    const existingRooms = new Set((await db.select().from(meters)).map((m) => m.roomId))
+    const all = (await db.select().from(rooms).where(eq(rooms.isDemo, true))).filter((r) => !existingRooms.has(r.id)).sort((a, b) => (codeOf.get(a.facilityId)! + a.code < codeOf.get(b.facilityId)! + b.code ? -1 : 1))
     const missingLast = new Set([5, 14, 29])
     const replacedIdx = 20
 

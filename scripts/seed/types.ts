@@ -28,4 +28,4 @@ export type SeedCtx = {
   state: SeedState
 }
 
-export type SeedModule = { name: string; run(ctx: SeedCtx): Promise<void> }
+export type SeedModule = { name: string; isSeeded(ctx: SeedCtx): Promise<boolean>; run(ctx: SeedCtx): Promise<void> }

@@ -207,7 +207,7 @@ tests/helpers/db.ts  tests/unit/**  tests/integration/**  tests/e2e/**
 - [x] **Step 4:** Chạy → PASS.
 - [x] **Step 5:** Commit `feat: biên bản bàn giao check-in, check-out`.
 
-### Task 12b: Bổ sung sau rà soát spec (16/11) — quyền xem, vật tư theo số lượng
+### Task 12b: Bổ sung sau rà soát spec (16/11) — quyền xem, vật tư theo số lượng ✅
 
 Rà soát spec ngày 16/11 thấy Task 9–12 còn thiếu: Task 9 và 12 không ghi quyền cần có; spec 5 yêu cầu người chỉ có "Ghi điện nước" không thấy thông tin khách hay tiền; spec 6.7 yêu cầu hỗ trợ cả vật tư theo số lượng; spec 6.2 người ở là khách cá nhân.
 
@@ -231,23 +231,23 @@ Rà soát spec ngày 16/11 thấy Task 9–12 còn thiếu: Task 9 và 12 không
   - Mỗi module dùng `createRng` với hạt giống riêng suy ra từ tên module, để dữ liệu của một module không đổi khi module trước nó bị bỏ qua.
   - Vật tư mẫu ở module riêng `stockSeed` (`scripts/seed/stock.ts`, đăng ký sau `assetSeed`): mỗi cơ sở vài vật tư (bóng đèn, ruột gối, khăn tắm…) có tồn ở kho và vài phòng.
 
-- [ ] **Step 1: Viết test**
+- [x] **Step 1: Viết test**
   - Hùng (meters, assets, incidents tại BT) gọi `getRoomDetail` một phòng BT đang ở → có `status = 'occupied'`, không có `lease`, không có `money`.
   - Minh (billing) → có `money`, không có `lease`.
   - Hùng gọi `startHandover` → `ForbiddenError`; gọi `createLease` → `ForbiddenError`.
   - Tạo lease với người ở là khách công ty → `ValidationError` "Người ở phải là khách cá nhân".
   - Nhập kho 20 bóng đèn, chuyển 3 sang phòng 301 → kho 17, phòng 301 có 3, 1 dòng `stock_moves`; chuyển 25 → lỗi "Không đủ số lượng tại vị trí nguồn"; người cơ sở khác → `NotFoundError`.
   - Seed: chạy `runSeed` hai lần không `reset` → lần hai không lỗi, số dòng mọi bảng không đổi. Xoá hết dòng `stock_*` rồi chạy lại → chỉ vật tư được nạp lại; khách, hợp đồng, tài khoản giữ nguyên id.
-- [ ] **Step 2:** Chạy `npx vitest run tests/integration/room-visibility.test.ts tests/integration/stock.test.ts tests/integration/contracts.test.ts tests/integration/handovers.test.ts` → FAIL.
-- [ ] **Step 3:** Cài đặt. Trang tài sản thêm tab "Vật tư" (bảng theo vị trí, nút Nhập kho / Chuyển / Xuất dùng); trang phòng dùng `getRoomDetail`.
-- [ ] **Step 4:** Chạy lại → PASS; `npm test` → PASS toàn bộ.
-- [ ] **Step 5:** Commit `feat: ẩn thông tin khách và tiền theo quyền, vật tư theo số lượng, seed thêm dần`.
+- [x] **Step 2:** Chạy `npx vitest run tests/integration/room-visibility.test.ts tests/integration/stock.test.ts tests/integration/contracts.test.ts tests/integration/handovers.test.ts` → FAIL.
+- [x] **Step 3:** Cài đặt. Trang tài sản thêm tab "Vật tư" (bảng theo vị trí, nút Nhập kho / Chuyển / Xuất dùng); trang phòng dùng `getRoomDetail`.
+- [x] **Step 4:** Chạy lại → PASS; `npm test` → PASS toàn bộ.
+- [x] **Step 5:** Commit `feat: ẩn thông tin khách và tiền theo quyền, vật tư theo số lượng, seed thêm dần`.
 
 ### Điểm dừng đợt 2: người dùng test
 
-- [ ] **Step 1:** `npm test` → PASS toàn bộ; `npm run lint` sạch; `npm run build` OK.
-- [ ] **Step 2:** Playwright (chạy trên Supabase dev, bỏ qua nếu thiếu `E2E_BASE_URL`) cho các luồng: tạo cọc cho phòng trống → phòng "Đã cọc"; chuyển thành hợp đồng thuê qua wizard; xuất Word; đánh dấu đã ký kèm file; chuyển 2 tài sản từ kho vào phòng; ghi chỉ số điện nước, nhập chỉ số giảm → báo lỗi; thay đồng hồ; check-in rồi check-out có phạt; Hùng mở trang phòng đang ở → không thấy tên khách và tiền; chuyển 3 bóng đèn từ kho vào phòng. `npx playwright test` → PASS.
-- [ ] **Step 3:** `npm run db:migrate && npm run db:seed` trên Supabase dev — thêm bảng vật tư và vật tư mẫu, giữ nguyên dữ liệu đang có (không dùng `--reset`); triển khai bản thử lên Vercel (preview) với `NEXT_PUBLIC_DEMO_MODE=1`.
-- [ ] **Step 4:** Viết `docs/review/dot-2-checklist.md`: từng luồng cần bấm thử (các bước, điều cần để ý, ô ghi chú) cho phần của đợt này.
-- [ ] **Step 5:** Commit `test: e2e và checklist test đợt 2`.
-- [ ] **Step 6: Dừng lại.** Gửi link bản thử + checklist cho người dùng. Góp ý được cập nhật vào spec và kế hoạch các đợt sau rồi mới bắt đầu đợt tiếp theo.
+- [x] **Step 1:** `npm test` → PASS toàn bộ; `npm run lint` sạch; `npm run build` OK.
+- [x] **Step 2:** Playwright (chạy trên Supabase dev, bỏ qua nếu thiếu `E2E_BASE_URL`) cho các luồng: tạo cọc cho phòng trống → phòng "Đã cọc"; chuyển thành hợp đồng thuê qua wizard; xuất Word; đánh dấu đã ký kèm file; chuyển 2 tài sản từ kho vào phòng; ghi chỉ số điện nước, nhập chỉ số giảm → báo lỗi; thay đồng hồ; check-in rồi check-out có phạt; Hùng mở trang phòng đang ở → không thấy tên khách và tiền; chuyển 3 bóng đèn từ kho vào phòng. `npx playwright test` → PASS.
+- [x] **Step 3:** `npm run db:migrate && npm run db:seed` trên Supabase dev — thêm bảng vật tư và vật tư mẫu, giữ nguyên dữ liệu đang có (không dùng `--reset`); triển khai bản thử lên Vercel (preview) với `NEXT_PUBLIC_DEMO_MODE=1`.
+- [x] **Step 4:** Viết `docs/review/dot-2-checklist.md`: từng luồng cần bấm thử (các bước, điều cần để ý, ô ghi chú) cho phần của đợt này.
+- [x] **Step 5:** Commit `test: e2e và checklist test đợt 2`.
+- [ ] **Step 6: Dừng lại.** Gửi link bản thử + checklist cho người dùng. Góp ý được cập nhật vào spec và kế hoạch các đợt sau rồi mới bắt đầu đợt tiếp theo. *(16/11: đã gửi link preview + checklist; đang chờ người dùng thử và góp ý.)*

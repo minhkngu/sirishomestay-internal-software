@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { userFacilities, userPermissions, userProfiles } from '@/db'
 import type { Permission } from '@/domain/access'
 import type { SeedModule } from './types'
@@ -12,6 +13,7 @@ const USERS: { email: string; name: string; facilities: string[] | 'none'; perms
 
 export const userSeed: SeedModule = {
   name: 'users',
+  async isSeeded({ db }) { return (await db.select({ id: userProfiles.id }).from(userProfiles).where(eq(userProfiles.isDemo, true)).limit(1)).length > 0 },
   async run({ db, auth, password, state }) {
     for (const u of USERS) {
       const id = await auth.createUser(u.email, password)

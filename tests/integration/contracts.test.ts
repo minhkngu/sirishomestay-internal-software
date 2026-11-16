@@ -50,6 +50,11 @@ describe('contracts', () => {
     fees: [{ feeTypeId: feePerson, quantity: 1, unitPrice: 200_000 }], ...over,
   })
 
+  it('không cho công ty làm người ở', async () => {
+    const company = await createTenant(db, admin, { kind: 'company', homeFacilityId: fa, companyName: 'Công ty A', phone: '0909876543', taxCode: '1234567890', representative: 'Nguyễn A' })
+    await expect(createLease(db, lan(), leaseInput({ occupantIds: [company.id] }))).rejects.toThrow('Người ở phải là khách cá nhân')
+  })
+
   it('tạo cọc cho phòng trống → phòng thành "Đã cọc"; cọc thứ hai cho cùng phòng → lỗi', async () => {
     expect(await status(r301)).toBe('vacant')
     const { contract } = await createDepositContract(db, lan(), { roomId: r301, tenantId: tenant1, depositAmount: 5_000_000, agreedRent: 9_000_000, expectedMoveIn: '2026-11-01' })
@@ -118,6 +123,7 @@ describe('contracts', () => {
     await expect(getLease(db, ctxOf(['tenants_contracts'], [fb]), lease.id)).rejects.toThrow(NotFoundError)
     await expect(getLease(db, ctxOf(['billing'], [fa]), lease.id)).rejects.toThrow(ForbiddenError)
     await expect(createLease(db, ctxOf(['tenants_contracts'], [fb]), leaseInput({ roomId: r302 }))).rejects.toThrow(NotFoundError)
+    await expect(createLease(db, ctxOf(['meters', 'assets', 'incidents'], [fa]), leaseInput({ roomId: r302 }))).rejects.toThrow(ForbiddenError)
     await expect(createDepositContract(db, ctxOf(['meters'], [fa]), { roomId: r302, tenantId: tenant1, depositAmount: 1, agreedRent: 1, expectedMoveIn: '2026-11-01' })).rejects.toThrow(ForbiddenError)
     await expect(createLease(db, lan(), leaseInput({ roomId: rB }))).rejects.toThrow(NotFoundError)
   })

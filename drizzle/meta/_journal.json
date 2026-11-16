@@ -15,6 +15,13 @@
       "when": 1794805893639,
       "tag": "0001_enable_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794826238998,
+      "tag": "0002_bizarre_professor_monster",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,7 @@
 import { and, asc, eq, ilike, inArray } from 'drizzle-orm'
-import { depositContracts, leases, rooms, tenants } from '@/db'
+import { depositContracts, depositEntries, leaseOccupants, leases, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
-import { assertCan, facilityScope, NotFoundError, type AccessContext } from '@/domain/access'
+import { assertCan, can, facilityScope, NotFoundError, type AccessContext } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/server/audit'
 import { roomStatus, type RoomStatus } from '@/domain/room-status'
@@ -20,7 +20,7 @@ export async function getRoom(db: DB, ctx: AccessContext, id: string): Promise<R
   if (!r) throw new NotFoundError()
   const scope = facilityScope(ctx)
   if (scope !== 'all' && !scope.includes(r.facilityId)) throw new NotFoundError()
-  return r
+  return can(ctx, 'tenants_contracts', r.facilityId) || can(ctx, 'billing', r.facilityId) ? r : { ...r, listPrice: null }
 }
 
 export async function listRooms(
@@ -31,7 +31,8 @@ export async function listRooms(
   if (!opts.includeInactive) conds.push(eq(rooms.isActive, true))
   if (opts.q?.trim()) conds.push(ilike(rooms.code, `%${opts.q.trim().replace(/[%_\\]/g, '\\$&')}%`))
   if (opts.floor) conds.push(eq(rooms.floor, opts.floor))
-  return db.select().from(rooms).where(and(...conds)).orderBy(asc(rooms.code))
+  const result = await db.select().from(rooms).where(and(...conds)).orderBy(asc(rooms.code))
+  return can(ctx, 'tenants_contracts', opts.facilityId) || can(ctx, 'billing', opts.facilityId) ? result : result.map((r) => ({ ...r, listPrice: null }))
 }
 
 export async function countRoomsByFacility(db: DB, facilityIds: string[]): Promise<Map<string, number>> {
@@ -131,8 +132,36 @@ export async function listRoomsWithStatus(
     return {
       ...r,
       status: roomStatus(r, lease ?? null, pending.find((p) => p.roomId === r.id) ?? null, today, settings.contractWarningDays),
-      tenantName: lease ? lease.fullName ?? lease.companyName : null,
-      leaseEndDate: lease?.endDate ?? null,
+      ...(can(ctx, 'tenants_contracts', r.facilityId) ? { tenantName: lease ? lease.fullName ?? lease.companyName : null, leaseEndDate: lease?.endDate ?? null } : {}),
     }
   })
+}
+
+/** Chi tiết phòng chỉ chứa thông tin phù hợp với quyền của người gọi. */
+export async function getRoomDetail(db: DB, ctx: AccessContext, id: string): Promise<{
+  room: Room; status: RoomStatus
+  lease?: { id: string; code: string; tenantName: string | null | undefined; occupants: { id: string; name: string | null }[]; endDate: string }
+  money?: { monthlyRent: number | null; depositBalance: number; debt: null }
+}> {
+  const room = await getRoom(db, ctx, id)
+  const status = (await listRoomsWithStatus(db, ctx, { facilityId: room.facilityId, includeInactive: true })).find((r) => r.id === id)!.status
+  const [active] = await db.select().from(leases).where(and(eq(leases.roomId, id), eq(leases.status, 'active')))
+  const showLease = can(ctx, 'tenants_contracts', room.facilityId)
+  const showMoney = showLease || can(ctx, 'billing', room.facilityId)
+  if (!active) {
+    if (!showMoney) return { room, status }
+    const [pending] = await db.select().from(depositContracts).where(and(eq(depositContracts.roomId, id), eq(depositContracts.status, 'pending')))
+    if (!pending) return { room, status }
+    const entries = await db.select().from(depositEntries).where(eq(depositEntries.depositContractId, pending.id))
+    const balance = entries.filter((e) => e.status === 'done').reduce((n, e) => n + (e.type === 'collect' || e.type === 'topup' ? e.amount : -e.amount), 0)
+    return { room, status, money: { monthlyRent: null, depositBalance: balance, debt: null } }
+  }
+  const [tenant] = showLease ? await db.select().from(tenants).where(eq(tenants.id, active.tenantId)) : []
+  const occupants = showLease ? await db.select({ id: tenants.id, name: tenants.fullName }).from(leaseOccupants).innerJoin(tenants, eq(tenants.id, leaseOccupants.tenantId)).where(eq(leaseOccupants.leaseId, active.id)) : []
+  const entries = showMoney ? await db.select().from(depositEntries).where(eq(depositEntries.leaseId, active.id)) : []
+  const balance = entries.filter((e) => e.status === 'done').reduce((n, e) => n + (e.type === 'collect' || e.type === 'topup' ? e.amount : -e.amount), 0)
+  return { room, status,
+    ...(showLease ? { lease: { id: active.id, code: active.code, tenantName: tenant?.fullName ?? tenant?.companyName, occupants, endDate: active.endDate } } : {}),
+    ...(showMoney ? { money: { monthlyRent: active.monthlyRent, depositBalance: balance, debt: null } } : {}),
+  }
 }

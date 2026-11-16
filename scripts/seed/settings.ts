@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { feeTypes, feeUnits, utilityRates } from '@/db'
 import type { SeedModule } from './types'
 
@@ -13,6 +14,7 @@ const FEES: { name: string; unit: string; price: number; billing: 'monthly_fixed
 
 export const settingsSeed: SeedModule = {
   name: 'settings',
+  async isSeeded({ db }) { return (await db.select({ id: feeTypes.id }).from(feeTypes).where(eq(feeTypes.isDemo, true)).limit(1)).length > 0 },
   async run({ db, state, today }) {
     const unitIds: Record<string, string> = {}
     for (const name of UNITS) {

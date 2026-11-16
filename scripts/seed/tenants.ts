@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { tenants } from '@/db'
 import { addDays } from '@/domain/dates'
 import { parseTenantInput, toTenantRow } from '@/server/tenants/service'
@@ -19,6 +20,7 @@ const PHONE_STYLES = [(n: string) => `0${n}`, (n: string) => `0${n.slice(0, 3)} 
 
 export const tenantSeed: SeedModule = {
   name: 'tenants',
+  async isSeeded({ db }) { return (await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.isDemo, true)).limit(1)).length > 0 },
   async run({ db, rng, today, state }) {
     const codes = Object.keys(state.facilityIds)
     const home = (i: number) => state.facilityIds[codes[i % codes.length]]

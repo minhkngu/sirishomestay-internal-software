@@ -110,6 +110,7 @@ describe('handovers', () => {
     await expect(startHandover(db, other, leaseId, 'check_in')).rejects.toThrow(NotFoundError)
     await expect(requestUpload(db, other, storage, { ownerType: 'handover_photo', ownerId: item.id, contentType: 'image/webp' })).rejects.toThrow(NotFoundError)
     await expect(getHandover(db, ctxOf(['billing'], [fa]), h.id)).rejects.toThrow(ForbiddenError)
+    await expect(startHandover(db, ctxOf(['meters', 'assets', 'incidents'], [fa]), leaseId, 'check_in')).rejects.toThrow(ForbiddenError)
   })
 
   it('lịch sử tài sản có dòng bàn giao', async () => {
