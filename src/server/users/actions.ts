@@ -74,7 +74,7 @@ export async function resetUserPassword(id: string): Promise<ActionResult<{ pass
     const password = tempPassword()
     const { error } = await supabaseAdmin().auth.admin.updateUserById(id, { password })
     if (error) throw new ValidationError('Không đặt lại được mật khẩu')
-    await recordAudit(db, ctx, { action: 'update', entity: 'user_password', entityId: id })
+    await recordAudit(db, ctx, { action: 'update', entity: 'user_password', summary: 'Sửa mật khẩu người dùng', entityId: id })
     return { password }
   })
 }

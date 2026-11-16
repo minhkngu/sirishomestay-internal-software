@@ -7,6 +7,7 @@ export const userProfiles = pgTable('user_profiles', {
   email: text('email').notNull().unique(),
   fullName: text('full_name').notNull(),
   isActive: boolean('is_active').notNull().default(true),
+  isDemo: boolean('is_demo').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

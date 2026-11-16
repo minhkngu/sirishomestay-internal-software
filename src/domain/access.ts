@@ -60,3 +60,14 @@ export function assertCan(ctx: AccessContext, perm: Permission, facilityId?: str
 export function facilityScope(ctx: AccessContext): string[] | 'all' {
   return ctx.isAdmin ? 'all' : [...ctx.facilityIds]
 }
+
+/** Số passport/CCCD và ảnh giấy tờ chỉ người có nhóm "Khách & hợp đồng" tại cơ sở đó xem được. */
+export function canViewTenantIdentity(ctx: AccessContext, facilityId: string): boolean {
+  return can(ctx, 'tenants_contracts', facilityId)
+}
+
+/** "012345678901" → "•••••8901" */
+export function maskId(s: string | null | undefined): string {
+  if (!s) return ''
+  return '•••••' + s.slice(-4)
+}

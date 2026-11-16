@@ -5,6 +5,7 @@ export const auditLogs = pgTable('audit_logs', {
   userId: uuid('user_id'),
   action: text('action').notNull(),
   entity: text('entity').notNull(),
+  summary: text('summary').notNull().default(''),
   entityId: uuid('entity_id'),
   facilityId: uuid('facility_id'),
   before: jsonb('before'),

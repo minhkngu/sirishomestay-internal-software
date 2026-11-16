@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  can, assertCan, facilityScope, NotFoundError, ForbiddenError, PERMISSIONS, PERMISSION_LABELS,
+  can, assertCan, facilityScope, canViewTenantIdentity, maskId, NotFoundError, ForbiddenError, PERMISSIONS, PERMISSION_LABELS,
   type AccessContext, type Permission,
 } from '@/domain/access'
 
@@ -42,5 +42,15 @@ describe('access', () => {
   })
   it('assertCan: cơ sở ngoài phạm vi và thiếu quyền → NotFoundError (không lộ sự tồn tại)', () => {
     expect(() => assertCan(ctx(['meters'], [A]), 'billing', B)).toThrow(NotFoundError)
+  })
+  it('canViewTenantIdentity cần tenants_contracts tại cơ sở đó', () => {
+    expect(canViewTenantIdentity(ctx(['tenants_contracts'], [A]), A)).toBe(true)
+    expect(canViewTenantIdentity(ctx(['tenants_contracts'], [A]), B)).toBe(false)
+    expect(canViewTenantIdentity(ctx(['billing'], [A]), A)).toBe(false)
+    expect(canViewTenantIdentity(ctx(['settings'], []), B)).toBe(true)
+  })
+  it('maskId chỉ giữ 4 số cuối', () => {
+    expect(maskId('012345678901')).toBe('•••••8901')
+    expect(maskId(null)).toBe('')
   })
 })

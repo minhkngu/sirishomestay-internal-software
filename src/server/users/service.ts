@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import { userProfiles, userFacilities, userPermissions } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext, type Permission } from '@/domain/access'
@@ -37,7 +37,7 @@ export async function saveUserAccess(db: DB, ctx: AccessContext, userId: string,
 
     await recordAudit(tx, ctx, {
       action: 'update',
-      entity: 'user',
+      entity: 'user', summary: 'Sửa người dùng',
       entityId: userId,
       before: { fullName: before.fullName, isActive: before.isActive, facilityIds: oldFacilities.map((f) => f.facilityId), permissions: oldPermissions.map((p) => p.permission) },
       after: { ...input, facilityIds, permissions },
@@ -58,6 +58,20 @@ export async function createUserProfile(
     const facilityIds = [...new Set(input.facilityIds)]
     if (facilityIds.length) await tx.insert(userFacilities).values(facilityIds.map((facilityId) => ({ userId: authUserId, facilityId })))
     await tx.insert(userPermissions).values([...new Set(input.permissions)].map((permission) => ({ userId: authUserId, permission })))
-    await recordAudit(tx, ctx, { action: 'create', entity: 'user', entityId: authUserId, after: { ...input } })
+    await recordAudit(tx, ctx, { action: 'create', entity: 'user', summary: 'Tạo người dùng', entityId: authUserId, after: { ...input } })
   })
+}
+
+export type DemoAccount = { email: string; fullName: string; permissions: Permission[]; facilityIds: string[] }
+
+/** Tài khoản mẫu (is_demo) đang hoạt động — dùng cho nút "đăng nhập nhanh" ở demo mode. */
+export async function listDemoAccounts(db: Pick<DB, 'select'>): Promise<DemoAccount[]> {
+  const users = await db.select().from(userProfiles).where(and(eq(userProfiles.isDemo, true), eq(userProfiles.isActive, true))).orderBy(asc(userProfiles.fullName))
+  const [uf, up] = await Promise.all([db.select().from(userFacilities), db.select().from(userPermissions)])
+  return users.map((u) => ({
+    email: u.email,
+    fullName: u.fullName,
+    facilityIds: uf.filter((x) => x.userId === u.id).map((x) => x.facilityId),
+    permissions: up.filter((x) => x.userId === u.id).map((x) => x.permission as Permission),
+  }))
 }

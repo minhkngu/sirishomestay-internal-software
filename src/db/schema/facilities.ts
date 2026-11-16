@@ -7,6 +7,8 @@ export const facilities = pgTable('facilities', {
   address: text('address').notNull().default(''),
   note: text('note').notNull().default(''),
   isActive: boolean('is_active').notNull().default(true),
+  expectedInvoiceDay: integer('expected_invoice_day').notNull().default(5),
+  isDemo: boolean('is_demo').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
@@ -24,6 +26,7 @@ export const rooms = pgTable(
     capacity: integer('capacity'),
     note: text('note').notNull().default(''),
     isActive: boolean('is_active').notNull().default(true),
+    isDemo: boolean('is_demo').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

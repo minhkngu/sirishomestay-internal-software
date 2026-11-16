@@ -48,7 +48,7 @@ export async function createRoom(db: DB, ctx: AccessContext, input: RoomInput): 
     const [dup] = await tx.select({ id: rooms.id }).from(rooms).where(and(eq(rooms.facilityId, data.facilityId), eq(rooms.code, data.code)))
     if (dup) throw new ValidationError(DUP, { code: DUP })
     const [r] = await tx.insert(rooms).values({ ...data, areaM2: data.areaM2?.toString() ?? null }).returning()
-    await recordAudit(tx, ctx, { action: 'create', entity: 'room', entityId: r.id, facilityId: r.facilityId, after: r })
+    await recordAudit(tx, ctx, { action: 'create', entity: 'room', summary: 'Tạo phòng', entityId: r.id, facilityId: r.facilityId, after: r })
     return r
   })
 }
@@ -67,7 +67,7 @@ export async function updateRoom(db: DB, ctx: AccessContext, id: string, input: 
     const [after] = await tx.update(rooms)
       .set({ ...rest, ...(areaM2 !== undefined && { areaM2: areaM2?.toString() ?? null }), updatedAt: new Date() })
       .where(eq(rooms.id, id)).returning()
-    await recordAudit(tx, ctx, { action: 'update', entity: 'room', entityId: id, facilityId: before.facilityId, before, after })
+    await recordAudit(tx, ctx, { action: 'update', entity: 'room', summary: 'Sửa phòng', entityId: id, facilityId: before.facilityId, before, after })
     return after
   })
 }
@@ -79,7 +79,7 @@ export async function setRoomActive(db: DB, ctx: AccessContext, id: string, isAc
     const [before] = await tx.select().from(rooms).where(eq(rooms.id, id))
     if (!before) throw new NotFoundError()
     const [after] = await tx.update(rooms).set({ isActive, updatedAt: new Date() }).where(eq(rooms.id, id)).returning()
-    await recordAudit(tx, ctx, { action: 'update', entity: 'room', entityId: id, facilityId: before.facilityId, before: { isActive: before.isActive }, after: { isActive } })
+    await recordAudit(tx, ctx, { action: 'update', entity: 'room', summary: 'Sửa phòng', entityId: id, facilityId: before.facilityId, before: { isActive: before.isActive }, after: { isActive } })
     return after
   })
 }
@@ -103,7 +103,7 @@ export async function createRoomsBulk(db: DB, ctx: AccessContext, facilityId: st
         facilityId, code, floor: data.floor, roomType: data.roomType ?? null, listPrice: data.listPrice ?? null, capacity: data.capacity ?? null,
       })))
     }
-    await recordAudit(tx, ctx, { action: 'create', entity: 'room_bulk', facilityId, after: { created: toCreate, skipped } })
+    await recordAudit(tx, ctx, { action: 'create', entity: 'room_bulk', summary: 'Tạo nhiều phòng', facilityId, after: { created: toCreate, skipped } })
     return { created: toCreate.length, skipped }
   })
 }

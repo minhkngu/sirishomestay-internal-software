@@ -1,6 +1,6 @@
 {
-  "id": "5140c06d-a5ea-4edd-a0f1-b0e6470d7cda",
-  "prevId": "f1606aca-5f52-4d3e-aa55-548d0d3157e3",
+  "id": "54f8b615-463d-4880-aaa6-b267772aefe9",
+  "prevId": "a290a8ec-96cf-46ea-8973-f9c771baaa17",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -32,6 +32,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "summary": {
+          "name": "summary",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
         },
         "entity_id": {
           "name": "entity_id",
@@ -116,6 +123,20 @@
           "primaryKey": false,
           "notNull": true,
           "default": true
+        },
+        "expected_invoice_day": {
+          "name": "expected_invoice_day",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 5
+        },
+        "is_demo": {
+          "name": "is_demo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "created_at": {
           "name": "created_at",
@@ -214,6 +235,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": true
+        },
+        "is_demo": {
+          "name": "is_demo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "created_at": {
           "name": "created_at",
@@ -510,6 +538,13 @@
           "notNull": true,
           "default": "''"
         },
+        "is_demo": {
+          "name": "is_demo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -761,6 +796,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": true
+        },
+        "is_demo": {
+          "name": "is_demo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "created_at": {
           "name": "created_at",

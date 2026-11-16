@@ -42,7 +42,7 @@ export async function updateSettings(db: DB, ctx: AccessContext, partial: Partia
       await tx.insert(appSettings).values({ key, value }).onConflictDoUpdate({ target: appSettings.key, set: { value } })
     }
     const after = await getSettings(tx)
-    await recordAudit(tx, ctx, { action: 'update', entity: 'settings', before, after })
+    await recordAudit(tx, ctx, { action: 'update', entity: 'settings', summary: 'Sửa cài đặt chung', before, after })
     return after
   })
 }

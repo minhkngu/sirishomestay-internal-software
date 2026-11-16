@@ -26,10 +26,11 @@ Công nghệ: Next.js 16 (App Router), TypeScript, Tailwind v4 + shadcn/ui, Driz
    npm install
    npm run db:migrate
    npm run seed:admin -- --email you@example.com --name "Tên của bạn"
+   npm run db:seed          # (tuỳ chọn) nạp dữ liệu giả + 5 tài khoản mẫu; thêm -- --reset để xoá nạp lại
    npm run dev
    ```
 
-   Mở http://localhost:3000 và đăng nhập.
+   Mở http://localhost:3000 và đăng nhập. Đặt `NEXT_PUBLIC_DEMO_MODE=1` và `DEMO_PASSWORD` để thấy dải "Môi trường thử" và nút đăng nhập nhanh bằng tài khoản mẫu (Admin, Lan, Minh, Hùng, Vy).
 
 ## Kiểm thử
 

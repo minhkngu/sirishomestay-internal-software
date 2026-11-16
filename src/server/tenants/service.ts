@@ -102,7 +102,7 @@ export async function createTenant(db: DB, ctx: AccessContext, input: unknown): 
     const dup = await findDuplicateField(tx, row)
     if (dup) throw dupError(dup)
     const [t] = await tx.insert(tenants).values(row).returning()
-    await recordAudit(tx, ctx, { action: 'create', entity: 'tenant', entityId: t.id, facilityId: t.homeFacilityId, after: t })
+    await recordAudit(tx, ctx, { action: 'create', entity: 'tenant', summary: 'Tạo khách thuê', entityId: t.id, facilityId: t.homeFacilityId, after: t })
     return t
   })
 }
@@ -118,7 +118,7 @@ export async function updateTenant(db: DB, ctx: AccessContext, id: string, input
     const dup = await findDuplicateField(tx, row, id)
     if (dup) throw dupError(dup)
     const [after] = await tx.update(tenants).set({ ...row, updatedAt: new Date() }).where(eq(tenants.id, id)).returning()
-    await recordAudit(tx, ctx, { action: 'update', entity: 'tenant', entityId: id, facilityId: after.homeFacilityId, before, after })
+    await recordAudit(tx, ctx, { action: 'update', entity: 'tenant', summary: 'Sửa khách thuê', entityId: id, facilityId: after.homeFacilityId, before, after })
     return after
   })
 }

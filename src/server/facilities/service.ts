@@ -35,7 +35,7 @@ export async function createFacility(db: DB, ctx: AccessContext, input: Facility
   return db.transaction(async (tx) => {
     if (await codeTaken(tx, data.code)) throw new ValidationError('Mã cơ sở đã tồn tại', { code: 'Mã cơ sở đã tồn tại' })
     const [f] = await tx.insert(facilities).values(data).returning()
-    await recordAudit(tx, ctx, { action: 'create', entity: 'facility', entityId: f.id, facilityId: f.id, after: f })
+    await recordAudit(tx, ctx, { action: 'create', entity: 'facility', summary: 'Tạo cơ sở', entityId: f.id, facilityId: f.id, after: f })
     return f
   })
 }
@@ -48,7 +48,7 @@ export async function updateFacility(db: DB, ctx: AccessContext, id: string, inp
     if (!before) throw new NotFoundError()
     if (data.code && (await codeTaken(tx, data.code, id))) throw new ValidationError('Mã cơ sở đã tồn tại', { code: 'Mã cơ sở đã tồn tại' })
     const [after] = await tx.update(facilities).set({ ...data, updatedAt: new Date() }).where(eq(facilities.id, id)).returning()
-    await recordAudit(tx, ctx, { action: 'update', entity: 'facility', entityId: id, facilityId: id, before, after })
+    await recordAudit(tx, ctx, { action: 'update', entity: 'facility', summary: 'Sửa cơ sở', entityId: id, facilityId: id, before, after })
     return after
   })
 }

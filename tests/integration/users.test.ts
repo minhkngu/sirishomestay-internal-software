@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { facilities, userProfiles, auditLogs } from '@/db'
-import { saveUserAccess } from '@/server/users/service'
+import { saveUserAccess, listDemoAccounts } from '@/server/users/service'
 import { loadAccessContext } from '@/server/session'
 import { ForbiddenError, type AccessContext, type Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'
@@ -65,5 +65,13 @@ describe('saveUserAccess', () => {
     const logs = await db.select().from(auditLogs)
     expect(logs).toHaveLength(1)
     expect(logs[0]).toMatchObject({ action: 'update', entity: 'user', userId: adminId })
+  })
+
+  it('listDemoAccounts chỉ trả tài khoản mẫu đang hoạt động', async () => {
+    const demoId = crypto.randomUUID()
+    await db.insert(userProfiles).values({ id: demoId, email: 'demo@x.com', fullName: 'Demo', isDemo: true })
+    await db.insert(userProfiles).values({ id: crypto.randomUUID(), email: 'locked@x.com', fullName: 'Khoá', isDemo: true, isActive: false })
+    const list = await listDemoAccounts(db)
+    expect(list.map((u) => u.email)).toEqual(['demo@x.com'])
   })
 })

@@ -50,7 +50,7 @@ export async function confirmTenantDoc(
     const [doc] = await tx.insert(tenantDocuments).values({
       tenantId, storageKey: input.key, thumbKey: input.thumbKey, contentType: input.contentType, label: input.label.trim(), uploadedBy: ctx.userId,
     }).returning()
-    await recordAudit(tx, ctx, { action: 'create', entity: 'tenant_document', entityId: doc.id, facilityId, after: { tenantId, key: doc.storageKey, label: doc.label } })
+    await recordAudit(tx, ctx, { action: 'create', entity: 'tenant_document', summary: 'Tạo ảnh giấy tờ khách', entityId: doc.id, facilityId, after: { tenantId, key: doc.storageKey, label: doc.label } })
     return doc
   })
 }
@@ -67,7 +67,7 @@ export async function deleteTenantDoc(db: DB, ctx: AccessContext, storage: Stora
   assertCan(ctx, 'tenants_contracts', facilityId)
   await db.transaction(async (tx) => {
     await tx.delete(tenantDocuments).where(eq(tenantDocuments.id, docId))
-    await recordAudit(tx, ctx, { action: 'delete', entity: 'tenant_document', entityId: docId, facilityId, before: { key: doc.storageKey, label: doc.label } })
+    await recordAudit(tx, ctx, { action: 'delete', entity: 'tenant_document', summary: 'Xoá ảnh giấy tờ khách', entityId: docId, facilityId, before: { key: doc.storageKey, label: doc.label } })
   })
   await storage.delete(doc.storageKey)
   await storage.delete(doc.thumbKey)

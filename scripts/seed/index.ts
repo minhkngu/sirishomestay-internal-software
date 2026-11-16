@@ -1,0 +1,59 @@
+import { sql } from 'drizzle-orm'
+import type { DB } from '@/db/client'
+import { userProfiles } from '@/db'
+import { eq } from 'drizzle-orm'
+import { createRng } from './rng'
+import { facilitySeed } from './facilities'
+import { userSeed } from './users'
+import type { AuthAdmin, SeedCtx, SeedModule } from './types'
+
+export type { AuthAdmin } from './types'
+
+/** Thứ tự nạp: mỗi task thêm module của mình vào đây. */
+export const SEED_MODULES: SeedModule[] = [facilitySeed, userSeed]
+
+export type SeedOptions = { today?: string; password: string; reset?: boolean }
+
+async function resetAll(db: DB, auth: AuthAdmin) {
+  const demoUsers = await db.select({ id: userProfiles.id }).from(userProfiles).where(eq(userProfiles.isDemo, true))
+  for (const u of demoUsers) await auth.deleteUser(u.id)
+  const res = (await db.execute(sql`select tablename from pg_tables where schemaname = 'public'`)) as unknown as { rows?: { tablename: string }[] } | { tablename: string }[]
+  const rows = Array.isArray(res) ? res : res.rows ?? []
+  if (rows.length) await db.execute(sql.raw(`truncate ${rows.map((r) => `"${r.tablename}"`).join(', ')} restart identity cascade`))
+}
+
+export async function runSeed(db: DB, auth: AuthAdmin, opts: SeedOptions): Promise<void> {
+  const today = opts.today ?? new Date().toISOString().slice(0, 10)
+  if (opts.reset) await resetAll(db, auth)
+  const ctx: SeedCtx = { db, auth, today, password: opts.password, rng: createRng(), state: { facilityIds: {}, roomIds: {}, userIds: {} } }
+  for (const m of SEED_MODULES) await m.run(ctx)
+}
+
+async function main() {
+  try { process.loadEnvFile('.env.local') } catch { /* dùng biến môi trường hiện có */ }
+  const [{ drizzle }, { default: postgres }, { createClient }, { todayVN }] = await Promise.all([
+    import('drizzle-orm/postgres-js'), import('postgres'), import('@supabase/supabase-js'), import('@/domain/dates'),
+  ])
+  const schema = await import('@/db')
+  const url = process.env.DATABASE_URL
+  const password = process.env.DEMO_PASSWORD
+  if (!url || !password) throw new Error('Cần DATABASE_URL và DEMO_PASSWORD')
+  const client = postgres(url, { prepare: false })
+  const db = drizzle(client, { schema }) as unknown as DB
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } })
+  const auth: AuthAdmin = {
+    async createUser(email, pw) {
+      const { data, error } = await supabase.auth.admin.createUser({ email, password: pw, email_confirm: true })
+      if (error || !data.user) throw new Error(`Không tạo được ${email}: ${error?.message}`)
+      return data.user.id
+    },
+    async deleteUser(id) { await supabase.auth.admin.deleteUser(id) },
+  }
+  await runSeed(db, auth, { today: todayVN(), password, reset: process.argv.includes('--reset') })
+  await client.end()
+  console.log('Đã nạp dữ liệu giả.')
+}
+
+if (process.argv[1]?.endsWith('seed/index.ts')) {
+  main().catch((e) => { console.error(e.message); process.exit(1) })
+}

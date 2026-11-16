@@ -4,6 +4,7 @@ CREATE TABLE "audit_logs" (
 	"user_id" uuid,
 	"action" text NOT NULL,
 	"entity" text NOT NULL,
+	"summary" text DEFAULT '' NOT NULL,
 	"entity_id" uuid,
 	"facility_id" uuid,
 	"before" jsonb,
@@ -18,6 +19,8 @@ CREATE TABLE "facilities" (
 	"address" text DEFAULT '' NOT NULL,
 	"note" text DEFAULT '' NOT NULL,
 	"is_active" boolean DEFAULT true NOT NULL,
+	"expected_invoice_day" integer DEFAULT 5 NOT NULL,
+	"is_demo" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "facilities_code_unique" UNIQUE("code")
@@ -34,6 +37,7 @@ CREATE TABLE "rooms" (
 	"capacity" integer,
 	"note" text DEFAULT '' NOT NULL,
 	"is_active" boolean DEFAULT true NOT NULL,
+	"is_demo" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "rooms_facility_code_unique" UNIQUE("facility_id","code")
@@ -79,6 +83,7 @@ CREATE TABLE "tenants" (
 	"representative" text,
 	"contact_person" text,
 	"search_text" text DEFAULT '' NOT NULL,
+	"is_demo" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "tenants_phone_unique" UNIQUE("phone"),
@@ -106,6 +111,7 @@ CREATE TABLE "user_profiles" (
 	"email" text NOT NULL,
 	"full_name" text NOT NULL,
 	"is_active" boolean DEFAULT true NOT NULL,
+	"is_demo" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "user_profiles_email_unique" UNIQUE("email")

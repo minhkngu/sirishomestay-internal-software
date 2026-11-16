@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { check, date, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
+import { boolean, check, date, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 import { facilities } from './facilities'
 
 export const tenantKind = pgEnum('tenant_kind', ['foreign', 'vietnamese', 'company'])
@@ -30,6 +30,7 @@ export const tenants = pgTable(
     representative: text('representative'),
     contactPerson: text('contact_person'),
     searchText: text('search_text').notNull().default(''),
+    isDemo: boolean('is_demo').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
