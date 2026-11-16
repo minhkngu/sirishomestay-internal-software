@@ -11,7 +11,9 @@
 **Spec:** `docs/superpowers/specs/2026-11-16-quan-ly-khach-thue-design.md`
 **Tổng quan các đợt:** `docs/superpowers/plans/README.md` · Số Task giữ theo thứ tự chung của toàn dự án.
 
-**Điều kiện bắt đầu:** Đợt 3 đã được người dùng duyệt.
+**Điều kiện bắt đầu:** Đợt 3 đã cài đặt xong.
+> **16/11/2026:** Các task chưa làm không còn bước test và không còn điểm dừng theo đợt. Ca test được chuyển sang [kiểm thử tổng thể](2026-11-16-kiem-thu-tong-the.md), chạy một lần sau khi cài đặt xong.
+
 
 ## Global Constraints
 
@@ -78,22 +80,19 @@ tests/helpers/db.ts  tests/unit/**  tests/integration/**  tests/e2e/**
 
 **Files:**
 - Create: `src/db/schema/incidents.ts`, `src/server/incidents/{service.ts,actions.ts}`, `src/app/(app)/incidents/page.tsx`, `[id]/page.tsx`, `src/features/incidents/components/{incident-form.tsx,incident-board.tsx}`, `scripts/seed/incidents.ts`
-- Test: `tests/integration/incidents.test.ts`
+- Test (viết ở [kiểm thử tổng thể](2026-11-16-kiem-thu-tong-the.md), Task K1): `tests/integration/incidents.test.ts`
 
 **Interfaces:**
 - Bảng: `incidents(facility_id, room_id null, asset_id null, title, description, priority 'low'|'normal'|'high', status 'new'|'in_progress'|'done'|'cancelled', reported_by, assignee_id, cost, charge_to_tenant bool, charged_one_off_id)`. Ảnh dùng `ownerType = 'incident_photo'`.
 - Produces: `listIncidents(db, ctx, { facilityId?, status?, assigneeId? })`, `getIncident`, `createIncident`, `updateIncident`, `setIncidentStatus`; khi chuyển sang `done` với `charge_to_tenant` và có `cost` → tạo `one_off_charges` loại `penalty` cho hợp đồng đang ở phòng đó. Cần quyền `incidents`.
-- [ ] **Step 1:** Test: sự cố ở phòng 301 xong với chi phí 350.000, do khách gây ra → có phí phạt 350.000 chưa tính; `assetHistory` có sự cố này; người của cơ sở khác → `NotFoundError`.
-- [ ] **Step 2:** Chạy → FAIL.
-- [ ] **Step 3:** Cài đặt UI: bảng theo cột Mới / Đang xử lý / Xong; lọc "Việc của tôi"; form ngắn, có chụp ảnh, dùng tốt trên điện thoại; nút "Báo sự cố" ở trang phòng.
-- [ ] **Step 4:** Chạy → PASS.
-- [ ] **Step 5:** Commit `feat: sự cố và sửa chữa, tính phí cho khách`.
+- [ ] **Step 1:** Cài đặt service và UI: bảng theo cột Mới / Đang xử lý / Xong; lọc "Việc của tôi"; form ngắn, có chụp ảnh, dùng tốt trên điện thoại; nút "Báo sự cố" ở trang phòng.
+- [ ] **Step 2:** Commit `feat: sự cố và sửa chữa, tính phí cho khách`.
 
 ### Task 17: Bảng nhắc việc
 
 **Files:**
 - Modify (đã tạo ở Task 7b, đợt 1): `src/domain/reminders.ts`, `src/server/dashboard/service.ts`, `src/app/(app)/page.tsx`, `src/features/dashboard/components/{reminder-card.tsx,stat-strip.tsx}`
-- Test: `tests/unit/domain/reminders.test.ts` (thêm ca cho các loại mới), `tests/integration/dashboard.test.ts`
+- Test (viết ở [kiểm thử tổng thể](2026-11-16-kiem-thu-tong-the.md), Task K1): `tests/unit/domain/reminders.test.ts` (thêm ca cho các loại mới), `tests/integration/dashboard.test.ts`
 
 **Interfaces:**
 - Produces: `buildReminders(snapshot, ctx, today, settings): Reminder[]` với `Reminder { kind; title; count; items: { label; sub; href; severity: 'danger'|'warning'|'info' }[] }`. Mỗi loại chỉ hiện khi người dùng có quyền tương ứng, và lọc theo cơ sở:
@@ -108,17 +107,14 @@ tests/helpers/db.ts  tests/unit/**  tests/integration/**  tests/e2e/**
   - `photos_expiring` (settings): ảnh sẽ bị xoá trong vòng 7 ngày
 
   `getDashboard(db, ctx)` lấy snapshot cần thiết rồi gọi `buildReminders`.
-- [ ] **Step 1:** Test với `today = '2026-11-16'` và ngưỡng 30: visa còn 0 / −6 / 30 ngày có mặt, 31 ngày không; hoá đơn hạn 15/11 chưa thu có mặt, hạn 16/11 không; Hùng chỉ thấy `meters_missing` và `open_incidents` của Bình Thạnh.
-- [ ] **Step 2:** Chạy → FAIL.
-- [ ] **Step 3:** Cài đặt UI: dải số liệu (phòng đang ở / trống / đã cọc, tổng công nợ quá hạn); lưới thẻ xếp theo mức độ, mỗi thẻ tối đa 8 dòng, có "Xem tất cả" dẫn tới danh sách đã lọc sẵn.
-- [ ] **Step 4:** Chạy → PASS.
-- [ ] **Step 5:** Commit `feat: bảng nhắc việc`.
+- [ ] **Step 1:** Cài đặt service và UI: dải số liệu (phòng đang ở / trống / đã cọc, tổng công nợ quá hạn); lưới thẻ xếp theo mức độ, mỗi thẻ tối đa 8 dòng, có "Xem tất cả" dẫn tới danh sách đã lọc sẵn.
+- [ ] **Step 2:** Commit `feat: bảng nhắc việc`.
 
 ### Task 18: Nhập dữ liệu từ Excel
 
 **Files:**
-- Create: `src/lib/excel.ts`, `src/server/import/{targets.ts,validate.ts,run.ts,actions.ts}`, `src/features/import/components/{upload-step.tsx,mapping-step.tsx,preview-step.tsx}`, `src/app/(app)/import/page.tsx`, `tests/fixtures/build-fixtures.ts`
-- Test: `tests/unit/import.test.ts`, `tests/integration/import-run.test.ts`
+- Create: `src/lib/excel.ts`, `src/server/import/{targets.ts,validate.ts,run.ts,actions.ts}`, `src/features/import/components/{upload-step.tsx,mapping-step.tsx,preview-step.tsx}`, `src/app/(app)/import/page.tsx`, `tests/fixtures/build-fixtures.ts` (file mẫu cho nút "Tải file mẫu")
+- Test (viết ở [kiểm thử tổng thể](2026-11-16-kiem-thu-tong-the.md), Task K1): `tests/unit/import.test.ts`, `tests/integration/import-run.test.ts`
 
 **Interfaces:**
 - Produces:
@@ -135,37 +131,14 @@ tests/helpers/db.ts  tests/unit/**  tests/integration/**  tests/e2e/**
     - công nợ đầu kỳ: một hoá đơn `manual` mỗi hợp đồng với `invoices.source = 'import:debt'`, nhập lại thì sửa dòng của hoá đơn đó (nếu đã có khoản thu → lỗi dòng "Công nợ đã có khoản thu, sửa tay trên hoá đơn");
     - chỉ số: `(meter, period)` (đã unique); tài sản: mã tài sản.
   - Ghi audit `import`. Chỉ người có quyền `settings`.
-- [ ] **Step 1:** Test:
-  - `suggestMapping(['Số điện thoại','Họ tên','Hết hạn visa'])` → `phone, fullName, visaExpiry`.
-  - `05/03/2027` và số Excel 46451 đều thành `2027-03-05`.
-  - Dòng thiếu passport → `{ row: 3, field: 'passportNumber' }`.
-  - Chạy cùng file 2 lần → lần 2 `created 0`; sửa SĐT trong file rồi chạy lại → `updated 1`.
-  - Nhập file công nợ 2 lần → mỗi hợp đồng vẫn chỉ có 1 hoá đơn `import:debt`; nhập file số dư cọc 2 lần → `depositBalance` không đổi.
-  - Hai dòng hợp đồng cùng `legacy_code` khác ngày bắt đầu → lần 2 là `updated`, không tạo hợp đồng thứ hai.
-- [ ] **Step 2:** Chạy → FAIL.
-- [ ] **Step 3:** Cài đặt UI 3 bước:
+- [ ] **Step 1:** Cài đặt service và UI 3 bước:
   1. Chọn loại dữ liệu, file và sheet.
   2. Ghép cột, có gợi ý sẵn.
   3. Xem trước: số dòng hợp lệ và lỗi, bảng lỗi theo dòng, nút "Nhập N dòng hợp lệ".
 
   Có nút "Tải file mẫu" cho từng loại. Giới hạn 10MB và 5.000 dòng.
-- [ ] **Step 4:** Chạy → PASS.
-- [ ] **Step 5:** Commit `feat: nhập dữ liệu từ Excel`.
+- [ ] **Step 2:** Commit `feat: nhập dữ liệu từ Excel`.
 
-### Task 19: Điểm dừng — người dùng duyệt giao diện với dữ liệu giả
+### ~~Task 19: Điểm dừng — người dùng duyệt giao diện~~ — chuyển (16/11/2026)
 
-**Files:**
-- Create: `docs/review/checklist.md`, `tests/e2e/{login,tenants,contracts,invoices,termination}.spec.ts`
-
-- [ ] **Step 1:** Viết các test Playwright chạy trên Supabase dev; bỏ qua nếu thiếu `E2E_BASE_URL`.
-  1. Đăng nhập nhanh bằng Admin → thấy Nhắc việc.
-  2. Hùng mở `/tenants` → "Không tìm thấy".
-  3. Tạo khách → tạo cọc → chuyển thành hợp đồng thuê → check-in.
-  4. Ghi điện nước → tạo hoá đơn tháng → duyệt → thu tiền.
-  5. Thanh lý → hoá đơn thanh lý hiện "Hoàn khách".
-- [ ] **Step 2:** `npm test` → PASS toàn bộ; `npx playwright test` → PASS; `npm run lint` → sạch; `npm run build` → OK.
-- [ ] **Step 3:** `npm run db:migrate && npm run db:seed` trên Supabase dev — chỉ nạp dữ liệu của module mới, giữ nguyên dữ liệu đang có (không dùng `--reset`); triển khai bản thử lên Vercel (preview) với `NEXT_PUBLIC_DEMO_MODE=1`.
-- [ ] **Step 4:** Viết `docs/review/checklist.md`: danh sách luồng để người dùng bấm thử và ghi góp ý. Mỗi luồng gồm các bước, điều cần để ý và ô ghi chú. Thứ tự: nhắc việc → khách → cọc → hợp đồng thuê → bàn giao → điện nước → hoá đơn → gia hạn / chuyển phòng / thanh lý → tài sản → sự cố → người dùng & phân quyền → mẫu Word → nhập Excel → cài đặt.
-- [ ] **Step 5:** Commit `test: e2e các luồng chính; docs: checklist duyệt`.
-- [ ] **Step 6: Dừng lại.** Người dùng duyệt. Góp ý được cập nhật vào spec và plan rồi mới làm tiếp. Các task từ 20 trở đi chỉ làm sau khi giao diện đã được duyệt.
-
+E2E, kiểm tra toàn bộ, bản thử Vercel và `docs/review/checklist.md` làm ở [kiểm thử tổng thể](2026-11-16-kiem-thu-tong-the.md) (Task K2, K3, K5), sau khi đợt 5 cài đặt xong.

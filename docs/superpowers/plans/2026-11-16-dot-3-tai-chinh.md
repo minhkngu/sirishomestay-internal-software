@@ -11,7 +11,9 @@
 **Spec:** `docs/superpowers/specs/2026-11-16-quan-ly-khach-thue-design.md`
 **Tổng quan các đợt:** `docs/superpowers/plans/README.md` · Số Task giữ theo thứ tự chung của toàn dự án.
 
-**Điều kiện bắt đầu:** Đợt 2 đã được người dùng duyệt.
+**Điều kiện bắt đầu:** Đợt 2 đã cài đặt xong (không chờ người dùng duyệt — duyệt một lần ở cuối).
+> **16/11/2026:** Các task chưa làm không còn bước test và không còn điểm dừng theo đợt. Ca test được chuyển sang [kiểm thử tổng thể](2026-11-16-kiem-thu-tong-the.md), chạy một lần sau khi cài đặt xong.
+
 
 ## Global Constraints
 
@@ -134,13 +136,13 @@ expect(computeDueDate({kind:'day_of_next_month',day:31},'2027-01-20')).toBe('202
 - [x] **Step 2:** Chạy → FAIL. **Step 3:** Cài đặt. **Step 4:** Chạy → PASS.
 - [x] **Step 5:** Commit `feat(domain): lõi tính tiền — lẻ ngày, điện nước, điều chỉnh, sổ cọc, thanh lý`.
 
-### Task 4b: Bổ sung lõi tính tiền (sau rà soát spec 16/11)
+### Task 4b: Bổ sung lõi tính tiền (sau rà soát spec 16/11) ✅
 
 Task 4 chưa xử lý: thay đổi điều khoản *bên trong* kỳ của hoá đơn chưa duyệt (spec 6.3 "hoá đơn kỳ đó tách theo ngày ở mỗi phòng"), đổi số người ở giữa kỳ (spec 6.5), nước tính theo người thay cho đồng hồ (spec 6.6), và trạng thái của hoá đơn âm (hoàn khách).
 
 **Files:**
 - Modify: `src/domain/types.ts`, `src/domain/contract-terms.ts`, `src/domain/invoice-builder.ts`, `src/domain/adjustments.ts`
-- Test: `tests/unit/domain/billing.test.ts` (thêm ca)
+- Test (viết ở [kiểm thử tổng thể](2026-11-16-kiem-thu-tong-the.md), Task K1): `tests/unit/domain/billing.test.ts` (thêm ca)
 
 **Interfaces:**
 - Consumes: `contractTermsAt`, `prorate`, `meterUsage`, `rateFor` (Task 4).
@@ -153,51 +155,27 @@ Task 4 chưa xử lý: thay đổi điều khoản *bên trong* kỳ của hoá 
   - `midPeriodAdjustments` tính cả chênh lệch phí `quantityFrom: 'occupants'` khi phụ lục `occupants` có hiệu lực trong kỳ đã duyệt.
   - `invoiceStatus` (Task 14) dùng `settlementState(total, paid): 'unpaid'|'partial'|'paid'|'refund_pending'|'refunded'` trong `invoice-builder.ts`: `total < 0` → khoản thu âm (tiền đã hoàn) so với `total`.
 
-- [ ] **Step 1: Viết test (days_30)**
+- [x] **Step 1:** Cài đặt. Các test cũ của Task 4 phải vẫn đúng (chỉ đổi cách truyền đầu vào).
+- [x] **Step 2:** Commit `f352374`.
 
-```ts
-// chuyển phòng 15/11 từ phòng 9tr sang 11tr, hoá đơn tháng 11 CHƯA tạo
-//   → 2 dòng tiền phòng: 9.000.000 × 14/30 = 4.200.000 và 11.000.000 × 16/30 = 5.866.667
-// hoá đơn tháng 12 sau chuyển phòng: phòng cũ tiêu thụ 60 kWh tới 15/11 + phòng mới 40 kWh → điện 100 kWh
-// phí 200.000/người, 2 → 3 người từ 16/11, hoá đơn tháng 11 đã duyệt → điều chỉnh +100.000
-// billWaterByMeter = false → không có dòng 'water'
-const q = { ...lease, billingCycleMonths: 3, startDate: '2026-10-01' }
-expect(nextBillingPeriod(q, null, '2026-10')).toEqual({ start: '2026-10-01', end: '2026-12-31' })
-expect(nextBillingPeriod(q, '2026-12-31', '2026-11')).toBeNull()          // đã trả tới hết tháng 12
-expect(nextBillingPeriod(q, '2026-12-31', '2027-01')).toEqual({ start: '2027-01-01', end: '2027-03-31' })
-expect(nextBillingPeriod({ ...q, billingCycleMonths: 1 }, '2027-02-28', '2027-01')).toBeNull() // sửa tay kỳ tới 28/02
-expect(nextBillingPeriod({ ...q, billingCycleMonths: 1 }, '2026-11-30', '2026-11')).toBeNull() // đã có hoá đơn tháng 11
-expect(nextBillingPeriod({ ...q, endDate: '2027-02-15' }, '2026-12-31', '2027-01')).toEqual({ start: '2027-01-01', end: '2027-02-15' }) // không vượt ngày kết thúc HĐ
-expect(settlementState(-11_080_000, 0)).toBe('refund_pending')
-expect(settlementState(-11_080_000, -11_080_000)).toBe('refunded')
-```
-
-- [ ] **Step 2:** Chạy `npx vitest run tests/unit/domain/billing.test.ts` → FAIL.
-- [ ] **Step 3:** Cài đặt. Các test cũ của Task 4 phải vẫn đúng (chỉ đổi cách truyền đầu vào).
-- [ ] **Step 4:** Chạy → PASS toàn bộ `billing.test.ts`.
-- [ ] **Step 5:** Commit `feat(domain): tách kỳ theo phụ lục, đổi người ở, kỳ thanh toán nhiều tháng, hoá đơn hoàn khách`.
-
-### Task 13: Phí phát sinh theo lần
+### Task 13: Phí phát sinh theo lần ✅
 
 **Files:**
 - Create: `src/db/schema/charges.ts`, `src/server/charges/{service.ts,actions.ts}`, `src/features/charges/components/one-off-dialog.tsx`, `src/features/deposits/components/deposit-ledger.tsx`
-- Test: `tests/integration/charges.test.ts`
+- Test (viết ở [kiểm thử tổng thể](2026-11-16-kiem-thu-tong-the.md), Task K1): `tests/integration/charges.test.ts`
 
 **Interfaces:**
 - Bảng: `one_off_charges(lease_id, fee_type_id null, kind 'service'|'penalty', description, date, quantity, unit_price, invoice_id null, source text null)`, `pending_adjustments(lease_id, description, amount, source_key unique, invoice_id null)`.
 - Produces: `addOneOff`, `listOneOffs`, `removeOneOff` (không xoá được nếu đã vào hoá đơn đã duyệt); `listDepositEntries(leaseId)`, `markDepositDone(entryId, { date, method })`, `addDepositEntry`. Tất cả có dạng `(db, ctx, …)` và cần quyền `billing` tại cơ sở của hợp đồng.
-- [ ] **Step 1:** Test: thêm "Giặt ủi 3kg × 25.000" → ở trạng thái chưa tính; đánh dấu khoản cọc bổ sung đã thu → `depositBalance` tăng 1.000.000; người chỉ có `meters` gọi `addOneOff` → `ForbiddenError`.
-- [ ] **Step 2:** Chạy → FAIL.
-- [ ] **Step 3:** Cài đặt UI: nút "Thêm phí phát sinh" ở trang hợp đồng và trang phòng; sổ cọc dạng bảng (ngày, loại, số tiền, trạng thái, số dư luỹ kế).
-- [ ] **Step 4:** Chạy → PASS.
-- [ ] **Step 5:** Commit `feat: phí phát sinh theo lần, sổ cọc`.
+- [x] **Step 1:** Cài đặt service và UI: nút "Thêm phí phát sinh" ở trang hợp đồng và trang phòng; sổ cọc dạng bảng (ngày, loại, số tiền, trạng thái, số dư luỹ kế). Kiểm tra quyền xoá phí đã gắn hoá đơn nháp sẽ hoàn thiện tại Task 14.
+- [x] **Step 2:** Commit `a950290`.
 
 ### Task 14: Hoá đơn và thu tiền
 
 **Files:**
 - Create: `src/db/schema/invoices.ts`, `src/server/invoices/{service.ts,actions.ts}`, `src/app/(app)/invoices/page.tsx`, `generate/page.tsx`, `[id]/page.tsx`, `src/features/invoices/components/{generate-wizard.tsx,invoice-editor.tsx,payment-dialog.tsx,invoice-status.tsx}`, `scripts/seed/invoices.ts`
 - Modify: `src/server/contracts/service.ts` (tạo hoá đơn đầu tiên nháp thật)
-- Test: `tests/integration/invoices.test.ts`
+- Test (viết ở [kiểm thử tổng thể](2026-11-16-kiem-thu-tong-the.md), Task K1): `tests/integration/invoices.test.ts`
 
 **Interfaces:**
 - Bảng:
@@ -218,29 +196,18 @@ expect(settlementState(-11_080_000, -11_080_000)).toBe('refunded')
   - `listInvoices(db, ctx, { facilityId?, status?, period?, overdue? })`, `tenantBalance(db, ctx, tenantId)`.
   - Mỗi khi duyệt hoá đơn hoặc tạo phụ lục: tính `midPeriodAdjustments` rồi upsert vào `pending_adjustments` theo `source_key`.
   - Cần quyền `billing`.
-- [ ] **Step 1:** Viết test.
-  - Tạo nháp tháng 12 → dòng tiền phòng tháng 12, điện nước tháng 11, phí phát sinh.
-  - Tạo nháp lần nữa → không trùng hoá đơn, không lặp điều chỉnh.
-  - Sửa kỳ 01/12–28/02 → hệ số 3; tạo hàng loạt tháng 01 và tháng 02 → hợp đồng đó bị bỏ qua, hiện "Đã trả trước tới 28/02/2027".
-  - Hợp đồng `billing_cycle_months = 3` bắt đầu 01/10 → nháp tháng 10 có kỳ 01/10–31/12, tháng 11 và 12 không sinh hoá đơn.
-  - Hoá đơn có `proration = 'days_30'` trong khi cài đặt là `actual_days` → dòng tiền phòng lẻ ngày tính theo 30.
-  - Duyệt với "ngày 5 của tháng sau" → hạn 05/01.
-  - Thu một phần → "Thu một phần"; xoá → lỗi; quá hạn → "Quá hạn".
-  - Người chỉ có quyền `meters` → `ForbiddenError`.
-- [ ] **Step 2:** Chạy → FAIL.
-- [ ] **Step 3:** Cài đặt UI.
+- [ ] **Step 1:** Cài đặt service và UI.
   - **Danh sách:** bộ lọc nhanh Nháp / Chưa thu / Quá hạn / Kỳ.
   - **Wizard tạo hàng loạt:** chọn cơ sở và kỳ → xem trước kèm cảnh báo → tạo nháp.
   - **Editor:** bảng dòng hoá đơn sửa trực tiếp (thêm dòng, chọn loại phí, phạt, điều chỉnh); sửa kỳ và hệ số; chọn hạn thanh toán; ghi thu; xem công nợ của khách.
   - **Menu xuất:** Word chạy ngay; PDF và Ảnh sẽ có ở Task 20, trước đó các nút này báo "Sắp có".
-- [ ] **Step 4:** Chạy → PASS.
-- [ ] **Step 5:** Commit `feat: hoá đơn hàng loạt, sửa, duyệt, thu tiền, công nợ`.
+- [ ] **Step 2:** Commit `feat: hoá đơn hàng loạt, sửa, duyệt, thu tiền, công nợ`.
 
 ### Task 15: Phụ lục — gia hạn, chuyển phòng, thanh lý
 
 **Files:**
 - Create: `src/db/schema/addenda.ts`, `src/server/addenda/{service.ts,actions.ts}`, `src/features/contracts/components/{extension-dialog.tsx,transfer-wizard.tsx,termination-wizard.tsx}`
-- Test: `tests/integration/addenda.test.ts`
+- Test (viết ở [kiểm thử tổng thể](2026-11-16-kiem-thu-tong-the.md), Task K1): `tests/integration/addenda.test.ts`
 
 **Interfaces:**
 - Bảng: `addenda(lease_id, type 'extension'|'transfer'|'termination'|'occupants', effective_date, new_end_date, new_room_id, new_monthly_rent, new_deposit_amount, new_fees jsonb, new_occupant_ids jsonb, deposit_forfeit jsonb, adjustment_target 'next'|'current', sign_status, signed_file_id)`.
@@ -257,24 +224,9 @@ expect(settlementState(-11_080_000, -11_080_000)).toBe('refunded')
     - Khi hoá đơn thanh lý được duyệt: lease chuyển `ended`; ghi sổ cọc `forfeit` (phần mất cọc) và `deduct` (phần cọc còn lại, đã trừ vào hoá đơn) ở trạng thái `done` để số dư cọc về 0; tiền hoàn cho khách theo dõi trên chính hoá đơn thanh lý (Chờ hoàn khách → Đã hoàn, Task 14), không ghi thêm dòng `refund` để khỏi trừ hai lần.
     - Đặt `files.delete_after = endDate + photoRetentionDays` cho ảnh bàn giao của hợp đồng; ảnh giấy tờ của bên thuê và người ở chỉ đặt khi khách đó **không còn** hợp đồng thuê `active` hay cọc `pending` nào khác.
   - Phụ lục có trạng thái ký và xuất Word như hợp đồng.
-- [ ] **Step 1:** Viết test (cài đặt days_30).
-  - Gia hạn tăng giá 9tr→10tr và cọc 9tr→10tr → sổ cọc có topup 1.000.000 pending.
-  - Chuyển phòng 15/11 sang phòng 11tr, sau khi hoá đơn tháng 11 đã duyệt → `pending_adjustments` có +1.066.667; cùng ca với `adjustmentTarget: 'current'` → hoá đơn tháng 11 có thêm dòng +1.066.667, không có `pending_adjustments`.
-  - Đổi người ở 2 → 3 từ 16/11 (phí 200.000/người), hoá đơn tháng 11 đã duyệt → `pending_adjustments` có +100.000; thêm khách công ty làm người ở → `ValidationError`.
-  - Thanh lý 20/11 với phạt 500.000, không mất cọc → hoá đơn tổng −11.080.000; mất cọc toàn bộ → −2.080.000.
-  - Sau khi duyệt hoá đơn thanh lý → phòng về Trống, hoặc Đã cọc nếu có cọc chờ; số dư cọc = 0; hoá đơn ở "Chờ hoàn khách".
-  - Khách có ảnh passport còn một hợp đồng khác đang hiệu lực → ảnh giấy tờ không bị đặt `delete_after`.
-  - Người chỉ có `billing` tạo phụ lục → `ForbiddenError`.
-- [ ] **Step 2:** Chạy → FAIL.
-- [ ] **Step 3:** Cài đặt UI: mỗi phụ lục là một wizard ngắn, có bước "Xem trước tiền" trước khi lưu.
-- [ ] **Step 4:** Chạy → PASS.
-- [ ] **Step 5:** Commit `feat: phụ lục gia hạn, chuyển phòng, thanh lý`.
+- [ ] **Step 1:** Cài đặt service và UI: mỗi phụ lục là một wizard ngắn, có bước "Xem trước tiền" trước khi lưu.
+- [ ] **Step 2:** Commit `feat: phụ lục gia hạn, chuyển phòng, thanh lý`.
 
-### Điểm dừng đợt 3: người dùng test
+### ~~Điểm dừng đợt 3~~ — bỏ (16/11/2026)
 
-- [ ] **Step 1:** `npm test` → PASS toàn bộ; `npm run lint` sạch; `npm run build` OK.
-- [ ] **Step 2:** Playwright (chạy trên Supabase dev, bỏ qua nếu thiếu `E2E_BASE_URL`) cho các luồng: ghi điện nước → tạo hoá đơn tháng hàng loạt → sửa kỳ thành 3 tháng → duyệt → thu một phần; gia hạn tăng giá và cọc → sổ cọc có khoản thu bổ sung; chuyển phòng giữa tháng → dòng điều chỉnh ở kỳ sau; thanh lý → hoá đơn thanh lý hiện "Hoàn khách". `npx playwright test` → PASS.
-- [ ] **Step 3:** `npm run db:migrate && npm run db:seed` trên Supabase dev — chỉ nạp dữ liệu của module mới, giữ nguyên dữ liệu đang có (không dùng `--reset`); triển khai bản thử lên Vercel (preview) với `NEXT_PUBLIC_DEMO_MODE=1`.
-- [ ] **Step 4:** Viết `docs/review/dot-3-checklist.md`: từng luồng cần bấm thử (các bước, điều cần để ý, ô ghi chú) cho phần của đợt này.
-- [ ] **Step 5:** Commit `test: e2e và checklist test đợt 3`.
-- [ ] **Step 6: Dừng lại.** Gửi link bản thử + checklist cho người dùng. Góp ý được cập nhật vào spec và kế hoạch các đợt sau rồi mới bắt đầu đợt tiếp theo.
+Test, e2e, bản thử Vercel và checklist của đợt này làm gộp ở [kiểm thử tổng thể](2026-11-16-kiem-thu-tong-the.md).

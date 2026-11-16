@@ -250,4 +250,4 @@ Rà soát spec ngày 16/11 thấy Task 9–12 còn thiếu: Task 9 và 12 không
 - [x] **Step 3:** `npm run db:migrate && npm run db:seed` trên Supabase dev — thêm bảng vật tư và vật tư mẫu, giữ nguyên dữ liệu đang có (không dùng `--reset`); triển khai bản thử lên Vercel (preview) với `NEXT_PUBLIC_DEMO_MODE=1`.
 - [x] **Step 4:** Viết `docs/review/dot-2-checklist.md`: từng luồng cần bấm thử (các bước, điều cần để ý, ô ghi chú) cho phần của đợt này.
 - [x] **Step 5:** Commit `test: e2e và checklist test đợt 2`.
-- [x] **Step 6: Dừng lại.** Gửi link bản thử + checklist cho người dùng. Góp ý được cập nhật vào spec và kế hoạch các đợt sau rồi mới bắt đầu đợt tiếp theo. *(16/11: người dùng xác nhận hoàn thành điểm dừng và yêu cầu tiếp tục đợt 3.)*
+- [x] **Step 6: Dừng lại.** Đã gửi link preview + checklist; người dùng xác nhận hoàn thành điểm dừng. Góp ý tiếp theo gộp vào lần duyệt ở [kiểm thử tổng thể](2026-11-16-kiem-thu-tong-the.md), Task K5.

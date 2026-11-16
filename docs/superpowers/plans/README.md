@@ -2,15 +2,18 @@
 
 Spec: [../specs/2026-11-16-quan-ly-khach-thue-design.md](../specs/2026-11-16-quan-ly-khach-thue-design.md)
 
-Dùng Supabase ngay từ đầu, dữ liệu giả nạp bằng `npm run db:seed`. Mỗi đợt kết thúc bằng **điểm dừng**: đưa bản thử lên Vercel + checklist để người dùng test và góp ý, rồi mới sang đợt sau. Số Task đánh liên tục cho cả dự án.
+Dùng Supabase ngay từ đầu, dữ liệu giả nạp bằng `npm run db:seed`. Số Task đánh liên tục cho cả dự án.
+
+**Từ 16/11/2026:** bỏ bước test trong các task chưa làm và bỏ điểm dừng theo đợt. Làm hết phần cài đặt (đợt 3 → 5), rồi kiểm thử một lần theo [kế hoạch kiểm thử tổng thể](2026-11-16-kiem-thu-tong-the.md): test còn thiếu, e2e, kiểm tra toàn bộ, đo tốc độ, một bản thử Vercel + checklist cho người dùng duyệt. Các bước chạy thật (`go-live.md`) làm sau lần duyệt đó.
 
 | Đợt | Nội dung | Task | File | Tiến độ (16/11/2026) |
 |---|---|---|---|---|
 | 1 | Nền tảng: đăng nhập, phân quyền, người dùng, cơ sở/phòng, cài đặt, loại phí, đơn giá, lưu file, khách thuê, nhắc visa | 1, 2, 3, 5, 6, 7, 7b | [dot-1](2026-11-16-dot-1-nen-tang.md) | Hoàn thành điểm dừng theo xác nhận của người dùng |
 | 2 | Mẫu Word, hợp đồng cọc/thuê, tài sản & kho, điện nước, bàn giao | 8–12, 12b | [dot-2](2026-11-16-dot-2-hop-dong-tai-san-dien-nuoc.md) | Task 8–12b và điểm dừng hoàn thành theo xác nhận của người dùng |
-| 3 | Tài chính: lõi tính tiền, phí phát sinh, sổ cọc, hoá đơn, thu tiền, phụ lục gia hạn/chuyển phòng/thanh lý/đổi người ở | 4, 4b, 13–15 | [dot-3](2026-11-16-dot-3-tai-chinh.md) | Task 4 xong · Task 4b (thêm sau rà soát), 13–15 chưa làm |
-| 4 | Sự cố, nhắc việc đầy đủ, nhập Excel, test toàn hệ thống | 16–19 | [dot-4](2026-11-16-dot-4-su-co-nhac-viec-nhap-excel.md) | Chưa làm |
+| 3 | Tài chính: lõi tính tiền, phí phát sinh, sổ cọc, hoá đơn, thu tiền, phụ lục gia hạn/chuyển phòng/thanh lý/đổi người ở | 4, 4b, 13–15 | [dot-3](2026-11-16-dot-3-tai-chinh.md) | Task 4, 4b và 13 đã triển khai · Task 14 đang làm, Task 15 chưa làm |
+| 4 | Sự cố, nhắc việc đầy đủ, nhập Excel | 16–18 | [dot-4](2026-11-16-dot-4-su-co-nhac-viec-nhap-excel.md) | Chưa làm |
 | 5 | Chạy thật: PDF/ảnh, R2 + tự xoá ảnh, sao lưu Drive, xoá dữ liệu giả | 20–23 | [dot-5](2026-11-16-dot-5-chay-that.md) | Task 22 (sao lưu) xong, chưa chạy thử khôi phục · còn lại chưa làm |
+| — | Kiểm thử tổng thể + người dùng duyệt | K1–K5 | [kiem-thu-tong-the](2026-11-16-kiem-thu-tong-the.md) | Chưa làm (sau khi xong đợt 5) |
 
 Kế hoạch các đợt sau có thể được chỉnh lại theo góp ý ở điểm dừng của đợt trước.
 
@@ -22,7 +25,7 @@ Kế hoạch lẻ: [Tăng tốc chuyển trang](2026-11-16-tang-toc-tai-trang.md
 - **16/11/2026 (sau):** seed tự tạo bucket `siris` (`8c09af0`); e2e + checklist đợt 1 (`4d71407`).
 - **16/11/2026 — rà soát plan với spec:** thêm Task 12b (ẩn thông tin khách/tiền theo quyền, quyền cho hợp đồng/bàn giao, vật tư theo số lượng, người ở phải là cá nhân) và Task 4b (tách kỳ theo phụ lục chưa duyệt, đổi người ở, kỳ thanh toán nhiều tháng, nước tính theo người, hoá đơn hoàn khách). Sửa Task 13–15 (quyền, ghi đè lẻ ngày trên hoá đơn, `billing_cycle_months`, phiếu thu, điều chỉnh "sửa thẳng hoá đơn hiện tại", sổ cọc khi thanh lý, không xoá ảnh giấy tờ của khách còn hợp đồng), Task 18 (khoá chống trùng cho cọc, công nợ, mã hợp đồng cũ) và Task 21.
 - **16/11/2026 — bỏ `--reset` ở các điểm dừng:** seed sẽ chạy thêm dần (làm trong Task 12b): module đã có dữ liệu thì bỏ qua, nên điểm dừng chỉ chạy `db:migrate && db:seed` và giữ nguyên dữ liệu đang test. `--reset` chỉ dùng khi chủ động muốn làm sạch.
-- **Việc kế tiếp:** Task 4b, 13–15 và điểm dừng đợt 3.
+- **16/11/2026 — gộp kiểm thử về cuối:** các ca test được chuyển sang `2026-11-16-kiem-thu-tong-the.md`. Task 4b và 13 đã triển khai; tiếp tục Task 14–15, sau đó kiểm thử tổng thể theo kế hoạch mới.
 
 ## Ghi chú môi trường (rút ra khi chạy thật)
 
