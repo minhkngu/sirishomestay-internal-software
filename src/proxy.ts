@@ -1,3 +1,4 @@
+import { readUserId } from '@/server/auth-user'
 import { resolveSupabaseKey } from '@/lib/supabase/config'
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
@@ -15,9 +16,9 @@ export async function proxy(request: NextRequest) {
       },
     },
   })
-  const { data } = await supabase.auth.getUser()
+  const userId = await readUserId(supabase)
   const isLogin = request.nextUrl.pathname.startsWith('/login')
-  if (!data.user && !isLogin) {
+  if (!userId && !isLogin) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
   return response
