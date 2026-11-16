@@ -184,7 +184,11 @@ Lọc theo cơ sở người dùng được thấy, chỉ hiện mục người 
 - Tiền lưu dạng số nguyên VND. Ngày lưu dạng `date` (không giờ) cho nghiệp vụ; múi giờ Asia/Ho_Chi_Minh.
 - Logic tính tiền (lẻ ngày, hệ số, thay đồng hồ, đổi giá, thanh lý) gom trong một module thuần, có test đầy đủ.
 
-## 10. Lộ trình theo đợt
+## 10. Lộ trình
+
+**Giai đoạn A — Giao diện toàn bộ hệ thống với dữ liệu giả (người dùng đã quyết định).** Dựng web Next.js thật cho mọi phần (cơ sở/phòng, khách, người dùng, hợp đồng/phụ lục, bàn giao, điện nước, hoá đơn, sổ cọc, thanh lý, tài sản, sự cố, nhắc việc, nhập Excel, cài đặt) nhưng dữ liệu là dữ liệu giả, lưu trên trình duyệt, đăng nhập giả bằng chọn vai trò. Màn hình lấy dữ liệu qua một lớp trung gian (repository) để sau này thay bằng Supabase mà không sửa giao diện. Logic tính tiền, phân quyền viết thật và có test ngay từ giai đoạn này. Người dùng duyệt giao diện và luồng → sửa tới khi ổn.
+
+**Giai đoạn B — Gắn cơ sở dữ liệu**, theo từng đợt dưới đây (thay repository giả bằng Supabase, đăng nhập thật, lưu file R2, PDF, sao lưu):
 
 1. Nền tảng: đăng nhập, người dùng + phân quyền, cơ sở/phòng, khách, nhập Excel (phần tương ứng), khung bảng nhắc việc (visa).
 2. Hợp đồng cọc/thuê/phụ lục, mẫu Word + xuất docx/PDF, biên bản bàn giao, nhắc hợp đồng hết hạn / chưa ký.
