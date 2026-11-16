@@ -27,7 +27,7 @@ export function midPeriodAdjustments(input: {
     if (inv.kind !== 'monthly' && inv.kind !== 'first') continue
     const multiMonth = monthOf(inv.periodStart) !== monthOf(inv.periodEnd)
     for (const a of addenda) {
-      if (a.type === 'termination') continue
+      if (a.leaseId !== lease.id || a.type === 'termination') continue
       if (!(a.effectiveDate > inv.periodStart && a.effectiveDate <= inv.periodEnd)) continue
       if (a.type === 'extension' && multiMonth) continue
       const before = contractTermsAt(lease, addenda, addDays(a.effectiveDate, -1))
@@ -39,7 +39,7 @@ export function midPeriodAdjustments(input: {
       const feeDiff = prorate(fixedMonthly(after.fees, occ(after)) - fixedMonthly(before.fees, occ(before)), a.effectiveDate, to, proration).amount
       const amount = rentDiff + feeDiff
       if (amount === 0) continue
-      const label = a.type === 'transfer' ? 'chuyển phòng' : 'gia hạn đổi giá'
+      const label = a.type === 'transfer' ? 'chuyển phòng' : a.type === 'occupants' ? 'đổi người ở' : 'gia hạn đổi giá'
       out.push({
         description: `Điều chỉnh ${label} ${formatDateVN(a.effectiveDate).slice(0, 5)}–${formatDateVN(to).slice(0, 5)}`,
         amount,

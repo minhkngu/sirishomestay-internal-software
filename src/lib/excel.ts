@@ -43,3 +43,14 @@ export async function parseWorkbook(buf: ArrayBuffer): Promise<{ sheets: ParsedS
   }
   return { sheets }
 }
+
+/** File mẫu cho nút "Tải file mẫu": dòng 1 là tiêu đề các cột, dòng 2 là ví dụ. */
+export async function buildTemplateWorkbook(sheetName: string, headers: string[], example: string[]): Promise<ArrayBuffer> {
+  const wb = new ExcelJS.Workbook()
+  const ws = wb.addWorksheet(sheetName.slice(0, 30))
+  ws.addRow(headers); ws.addRow(example)
+  ws.getRow(1).font = { bold: true }
+  headers.forEach((_, i) => { ws.getColumn(i + 1).width = 22 })
+  const buf = new Uint8Array((await wb.xlsx.writeBuffer()) as ArrayBuffer)
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer
+}

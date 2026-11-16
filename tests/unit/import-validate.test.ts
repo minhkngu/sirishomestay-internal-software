@@ -63,3 +63,25 @@ describe('validateRows rooms', () => {
     expect(errors).toEqual([{ row: 3, field: 'roomCode', message: expect.any(String) }])
   })
 })
+
+describe('nhập Excel — gợi ý ghép cột và loại mới', () => {
+  it('suggestMapping hiểu tiêu đề tiếng Việt', async () => {
+    const { suggestMapping } = await import('@/server/import/targets')
+    expect(suggestMapping(['Số điện thoại', 'Họ tên', 'Hết hạn visa'], 'tenants')).toMatchObject({ phone: 'Số điện thoại', fullName: 'Họ tên', visaExpiry: 'Hết hạn visa' })
+  })
+  it('hợp đồng: cần giấy tờ hoặc SĐT khách, ngày hợp lệ, kết thúc không trước bắt đầu', async () => {
+    const { validateRows } = await import('@/server/import/validate')
+    const m = { facilityCode: 'f', roomCode: 'r', startDate: 's', endDate: 'e', monthlyRent: 'p', tenantDocument: 'd' }
+    const ok = validateRows('leases', [{ f: 'A', r: '101', s: '01/01/2026', e: '31/12/2026', p: '9.000.000', d: 'X1' }], m)
+    expect(ok.errors).toEqual([]); expect(ok.valid[0].data).toMatchObject({ startDate: '2026-01-01', monthlyRent: 9000000 })
+    const bad = validateRows('leases', [{ f: 'A', r: '101', s: '01/01/2026', e: '01/01/2025', p: '9.000.000', d: null }], m)
+    expect(bad.errors.map((e) => e.field)).toEqual(expect.arrayContaining(['tenantDocument', 'endDate']))
+  })
+  it('chỉ số: loại điện/nước và kỳ tháng/năm', async () => {
+    const { validateRows } = await import('@/server/import/validate')
+    const m = { facilityCode: 'f', roomCode: 'r', utility: 'u', period: 'p', value: 'v' }
+    const r = validateRows('meter_readings', [{ f: 'A', r: '101', u: 'Điện', p: '11/2026', v: 1250 }, { f: 'A', r: '101', u: 'Gas', p: 'abc', v: 1 }], m)
+    expect(r.valid[0].data).toMatchObject({ utility: 'electric', period: '2026-11', value: 1250 })
+    expect(r.errors.map((e) => e.field)).toEqual(['utility', 'period'])
+  })
+})

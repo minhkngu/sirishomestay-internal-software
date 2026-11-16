@@ -72,3 +72,24 @@ describe('getExpiringVisas', () => {
     expect((await getExpiringVisas(db, admin, undefined, new Date('2026-11-15T23:30:00Z')))[0].daysLeft).toBe(0)
   })
 })
+
+describe('getDashboard', () => {
+  it('gom nhắc việc theo quyền và cơ sở; số liệu phòng và công nợ quá hạn', async () => {
+    const { rooms, tenants, leases, invoices, invoiceLines, incidents } = await import('@/db')
+    const { getDashboard } = await import('@/server/dashboard/service')
+    const db = await createTestDb()
+    const [fa, fb] = await db.insert(facilities).values([{ code: 'A', name: 'A' }, { code: 'B', name: 'B' }]).returning()
+    const [ra, rb] = await db.insert(rooms).values([{ facilityId: fa.id, code: '1' }, { facilityId: fa.id, code: '2' }]).returning()
+    const [t] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: fa.id, fullName: 'K', phone: '+84901234567', idNumber: '012345678901' }).returning()
+    const [l] = await db.insert(leases).values({ code: 'HD', roomId: ra.id, tenantId: t.id, startDate: '2026-01-01', endDate: '2027-01-01', monthlyRent: 100, depositAmount: 0 }).returning()
+    const [inv] = await db.insert(invoices).values({ code: 'A-HD-1', leaseId: l.id, facilityId: fa.id, kind: 'monthly', periodStart: '2026-10-01', periodEnd: '2026-10-31', issueDate: '2026-10-01', dueDate: '2026-11-05', status: 'approved' }).returning()
+    await db.insert(invoiceLines).values({ invoiceId: inv.id, type: 'rent', description: 'r', quantity: 1, unitPrice: 100, amount: 100 })
+    await db.insert(incidents).values({ facilityId: fb.id, title: 'x', reportedBy: crypto.randomUUID() })
+    void rb
+    const admin = await getDashboard(db, ctxOf(['settings']), TODAY)
+    expect(admin.stats).toMatchObject({ occupied: 1, vacant: 1, overdueDebt: 100 })
+    expect(admin.reminders.map((r) => r.kind)).toEqual(expect.arrayContaining(['overdue_invoices', 'open_incidents', 'invoices_not_created']))
+    const tech = await getDashboard(db, ctxOf(['incidents'], [fa.id]), TODAY)
+    expect(tech.reminders).toEqual([])
+  })
+})

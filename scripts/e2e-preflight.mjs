@@ -15,7 +15,7 @@ if (!existsSync(chromium.executablePath())) fail('chưa cài Chromium cho Playwr
 
 let res
 try {
-  res = await fetch(new URL('/login', baseURL), { signal: AbortSignal.timeout(15_000) })
+  res = await fetch(new URL('/login', baseURL), { signal: AbortSignal.timeout(15_000), headers: process.env.E2E_VERCEL_OIDC ? { 'x-vercel-trusted-oidc-idp-token': process.env.E2E_VERCEL_OIDC } : {} })
 } catch (e) {
   fail(`không kết nối được ${baseURL}/login (${e.cause?.code ?? e.message})`)
 }

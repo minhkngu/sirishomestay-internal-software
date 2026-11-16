@@ -2,6 +2,7 @@ import { and, asc, desc, eq, ilike, inArray, ne } from 'drizzle-orm'
 import { z } from 'zod'
 import { assetMoves, assets, facilities, handoverItems, handovers, rooms } from '@/db'
 import type { DB } from '@/db/client'
+import { incidentsForAsset } from '@/server/incidents/service'
 import { assertCan, facilityScope, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { buildSearchText, removeDiacritics } from '@/domain/text'
@@ -137,5 +138,5 @@ export async function assetHistory(db: DB, ctx: AccessContext, id: string) {
   const hs = await db
     .select({ date: handovers.date, kind: handovers.kind, condition: handoverItems.condition, damaged: handoverItems.damaged, missing: handoverItems.missing, penalty: handoverItems.penalty })
     .from(handoverItems).innerJoin(handovers, eq(handovers.id, handoverItems.handoverId)).where(eq(handoverItems.assetId, id)).orderBy(desc(handovers.date))
-  return { moves, handovers: hs, incidents: [] as unknown[] }
+  return { moves, handovers: hs, incidents: await incidentsForAsset(db, id) }
 }

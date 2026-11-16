@@ -16,7 +16,7 @@ const fee = (over: Partial<ContractFee> = {}): ContractFee => ({
 })
 const lease = (over: Partial<Lease> = {}): Lease => ({
   id: 'L1', code: 'TD-HĐ-2026-0001', roomId: 'R1', startDate: '2026-01-01', endDate: '2027-01-01', monthlyRent: 9_000_000,
-  depositAmount: 9_000_000, fees: [], occupantIds: ['t1'], ...over,
+  billingCycleMonths: 1, billWaterByMeter: true, depositAmount: 9_000_000, fees: [], occupantIds: ['t1'], ...over,
 })
 const invoice = (over: Partial<Invoice> = {}): Invoice => ({
   id: 'I1', leaseId: 'L1', kind: 'monthly', status: 'approved', periodStart: '2026-11-01', periodEnd: '2026-11-30', lines: [], ...over,
@@ -180,11 +180,11 @@ describe('buildMonthlyInvoice', () => {
   const rates: UtilityRate[] = [{ facilityId: 'TD', utility: 'electric', pricePerUnit: 3500, effectiveFrom: '2026-01-01' }]
   const terms = () => ({ ...contractTermsAt(lease({ fees: [fee(), fee({ feeTypeId: 'f2', name: 'Giặt ủi', unit: 'kg', billing: 'per_occurrence', quantityFrom: 'manual', unitPrice: 25_000 })] }), [], '2026-11-01'), startDate: '2026-01-01' })
   const base = {
-    facilityId: 'TD', period: '2026-11', proration: 'days_30' as const, meters: [meterE], readings, rates, oneOffs: [], pending: [], occupantsCount: 2,
+    facilityId: 'TD', period: '2026-11', proration: 'days_30' as const, meters: [meterE], readings, rates, oneOffs: [], pending: [], addenda: [],
   }
   it('tiền phòng + phí cố định kỳ N, điện tháng N−1, phí lẻ và điều chỉnh đang chờ', () => {
     const r = buildMonthlyInvoice({
-      ...base, terms: terms(),
+      ...base, lease: lease({ ...terms(), occupantIds: ['t1', 't2'] }),
       oneOffs: [{ id: 'o1', leaseId: 'L1', kind: 'service', description: 'Giặt ủi 3kg', date: '2026-10-20', quantity: 3, unitPrice: 25_000 }],
       pending: [{ id: 'p1', leaseId: 'L1', description: 'Điều chỉnh chuyển phòng 15/11–30/11', amount: 1_066_667, sourceKey: 'A1:I1' }],
     })
@@ -199,37 +199,37 @@ describe('buildMonthlyInvoice', () => {
     expect(r.warnings).toEqual([])
   })
   it('phí lẻ ngày sau cuối tháng N−1 chưa được tính', () => {
-    const r = buildMonthlyInvoice({ ...base, terms: terms(), oneOffs: [{ id: 'o2', leaseId: 'L1', kind: 'service', description: 'Dọn thêm', date: '2026-11-05', quantity: 1, unitPrice: 100_000 }] })
+    const r = buildMonthlyInvoice({ ...base, lease: lease({ ...terms(), occupantIds: ['t1', 't2'] }), oneOffs: [{ id: 'o2', leaseId: 'L1', kind: 'service', description: 'Dọn thêm', date: '2026-11-05', quantity: 1, unitPrice: 100_000 }] })
     expect(r.lines.filter((l) => l.type === 'one_off')).toHaveLength(0)
   })
   it('hợp đồng bắt đầu giữa tháng N: tiền phòng lẻ ngày và không có điện nước tháng N−1', () => {
     const t = { ...terms(), startDate: '2026-11-15' }
-    const r = buildMonthlyInvoice({ ...base, terms: t })
+    const r = buildMonthlyInvoice({ ...base, lease: lease({ ...t, occupantIds: ['t1', 't2'] }) })
     expect(r.lines.find((l) => l.type === 'rent')?.amount).toBe(4_800_000)
     expect(r.lines.some((l) => l.type === 'electric')).toBe(false)
   })
   it('fullMonth bỏ qua tính lẻ ngày', () => {
     const t = { ...terms(), startDate: '2026-11-15' }
-    expect(buildMonthlyInvoice({ ...base, terms: t, fullMonth: true }).lines.find((l) => l.type === 'rent')?.amount).toBe(9_000_000)
+    expect(buildMonthlyInvoice({ ...base, lease: lease({ ...t, occupantIds: ['t1', 't2'] }), fullMonth: true }).lines.find((l) => l.type === 'rent')?.amount).toBe(9_000_000)
   })
   it('sửa tay kỳ 01/12–28/02 → hệ số 3, tiền phòng ×3', () => {
-    const r = buildMonthlyInvoice({ ...base, period: '2026-12', terms: terms(), overridePeriod: { start: '2026-12-01', end: '2027-02-28' } })
+    const r = buildMonthlyInvoice({ ...base, period: '2026-12', lease: lease({ ...terms(), occupantIds: ['t1', 't2'] }), overridePeriod: { start: '2026-12-01', end: '2027-02-28' } })
     expect(r.periodStart).toBe('2026-12-01')
     expect(r.lines.find((l) => l.type === 'rent')).toMatchObject({ quantity: 3, amount: 27_000_000 })
   })
   it('hệ số sửa tay được dùng thay hệ số tính ra', () => {
-    const r = buildMonthlyInvoice({ ...base, terms: terms(), overridePeriod: { start: '2026-11-01', end: '2026-11-30', coefficient: 1.5 } })
+    const r = buildMonthlyInvoice({ ...base, lease: lease({ ...terms(), occupantIds: ['t1', 't2'] }), overridePeriod: { start: '2026-11-01', end: '2026-11-30', coefficient: 1.5 } })
     expect(r.lines.find((l) => l.type === 'rent')).toMatchObject({ quantity: 1.5, amount: 13_500_000 })
   })
   it('thiếu chỉ số hoặc đơn giá → cảnh báo, không ném lỗi', () => {
-    const noReading = buildMonthlyInvoice({ ...base, terms: terms(), readings: readings.slice(0, 1) })
+    const noReading = buildMonthlyInvoice({ ...base, lease: lease({ ...terms(), occupantIds: ['t1', 't2'] }), readings: readings.slice(0, 1) })
     expect(noReading.warnings.join(' ')).toContain('Chưa ghi chỉ số điện')
-    const noRate = buildMonthlyInvoice({ ...base, terms: terms(), rates: [] })
+    const noRate = buildMonthlyInvoice({ ...base, lease: lease({ ...terms(), occupantIds: ['t1', 't2'] }), rates: [] })
     expect(noRate.warnings.join(' ')).toContain('Chưa cài đơn giá điện')
   })
   it('hợp đồng kết thúc giữa kỳ: tiền phòng lẻ đến ngày kết thúc', () => {
     const t = { ...terms(), endDate: '2026-11-20' }
-    expect(buildMonthlyInvoice({ ...base, terms: t }).lines.find((l) => l.type === 'rent')?.amount).toBe(6_000_000)
+    expect(buildMonthlyInvoice({ ...base, lease: lease({ ...t, occupantIds: ['t1', 't2'] }) }).lines.find((l) => l.type === 'rent')?.amount).toBe(6_000_000)
   })
 })
 
@@ -276,4 +276,99 @@ describe('buildTerminationInvoice', () => {
     expect(r.lines.find((l) => l.type === 'rent')?.amount).toBe(6_000_000)
     expect(r.total).toBe(-9_000_000 + 6_000_000 + 920_000)
   })
+})
+
+describe('kỳ thanh toán và hoàn khách', () => {
+  it('tính kỳ ba tháng, bỏ qua kỳ đã trả trước và giới hạn ngày kết thúc', async () => {
+    const { nextBillingPeriod } = await import('@/domain/invoice-builder')
+    const q = { ...lease(), billingCycleMonths: 3, startDate: '2026-10-01', endDate: '2027-12-31' }
+    expect(nextBillingPeriod(q, null, '2026-10')).toEqual({ start: '2026-10-01', end: '2026-12-31' })
+    expect(nextBillingPeriod(q, '2026-12-31', '2026-11')).toBeNull()
+    expect(nextBillingPeriod(q, '2026-12-31', '2027-01')).toEqual({ start: '2027-01-01', end: '2027-03-31' })
+    expect(nextBillingPeriod({ ...q, billingCycleMonths: 1 }, '2027-02-28', '2027-01')).toBeNull()
+    expect(nextBillingPeriod({ ...q, billingCycleMonths: 1 }, '2026-11-30', '2026-11')).toBeNull()
+    expect(nextBillingPeriod({ ...q, endDate: '2027-02-15' }, '2026-12-31', '2027-01')).toEqual({ start: '2027-01-01', end: '2027-02-15' })
+  })
+  it('phân biệt chờ hoàn và đã hoàn', async () => {
+    const { settlementState } = await import('@/domain/invoice-builder')
+    expect(settlementState(-11_080_000, 0)).toBe('refund_pending')
+    expect(settlementState(-11_080_000, -11_080_000)).toBe('refunded')
+    expect(settlementState(100, 50)).toBe('partial')
+  })
+})
+
+describe('điều khoản giữa kỳ', () => {
+  it('chia tiền phòng theo ngày phụ lục có hiệu lực', async () => {
+    const { termSegments } = await import('@/domain/contract-terms')
+    const changes: Addendum[] = [{ id: 'A', leaseId: 'L1', type: 'transfer', effectiveDate: '2026-11-15', newRoomId: 'R2', newMonthlyRent: 11_000_000 }]
+    const segments = termSegments(lease(), changes, '2026-11-01', '2026-11-30')
+    expect(segments.map(s => [s.from, s.to, s.terms.roomId, prorate(s.terms.monthlyRent, s.from, s.to, 'days_30').amount])).toEqual([
+      ['2026-11-01', '2026-11-14', 'R1', 4_200_000], ['2026-11-15', '2026-11-30', 'R2', 5_866_667],
+    ])
+  })
+  it('điều chỉnh phí theo số người khi đổi người ở', () => {
+    const change = { id: 'A', leaseId: 'L1', type: 'occupants' as const, effectiveDate: '2026-11-16', newOccupantIds: ['t1', 't2', 't3'] }
+    const result = midPeriodAdjustments({ lease: lease({ fees: [fee()], occupantIds: ['t1', 't2'] }), addenda: [change], approvedInvoices: [invoice()], proration: 'days_30' })
+    expect(result[0].amount).toBe(100_000)
+  })
+})
+
+describe('hóa đơn có phụ lục trong kỳ', () => {
+  it('tính riêng tiền phòng theo từng đoạn', () => {
+    const l = lease()
+    const changes: Addendum[] = [{ id: 'A', leaseId: 'L1', type: 'transfer', effectiveDate: '2026-11-15', newRoomId: 'R2', newMonthlyRent: 11_000_000 }]
+    const result = buildMonthlyInvoice({ lease: l, addenda: changes, facilityId: 'TD', period: '2026-11', proration: 'days_30', meters: [], readings: [], rates: [], oneOffs: [], pending: [] })
+    expect(result.lines.filter(line => line.type === 'rent').map(line => line.amount)).toEqual([4_200_000, 5_866_667])
+  })
+  it('không tính nước đồng hồ khi hợp đồng không dùng đồng hồ nước', () => {
+    const result = buildMonthlyInvoice({ lease: lease({ billWaterByMeter: false }), addenda: [], facilityId: 'TD', period: '2026-11', proration: 'days_30', meters: [{ id: 'w', roomId: 'R1', utility: 'water', installedOn: '2026-01-01', startReading: 0 }], readings: [{ meterId: 'w', period: '2026-10', readOn: '2026-10-31', value: 10 }], rates: [{ facilityId: 'TD', utility: 'water', pricePerUnit: 18000, effectiveFrom: '2026-01-01' }], oneOffs: [], pending: [] })
+    expect(result.lines.some(line => line.type === 'water')).toBe(false)
+  })
+})
+
+it('chỉ tính điện của từng phòng trong thời gian khách ở phòng đó', () => {
+  const changes: Addendum[] = [{ id: 'A', leaseId: 'L1', type: 'transfer', effectiveDate: '2026-11-15', newRoomId: 'R2' }]
+  const meters: Meter[] = ['R1', 'R2'].map((roomId, i) => ({ id: `m${i}`, roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 }))
+  const readings: MeterReading[] = [
+    { meterId: 'm0', period: '2026-10', readOn: '2026-10-31', value: 100 },
+    { meterId: 'm0', period: '2026-11', readOn: '2026-11-15', value: 160 },
+    { meterId: 'm0', period: '2026-11', readOn: '2026-11-30', value: 200 },
+    { meterId: 'm1', period: '2026-11', readOn: '2026-11-15', value: 200 },
+    { meterId: 'm1', period: '2026-11', readOn: '2026-11-30', value: 240 },
+  ]
+  const result = buildMonthlyInvoice({ lease: lease(), addenda: changes, facilityId: 'TD', period: '2026-12', proration: 'days_30', meters, readings, rates: [{ facilityId: 'TD', utility: 'electric', pricePerUnit: 3500, effectiveFrom: '2026-01-01' }], oneOffs: [], pending: [] })
+  expect(result.lines.find(line => line.type === 'electric')?.quantity).toBe(100)
+})
+
+it('đổi người ở không yêu cầu chốt đồng hồ giữa kỳ', () => {
+  const change: Addendum = { id: 'A', leaseId: 'L1', type: 'occupants', effectiveDate: '2026-11-15', newOccupantIds: ['t1', 't2'] }
+  const result = buildMonthlyInvoice({ lease: lease(), addenda: [change], facilityId: 'TD', period: '2026-12', proration: 'days_30', meters: [{ id: 'm', roomId: 'R1', utility: 'electric', installedOn: '2026-01-01', startReading: 0 }], readings: [{ meterId: 'm', period: '2026-10', readOn: '2026-10-31', value: 100 }, { meterId: 'm', period: '2026-11', readOn: '2026-11-30', value: 200 }], rates: [{ facilityId: 'TD', utility: 'electric', pricePerUnit: 3500, effectiveFrom: '2026-01-01' }], oneOffs: [], pending: [] })
+  expect(result.lines.find(line => line.type === 'electric')?.quantity).toBe(100)
+})
+
+it('bỏ qua phụ lục của hợp đồng khác khi tính điều khoản', () => {
+  const other: Addendum = { id: 'other', leaseId: 'L2', type: 'transfer', effectiveDate: '2026-11-01', newRoomId: 'R9', newMonthlyRent: 1 }
+  expect(contractTermsAt(lease(), [other], '2026-11-15')).toMatchObject({ roomId: 'R1', monthlyRent: 9_000_000 })
+})
+
+it('gia hạn có hiệu lực trước kỳ cho phép lập hóa đơn sau ngày kết thúc cũ', () => {
+  const l = lease({ endDate: '2026-11-30' })
+  const extension: Addendum = { id: 'A', leaseId: 'L1', type: 'extension', effectiveDate: '2026-11-15', newEndDate: '2027-06-30' }
+  const result = buildMonthlyInvoice({ lease: l, addenda: [extension], facilityId: 'TD', period: '2026-12', proration: 'days_30', meters: [], readings: [], rates: [], oneOffs: [], pending: [] })
+  expect(result.lines.find(line => line.type === 'rent')?.amount).toBe(9_000_000)
+})
+
+it('cảnh báo khi thiếu chỉ số chốt phòng cũ lúc chuyển phòng', () => {
+  const change: Addendum = { id: 'A', leaseId: 'L1', type: 'transfer', effectiveDate: '2026-11-15', newRoomId: 'R2' }
+  const meters: Meter[] = ['R1', 'R2'].map((roomId, i) => ({ id: `m${i}`, roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 }))
+  const readings: MeterReading[] = [{ meterId: 'm0', period: '2026-10', readOn: '2026-10-31', value: 100 }, { meterId: 'm0', period: '2026-11', readOn: '2026-11-10', value: 110 }, { meterId: 'm1', period: '2026-11', readOn: '2026-11-15', value: 200 }, { meterId: 'm1', period: '2026-11', readOn: '2026-11-30', value: 240 }]
+  const result = buildMonthlyInvoice({ lease: lease(), addenda: [change], facilityId: 'TD', period: '2026-12', proration: 'days_30', meters, readings, rates: [{ facilityId: 'TD', utility: 'electric', pricePerUnit: 3500, effectiveFrom: '2026-01-01' }], oneOffs: [], pending: [] })
+  expect(result.lines.find(line => line.type === 'electric')).toBeUndefined()
+  expect(result.warnings.join(' ')).toContain('Chưa ghi chỉ số điện')
+})
+
+it('hóa đơn trong tháng thanh lý chỉ tính đến ngày thanh lý', () => {
+  const termination: Addendum = { id: 'end', leaseId: 'L1', type: 'termination', effectiveDate: '2026-11-20' }
+  const result = buildMonthlyInvoice({ lease: lease(), addenda: [termination], facilityId: 'TD', period: '2026-11', proration: 'days_30', meters: [], readings: [], rates: [], oneOffs: [], pending: [] })
+  expect(result.lines.filter(line => line.type === 'rent').reduce((sum, line) => sum + line.amount, 0)).toBe(6_000_000)
 })

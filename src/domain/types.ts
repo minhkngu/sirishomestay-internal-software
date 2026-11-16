@@ -24,6 +24,8 @@ export type Lease = {
   depositAmount: number
   fees: ContractFee[]
   occupantIds: string[]
+  billingCycleMonths: number
+  billWaterByMeter: boolean
   dueRule?: DueRule | null
   proration?: Proration | null
 }
@@ -31,7 +33,7 @@ export type Lease = {
 export type Addendum = {
   id: string
   leaseId: string
-  type: 'extension' | 'transfer' | 'termination'
+  type: 'extension' | 'transfer' | 'termination' | 'occupants'
   effectiveDate: ISODate
   newEndDate?: ISODate | null
   newRoomId?: string | null
@@ -39,10 +41,15 @@ export type Addendum = {
   newDepositAmount?: number | null
   newFees?: ContractFee[] | null
   newOccupantIds?: string[] | null
+  /** phòng trước khi chuyển (chỉ phụ lục chuyển phòng) */
+  oldRoomId?: string | null
+  adjustmentTarget?: 'next' | 'current'
 }
 
 /** Điều khoản hiệu lực của hợp đồng tại một ngày (hợp đồng gốc + phụ lục). */
 export type LeaseTerms = {
+  billingCycleMonths: number
+  billWaterByMeter: boolean
   roomId: string
   startDate: ISODate
   endDate: ISODate
@@ -63,7 +70,7 @@ export type Meter = {
   finalReading?: number | null
 }
 
-export type MeterReading = { meterId: string; period: string; readOn: ISODate; value: number }
+export type MeterReading = { meterId: string; period: string; readOn: ISODate; value: number; kind?: 'monthly' | 'handover' }
 export type UtilityRate = { facilityId: string; utility: Utility; pricePerUnit: number; effectiveFrom: ISODate }
 
 export type InvoiceLineType = 'rent' | 'fee' | 'electric' | 'water' | 'one_off' | 'penalty' | 'adjustment' | 'deposit' | 'deposit_offset' | 'refund'

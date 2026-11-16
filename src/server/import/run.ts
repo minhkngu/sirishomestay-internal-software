@@ -7,7 +7,8 @@ import { recordAudit } from '@/server/audit'
 import { findDuplicateField, toTenantRow } from '../tenants/service'
 import type { Tenant } from '../tenants/service'
 import type { ImportTarget } from './targets'
-import type { ImportError, NormalizedRow } from './validate'
+import { applyOpsRows } from './ops'
+import { OPS_TARGETS, type ImportError, type NormalizedRow, type OpsTarget } from './validate'
 
 const DUP_FIELD_MSG: Record<string, string> = {
   phone: 'Số điện thoại đã thuộc về khách khác', passportNumber: 'Số passport đã tồn tại',
@@ -19,7 +20,7 @@ export async function findMissingFacilities(db: DB, rows: NormalizedRow[]): Prom
   const known = new Set((await db.select({ code: facilities.code }).from(facilities)).map((f) => f.code))
   const out: ImportError[] = []
   for (const r of rows) {
-    if (r.target === 'tenants' && !known.has(r.facilityCode)) {
+    if (r.target !== 'rooms' && !known.has(r.facilityCode)) {
       out.push({ row: r.row, field: 'facilityCode', message: `Không tìm thấy cơ sở "${r.facilityCode}"` })
     }
   }
@@ -83,6 +84,12 @@ export async function runImport(db: DB, ctx: AccessContext, target: ImportTarget
   return db.transaction(async (tx) => {
     let created = 0
     let updated = 0
+    if ((OPS_TARGETS as string[]).includes(target)) {
+      const res = await applyOpsRows(tx as unknown as DB, ctx, rowsIn.filter((r): r is Extract<NormalizedRow, { target: OpsTarget }> => r.target === target))
+      if (res.errors.length) throw new ValidationError(`Dòng ${res.errors[0].row}: ${res.errors[0].message}`)
+      await recordAudit(tx, ctx, { action: 'import', entity: `import_${target}`, summary: 'Nhập dữ liệu từ Excel', after: { created: res.created, updated: res.updated, rows: rowsIn.length } })
+      return { created: res.created, updated: res.updated }
+    }
     const facByCode = new Map((await tx.select().from(facilities)).map((f) => [f.code, f]))
 
     for (const r of rowsIn) {

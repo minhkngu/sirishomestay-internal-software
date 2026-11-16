@@ -114,3 +114,59 @@ describe('runImport', () => {
     expect(conflicts.map((c) => [c.row, c.field])).toEqual([[2, 'phone'], [4, 'phone']])
   })
 })
+
+describe('runImport — hợp đồng, cọc, công nợ, chỉ số, tài sản', () => {
+  let db: DB
+  const admin = ctxOf(['settings'])
+  const ident = (keys: string[]) => Object.fromEntries(keys.map((k) => [k, k]))
+  async function run(target: Parameters<typeof validateRows>[0], rows: Record<string, unknown>[]) {
+    const { valid, errors } = validateRows(target, rows, ident(Object.keys(rows[0]).filter((k) => !k.startsWith('__'))))
+    expect(errors).toEqual([])
+    return runImport(db, admin, target, valid)
+  }
+  const lease = { facilityCode: 'A', roomCode: '101', tenantDocument: '012345678901', startDate: '01/01/2026', endDate: '31/12/2027', monthlyRent: '9.000.000', depositAmount: '9.000.000', legacyCode: 'OLD-1' }
+  beforeEach(async () => {
+    db = await createTestDb()
+    const { meters } = await import('@/db')
+    const [f] = await db.insert(facilities).values({ code: 'A', name: 'A' }).returning()
+    const [r] = await db.insert(rooms).values({ facilityId: f.id, code: '101' }).returning()
+    await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: f.id, fullName: 'K', phone: '+84901234567', idNumber: '012345678901' })
+    await db.insert(meters).values({ roomId: r.id, utility: 'electric', installedOn: '2025-01-01', startReading: 0 })
+  })
+  it('hợp đồng: hai dòng cùng mã cũ khác ngày bắt đầu → lần 2 cập nhật, không tạo hợp đồng thứ hai', async () => {
+    const { leases } = await import('@/db')
+    expect(await run('leases', [lease])).toEqual({ created: 1, updated: 0 })
+    expect(await run('leases', [{ ...lease, startDate: '02/01/2026', endDate: '31/12/2028' }])).toEqual({ created: 0, updated: 1 })
+    const all = await db.select().from(leases)
+    expect(all).toHaveLength(1); expect(all[0]).toMatchObject({ legacyCode: 'OLD-1', endDate: '2028-12-31', status: 'active' })
+  })
+  it('số dư cọc nhập 2 lần → số dư không đổi; sửa số thì cập nhật chính dòng đó', async () => {
+    const { depositEntries } = await import('@/db')
+    await run('leases', [lease])
+    const dep = { facilityCode: 'A', legacyCode: 'OLD-1', amount: '5.000.000' }
+    await run('deposits', [dep]); expect(await run('deposits', [dep])).toEqual({ created: 0, updated: 0 })
+    expect(await run('deposits', [{ ...dep, amount: '6.000.000' }])).toEqual({ created: 0, updated: 1 })
+    const rowsDb = await db.select().from(depositEntries)
+    expect(rowsDb).toHaveLength(1); expect(rowsDb[0]).toMatchObject({ amount: 6000000, status: 'done' })
+  })
+  it('công nợ nhập 2 lần → một hoá đơn import:debt; đã có khoản thu → lỗi dòng', async () => {
+    const { invoices, payments } = await import('@/db')
+    await run('leases', [lease])
+    const debt = { facilityCode: 'A', roomCode: '101', amount: '3.000.000' }
+    await run('debts', [debt]); await run('debts', [{ ...debt, amount: '4.000.000' }])
+    const inv = await db.select().from(invoices); expect(inv).toHaveLength(1); expect(inv[0].source).toBe('import:debt')
+    await db.insert(payments).values({ invoiceId: inv[0].id, paidOn: '2026-11-01', amount: 100, method: 'cash', receivedBy: crypto.randomUUID() })
+    const { valid } = validateRows('debts', [debt], ident(Object.keys(debt)))
+    await expect(runImport(db, admin, 'debts', valid)).rejects.toThrow('Công nợ đã có khoản thu')
+  })
+  it('chỉ số và tài sản chạy lại không trùng', async () => {
+    const { meterReadings, assets } = await import('@/db')
+    const reading = { facilityCode: 'A', roomCode: '101', utility: 'Điện', period: '11/2026', value: 150 }
+    await run('meter_readings', [reading]); await run('meter_readings', [{ ...reading, value: 160 }])
+    const rd = await db.select().from(meterReadings); expect(rd).toHaveLength(1); expect(rd[0].value).toBe(160)
+    const asset = { facilityCode: 'A', code: 'TV1', name: 'Tivi', value: '5.000.000', roomCode: '101' }
+    expect(await run('assets', [asset])).toEqual({ created: 1, updated: 0 })
+    expect(await run('assets', [asset])).toEqual({ created: 0, updated: 0 })
+    expect(await db.select().from(assets)).toHaveLength(1)
+  })
+})

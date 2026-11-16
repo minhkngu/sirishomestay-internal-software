@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { boolean, date, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
+import { boolean, check, date, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 import { rooms } from './facilities'
 import { feeTypes } from './fees'
 import { tenants } from './tenants'
@@ -34,6 +34,9 @@ export const leases = pgTable(
     startDate: date('start_date', { mode: 'string' }).notNull(),
     endDate: date('end_date', { mode: 'string' }).notNull(),
     monthlyRent: integer('monthly_rent').notNull(),
+    legacyCode: text('legacy_code').unique(),
+    billingCycleMonths: integer('billing_cycle_months').notNull().default(1),
+    billWaterByMeter: boolean('bill_water_by_meter').notNull().default(true),
     depositAmount: integer('deposit_amount').notNull(),
     dueRule: jsonb('due_rule'),
     proration: text('proration'),
@@ -45,7 +48,7 @@ export const leases = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('leases_one_active_per_room').on(t.roomId).where(sql`${t.status} = 'active'`)],
+  (t) => [uniqueIndex('leases_one_active_per_room').on(t.roomId).where(sql`${t.status} = 'active'`), check('leases_billing_cycle_range', sql`${t.billingCycleMonths} between 1 and 12`)],
 )
 
 export const leaseOccupants = pgTable(

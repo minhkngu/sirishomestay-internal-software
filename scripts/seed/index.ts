@@ -7,6 +7,10 @@ import { ensureSeedBucket } from './bucket'
 import { facilitySeed } from './facilities'
 import { assetSeed } from './assets'
 import { stockSeed } from './stock'
+import { chargesSeed } from './charges'
+import { addendaSeed } from './addenda'
+import { incidentSeed } from './incidents'
+import { invoiceSeed } from './invoices'
 import { loadSeedState } from './state'
 import { contractSeed } from './contracts'
 import { handoverSeed } from './handovers'
@@ -22,7 +26,7 @@ import type { AuthAdmin, SeedCtx, SeedModule } from './types'
 export type { AuthAdmin } from './types'
 
 /** Thứ tự nạp: mỗi task thêm module của mình vào đây. */
-export const SEED_MODULES: SeedModule[] = [facilitySeed, settingsSeed, userSeed, tenantSeed, templateSeed, contractSeed, assetSeed, stockSeed, meterSeed, handoverSeed]
+export const SEED_MODULES: SeedModule[] = [facilitySeed, settingsSeed, userSeed, tenantSeed, templateSeed, contractSeed, assetSeed, stockSeed, meterSeed, handoverSeed, chargesSeed, invoiceSeed, addendaSeed, incidentSeed]
 
 export type SeedOptions = { today?: string; password: string; reset?: boolean; storage?: StorageAdapter }
 

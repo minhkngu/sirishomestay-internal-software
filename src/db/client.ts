@@ -11,7 +11,8 @@ function connect() {
   const url = process.env.DATABASE_URL
   if (!url) throw new Error('Thiếu biến môi trường DATABASE_URL')
   // prepare:false để chạy được qua Supabase transaction pooler
-  return drizzle(postgres(url, { prepare: false }), { schema })
+  // Mỗi instance serverless giữ ít kết nối để nhiều instance chạy song song không vượt giới hạn của pooler (session pooler chỉ ~15)
+  return drizzle(postgres(url, { prepare: false, max: Number(process.env.DATABASE_POOL_MAX) || 3 }), { schema })
 }
 
 /** Kết nối Drizzle dùng chung (khởi tạo khi dùng lần đầu). */

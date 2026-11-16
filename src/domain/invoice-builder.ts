@@ -1,10 +1,11 @@
+import { contractTermsAt, termSegments } from './contract-terms'
 import { addDays, daysInMonth, formatDateVN } from './dates'
 import { ValidationError } from './errors'
 import { meterUsage } from './meters'
 import { fullMonthCoefficient, prorateFraction } from './proration'
 import { rateFor } from './rates'
 import type {
-  ISODate, InvoiceLineInput, LeaseTerms, Meter, MeterReading, OneOffCharge, PendingAdjustment, Proration, UtilityRate, Utility,
+  ISODate, InvoiceLineInput, Lease, Addendum, LeaseTerms, Meter, MeterReading, OneOffCharge, PendingAdjustment, Proration, UtilityRate, Utility,
 } from './types'
 
 const round4 = (n: number) => Math.round(n * 10000) / 10000
@@ -39,7 +40,8 @@ function rentAndFixedLines(terms: LeaseTerms, from: ISODate, to: ISODate, sum: n
 }
 
 export type MonthlyInvoiceInput = {
-  terms: LeaseTerms
+  lease: Lease
+  addenda: Addendum[]
   facilityId: string
   period: string // 'YYYY-MM'
   proration: Proration
@@ -48,7 +50,6 @@ export type MonthlyInvoiceInput = {
   rates: UtilityRate[]
   oneOffs: OneOffCharge[]
   pending: PendingAdjustment[]
-  occupantsCount: number
   overridePeriod?: { start: ISODate; end: ISODate; coefficient?: number }
   fullMonth?: boolean
 }
@@ -58,7 +59,8 @@ export type MonthlyInvoiceInput = {
  * điều chỉnh đang chờ. Hợp đồng bắt đầu/kết thúc giữa kỳ → tính lẻ ngày (trừ khi fullMonth).
  */
 export function buildMonthlyInvoice(input: MonthlyInvoiceInput): { lines: InvoiceLineInput[]; periodStart: ISODate; periodEnd: ISODate; warnings: string[] } {
-  const { terms, period } = input
+  const { period } = input
+  const terms = contractTermsAt(input.lease, input.addenda, `${period}-01`)
   const monthStart = `${period}-01`
   const monthEnd = lastDayOf(period)
   const warnings: string[] = []
@@ -74,11 +76,23 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): { lines: Invoic
     sum = input.overridePeriod.coefficient ?? (input.fullMonth ? fullMonthCoefficient(from, to) : prorateFraction(from, to, input.proration))
   } else {
     from = terms.startDate > monthStart ? terms.startDate : monthStart
-    to = terms.endDate < monthEnd ? terms.endDate : monthEnd
+    const endDate = contractTermsAt(input.lease, input.addenda, monthEnd).endDate
+    to = endDate < monthEnd ? endDate : monthEnd
     sum = to < from ? 0 : input.fullMonth ? fullMonthCoefficient(from, to) : prorateFraction(from, to, input.proration)
   }
-  if (sum > 0) lines.push(...rentAndFixedLines(terms, from, to, sum, input.occupantsCount))
-  else warnings.push('Hợp đồng không có hiệu lực trong kỳ này')
+  if (sum > 0) {
+    {
+      const segments = termSegments(input.lease, input.addenda ?? [], from, to)
+      const totalFraction = segments.reduce((n, segment) => n + prorateFraction(segment.from, segment.to, input.proration), 0)
+      for (const segment of segments) {
+        const fraction = prorateFraction(segment.from, segment.to, input.proration)
+        const coefficient = input.overridePeriod?.coefficient != null || input.fullMonth ? sum * fraction / totalFraction : fraction
+        const segmentLines = rentAndFixedLines(segment.terms, segment.from, segment.to, coefficient, segment.terms.occupantIds.length)
+        segmentLines.forEach(line => { line.description += ` — phòng ${segment.terms.roomId}` })
+        lines.push(...segmentLines)
+      }
+    }
+  } else warnings.push('Hợp đồng không có hiệu lực trong kỳ này')
 
   // --- tháng N−1: điện, nước (bỏ qua nếu hợp đồng bắt đầu từ tháng N trở đi)
   const prev = prevMonth(period)
@@ -86,11 +100,26 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): { lines: Invoic
   const prevEnd = lastDayOf(prev)
   if (terms.startDate <= prevEnd && terms.endDate >= prevStart) {
     for (const utility of ['electric', 'water'] as const) {
-      const ms = input.meters.filter((m) => m.utility === utility)
+      if (utility === 'water' && !terms.billWaterByMeter) continue
+      const ms = input.meters.filter((m) => m.utility === utility && termSegments(input.lease, input.addenda, prevStart, prevEnd).some(segment => segment.terms.roomId === m.roomId))
       if (ms.length === 0) continue
       const { name, unit } = UTILITY_LABEL[utility]
       try {
-        const u = meterUsage(ms, input.readings, prevStart, prevEnd)
+        const roomSegments = termSegments(input.lease, input.addenda.filter(a => a.newRoomId != null), prevStart, prevEnd)
+        const ranges = roomSegments.map((segment, index) => ({
+          meters: ms.filter(m => m.roomId === segment.terms.roomId),
+          start: index === 0 ? segment.from : addDays(segment.from, 1),
+          end: index + 1 < roomSegments.length ? addDays(segment.to, 1) : segment.to,
+          boundary: index === 0 ? null : segment.from,
+          endBoundary: index + 1 < roomSegments.length ? addDays(segment.to, 1) : null,
+        }))
+        const usage = 0
+        const u = ranges.reduce((result, range) => {
+          const missingBoundary = range.boundary ? range.meters.filter(m => m.installedOn < range.boundary! && !input.readings.some(r => r.meterId === m.id && r.readOn === range.boundary)).map(m => m.id) : []
+          const missingEnd = range.endBoundary ? range.meters.filter(m => m.installedOn <= range.endBoundary! && (!m.removedOn || m.removedOn > range.endBoundary!) && !input.readings.some(r => r.meterId === m.id && r.readOn === range.endBoundary)).map(m => m.id) : []
+          const part = meterUsage(range.meters, input.readings, range.start, range.end)
+          return { usage: result.usage + part.usage, segments: [...result.segments, ...part.segments], missing: [...result.missing, ...missingBoundary, ...missingEnd, ...part.missing] }
+        }, { usage, segments: [] as ReturnType<typeof meterUsage>['segments'], missing: [] as string[] })
         if (u.missing.length) { warnings.push(`Chưa ghi chỉ số ${name} tháng ${mmYYYY(prev)}`); continue }
         const price = rateFor(input.rates, input.facilityId, utility, prevStart)
         lines.push({
@@ -133,3 +162,22 @@ export function buildFirstInvoice(terms: LeaseTerms, startDate: ISODate, prorati
 }
 
 export { addDays }
+
+/** Kỳ tiếp theo bắt đầu ngay sau kỳ đã lập, tính theo tháng dương lịch. */
+export function nextBillingPeriod(lease: Lease, lastBilledEnd: ISODate | null, period: string): { start: ISODate; end: ISODate } | null {
+  const start = lastBilledEnd ? addDays(lastBilledEnd, 1) : lease.startDate
+  if (start > lastDayOf(period) || start > lease.endDate) return null
+  const [year, month, day] = start.split('-').map(Number)
+  const months = lease.billingCycleMonths ?? 1
+  const target = new Date(Date.UTC(year, month - 1 + months, 1))
+  const ym = `${target.getUTCFullYear()}-${String(target.getUTCMonth() + 1).padStart(2, '0')}`
+  const next = `${ym}-${String(Math.min(day, daysInMonth(ym))).padStart(2, '0')}`
+  const end = addDays(next, -1)
+  return { start, end: end < lease.endDate ? end : lease.endDate }
+}
+
+export function settlementState(total: number, paid: number): 'unpaid' | 'partial' | 'paid' | 'refund_pending' | 'refunded' {
+  if (total < 0) return paid <= total ? 'refunded' : 'refund_pending'
+  if (paid >= total) return 'paid'
+  return paid > 0 ? 'partial' : 'unpaid'
+}

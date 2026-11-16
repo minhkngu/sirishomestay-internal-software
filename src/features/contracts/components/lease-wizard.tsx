@@ -35,6 +35,8 @@ export function LeaseWizard({ rooms, tenants, feeTypes, initial = {}, defaults }
   )
   const [overrideProration, setOverrideProration] = useState('')
   const [dayOfMonth, setDayOfMonth] = useState('')
+  const [cycle, setCycle] = useState('1')
+  const [waterByMeter, setWaterByMeter] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const individuals = tenants.filter((t) => t.kind !== 'company')
@@ -61,7 +63,7 @@ export function LeaseWizard({ rooms, tenants, feeTypes, initial = {}, defaults }
     const input = {
       roomId, tenantId, occupantIds, startDate, endDate, monthlyRent: Number(rent), depositAmount: Number(deposit),
       fees: chosenFees.map((f) => ({ feeTypeId: f.id, quantity: qty(f), unitPrice: Number(fees[f.id].price) || 0 })),
-      proration: overrideProration || null,
+      proration: overrideProration || null, billingCycleMonths: Number(cycle) || 1, billWaterByMeter: waterByMeter,
       dueRule: dayOfMonth ? { kind: 'day_of_next_month', day: Number(dayOfMonth) } : null,
     }
     start(async () => {
@@ -122,6 +124,10 @@ export function LeaseWizard({ rooms, tenants, feeTypes, initial = {}, defaults }
           <div className="space-y-1"><Label htmlFor="pro">Cách tính lẻ ngày</Label>
             <select id="pro" value={overrideProration} onChange={(e) => setOverrideProration(e.target.value)} className="h-8 w-full rounded-lg border px-2 text-sm">
               <option value="">Theo mặc định hệ thống ({defaults.proration === 'days_30' ? 'chia 30' : 'số ngày thực của tháng'})</option><option value="days_30">Chia 30</option><option value="actual_days">Số ngày thực của tháng</option></select></div>
+          <div className="space-y-1"><Label htmlFor="cycle">Kỳ thanh toán mặc định (số tháng mỗi hoá đơn)</Label>
+            <select id="cycle" value={cycle} onChange={(e) => setCycle(e.target.value)} className="h-8 w-full rounded-lg border px-2 text-sm">
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n} tháng</option>)}</select></div>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={waterByMeter} onChange={(e) => setWaterByMeter(e.target.checked)} /> Tính nước theo đồng hồ</label>
         </div>
       )}
 

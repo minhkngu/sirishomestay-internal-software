@@ -32,7 +32,7 @@ export async function setSignStatusAction(kind: 'lease' | 'deposit', id: string,
   const ctx = await getAccessContext()
   return toActionResult(async () => { await setSignStatus(db, ctx, kind, id, status, signedFileId); refresh(); return {} })
 }
-export async function exportContractAction(kind: 'lease' | 'deposit', id: string, templateId?: string) {
+export async function exportContractAction(kind: 'lease' | 'deposit', id: string, templateId?: string, format: 'docx' | 'pdf' = 'docx') {
   const ctx = await getAccessContext()
-  return toActionResult(async () => { const r = await exportContract(db, ctx, getStorage(), kind, id, templateId); refresh(); return r })
+  return toActionResult(async () => { const r = await exportContract(db, ctx, getStorage(), kind, id, templateId, format); refresh(); return r })
 }
