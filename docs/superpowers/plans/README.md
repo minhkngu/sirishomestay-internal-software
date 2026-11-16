@@ -14,7 +14,7 @@ Dùng Supabase ngay từ đầu, dữ liệu giả nạp bằng `npm run db:seed
 
 Kế hoạch các đợt sau có thể được chỉnh lại theo góp ý ở điểm dừng của đợt trước.
 
-Kế hoạch lẻ: [Tăng tốc chuyển trang](2026-11-16-tang-toc-tai-trang.md) — getClaims, dùng chung AccessContext, loading, Vercel `bom1` (chưa làm).
+Kế hoạch lẻ: [Tăng tốc chuyển trang](2026-11-16-tang-toc-tai-trang.md) — đã triển khai getClaims, dùng chung AccessContext, loading, Vercel `bom1`; Preview đăng nhập thành công, trung vị chuyển trang khoảng 409 ms theo thời gian hiển thị. Còn đo `_rsc`, đối chiếu mốc trước sửa và kiểm tra làm mới phiên, cập nhật menu khi thu hồi quyền.
 
 ## Tiến độ
 

@@ -115,5 +115,13 @@ it('function Vercel chạy cùng vùng với Supabase', () => {
 
 | Lúc | Trung vị request `_rsc` | Ghi chú |
 |---|---|---|
-| Trước sửa | | |
-| Sau sửa | | |
+| Trước sửa | Chưa đo | Chưa có mốc trên bản build production. |
+| Sau sửa | Chưa đo riêng `_rsc` | Bản Preview Vercel: thời gian từ lúc bấm đến khi tiêu đề trang hiện, trung vị 409 ms qua 10 lần; đây không phải thời gian xử lý riêng của server. |
+
+### Kiểm tra Preview ngày 16/11/2026
+
+- Bản Preview build thành công, function tại `bom1`; đăng nhập nhanh Admin thành công, có màn hình đang tải.
+- Hai lượt chuyển trang (ms, từ lúc bấm đến khi tiêu đề hiện): Nhắc việc 526/405; Cơ sở & phòng 407/410; Khách thuê 519/388; Hợp đồng 495/617; Điện nước 388/404. Trung vị 409 ms; bao gồm độ trễ công cụ kiểm tra và có thể có dữ liệu tải trước.
+- Chưa có số đo `_rsc` và mốc trước sửa nên chưa xác nhận mục tiêu server ≤ 600 ms hoặc giảm ≥ 60%.
+- Chưa kiểm tra làm mới token hết hạn; menu có thể vẫn hiển thị quyền đã thu hồi đến khi tải lại trang. Quyền vẫn được kiểm tra phía server.
+- Kiểm thử tự động: 256 bài đạt; kiểm tra kiểu dữ liệu đạt; lint 0 lỗi, 8 cảnh báo có sẵn.
