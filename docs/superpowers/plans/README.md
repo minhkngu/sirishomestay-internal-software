@@ -21,6 +21,7 @@ Kế hoạch lẻ: [Tăng tốc chuyển trang](2026-11-16-tang-toc-tai-trang.md
 - **16/11/2026:** Nhánh `claude/superpowers-executing-plans-phase-1-728325` đã merge vào `main` (commit `f2a8a22`): Task 1, 2, 3, 4, 5, 6, 7, 7b, 8–12. Kiểm tra: 242/242 test đạt, `tsc` sạch, lint 0 lỗi (8 cảnh báo), build OK. Đã migrate + nạp dữ liệu giả lên Supabase `siris-pms`, đăng nhập thử Admin thành công.
 - **16/11/2026 (sau):** seed tự tạo bucket `siris` (`8c09af0`); e2e + checklist đợt 1 (`4d71407`).
 - **16/11/2026 — rà soát plan với spec:** thêm Task 12b (ẩn thông tin khách/tiền theo quyền, quyền cho hợp đồng/bàn giao, vật tư theo số lượng, người ở phải là cá nhân) và Task 4b (tách kỳ theo phụ lục chưa duyệt, đổi người ở, kỳ thanh toán nhiều tháng, nước tính theo người, hoá đơn hoàn khách). Sửa Task 13–15 (quyền, ghi đè lẻ ngày trên hoá đơn, `billing_cycle_months`, phiếu thu, điều chỉnh "sửa thẳng hoá đơn hiện tại", sổ cọc khi thanh lý, không xoá ảnh giấy tờ của khách còn hợp đồng), Task 18 (khoá chống trùng cho cọc, công nợ, mã hợp đồng cũ) và Task 21.
+- **16/11/2026 — bỏ `--reset` ở các điểm dừng:** seed sẽ chạy thêm dần (làm trong Task 12b): module đã có dữ liệu thì bỏ qua, nên điểm dừng chỉ chạy `db:migrate && db:seed` và giữ nguyên dữ liệu đang test. `--reset` chỉ dùng khi chủ động muốn làm sạch.
 - **Việc kế tiếp:** Task 12b → điểm dừng đợt 2 (e2e, `dot-2-checklist.md`) → bản thử Vercel; gỡ thư viện thừa `zustand`, `idb-keyval`; người dùng test và góp ý. Sau đó làm Task 4b, 13–15 (đợt 3).
 
 ## Ghi chú môi trường (rút ra khi chạy thật)

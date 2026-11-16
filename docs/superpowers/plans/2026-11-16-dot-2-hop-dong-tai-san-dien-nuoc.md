@@ -68,9 +68,9 @@ tests/helpers/db.ts  tests/unit/**  tests/integration/**  tests/e2e/**
 .github/workflows/backup.yml  docs/operations/*.md  docs/review/checklist.md
 ```
 
-**Quy ước cho mọi task có bảng mới:** viết schema Drizzle trong `src/db/schema/<module>.ts` → `npm run db:generate` → thêm `enable row level security` cho bảng mới trong cùng migration → thêm dữ liệu giả của module vào `scripts/seed/<module>.ts` (đăng ký trong `scripts/seed/index.ts`) → `npm run db:migrate` và `npm run db:seed` lên Supabase dev. Mọi bảng có `id uuid default gen_random_uuid()`, `created_at`, `updated_at`; bảng nào có dữ liệu giả thì thêm `is_demo bool default false` (seed đặt `true`) để Task 23 xoá sạch được.
+**Quy ước cho mọi task có bảng mới:** viết schema Drizzle trong `src/db/schema/<module>.ts` → `npm run db:generate` → thêm `enable row level security` cho bảng mới trong cùng migration → thêm dữ liệu giả của module vào `scripts/seed/<module>.ts` (đăng ký trong `scripts/seed/index.ts`) → `npm run db:migrate` và `npm run db:seed` lên Supabase dev. Seed chạy **thêm dần** (từ Task 12b): module nào đã có dữ liệu thì bỏ qua, nên không cần `--reset` để thêm dữ liệu của module mới. Mọi bảng có `id uuid default gen_random_uuid()`, `created_at`, `updated_at`; bảng nào có dữ liệu giả thì thêm `is_demo bool default false` (seed đặt `true`) để Task 23 xoá sạch được.
 
-**Dữ liệu giả (tổng hợp từ các task):** 2 cơ sở (TD Thảo Điền: tầng 1–4 × 6 phòng; BT Bình Thạnh: tầng 1–4 × 4 phòng); 30 khách (14 nước ngoài với visa hết hạn tương đối so với ngày seed: −5, 0, 3, 9, 16, 24, 29, 30, 45, 70, 120, 200, 260, 330 ngày; 12 Việt Nam; 4 công ty); ~26 hợp đồng thuê (vài cái hết hạn trong 30 ngày, 2 cái chưa ký); 3 hợp đồng cọc chờ; đồng hồ và chỉ số 3 tháng; hoá đơn 2 tháng (vài cái quá hạn); sổ cọc; ~120 tài sản; 8 sự cố; 6 loại phí; đơn giá điện 3.500đ/kWh (đổi lên 3.800đ từ đầu tháng hiện tại) và nước 18.000đ/m³; 5 tài khoản mẫu: Admin (settings); Lan — Quản lý TD (tenants_contracts, billing); Minh — Kế toán TD+BT (billing); Hùng — Kỹ thuật BT (meters, assets, incidents); Vy — Lễ tân TD (tenants_contracts, meters). Tên và số giấy tờ đều bịa. `db:seed --reset` xoá dữ liệu rồi nạp lại.
+**Dữ liệu giả (tổng hợp từ các task):** 2 cơ sở (TD Thảo Điền: tầng 1–4 × 6 phòng; BT Bình Thạnh: tầng 1–4 × 4 phòng); 30 khách (14 nước ngoài với visa hết hạn tương đối so với ngày seed: −5, 0, 3, 9, 16, 24, 29, 30, 45, 70, 120, 200, 260, 330 ngày; 12 Việt Nam; 4 công ty); ~26 hợp đồng thuê (vài cái hết hạn trong 30 ngày, 2 cái chưa ký); 3 hợp đồng cọc chờ; đồng hồ và chỉ số 3 tháng; hoá đơn 2 tháng (vài cái quá hạn); sổ cọc; ~120 tài sản; 8 sự cố; 6 loại phí; đơn giá điện 3.500đ/kWh (đổi lên 3.800đ từ đầu tháng hiện tại) và nước 18.000đ/m³; 5 tài khoản mẫu: Admin (settings); Lan — Quản lý TD (tenants_contracts, billing); Minh — Kế toán TD+BT (billing); Hùng — Kỹ thuật BT (meters, assets, incidents); Vy — Lễ tân TD (tenants_contracts, meters). Tên và số giấy tờ đều bịa. `db:seed` giữ nguyên dữ liệu đang có và chỉ nạp phần còn thiếu; `db:seed --reset` xoá sạch rồi nạp lại từ đầu, chỉ dùng khi chủ động muốn làm sạch (mất cả dữ liệu người dùng đã nhập khi test).
 
 ---
 
@@ -212,9 +212,10 @@ tests/helpers/db.ts  tests/unit/**  tests/integration/**  tests/e2e/**
 Rà soát spec ngày 16/11 thấy Task 9–12 còn thiếu: Task 9 và 12 không ghi quyền cần có; spec 5 yêu cầu người chỉ có "Ghi điện nước" không thấy thông tin khách hay tiền; spec 6.7 yêu cầu hỗ trợ cả vật tư theo số lượng; spec 6.2 người ở là khách cá nhân.
 
 **Files:**
-- Create: `src/db/schema/stock.ts`, `src/server/stock/{service.ts,actions.ts}`, `src/features/assets/components/{stock-table.tsx,stock-move-dialog.tsx}`, thêm vào `scripts/seed/assets.ts`
+- Create: `src/db/schema/stock.ts`, `src/server/stock/{service.ts,actions.ts}`, `src/features/assets/components/{stock-table.tsx,stock-move-dialog.tsx}`, `scripts/seed/{stock.ts,state.ts}`
+- Modify (seed thêm dần): `scripts/seed/{index.ts,types.ts}` và mỗi module trong `scripts/seed/` (thêm `isSeeded`)
 - Modify: `src/server/rooms/service.ts`, `src/server/tenants/service.ts`, `src/server/contracts/service.ts`, `src/server/handovers/service.ts`, `src/app/(app)/rooms/[id]/page.tsx`, `src/app/(app)/assets/page.tsx`
-- Test: `tests/integration/room-visibility.test.ts`, `tests/integration/stock.test.ts`, thêm ca vào `tests/integration/{contracts,handovers}.test.ts`
+- Test: `tests/integration/room-visibility.test.ts`, `tests/integration/stock.test.ts`, thêm ca vào `tests/integration/{contracts,handovers,seed}.test.ts`
 
 **Interfaces:**
 - Quyền (ghi vào đầu mỗi service): hợp đồng cọc/thuê và bàn giao cần `tenants_contracts`; xem hợp đồng hiện tại, bên thuê, người ở trên trang phòng cần `tenants_contracts`; tiền thuê, cọc, công nợ trên trang phòng/khách cần `tenants_contracts` hoặc `billing`. Người không đủ quyền vẫn thấy trạng thái phòng (Trống / Đang ở …) nhưng không thấy tên khách hay số tiền — dữ liệu bị bỏ ở service, không chỉ ẩn trên UI.
@@ -224,6 +225,11 @@ Rà soát spec ngày 16/11 thấy Task 9–12 còn thiếu: Task 9 và 12 không
   - Bảng `stock_items(facility_id, name, unit, category, is_active)`, `stock_levels(item_id, location_kind 'room'|'common'|'warehouse', location_id, quantity int ≥ 0)` unique `(item_id, location_kind, location_id)`, `stock_moves(item_id, from_kind, from_id, to_kind, to_id, quantity, moved_by, reason, moved_at)`.
   - `listStock(db, ctx, { facilityId?, location? })`, `createStockItem`, `receiveStock(db, ctx, itemId, to, quantity, reason)` (nhập kho), `moveStock(db, ctx, itemId, from, to, quantity, reason)`, `consumeStock(db, ctx, itemId, from, quantity, reason)` (dùng hết / hỏng). Cần quyền `assets`. Không đủ số lượng → `ValidationError('Không đủ số lượng tại vị trí nguồn')`.
   - Vật tư không vào biên bản bàn giao (chỉ tài sản có mã).
+- Seed thêm dần *(sửa 16/11: trước đây seed chỉ chạy trên database trống nên mỗi điểm dừng phải `--reset`, xoá cả dữ liệu đang test)*:
+  - `SeedModule` thêm `isSeeded(ctx): Promise<boolean>` — đúng khi bảng chính của module đã có dòng `is_demo = true`.
+  - `runSeed` khi không có `reset`: gọi `loadSeedState(ctx)` (`scripts/seed/state.ts`) để điền `state` từ database (`facilityIds` theo `facilities.code`, `roomIds` theo `mã cơ sở:mã phòng`, `userIds` theo email tài khoản mẫu), rồi chạy lần lượt các module và bỏ qua module có `isSeeded` = true. Có `reset` thì giữ hành vi cũ.
+  - Mỗi module dùng `createRng` với hạt giống riêng suy ra từ tên module, để dữ liệu của một module không đổi khi module trước nó bị bỏ qua.
+  - Vật tư mẫu ở module riêng `stockSeed` (`scripts/seed/stock.ts`, đăng ký sau `assetSeed`): mỗi cơ sở vài vật tư (bóng đèn, ruột gối, khăn tắm…) có tồn ở kho và vài phòng.
 
 - [ ] **Step 1: Viết test**
   - Hùng (meters, assets, incidents tại BT) gọi `getRoomDetail` một phòng BT đang ở → có `status = 'occupied'`, không có `lease`, không có `money`.
@@ -231,16 +237,17 @@ Rà soát spec ngày 16/11 thấy Task 9–12 còn thiếu: Task 9 và 12 không
   - Hùng gọi `startHandover` → `ForbiddenError`; gọi `createLease` → `ForbiddenError`.
   - Tạo lease với người ở là khách công ty → `ValidationError` "Người ở phải là khách cá nhân".
   - Nhập kho 20 bóng đèn, chuyển 3 sang phòng 301 → kho 17, phòng 301 có 3, 1 dòng `stock_moves`; chuyển 25 → lỗi "Không đủ số lượng tại vị trí nguồn"; người cơ sở khác → `NotFoundError`.
+  - Seed: chạy `runSeed` hai lần không `reset` → lần hai không lỗi, số dòng mọi bảng không đổi. Xoá hết dòng `stock_*` rồi chạy lại → chỉ vật tư được nạp lại; khách, hợp đồng, tài khoản giữ nguyên id.
 - [ ] **Step 2:** Chạy `npx vitest run tests/integration/room-visibility.test.ts tests/integration/stock.test.ts tests/integration/contracts.test.ts tests/integration/handovers.test.ts` → FAIL.
 - [ ] **Step 3:** Cài đặt. Trang tài sản thêm tab "Vật tư" (bảng theo vị trí, nút Nhập kho / Chuyển / Xuất dùng); trang phòng dùng `getRoomDetail`.
 - [ ] **Step 4:** Chạy lại → PASS; `npm test` → PASS toàn bộ.
-- [ ] **Step 5:** Commit `feat: ẩn thông tin khách và tiền theo quyền, vật tư theo số lượng`.
+- [ ] **Step 5:** Commit `feat: ẩn thông tin khách và tiền theo quyền, vật tư theo số lượng, seed thêm dần`.
 
 ### Điểm dừng đợt 2: người dùng test
 
 - [ ] **Step 1:** `npm test` → PASS toàn bộ; `npm run lint` sạch; `npm run build` OK.
 - [ ] **Step 2:** Playwright (chạy trên Supabase dev, bỏ qua nếu thiếu `E2E_BASE_URL`) cho các luồng: tạo cọc cho phòng trống → phòng "Đã cọc"; chuyển thành hợp đồng thuê qua wizard; xuất Word; đánh dấu đã ký kèm file; chuyển 2 tài sản từ kho vào phòng; ghi chỉ số điện nước, nhập chỉ số giảm → báo lỗi; thay đồng hồ; check-in rồi check-out có phạt; Hùng mở trang phòng đang ở → không thấy tên khách và tiền; chuyển 3 bóng đèn từ kho vào phòng. `npx playwright test` → PASS.
-- [ ] **Step 3:** `npm run db:migrate && npm run db:seed -- --reset` trên Supabase dev; triển khai bản thử lên Vercel (preview) với `NEXT_PUBLIC_DEMO_MODE=1`.
+- [ ] **Step 3:** `npm run db:migrate && npm run db:seed` trên Supabase dev — thêm bảng vật tư và vật tư mẫu, giữ nguyên dữ liệu đang có (không dùng `--reset`); triển khai bản thử lên Vercel (preview) với `NEXT_PUBLIC_DEMO_MODE=1`.
 - [ ] **Step 4:** Viết `docs/review/dot-2-checklist.md`: từng luồng cần bấm thử (các bước, điều cần để ý, ô ghi chú) cho phần của đợt này.
 - [ ] **Step 5:** Commit `test: e2e và checklist test đợt 2`.
 - [ ] **Step 6: Dừng lại.** Gửi link bản thử + checklist cho người dùng. Góp ý được cập nhật vào spec và kế hoạch các đợt sau rồi mới bắt đầu đợt tiếp theo.
