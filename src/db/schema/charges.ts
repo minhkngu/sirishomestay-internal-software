@@ -1,6 +1,7 @@
 import { boolean, date, bigint, numeric, pgTable, text, timestamp, uuid, index } from 'drizzle-orm/pg-core'
 import { leases } from './contracts'
 import { feeTypes } from './fees'
+import { invoices } from './invoices'
 
 export const oneOffCharges = pgTable('one_off_charges', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -11,7 +12,7 @@ export const oneOffCharges = pgTable('one_off_charges', {
   date: date('date', { mode: 'string' }).notNull(),
   quantity: numeric('quantity', { mode: 'number' }).notNull(),
   unitPrice: bigint('unit_price', { mode: 'number' }).notNull(),
-  invoiceId: uuid('invoice_id'),
+  invoiceId: uuid('invoice_id').references(() => invoices.id),
   source: text('source'),
   isDemo: boolean('is_demo').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -24,7 +25,7 @@ export const pendingAdjustments = pgTable('pending_adjustments', {
   description: text('description').notNull(),
   amount: bigint('amount', { mode: 'number' }).notNull(),
   sourceKey: text('source_key').notNull().unique(),
-  invoiceId: uuid('invoice_id'),
+  invoiceId: uuid('invoice_id').references(() => invoices.id),
   isDemo: boolean('is_demo').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
