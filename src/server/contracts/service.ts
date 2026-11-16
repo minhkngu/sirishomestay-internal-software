@@ -170,6 +170,7 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
   const proration = (lease.proration as Proration | null) ?? settings.proration
   const fees = await contractFees(tx, lease.id)
   const terms: LeaseTerms = {
+    billingCycleMonths: 1, billWaterByMeter: true,
     roomId: lease.roomId, startDate: lease.startDate, endDate: lease.endDate, monthlyRent: lease.monthlyRent,
     depositAmount: lease.depositAmount, fees, occupantIds: occupants,
   }
@@ -245,7 +246,7 @@ export async function getLease(db: DB, ctx: AccessContext, id: string): Promise<
   const occupantIds = occ.map((o) => o.tenantId)
   const terms = contractTermsAt({
     id, code: row.l.code, roomId: row.l.roomId, startDate: row.l.startDate, endDate: row.l.endDate, monthlyRent: row.l.monthlyRent,
-    depositAmount: row.l.depositAmount, fees, occupantIds,
+    depositAmount: row.l.depositAmount, billingCycleMonths: 1, billWaterByMeter: true, fees, occupantIds,
   }, [], row.l.startDate)
   return { ...row.l, roomCode: row.roomCode, facilityId: row.facilityId, tenantName: row.fullName ?? row.companyName ?? '', occupantCount: occupantIds.length, fees, occupantIds, depositEntries: entries, terms }
 }

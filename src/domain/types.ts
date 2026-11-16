@@ -24,6 +24,8 @@ export type Lease = {
   depositAmount: number
   fees: ContractFee[]
   occupantIds: string[]
+  billingCycleMonths: number
+  billWaterByMeter: boolean
   dueRule?: DueRule | null
   proration?: Proration | null
 }
@@ -31,7 +33,7 @@ export type Lease = {
 export type Addendum = {
   id: string
   leaseId: string
-  type: 'extension' | 'transfer' | 'termination'
+  type: 'extension' | 'transfer' | 'termination' | 'occupants'
   effectiveDate: ISODate
   newEndDate?: ISODate | null
   newRoomId?: string | null
@@ -43,6 +45,8 @@ export type Addendum = {
 
 /** Điều khoản hiệu lực của hợp đồng tại một ngày (hợp đồng gốc + phụ lục). */
 export type LeaseTerms = {
+  billingCycleMonths: number
+  billWaterByMeter: boolean
   roomId: string
   startDate: ISODate
   endDate: ISODate
