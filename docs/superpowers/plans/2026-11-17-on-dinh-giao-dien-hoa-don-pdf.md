@@ -55,7 +55,7 @@
 **Interfaces:**
 - Produces: không có. Các file này chỉ là quy ước route của Next.
 
-- [ ] **Step 1: Viết test e2e cho đường dẫn sai**
+- [x] **Step 1: Viết test e2e cho đường dẫn sai**
 
 ```ts
 test('mở phòng không tồn tại → báo "Không tìm thấy", menu vẫn còn', async ({ page }) => {
@@ -69,11 +69,11 @@ test('mở phòng không tồn tại → báo "Không tìm thấy", menu vẫn c
 
 Hàm `login` chép từ `tests/e2e/invoices.spec.ts`.
 
-- [ ] **Step 2: Chạy test, xác nhận FAIL**
+- [x] **Step 2: Chạy test, xác nhận FAIL**
 
 Chạy: `node scripts/e2e-preflight.mjs && E2E_BASE_URL=$E2E_BASE_URL npx playwright test tests/e2e/error-pages.spec.ts`. Kỳ vọng: FAIL vì không có heading.
 
-- [ ] **Step 3: Viết `(app)/not-found.tsx`, `(app)/error.tsx`, `global-error.tsx`**
+- [x] **Step 3: Viết `(app)/not-found.tsx`, `(app)/error.tsx`, `global-error.tsx`**
 
 - `not-found.tsx`:
   - Heading "Không tìm thấy trang này".
@@ -86,9 +86,9 @@ Chạy: `node scripts/e2e-preflight.mjs && E2E_BASE_URL=$E2E_BASE_URL npx playwr
   - Gọi `console.error(error)` trong `useEffect`.
 - `global-error.tsx`: cùng nội dung như `error.tsx`, tự bọc `<html lang="vi"><body>`.
 
-- [ ] **Step 4: Chạy lại test, xác nhận PASS.**
+- [x] **Step 4: Chạy lại test, xác nhận PASS.**
 
-- [ ] **Step 5: Commit** — `feat: màn hình báo lỗi và trang không tìm thấy`
+- [x] **Step 5: Commit** — `feat: màn hình báo lỗi và trang không tìm thấy`
 
 ### Task 2: Mở mọi trang không gặp lỗi — tìm và sửa nguyên nhân gốc
 
