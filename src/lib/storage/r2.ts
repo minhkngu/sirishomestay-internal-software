@@ -11,7 +11,7 @@ export class R2Storage implements StorageAdapter {
       credentials: { accessKeyId, secretAccessKey },
     })
   }
-  async createUploadUrl(key: string, contentType: string, _maxBytes: number) {
+  async createUploadUrl(key: string, contentType: string) {
     // R2 không ép được kích thước qua presigned PUT; giới hạn được kiểm ở trình duyệt (nén ảnh).
     return getSignedUrl(this.client, new PutObjectCommand({ Bucket: this.bucket, Key: key, ContentType: contentType }), { expiresIn: 600 })
   }

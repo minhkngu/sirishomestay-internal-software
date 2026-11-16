@@ -1,17 +1,52 @@
 # Siris — Web quản lý khách thuê dài hạn
 
-Web nội bộ quản lý cơ sở, phòng, khách thuê. Thiết kế: `docs/superpowers/specs/`, kế hoạch: `docs/superpowers/plans/`.
+Web nội bộ quản lý cơ sở, phòng, khách thuê, bảng nhắc việc (visa), nhập dữ liệu từ Excel.
+Thiết kế: `docs/superpowers/specs/` · Kế hoạch: `docs/superpowers/plans/`.
 
-## Chạy
+Công nghệ: Next.js 16 (App Router), TypeScript, Tailwind v4 + shadcn/ui, Drizzle ORM, Supabase (Postgres + Auth), Cloudflare R2, Vercel.
+
+## Yêu cầu
+
+- Node.js ≥ 20, npm
+- Một project **Supabase Free** (Postgres + Auth)
+- Một bucket **Cloudflare R2** riêng tư (xem mục R2 bên dưới)
+
+## Cài đặt và chạy
+
+1. Tạo project Supabase; lấy `DATABASE_URL` (Database → Connection string, Session pooler), `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` và `SUPABASE_SERVICE_ROLE_KEY` (Project Settings → API).
+2. Sao chép và điền biến môi trường:
+
+   ```bash
+   cp .env.example .env.local
+   ```
+
+3. Cài thư viện, tạo bảng, tạo tài khoản quản trị đầu tiên (mật khẩu tạm in ra một lần), chạy:
+
+   ```bash
+   npm install
+   npm run db:migrate
+   npm run seed:admin -- --email you@example.com --name "Tên của bạn"
+   npm run dev
+   ```
+
+   Mở http://localhost:3000 và đăng nhập.
+
+## Kiểm thử
 
 ```bash
-cp .env.example .env.local   # điền biến môi trường
-npm install
-npm run dev                  # http://localhost:3000
-npm test                     # Vitest + PGlite (không cần Docker)
+npm test          # Vitest + PGlite (Postgres nhúng, không cần Docker)
+npm run lint
+npm run build
+E2E_EMAIL=... E2E_PASSWORD=... npm run test:e2e   # smoke test Playwright, cần Supabase dev; bỏ qua nếu thiếu biến
 ```
 
-Biến môi trường: xem `.env.example`.
+## Triển khai Vercel
+
+Import repo vào Vercel và khai báo cùng các biến như `.env.example` (`DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `R2_*`). Chạy `npm run db:migrate` với `DATABASE_URL` của production trước lần deploy đầu và mỗi khi có migration mới.
+
+## Sao lưu
+
+Mỗi đêm GitHub Actions sao lưu cơ sở dữ liệu ra Google Drive (giữ 30 bản). Hướng dẫn thiết lập và khôi phục: [docs/operations/backup-restore.md](docs/operations/backup-restore.md).
 
 ## Cloudflare R2 (ảnh giấy tờ)
 
