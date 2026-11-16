@@ -254,9 +254,12 @@ expect(numberToVietnameseWords(2005000)).toBe('Hai triệu không trăm linh nă
 
 ### Điểm dừng đợt 1: người dùng test
 
-- [ ] **Step 1:** `npm test` → PASS toàn bộ; `npm run lint` sạch; `npm run build` OK.
+- [x] **Step 1:** `npm test` → PASS toàn bộ; `npm run lint` sạch; `npm run build` OK.
 - [x] **Step 2:** Playwright (chạy trên Supabase dev, bỏ qua nếu thiếu `E2E_BASE_URL`) cho các luồng: đăng nhập nhanh bằng Admin thấy Nhắc việc; Hùng mở `/tenants` → "Không tìm thấy"; Admin tick thêm quyền cho Vy rồi Vy thấy menu mới; tạo nhanh phòng 501–503; thêm khách nước ngoài với SĐT trùng → báo lỗi, đổi số → lưu; tìm `nguyen van an`. `npx playwright test` → PASS.
-- [ ] **Step 3:** Dữ liệu giả đã nạp lên Supabase `siris-pms` ngày 16/11 — không nạp lại (không dùng `--reset`), chỉ chạy `npm run db:migrate` nếu có migration mới; triển khai bản thử lên Vercel (preview) với `NEXT_PUBLIC_DEMO_MODE=1`.
+- [x] **Step 3:** Dữ liệu giả đã nạp lên Supabase `siris-pms` ngày 16/11 — không nạp lại (không dùng `--reset`), chỉ chạy `npm run db:migrate` nếu có migration mới; triển khai bản thử lên Vercel (preview) với `NEXT_PUBLIC_DEMO_MODE=1`.
 - [x] **Step 4:** Viết `docs/review/dot-1-checklist.md`: từng luồng cần bấm thử (các bước, điều cần để ý, ô ghi chú) cho phần của đợt này.
 - [x] **Step 5:** Commit `test: e2e và checklist test đợt 1` (`4d71407`).
-- [ ] **Step 6: Dừng lại.** Gửi link bản thử + checklist cho người dùng. Góp ý được cập nhật vào spec và kế hoạch các đợt sau rồi mới bắt đầu đợt tiếp theo.
+- [x] **Step 6: Dừng lại.** Gửi link bản thử + checklist cho người dùng. Góp ý được cập nhật vào spec và kế hoạch các đợt sau rồi mới bắt đầu đợt tiếp theo.
+
+
+*16/11/2026: Người dùng yêu cầu đánh dấu phần cuối đợt 1 hoàn thành; các dấu mới phản ánh xác nhận này, không phải kết quả chạy lại từng bước.*
