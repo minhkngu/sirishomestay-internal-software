@@ -34,6 +34,7 @@ export const leases = pgTable(
     startDate: date('start_date', { mode: 'string' }).notNull(),
     endDate: date('end_date', { mode: 'string' }).notNull(),
     monthlyRent: integer('monthly_rent').notNull(),
+    legacyCode: text('legacy_code').unique(),
     billingCycleMonths: integer('billing_cycle_months').notNull().default(1),
     billWaterByMeter: boolean('bill_water_by_meter').notNull().default(true),
     depositAmount: integer('deposit_amount').notNull(),

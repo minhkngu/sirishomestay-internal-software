@@ -1,11 +1,19 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { facilities, leases, rooms, tenants, meters, meterReadings, utilityRates } from '@/db'
+import { facilities, invoiceLines, leases, rooms, tenants, meters, meterReadings, utilityRates } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
-import { ForbiddenError } from '@/domain/errors'
+import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
+import { auditLogs, files, invoices } from '@/db'
+import { eq } from 'drizzle-orm'
 import { addOneOff } from '@/server/charges/service'
-import { addPayment, approveInvoice, createDrafts, deleteInvoice, invoiceStatus, previewBatch, setPeriod } from '@/server/invoices/service'
+import { exportReceipt, addPayment, approveInvoice, createDrafts, deleteInvoice, invoiceStatus, listInvoices, previewBatch, removePayment, setPeriod, tenantBalance, updateLines } from '@/server/invoices/service'
+import { DOCX_MIME } from '@/lib/docx'
+import { MemoryStorage } from '@/server/storage/memory'
+import { attachTemplateFile, createTemplate } from '@/server/templates/service'
+import { confirmUpload, requestUpload } from '@/server/files/service'
+import { buildSampleTemplate } from '../../scripts/build-sample-templates'
 import { createTestDb } from '../helpers/db'
+
 
 const context = (permissions: Permission[], facilityId: string): AccessContext => ({ userId: crypto.randomUUID(), email: 'test@example.com', fullName: 'Test', permissions: new Set(permissions), facilityIds: new Set([facilityId]), isAdmin: false })
 describe('hoá đơn và thu tiền', () => {
@@ -39,5 +47,71 @@ describe('hoá đơn và thu tiền', () => {
   })
   it('không cho người chỉ có quyền ghi điện nước tạo hoá đơn', async () => {
     await expect(createDrafts(db, context(['meters'], facilityId), { facilityId, period: '2026-12' })).rejects.toThrow(ForbiddenError)
+  })
+  it('sửa dòng, gỡ thu, liệt kê, công nợ và chặn sai cơ sở', async () => {
+    const ctx = context(['billing'], facilityId)
+    const [row] = await createDrafts(db, ctx, { facilityId, period: '2026-12' })
+    await updateLines(db, ctx, row.id, [{ type: 'rent', description: 'Tiền phòng', quantity: 1, unitPrice: 9000000 }, { type: 'adjustment', description: 'Giảm giá', quantity: 1, unitPrice: -500000 }])
+    expect((await db.select().from(invoiceLines)).reduce((n, l) => n + l.amount, 0)).toBe(8500000)
+    expect((await listInvoices(db, ctx, { status: 'draft' }))).toHaveLength(1)
+    await approveInvoice(db, ctx, row.id, { dueDate: '2027-01-05' })
+    await expect(addPayment(db, ctx, row.id, { paidOn: '2026-12-21', amount: -1, method: 'cash' })).rejects.toThrow(ValidationError)
+    const pay = await addPayment(db, ctx, row.id, { paidOn: '2026-12-21', amount: 2000000, method: 'cash' })
+    expect(await tenantBalance(db, ctx, (await db.select().from(leases))[0].tenantId)).toEqual({ billed: 8500000, paid: 2000000, balance: 6500000 })
+    expect((await listInvoices(db, ctx, { status: 'open' }))[0]).toMatchObject({ total: 8500000, paid: 2000000, state: 'partial' })
+    await removePayment(db, ctx, pay.id)
+    expect((await tenantBalance(db, ctx, (await db.select().from(leases))[0].tenantId)).paid).toBe(0)
+    const [other] = await db.insert(facilities).values({ code: 'BT', name: 'Bình Thạnh' }).returning()
+    await expect(updateLines(db, context(['billing'], other.id), row.id, [])).rejects.toThrow(NotFoundError)
+    await expect(listInvoices(db, context(['billing'], other.id), { facilityId })).rejects.toThrow(NotFoundError)
+    expect(await listInvoices(db, context(['billing'], other.id))).toHaveLength(0)
+  })
+  it('kỳ thanh toán 3 tháng: nháp tháng 10 phủ 01/10–31/12, tháng 11 và 12 không sinh hoá đơn', async () => {
+    await db.update(leases).set({ billingCycleMonths: 3, startDate: '2026-10-01' }).where(eq(leases.id, leaseId))
+    const ctx = context(['billing'], facilityId)
+    const [row] = await createDrafts(db, ctx, { facilityId, period: '2026-10' })
+    expect([row.periodStart, row.periodEnd]).toEqual(['2026-10-01', '2026-12-31'])
+    expect(await createDrafts(db, ctx, { facilityId, period: '2026-11' })).toHaveLength(0)
+    expect(await createDrafts(db, ctx, { facilityId, period: '2026-12' })).toHaveLength(0)
+  })
+  it('hoá đơn ghi đè lẻ ngày days_30 khi cài đặt actual_days', async () => {
+    const ctx = context(['billing'], facilityId)
+    const [row] = await createDrafts(db, ctx, { facilityId, period: '2026-02' })
+    await setPeriod(db, ctx, row.id, { start: '2026-02-01', end: '2026-02-14', proration: 'days_30' })
+    const rent = (await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, row.id))).find(l => l.type === 'rent')!
+    expect(rent.amount).toBe(Math.round(9000000 * 14 / 30))
+  })
+  it('hoá đơn tổng âm: khoản thu âm bằng tổng → Đã hoàn; hoá đơn dương nhận số âm → lỗi', async () => {
+    const ctx = context(['billing'], facilityId)
+    const [inv] = await db.insert(invoices).values({ code: 'TD-HD-202612-9001', leaseId, facilityId, kind: 'termination', periodStart: '2026-12-01', periodEnd: '2026-12-10', issueDate: '2026-12-10', dueDate: '2026-12-20', status: 'approved' }).returning()
+    await db.insert(invoiceLines).values({ invoiceId: inv.id, type: 'refund', description: 'Hoàn', quantity: 1, unitPrice: -2080000, amount: -2080000 })
+    await expect(addPayment(db, ctx, inv.id, { paidOn: '2026-12-11', amount: 100, method: 'cash' })).rejects.toThrow(ValidationError)
+    await addPayment(db, ctx, inv.id, { paidOn: '2026-12-11', amount: -2080000, method: 'transfer' })
+    expect(invoiceStatus(-2080000, -2080000, 'approved', '2026-12-20', '2026-12-12')).toBe('refunded')
+    expect(invoiceStatus(-2080000, 0, 'approved', '2026-12-20', '2026-12-12')).toBe('refund_pending')
+  })
+  it('sửa hoá đơn đã duyệt → có audit kèm trước/sau', async () => {
+    const ctx = context(['billing'], facilityId)
+    const [row] = await createDrafts(db, ctx, { facilityId, period: '2026-12' })
+    await approveInvoice(db, ctx, row.id, { dueDate: '2027-01-05' })
+    await updateLines(db, ctx, row.id, [{ type: 'rent', description: 'Tiền phòng', quantity: 1, unitPrice: 8000000 }])
+    const log = (await db.select().from(auditLogs)).find(x => x.summary === 'Sửa dòng hoá đơn đã duyệt')
+    expect(log?.before).toBeTruthy(); expect(log?.after).toBeTruthy()
+  })
+  it('xuất phiếu thu từ một khoản thu → có file doc_type receipt', async () => {
+    const ctx = context(['billing'], facilityId)
+    const storage = new MemoryStorage()
+    const [row] = await createDrafts(db, ctx, { facilityId, period: '2026-12' })
+    await approveInvoice(db, ctx, row.id, { dueDate: '2027-01-05' })
+    const pay = await addPayment(db, ctx, row.id, { paidOn: '2026-12-21', amount: 1000000, method: 'cash' })
+    const admin: AccessContext = { ...ctx, permissions: new Set(['settings']), isAdmin: true }
+    const t = await createTemplate(db, admin, { docType: 'receipt', name: 'Phiếu thu' })
+    const up = await requestUpload(db, admin, storage, { ownerType: 'template', ownerId: t.id, contentType: DOCX_MIME, name: 'pt.docx' })
+    const [f] = await db.select().from(files).where(eq(files.id, up.fileId))
+    await storage.write(f.storageKey, await buildSampleTemplate('receipt'), DOCX_MIME)
+    await confirmUpload(db, admin, up.fileId); await attachTemplateFile(db, admin, t.id, up.fileId)
+    const r = await exportReceipt(db, ctx, storage, pay.id)
+    const [out] = await db.select().from(files).where(eq(files.id, r.fileId))
+    expect(out.meta).toMatchObject({ docType: 'receipt' }); expect(out.ownerId).toBe(pay.id)
   })
 })

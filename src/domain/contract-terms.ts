@@ -10,7 +10,7 @@ export function contractTermsAt(lease: Lease, addenda: Addendum[], date: ISODate
   }
   const applicable = addenda
     .filter((a) => a.leaseId === lease.id && a.effectiveDate <= date)
-    .sort((a, b) => (a.effectiveDate === b.effectiveDate ? (a.id < b.id ? -1 : 1) : a.effectiveDate < b.effectiveDate ? -1 : 1))
+    .sort((a, b) => (a.effectiveDate === b.effectiveDate ? 0 : a.effectiveDate < b.effectiveDate ? -1 : 1)) // cùng ngày giữ thứ tự nhập (sắp xếp ổn định)
   for (const a of applicable) {
     if (a.type === 'termination') t.endDate = a.effectiveDate
     if (a.newEndDate) t.endDate = a.newEndDate

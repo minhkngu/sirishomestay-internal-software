@@ -1,6 +1,6 @@
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { depositEntries, leases, oneOffCharges, rooms } from '@/db'
+import { depositEntries, invoiceLines, invoices, leases, oneOffCharges, rooms } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
@@ -39,7 +39,12 @@ export async function removeOneOff(db: DB, ctx: AccessContext, id: string): Prom
     const [row] = await tx.select().from(oneOffCharges).where(eq(oneOffCharges.id, id))
     if (!row) throw new NotFoundError()
     const facilityId = await facilityForLease(tx as unknown as DB, ctx, row.leaseId)
-    if (row.invoiceId) throw new ValidationError('Phí đã được đưa vào hoá đơn')
+    if (row.invoiceId) {
+      const [inv] = await tx.select({ status: invoices.status }).from(invoices).where(eq(invoices.id, row.invoiceId))
+      if (inv?.status === 'approved') throw new ValidationError('Phí đã được đưa vào hoá đơn đã duyệt')
+      // Hoá đơn nháp: gỡ luôn dòng tương ứng để nháp không còn khoản đã xoá
+      await tx.delete(invoiceLines).where(and(eq(invoiceLines.invoiceId, row.invoiceId), sql`${invoiceLines.meta}->>'oneOffId' = ${id}`))
+    }
     await tx.delete(oneOffCharges).where(and(eq(oneOffCharges.id, id), eq(oneOffCharges.leaseId, row.leaseId)))
     await recordAudit(tx, ctx, { action: 'delete', entity: 'one_off_charge', entityId: id, facilityId, summary: `Gỡ phí ${row.description}`, before: row })
   })

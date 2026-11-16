@@ -1,17 +1,19 @@
 import { and, asc, eq, inArray, like, lte, ne } from 'drizzle-orm'
 import {
-  depositContracts, depositEntries, facilities, feeTypes, feeUnits, files, leaseFees, leaseOccupants, leases, rooms, tenants,
+  depositContracts, depositEntries, facilities, feeTypes, feeUnits, files, invoiceLines, invoices, leaseFees, leaseOccupants, leases, rooms, tenants,
 } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, facilityScope, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
-import { addDays, todayVN } from '@/domain/dates'
+import { addDays, daysInMonth, todayVN } from '@/domain/dates'
 import { depositBalance } from '@/domain/deposit'
 import { buildFirstInvoice } from '@/domain/invoice-builder'
 import { contractTermsAt } from '@/domain/contract-terms'
 import type { ContractFee, DepositEntry, InvoiceLineInput, LeaseTerms, Proration } from '@/domain/types'
 import { recordAudit } from '@/server/audit'
 import { registerExportOwnerResolver, registerOwnerResolver } from '@/server/files/owners'
+import type { ExportFormat } from '@/server/convert'
+import { leaseData, loadAddenda, nextInvoiceCode } from '@/server/invoices/service'
 import { getSettings } from '@/server/settings/service'
 import { exportDocument, registerDocLoader } from '@/server/templates/service'
 import type { StorageAdapter } from '@/server/storage/types'
@@ -38,7 +40,7 @@ async function loadTenant(db: Pick<DB, 'select'>, ctx: AccessContext, tenantId: 
   return t
 }
 
-async function nextLeaseCode(tx: Pick<DB, 'select'>, facilityCode: string, startDate: string): Promise<string> {
+export async function nextLeaseCode(tx: Pick<DB, 'select'>, facilityCode: string, startDate: string): Promise<string> {
   const prefix = `${facilityCode}-HĐ-${startDate.slice(0, 4)}-`
   const rows = await tx.select({ code: leases.code }).from(leases).where(like(leases.code, `${prefix}%`))
   const max = rows.reduce((m, r) => Math.max(m, Number(r.code.slice(prefix.length)) || 0), 0)
@@ -126,6 +128,8 @@ export type LeaseInput = {
   fees?: { feeTypeId: string; quantity: number; unitPrice: number }[]
   dueRule?: unknown
   proration?: Proration | null
+  billingCycleMonths?: number
+  billWaterByMeter?: boolean
 }
 
 export type LeaseCreated = { lease: Lease; firstInvoiceLines: InvoiceLineInput[]; warnings: string[] }
@@ -149,7 +153,7 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
   const code = await nextLeaseCode(tx, fac.code, input.startDate)
   const [lease] = await tx.insert(leases).values({
     code, roomId: room.id, tenantId: tenant.id, startDate: input.startDate, endDate: input.endDate, monthlyRent: input.monthlyRent,
-    depositAmount: input.depositAmount, dueRule: input.dueRule ?? null, proration: input.proration ?? null, fromDepositContractId: fromDepositId,
+    depositAmount: input.depositAmount, dueRule: input.dueRule ?? null, proration: input.proration ?? null, billingCycleMonths: input.billingCycleMonths ?? 1, billWaterByMeter: input.billWaterByMeter ?? true, fromDepositContractId: fromDepositId,
   }).returning()
   await tx.insert(leaseOccupants).values(occupants.map((tenantId) => ({ leaseId: lease.id, tenantId })))
   if (input.fees?.length) await tx.insert(leaseFees).values(input.fees.map((f) => ({ leaseId: lease.id, ...f })))
@@ -170,11 +174,19 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
   const proration = (lease.proration as Proration | null) ?? settings.proration
   const fees = await contractFees(tx, lease.id)
   const terms: LeaseTerms = {
-    billingCycleMonths: 1, billWaterByMeter: true,
+    billingCycleMonths: lease.billingCycleMonths, billWaterByMeter: lease.billWaterByMeter,
     roomId: lease.roomId, startDate: lease.startDate, endDate: lease.endDate, monthlyRent: lease.monthlyRent,
     depositAmount: lease.depositAmount, fees, occupantIds: occupants,
   }
   const firstInvoiceLines = buildFirstInvoice(terms, lease.startDate, proration, held)
+  // Hoá đơn đầu tiên (nháp thật): từ ngày vào ở tới hết tháng (hoặc hết hợp đồng); nhân viên duyệt vào lúc họ chọn
+  const monthEnd = `${lease.startDate.slice(0, 7)}-${String(daysInMonth(lease.startDate.slice(0, 7))).padStart(2, '0')}`
+  const [firstInvoice] = await tx.insert(invoices).values({
+    code: await nextInvoiceCode(tx, fac.code, lease.startDate.slice(0, 7)), leaseId: lease.id, facilityId: room.facilityId, kind: 'first',
+    periodStart: lease.startDate, periodEnd: lease.endDate < monthEnd ? lease.endDate : monthEnd, issueDate: todayVN(),
+  }).returning()
+  if (firstInvoiceLines.length) await tx.insert(invoiceLines).values(firstInvoiceLines.map((l) => ({ ...l, invoiceId: firstInvoice.id })))
+  await recordAudit(tx, ctx, { action: 'create', entity: 'invoice', entityId: firstInvoice.id, facilityId: room.facilityId, summary: `Tạo hoá đơn đầu tiên ${firstInvoice.code}`, after: firstInvoice })
 
   await recordAudit(tx, ctx, { action: 'create', entity: 'lease', entityId: lease.id, facilityId: room.facilityId, summary: `Tạo hợp đồng thuê ${lease.code}`, after: lease })
   return { lease, firstInvoiceLines, warnings: [] }
@@ -244,10 +256,9 @@ export async function getLease(db: DB, ctx: AccessContext, id: string): Promise<
     db.select().from(depositEntries).where(eq(depositEntries.leaseId, id)).orderBy(asc(depositEntries.date), asc(depositEntries.createdAt)),
   ])
   const occupantIds = occ.map((o) => o.tenantId)
-  const terms = contractTermsAt({
-    id, code: row.l.code, roomId: row.l.roomId, startDate: row.l.startDate, endDate: row.l.endDate, monthlyRent: row.l.monthlyRent,
-    depositAmount: row.l.depositAmount, billingCycleMonths: row.l.billingCycleMonths, billWaterByMeter: row.l.billWaterByMeter, fees, occupantIds,
-  }, [], row.l.startDate)
+  // Điều khoản hiện hành = hợp đồng gốc + phụ lục có hiệu lực tới hôm nay
+  const today = todayVN()
+  const terms = contractTermsAt(await leaseData(db, id), await loadAddenda(db, id), today < row.l.startDate ? row.l.startDate : today)
   return { ...row.l, roomCode: row.roomCode, facilityId: row.facilityId, tenantName: row.fullName ?? row.companyName ?? '', occupantCount: occupantIds.length, fees, occupantIds, depositEntries: entries, terms }
 }
 
@@ -278,8 +289,8 @@ export async function setSignStatus(db: DB, ctx: AccessContext, kind: 'lease' | 
 }
 
 /** Xuất hợp đồng ra Word từ mẫu; hợp đồng đang ở trạng thái nháp tự chuyển sang "đã xuất". */
-export async function exportContract(db: DB, ctx: AccessContext, storage: StorageAdapter, kind: 'lease' | 'deposit', id: string, templateId?: string) {
-  const r = await exportDocument(db, ctx, storage, { docType: kind === 'lease' ? 'lease' : 'deposit_contract', entityId: id, templateId })
+export async function exportContract(db: DB, ctx: AccessContext, storage: StorageAdapter, kind: 'lease' | 'deposit', id: string, templateId?: string, format: ExportFormat = 'docx') {
+  const r = await exportDocument(db, ctx, storage, { docType: kind === 'lease' ? 'lease' : 'deposit_contract', entityId: id, templateId, format })
   const table = kind === 'lease' ? leases : depositContracts
   const [row] = await db.select().from(table).where(eq(table.id, id))
   if (row?.signStatus === 'draft') await setSignStatus(db, ctx, kind, id, 'exported')

@@ -1,4 +1,5 @@
-import { boolean, date, integer, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
+import { boolean, date, integer, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 import { rooms } from './facilities'
 
 export const meters = pgTable('meters', {
@@ -21,11 +22,16 @@ export const meterReadings = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     meterId: uuid('meter_id').notNull().references(() => meters.id, { onDelete: 'cascade' }),
     period: text('period').notNull(), // YYYY-MM
+    // monthly: chỉ số ghi hằng tháng (duy nhất theo kỳ); handover: chỉ số chốt giữa tháng khi bàn giao/chuyển phòng (duy nhất theo ngày)
+    kind: text('kind').notNull().default('monthly'),
     readOn: date('read_on', { mode: 'string' }).notNull(),
     value: integer('value').notNull(),
     isDemo: boolean('is_demo').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [unique('meter_readings_meter_period_unique').on(t.meterId, t.period)],
+  (t) => [
+    uniqueIndex('meter_readings_monthly_unique').on(t.meterId, t.period).where(sql`${t.kind} = 'monthly'`),
+    uniqueIndex('meter_readings_handover_unique').on(t.meterId, t.readOn).where(sql`${t.kind} = 'handover'`),
+  ],
 )

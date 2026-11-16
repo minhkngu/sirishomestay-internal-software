@@ -4,9 +4,10 @@ import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { DOC_TYPES, type DocEntities, type DocType } from '@/domain/template-fields'
-import { DOCX_MIME, renderDocx } from '@/lib/docx'
+import { renderDocx } from '@/lib/docx'
 import { recordAudit } from '@/server/audit'
 import { fileAccessPermission } from '@/server/files/owners'
+import { assertFormatAllowed, convertDocx, FORMAT_EXT, type ExportFormat } from '@/server/convert'
 import type { StorageAdapter } from '@/server/storage/types'
 
 export type DocTemplate = typeof docTemplates.$inferSelect
@@ -89,8 +90,10 @@ export function registerDocLoader(docType: DocType, loader: DocLoader) {
 }
 
 export async function exportDocument(
-  db: DB, ctx: AccessContext, storage: StorageAdapter, input: { docType: DocType; entityId: string; templateId?: string },
+  db: DB, ctx: AccessContext, storage: StorageAdapter, input: { docType: DocType; entityId: string; templateId?: string; format?: ExportFormat },
 ): Promise<{ fileId: string; warnings: string[] }> {
+  const format = input.format ?? 'docx'
+  assertFormatAllowed(input.docType, format)
   const loader = loaders[input.docType]
   if (!loader) throw new ValidationError('Chưa hỗ trợ xuất loại giấy tờ này')
   const { entities, facilityId, baseName } = await loader(db, ctx, input.entityId)
@@ -106,17 +109,19 @@ export async function exportDocument(
 
   const { buildTemplateData } = await import('@/domain/template-fields')
   const { blob, warnings } = renderDocx(await storage.read(tplFile.storageKey), buildTemplateData(input.docType, entities))
-  const bytes = new Uint8Array(await blob.arrayBuffer())
+  const out = await convertDocx(blob, format)
+  const bytes = new Uint8Array(await out.arrayBuffer())
+  const { ext, mime } = FORMAT_EXT[format]
 
   const id = crypto.randomUUID()
-  const key = `export/${input.entityId}/${id}.docx`
-  await storage.write(key, bytes, DOCX_MIME)
+  const key = `export/${input.entityId}/${id}.${ext}`
+  await storage.write(key, bytes, mime)
   await db.transaction(async (tx) => {
     await tx.insert(files).values({
-      id, storageKey: key, name: `${baseName}.docx`, contentType: DOCX_MIME, size: bytes.byteLength, ownerType: 'export', ownerId: input.entityId,
+      id, storageKey: key, name: `${baseName}.${ext}`, contentType: mime, size: bytes.byteLength, ownerType: 'export', ownerId: input.entityId,
       facilityId, uploadedBy: ctx.userId, meta: { docType: input.docType }, confirmedAt: new Date(),
     })
-    await recordAudit(tx, ctx, { action: 'create', entity: 'export', entityId: id, facilityId, summary: `Xuất giấy tờ ${baseName}.docx` })
+    await recordAudit(tx, ctx, { action: 'create', entity: 'export', entityId: id, facilityId, summary: `Xuất giấy tờ ${baseName}.${ext}` })
   })
   return { fileId: id, warnings }
 }

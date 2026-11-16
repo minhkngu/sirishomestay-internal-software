@@ -1,30 +1,33 @@
 import Link from 'next/link'
 import { db } from '@/db/client'
 import { can } from '@/domain/access'
-import { formatDateVN } from '@/domain/dates'
+import { ReminderCard } from '@/features/dashboard/components/reminder-card'
+import { StatStrip } from '@/features/dashboard/components/stat-strip'
+import { getDashboard } from '@/server/dashboard/service'
 import { getAccessContext } from '@/server/session'
-import { getExpiringVisas } from '@/server/dashboard/service'
-import { ExpiryBadge, ReminderCard } from '@/features/dashboard/components/reminder-card'
 
+const SEVERITY = { danger: 'bg-red-600 text-white', warning: 'bg-orange-500 text-white', info: 'bg-secondary' } as const
 export default async function HomePage() {
   const ctx = await getAccessContext()
-  const showTenants = can(ctx, 'tenants_contracts')
-  const visas = showTenants ? await getExpiringVisas(db, ctx) : []
+  const { stats, reminders } = await getDashboard(db, ctx)
+  const rank = { danger: 0, warning: 1, info: 2 }
+  const sorted = [...reminders].sort((a, b) => Math.min(...a.items.map((i) => rank[i.severity])) - Math.min(...b.items.map((i) => rank[i.severity])))
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Nhắc việc</h1>
+      <StatStrip {...stats} showDebt={can(ctx, 'billing')} />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {showTenants && (
-          <ReminderCard title="Visa sắp hết hạn" count={visas.length} href="/tenants?kind=foreign">
-            {visas.slice(0, 10).map((v) => (
-              <li key={v.tenantId} className="flex items-center justify-between gap-2">
-                <Link href={`/tenants/${v.tenantId}`} className="underline">{v.name}</Link>
-                <span className="flex items-center gap-2 text-muted-foreground">{v.facilityName} · {formatDateVN(v.visaExpiry)} <ExpiryBadge daysLeft={v.daysLeft} /></span>
+        {sorted.map((r) => (
+          <ReminderCard key={r.kind} title={r.title} count={r.count} href={r.href}>
+            {r.items.map((i, n) => (
+              <li key={n} className="flex items-center justify-between gap-2">
+                <Link href={i.href} className="underline">{i.label}</Link>
+                <span className="flex items-center gap-2 text-muted-foreground">{i.sub} <span className={`h-2 w-2 rounded-full ${SEVERITY[i.severity]}`} /></span>
               </li>
             ))}
           </ReminderCard>
-        )}
-        {!showTenants && <p className="text-muted-foreground">Chưa có nhắc việc nào cho nhóm quyền của bạn.</p>}
+        ))}
+        {sorted.length === 0 && <p className="text-muted-foreground">Không có việc cần xử lý.</p>}
       </div>
     </div>
   )

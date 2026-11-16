@@ -31,7 +31,7 @@ export async function removeTemplateAction(id: string) {
 }
 
 /** Xuất giấy tờ thật (file lưu lại, tải qua /api/files/<id>). */
-export async function exportDocumentAction(input: { docType: DocType; entityId: string; templateId?: string }) {
+export async function exportDocumentAction(input: { docType: DocType; entityId: string; templateId?: string; format?: 'docx' | 'pdf' | 'png' }) {
   const ctx = await getAccessContext()
   return toActionResult(() => exportDocument(db, ctx, getStorage(), input))
 }

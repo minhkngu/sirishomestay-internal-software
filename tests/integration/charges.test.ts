@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { depositEntries, facilities, leases, oneOffCharges, rooms, tenants } from '@/db'
+import { depositEntries, facilities, invoiceLines, invoices, leases, oneOffCharges, rooms, tenants } from '@/db'
 import { eq } from 'drizzle-orm'
 import { depositBalance } from '@/domain/deposit'
 import type { AccessContext, Permission } from '@/domain/access'
@@ -25,11 +25,14 @@ describe('phí phát sinh và sổ cọc', () => {
     const charge = await addOneOff(db, ctx, leaseId, { kind: 'service', description: 'Giặt ủi', date: '2026-10-20', quantity: 3, unitPrice: 25000 })
     expect(charge).toMatchObject({ description: 'Giặt ủi', quantity: 3, unitPrice: 25000, invoiceId: null })
     expect(await listOneOffs(db, ctx, leaseId)).toHaveLength(1)
-    await db.update(oneOffCharges).set({ invoiceId: crypto.randomUUID() }).where(eq(oneOffCharges.id, charge.id))
-    await expect(removeOneOff(db, ctx, charge.id)).rejects.toThrow('Phí đã được đưa vào hoá đơn')
-    await db.update(oneOffCharges).set({ invoiceId: null }).where(eq(oneOffCharges.id, charge.id))
+    const [inv] = await db.insert(invoices).values({ code: 'TD-HD-202610-0001', leaseId, facilityId, kind: 'manual', periodStart: '2026-10-01', periodEnd: '2026-10-31', issueDate: '2026-10-31', status: 'approved' }).returning()
+    await db.update(oneOffCharges).set({ invoiceId: inv.id }).where(eq(oneOffCharges.id, charge.id))
+    await expect(removeOneOff(db, ctx, charge.id)).rejects.toThrow('Phí đã được đưa vào hoá đơn đã duyệt')
+    await db.update(invoices).set({ status: 'draft' }).where(eq(invoices.id, inv.id))
+    await db.insert(invoiceLines).values({ invoiceId: inv.id, type: 'one_off', description: 'Giặt ủi', quantity: 3, unitPrice: 25000, amount: 75000, meta: { oneOffId: charge.id } })
     await removeOneOff(db, ctx, charge.id)
     expect(await listOneOffs(db, ctx, leaseId)).toHaveLength(0)
+    expect(await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, inv.id))).toHaveLength(0)
   })
   it('ghi nhận cọc bổ sung và đánh dấu đã thu', async () => {
     const ctx = context(['billing'], [facilityId])

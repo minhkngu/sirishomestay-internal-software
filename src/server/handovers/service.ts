@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNotNull, ne } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNotNull, ne, sql } from 'drizzle-orm'
 import { assets, facilities, files, handoverItems, handovers, leases, meterReadings, meters, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
@@ -92,10 +92,10 @@ export async function saveHandover(db: DB, ctx: AccessContext, id: string, input
       const [m] = await tx.select().from(meters).where(and(eq(meters.id, r.meterId), eq(meters.roomId, h.roomId)))
       if (!m) throw new ValidationError('Đồng hồ không thuộc phòng này')
       const others = await tx.select().from(meterReadings).where(eq(meterReadings.meterId, m.id))
-      const prev = others.filter((x) => x.period !== period && x.readOn < h.date).sort((a, b) => (a.readOn < b.readOn ? 1 : -1))[0]
+      const prev = others.filter((x) => x.readOn < h.date).sort((a, b) => (a.readOn < b.readOn ? 1 : -1))[0]
       if (!Number.isInteger(r.value) || r.value < (prev?.value ?? m.startReading)) throw new ValidationError('Chỉ số mới nhỏ hơn chỉ số cũ', { value: 'Chỉ số mới nhỏ hơn chỉ số cũ' })
-      await tx.insert(meterReadings).values({ meterId: m.id, period, readOn: h.date, value: r.value })
-        .onConflictDoUpdate({ target: [meterReadings.meterId, meterReadings.period], set: { value: r.value, readOn: h.date, updatedAt: new Date() } })
+      await tx.insert(meterReadings).values({ meterId: m.id, period, readOn: h.date, value: r.value, kind: 'handover' })
+        .onConflictDoUpdate({ target: [meterReadings.meterId, meterReadings.readOn], targetWhere: sql`${meterReadings.kind} = 'handover'`, set: { value: r.value, readOn: h.date, updatedAt: new Date() } })
     }
     await tx.update(handovers).set({ updatedAt: new Date() }).where(eq(handovers.id, id))
     await recordAudit(tx, ctx, { action: 'update', entity: 'handover', entityId: id, facilityId, summary: `Cập nhật biên bản ${h.kind === 'check_in' ? 'check-in' : 'check-out'}`, after: { items: input.items.length, readings: input.meterReadings.length } })

@@ -30,7 +30,7 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
   const active = history.find((l) => l.status === 'active')
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Phòng {r.code}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2"><h1 className="text-xl font-semibold">Phòng {r.code}</h1>{can(ctx, 'incidents', r.facilityId) && <Link href={`/incidents/new?room=${id}`} className={buttonVariants({ variant: 'outline' })}>Báo sự cố</Link>}</div>
       <dl className="grid max-w-md grid-cols-2 gap-2 text-sm">
         <dt className="text-muted-foreground">Trạng thái</dt><dd>{ROOM_STATUS_LABELS[detail.status]}</dd>
         <dt className="text-muted-foreground">Tầng</dt><dd>{r.floor ?? ''}</dd>

@@ -19,6 +19,12 @@ import { StartHandoverButtons } from '@/features/handovers/components/start-hand
 import { getDepositContract, getLease } from '@/server/contracts/service'
 import { ExportMenu } from '@/features/contracts/components/export-menu'
 import { SignStatus } from '@/features/contracts/components/sign-status'
+import { AddendaList } from '@/features/contracts/components/addenda-list'
+import { ExtensionDialog } from '@/features/contracts/components/extension-dialog'
+import { OccupantDialog } from '@/features/contracts/components/occupant-dialog'
+import { TerminationWizard } from '@/features/contracts/components/termination-wizard'
+import { TransferWizard } from '@/features/contracts/components/transfer-wizard'
+import { addendumFormData, listAddenda } from '@/server/addenda/service'
 
 const ENTRY: Record<string, string> = { collect: 'Thu cọc', topup: 'Thu cọc bổ sung', deduct: 'Khấu trừ', refund: 'Hoàn cọc', forfeit: 'Mất cọc' }
 
@@ -83,6 +89,8 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
   const billing = can(ctx, 'billing', lease.facilityId)
   const charges = billing ? await listOneOffs(db, ctx, lease.id) : []
   const handoverList = await listHandovers(db, ctx, lease.id)
+  const addendaList = await listAddenda(db, ctx, lease.id)
+  const form = lease.status === 'active' ? await addendumFormData(db, ctx, lease.id) : null
   const [templates, exports] = await Promise.all([
     listTemplates(db, ctx, 'lease').then((t) => t.filter((x) => x.fileId)),
     listFiles(db, ctx, 'export', lease.id),
@@ -100,15 +108,26 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
         </TabsList>
         <TabsContent value="overview">
           <dl className="grid max-w-lg grid-cols-2 gap-2 py-3 text-sm">
-            <dt className="text-muted-foreground">Thời hạn</dt><dd>{formatDateVN(lease.startDate)} – {formatDateVN(lease.endDate)}</dd>
-            <dt className="text-muted-foreground">Giá thuê</dt><dd>{formatVND(lease.monthlyRent)} /tháng</dd>
-            <dt className="text-muted-foreground">Tiền cọc</dt><dd>{formatVND(lease.depositAmount)}</dd>
-            <dt className="text-muted-foreground">Số người ở</dt><dd>{lease.occupantCount}</dd>
-            <dt className="text-muted-foreground">Phí dịch vụ</dt><dd>{lease.fees.map((f) => `${f.name} ${formatVND(f.unitPrice)}`).join(', ') || '—'}</dd>
+            {lease.legacyCode && <><dt className="text-muted-foreground">Mã hợp đồng cũ</dt><dd>{lease.legacyCode}</dd></>}
+            <dt className="text-muted-foreground">Thời hạn</dt><dd>{formatDateVN(lease.startDate)} – {formatDateVN(lease.terms.endDate)}</dd>
+            <dt className="text-muted-foreground">Giá thuê</dt><dd>{formatVND(lease.terms.monthlyRent)} /tháng</dd>
+            <dt className="text-muted-foreground">Tiền cọc</dt><dd>{formatVND(lease.terms.depositAmount)}</dd>
+            <dt className="text-muted-foreground">Số người ở</dt><dd>{lease.terms.occupantIds.length}</dd>
+            <dt className="text-muted-foreground">Phí dịch vụ</dt><dd>{lease.terms.fees.map((f) => `${f.name} ${formatVND(f.unitPrice)}`).join(', ') || '—'}</dd>
           </dl>
           {billing && <OneOffDialog leaseId={lease.id} charges={charges} />}
+          {form && <div className="py-2"><OccupantDialog leaseId={lease.id} people={form.people} currentIds={lease.terms.occupantIds} today={form.today} /></div>}
         </TabsContent>
-        <TabsContent value="addenda"><p className="py-3 text-sm text-muted-foreground">Phụ lục gia hạn, chuyển phòng, thanh lý sẽ có ở bước sau.</p></TabsContent>
+        <TabsContent value="addenda">
+          <div className="space-y-3 py-3">
+            <AddendaList items={addendaList.map((a) => ({ id: a.id, type: a.type, effectiveDate: a.effectiveDate, signStatus: a.signStatus }))} />
+            {form && <div className="flex flex-wrap items-start gap-2">
+              <ExtensionDialog leaseId={lease.id} endDate={form.endDate} today={form.today} />
+              <TransferWizard leaseId={lease.id} currentRoomId={form.currentRoomId} freeRooms={form.freeRooms} meters={form.meters} today={form.today} />
+              <TerminationWizard leaseId={lease.id} meters={form.meters.filter((m) => m.roomId === form.currentRoomId)} today={form.today} />
+            </div>}
+          </div>
+        </TabsContent>
         <TabsContent value="handover">
           <div className="space-y-3 py-3">
             <StartHandoverButtons leaseId={lease.id} />

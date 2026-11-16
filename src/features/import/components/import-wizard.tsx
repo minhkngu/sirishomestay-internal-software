@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
-import { parseWorkbookAction, previewImportAction, runImportAction } from '@/server/import/actions'
+import { parseWorkbookAction, previewImportAction, runImportAction, sampleWorkbookAction } from '@/server/import/actions'
 import { IMPORT_TARGETS, suggestMapping, type ImportTarget } from '@/server/import/targets'
 import type { ImportError } from '@/server/import/validate'
 
@@ -69,6 +69,16 @@ export function ImportWizard() {
     })
   }
 
+  function downloadSample() {
+    start(async () => {
+      const r = await safely(() => sampleWorkbookAction(target))
+      if (!r.ok) { setError(r.error); return }
+      const bytes = Uint8Array.from(atob(r.data.base64), (c) => c.charCodeAt(0))
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+      const a = document.createElement('a'); a.href = url; a.download = r.data.name; a.click(); URL.revokeObjectURL(url)
+    })
+  }
+
   function downloadErrors() {
     if (!preview) return
     const url = URL.createObjectURL(new Blob([errorsCsv(preview.errors)], { type: 'text/csv;charset=utf-8' }))
@@ -101,6 +111,7 @@ export function ImportWizard() {
               {(Object.keys(IMPORT_TARGETS) as ImportTarget[]).map((t) => <option key={t} value={t}>{IMPORT_TARGETS[t].label}</option>)}
             </select>
           </div>
+          <Button variant="outline" size="sm" onClick={downloadSample}>Tải file mẫu</Button>
           <input type="file" accept=".xlsx" disabled={pending} onChange={(e) => upload(e.target.files?.[0])} />
           <p className="text-xs text-muted-foreground">Tối đa 10MB, 5.000 dòng. Dòng đầu tiên là tiêu đề cột.</p>
         </div>

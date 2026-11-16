@@ -28,6 +28,12 @@ export async function recordAudit(db: Pick<DB, 'insert'>, ctx: AccessContext, e:
   })
 }
 
+/** Ghi nhiều dòng nhật ký bằng một câu lệnh (thao tác hàng loạt). */
+export async function recordAuditBatch(db: Pick<DB, 'insert'>, ctx: AccessContext, events: AuditEvent[]): Promise<void> {
+  if (!events.length) return
+  await db.insert(auditLogs).values(events.map((e) => ({ userId: ctx.userId, action: e.action, entity: e.entity, summary: e.summary, entityId: e.entityId ?? null, facilityId: e.facilityId ?? null, before: e.before ?? null, after: e.after ?? null })))
+}
+
 export type AuditFilter = { userId?: string; entity?: string; limit?: number }
 
 /** Nhật ký thao tác (mới nhất trước); chỉ nhóm `settings` xem được. */

@@ -6,10 +6,11 @@ import { assertCan } from '@/domain/access'
 import { getAccessContext } from '@/server/session'
 import { toActionResult,  } from '@/lib/action-result'
 import { ValidationError } from '@/domain/errors'
-import { parseWorkbook, type ParsedSheet } from '@/lib/excel'
+import { buildTemplateWorkbook, parseWorkbook, type ParsedSheet } from '@/lib/excel'
 import { findImportConflicts, findMissingFacilities, runImport } from './run'
-import type { ImportTarget } from './targets'
-import { validateRows, type ImportError } from './validate'
+import { IMPORT_TARGETS, templateColumns, type ImportTarget } from './targets'
+import { previewOpsRows } from './ops'
+import { OPS_TARGETS, validateRows, type ImportError, type NormalizedRow, type OpsTarget } from './validate'
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024
 const MAX_ROWS = 5000
@@ -42,7 +43,9 @@ async function validateServerSide(ctx: Awaited<ReturnType<typeof getAccessContex
   const missing = await findMissingFacilities(db, valid)
   const missingRows = new Set(missing.map((m) => m.row))
   const present = valid.filter((v) => !missingRows.has(v.row))
-  const conflicts = await findImportConflicts(db, present)
+  const conflicts = (OPS_TARGETS as string[]).includes(p.target)
+    ? (await previewOpsRows(db, ctx, present as Extract<NormalizedRow, { target: OpsTarget }>[])).errors
+    : await findImportConflicts(db, present)
   const badRows = new Set(conflicts.map((m) => m.row))
   return {
     valid: present.filter((v) => !badRows.has(v.row)),
@@ -65,5 +68,17 @@ export async function runImportAction(p: Payload) {
     const r = await runImport(db, ctx, p.target, valid)
     revalidatePath('/', 'layout')
     return r
+  })
+}
+
+/** Tải file mẫu: tiêu đề cột đúng tên gợi ý ghép cột, kèm một dòng ví dụ. */
+export async function sampleWorkbookAction(target: ImportTarget) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => {
+    assertCan(ctx, 'settings')
+    if (!(target in IMPORT_TARGETS)) throw new ValidationError('Loại dữ liệu không hợp lệ')
+    const { headers, example } = templateColumns(target)
+    const buf = await buildTemplateWorkbook(IMPORT_TARGETS[target].label, headers, example)
+    return { base64: Buffer.from(buf).toString('base64'), name: `mau-${target}.xlsx` }
   })
 }
