@@ -11,9 +11,9 @@ alter table "fee_units" enable row level security;
 --> statement-breakpoint
 alter table "utility_rates" enable row level security;
 --> statement-breakpoint
-alter table "app_settings" enable row level security;
+alter table "files" enable row level security;
 --> statement-breakpoint
-alter table "tenant_documents" enable row level security;
+alter table "app_settings" enable row level security;
 --> statement-breakpoint
 alter table "tenants" enable row level security;
 --> statement-breakpoint

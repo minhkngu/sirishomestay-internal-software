@@ -77,20 +77,28 @@ CREATE TABLE "utility_rates" (
 	CONSTRAINT "utility_rates_facility_utility_from_unique" UNIQUE("facility_id","utility","effective_from")
 );
 --> statement-breakpoint
+CREATE TABLE "files" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"storage_key" text NOT NULL,
+	"thumb_key" text,
+	"name" text DEFAULT '' NOT NULL,
+	"content_type" text NOT NULL,
+	"size" bigint DEFAULT 0 NOT NULL,
+	"owner_type" text NOT NULL,
+	"owner_id" uuid NOT NULL,
+	"facility_id" uuid,
+	"uploaded_by" uuid,
+	"meta" jsonb,
+	"confirmed_at" timestamp with time zone,
+	"delete_after" date,
+	"is_demo" boolean DEFAULT false NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "app_settings" (
 	"key" text PRIMARY KEY NOT NULL,
 	"value" jsonb NOT NULL
-);
---> statement-breakpoint
-CREATE TABLE "tenant_documents" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"tenant_id" uuid NOT NULL,
-	"storage_key" text NOT NULL,
-	"thumb_key" text NOT NULL,
-	"content_type" text NOT NULL,
-	"label" text DEFAULT '' NOT NULL,
-	"uploaded_by" uuid,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "tenants" (
@@ -154,7 +162,6 @@ CREATE TABLE "user_profiles" (
 ALTER TABLE "rooms" ADD CONSTRAINT "rooms_facility_id_facilities_id_fk" FOREIGN KEY ("facility_id") REFERENCES "public"."facilities"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "fee_types" ADD CONSTRAINT "fee_types_unit_id_fee_units_id_fk" FOREIGN KEY ("unit_id") REFERENCES "public"."fee_units"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "utility_rates" ADD CONSTRAINT "utility_rates_facility_id_facilities_id_fk" FOREIGN KEY ("facility_id") REFERENCES "public"."facilities"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "tenant_documents" ADD CONSTRAINT "tenant_documents_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "tenants" ADD CONSTRAINT "tenants_home_facility_id_facilities_id_fk" FOREIGN KEY ("home_facility_id") REFERENCES "public"."facilities"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_facilities" ADD CONSTRAINT "user_facilities_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_facilities" ADD CONSTRAINT "user_facilities_facility_id_facilities_id_fk" FOREIGN KEY ("facility_id") REFERENCES "public"."facilities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

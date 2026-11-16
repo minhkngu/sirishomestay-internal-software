@@ -45,13 +45,3 @@ export const tenants = pgTable(
   ],
 )
 
-export const tenantDocuments = pgTable('tenant_documents', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-  storageKey: text('storage_key').notNull(),
-  thumbKey: text('thumb_key').notNull(),
-  contentType: text('content_type').notNull(),
-  label: text('label').notNull().default(''),
-  uploadedBy: uuid('uploaded_by'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
