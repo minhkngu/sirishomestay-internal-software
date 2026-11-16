@@ -137,7 +137,10 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
   if (input.monthlyRent < 0 || input.depositAmount < 0) throw new ValidationError('Số tiền không hợp lệ')
   const occupants = [...new Set(input.occupantIds?.length ? input.occupantIds : tenant.kind === 'company' ? [] : [tenant.id])]
   if (occupants.length === 0) throw new ValidationError('Chọn ít nhất một người ở', { occupantIds: 'Chọn ít nhất một người ở' })
-  for (const o of occupants) await loadTenant(tx, ctx, o)
+  for (const o of occupants) {
+    const occupant = await loadTenant(tx, ctx, o)
+    if (occupant.kind === 'company') throw new ValidationError('Người ở phải là khách cá nhân', { occupantIds: 'Người ở phải là khách cá nhân' })
+  }
 
   const [active] = await tx.select().from(leases).where(and(eq(leases.roomId, room.id), eq(leases.status, 'active')))
   if (active) throw new ValidationError('Phòng đã có hợp đồng trong khoảng thời gian này')

@@ -50,6 +50,11 @@ describe('contracts', () => {
     fees: [{ feeTypeId: feePerson, quantity: 1, unitPrice: 200_000 }], ...over,
   })
 
+  it('không cho công ty làm người ở', async () => {
+    const company = await createTenant(db, admin, { kind: 'company', homeFacilityId: fa, companyName: 'Công ty A', phone: '0909876543', taxCode: '1234567890', representative: 'Nguyễn A' })
+    await expect(createLease(db, lan(), leaseInput({ occupantIds: [company.id] }))).rejects.toThrow('Người ở phải là khách cá nhân')
+  })
+
   it('tạo cọc cho phòng trống → phòng thành "Đã cọc"; cọc thứ hai cho cùng phòng → lỗi', async () => {
     expect(await status(r301)).toBe('vacant')
     const { contract } = await createDepositContract(db, lan(), { roomId: r301, tenantId: tenant1, depositAmount: 5_000_000, agreedRent: 9_000_000, expectedMoveIn: '2026-11-01' })

@@ -1,4 +1,4 @@
-import { assets, facilities, rooms } from '@/db'
+import { assets, facilities, rooms, stockItems, stockLevels } from '@/db'
 import { buildSearchText } from '@/domain/text'
 import type { SeedModule } from './types'
 
@@ -22,6 +22,8 @@ export const assetSeed: SeedModule = {
       })
     }
     for (const f of facs) {
+      const [stock] = await db.insert(stockItems).values({ id: rng.uuid(), facilityId: f.id, name: 'Bóng đèn LED', unit: 'cái', category: 'Điện', isDemo: true }).returning()
+      await db.insert(stockLevels).values({ id: rng.uuid(), itemId: stock.id, locationKind: 'warehouse', locationId: f.id, quantity: 20, isDemo: true })
       for (const r of allRooms.filter((x) => x.facilityId === f.id)) {
         for (const p of PER_ROOM) await insert(`${f.code}-${p.tag}-${r.code}`, p, f.id, 'room', r.id)
       }
