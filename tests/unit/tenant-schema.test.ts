@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { tenantInput } from '@/features/tenants/schemas'
+import { tenantInput } from '@/server/tenants/schemas'
 
 const FAC = '11111111-1111-4111-8111-111111111111'
 

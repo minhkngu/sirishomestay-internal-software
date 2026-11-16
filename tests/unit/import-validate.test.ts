@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { IMPORT_TARGETS, suggestMapping } from '@/features/import/targets'
-import { validateRows } from '@/features/import/validate'
+import { IMPORT_TARGETS, suggestMapping } from '@/server/import/targets'
+import { validateRows } from '@/server/import/validate'
 
 describe('suggestMapping', () => {
   it('ghép cột theo tiêu đề tiếng Việt có dấu', () => {

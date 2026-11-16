@@ -11,7 +11,9 @@
     "db:migrate": "drizzle-kit migrate",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "seed:admin": "tsx scripts/seed-admin.ts"
+    "seed:admin": "tsx scripts/seed-admin.ts",
+    "db:regen": "node scripts/db-regen.mjs",
+    "db:seed": "tsx scripts/seed/index.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1169.0",

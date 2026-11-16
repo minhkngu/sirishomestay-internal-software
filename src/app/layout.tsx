@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   description: "Quản lý khách thuê dài hạn",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="vi"
