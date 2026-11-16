@@ -7,7 +7,8 @@ import { validateRows } from '@/features/import/validate'
 import { runImport } from '@/features/import/run'
 import { ForbiddenError, type AccessContext, type Permission } from '@/lib/access'
 import { createTestDb } from '../helpers/db'
-import { roomsWorkbook, tenantsWorkbook } from '../fixtures/build'
+import { roomsWorkbook, tenantsWorkbook, buildXlsx, TENANT_HEADERS } from '../fixtures/build'
+import { findImportConflicts } from '@/features/import/run'
 import type { DB } from '@/db/client'
 
 function ctxOf(perms: Permission[]): AccessContext {
@@ -76,5 +77,40 @@ describe('runImport', () => {
     const { valid } = await load(await tenantsWorkbook(), 'tenants')
     await expect(runImport(db, admin, 'tenants', valid)).rejects.toThrow(/Dòng 2.*"A"/)
     expect(await db.select().from(tenants)).toHaveLength(0)
+  })
+
+  it('không gộp hai người khác nhau chỉ vì trùng số điện thoại', async () => {
+    await runImport(db, admin, 'rooms', (await load(await roomsWorkbook(), 'rooms')).valid)
+    await runImport(db, admin, 'tenants', (await load(await tenantsWorkbook(), 'tenants')).valid)
+    const other = await buildXlsx({ K: [TENANT_HEADERS, ['Nước ngoài', 'A', 'Người Khác', '+1 415 555 0100', 'ZZ999', null, null, null, null]] })
+    const { valid } = await load(other, 'tenants')
+    await expect(runImport(db, admin, 'tenants', valid)).rejects.toThrow('Số điện thoại đã thuộc về khách khác')
+    const john = (await db.select().from(tenants)).find((t) => t.phone === '+14155550100')!
+    expect(john.passportNumber).toBe('X1234567')
+  })
+
+  it('ghi nhật ký từng dòng (create/update có before/after) và cơ sở tự tạo', async () => {
+    await runImport(db, admin, 'rooms', (await load(await roomsWorkbook(), 'rooms')).valid)
+    const logs = await db.select().from(auditLogs)
+    expect(logs.filter((l) => l.entity === 'facility' && l.action === 'create')).toHaveLength(2)
+    expect(logs.filter((l) => l.entity === 'room' && l.action === 'create')).toHaveLength(3)
+    await runImport(db, admin, 'tenants', (await load(await tenantsWorkbook(), 'tenants')).valid)
+    await runImport(db, admin, 'tenants', (await load(await tenantsWorkbook({ phone2: '0907777777' }), 'tenants')).valid)
+    const upd = (await db.select().from(auditLogs)).find((l) => l.entity === 'tenant' && l.action === 'update')!
+    expect((upd.before as { phone: string }).phone).toBe('+84901234567')
+    expect((upd.after as { phone: string }).phone).toBe('+84907777777')
+  })
+
+  it('xem trước báo trùng với CSDL và trùng trong file theo từng dòng', async () => {
+    await runImport(db, admin, 'rooms', (await load(await roomsWorkbook(), 'rooms')).valid)
+    await runImport(db, admin, 'tenants', (await load(await tenantsWorkbook(), 'tenants')).valid)
+    const file = await buildXlsx({ K: [TENANT_HEADERS,
+      ['Nước ngoài', 'A', 'Người Khác', '+1 415 555 0100', 'ZZ999', null, null, null, null], // trùng SĐT với John (CSDL)
+      ['Nước ngoài', 'A', 'Mới 1', '+1 415 555 0200', 'NEW1', null, null, null, null],
+      ['Nước ngoài', 'A', 'Mới 2', '+1 415 555 0200', 'NEW2', null, null, null, null], // trùng SĐT trong file
+    ] })
+    const { valid } = await load(file, 'tenants')
+    const conflicts = await findImportConflicts(db, valid)
+    expect(conflicts.map((c) => [c.row, c.field])).toEqual([[2, 'phone'], [4, 'phone']])
   })
 })

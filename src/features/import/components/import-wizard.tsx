@@ -8,6 +8,15 @@ import type { ImportError } from '../validate'
 
 type Sheet = { name: string; headers: string[]; rows: Record<string, unknown>[] }
 
+/** Lỗi ngoài ActionResult (mạng, vượt giới hạn dung lượng…) cũng phải hiện thông báo tiếng Việt. */
+async function safely<T>(fn: () => Promise<{ ok: true; data: T } | { ok: false; error: string }>): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
+  try {
+    return await fn()
+  } catch {
+    return { ok: false, error: 'Không xử lý được yêu cầu (file có thể quá lớn hoặc mất kết nối)' }
+  }
+}
+
 function errorsCsv(errors: ImportError[]) {
   const esc = (s: string) => `"${s.replace(/"/g, '""')}"`
   return '﻿' + ['Dòng,Trường,Lỗi', ...errors.map((e) => `${e.row},${esc(e.field)},${esc(e.message)}`)].join('\n')
@@ -34,7 +43,7 @@ export function ImportWizard() {
     start(async () => {
       const fd = new FormData()
       fd.set('file', file)
-      const r = await parseWorkbookAction(fd)
+      const r = await safely(() => parseWorkbookAction(fd))
       if (!r.ok) { setError(r.error); return }
       setSheets(r.data.sheets); setSheetIdx(0)
       setMapping(suggestMapping(r.data.sheets[0]?.headers ?? [], target))
@@ -45,7 +54,7 @@ export function ImportWizard() {
   function toPreview() {
     setError(null)
     start(async () => {
-      const r = await previewImportAction({ target, rows: sheet.rows, mapping })
+      const r = await safely(() => previewImportAction({ target, rows: sheet.rows, mapping }))
       if (!r.ok) { setError(r.error); return }
       setPreview(r.data); setStep(3)
     })
@@ -54,7 +63,7 @@ export function ImportWizard() {
   function doImport() {
     setError(null)
     start(async () => {
-      const r = await runImportAction({ target, rows: sheet.rows, mapping })
+      const r = await safely(() => runImportAction({ target, rows: sheet.rows, mapping }))
       if (!r.ok) { setError(r.error); return }
       setResult(r.data)
     })

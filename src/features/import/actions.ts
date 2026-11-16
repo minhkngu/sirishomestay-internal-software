@@ -6,7 +6,7 @@ import { assertCan } from '@/lib/access'
 import { getAccessContext } from '@/lib/session'
 import { runAction, UserError } from '@/lib/action-result'
 import { parseWorkbook, type ParsedSheet } from './parse'
-import { findMissingFacilities, runImport } from './run'
+import { findImportConflicts, findMissingFacilities, runImport } from './run'
 import type { ImportTarget } from './targets'
 import { validateRows, type ImportError } from './validate'
 
@@ -40,7 +40,13 @@ async function validateServerSide(ctx: Awaited<ReturnType<typeof getAccessContex
   const { valid, errors } = validateRows(p.target, p.rows, p.mapping)
   const missing = await findMissingFacilities(db, valid)
   const missingRows = new Set(missing.map((m) => m.row))
-  return { valid: valid.filter((v) => !missingRows.has(v.row)), errors: [...errors, ...missing].sort((a, b) => a.row - b.row) }
+  const present = valid.filter((v) => !missingRows.has(v.row))
+  const conflicts = await findImportConflicts(db, present)
+  const badRows = new Set(conflicts.map((m) => m.row))
+  return {
+    valid: present.filter((v) => !badRows.has(v.row)),
+    errors: [...errors, ...missing, ...conflicts].sort((a, b) => a.row - b.row),
+  }
 }
 
 export async function previewImportAction(p: Payload) {

@@ -5,6 +5,7 @@ import { assertCan, type AccessContext } from '@/lib/access'
 import { UserError } from '@/lib/action-result'
 import { recordAudit } from '@/lib/audit'
 import { findDuplicateField, toTenantRow } from '../tenants/service'
+import type { Tenant } from '../tenants/service'
 import type { ImportTarget } from './targets'
 import type { ImportError, NormalizedRow } from './validate'
 
@@ -25,6 +26,57 @@ export async function findMissingFacilities(db: DB, rows: NormalizedRow[]): Prom
   return out
 }
 
+type TenantRow = ReturnType<typeof toTenantRow>
+
+function mainKey(row: TenantRow): string {
+  return `${row.kind}:${row.passportNumber ?? row.idNumber ?? row.taxCode ?? ''}`
+}
+
+/**
+ * Tìm khách đã có theo giấy tờ chính (passport / CCCD / MST). Số điện thoại KHÔNG dùng để gộp:
+ * nếu giấy tờ chính chưa có mà số điện thoại đã thuộc về người khác thì đó là xung đột.
+ */
+async function resolveTenant(db: Pick<DB, 'select'>, row: TenantRow): Promise<{ existing?: Tenant; conflict?: { field: string; message: string } }> {
+  let cond
+  if (row.kind === 'foreign' && row.passportNumber) cond = and(eq(tenants.kind, 'foreign'), eq(tenants.passportNumber, row.passportNumber))
+  else if (row.kind === 'vietnamese' && row.idNumber) cond = and(eq(tenants.kind, 'vietnamese'), eq(tenants.idNumber, row.idNumber))
+  else if (row.kind === 'company' && row.taxCode) cond = and(eq(tenants.kind, 'company'), eq(tenants.taxCode, row.taxCode))
+  const [existing] = cond ? await db.select().from(tenants).where(cond) : []
+  const dup = await findDuplicateField(db, row, existing?.id)
+  if (dup) return { existing, conflict: { field: dup, message: DUP_FIELD_MSG[dup] } }
+  return { existing }
+}
+
+/** Xem trước: báo trùng với CSDL và trùng giữa các dòng trong file (không ghi gì). */
+export async function findImportConflicts(db: DB, rows: NormalizedRow[]): Promise<ImportError[]> {
+  const facByCode = new Map((await db.select().from(facilities)).map((f) => [f.code, f.id]))
+  const out: ImportError[] = []
+  const seenPhone = new Map<string, string>()
+  const seenMain = new Map<string, string>()
+  for (const r of rows) {
+    if (r.target !== 'tenants') continue
+    const fid = facByCode.get(r.facilityCode)
+    if (!fid) continue
+    const row = toTenantRow({ ...r.data, homeFacilityId: fid })
+    const { conflict } = await resolveTenant(db, row)
+    if (conflict) { out.push({ row: r.row, field: conflict.field, message: conflict.message }); continue }
+    const key = mainKey(row)
+    if (row.phone) {
+      const owner = seenPhone.get(row.phone)
+      if (owner && owner !== key) { out.push({ row: r.row, field: 'phone', message: DUP_FIELD_MSG.phone + ' (trùng với dòng khác trong file)' }); continue }
+      seenPhone.set(row.phone, key)
+    }
+    const ownerOfMain = seenMain.get(key)
+    if (ownerOfMain && row.phone && ownerOfMain !== row.phone) {
+      // cùng một giấy tờ nhưng số điện thoại khác nhau giữa các dòng: dòng sau sẽ ghi đè, báo để người dùng biết
+      out.push({ row: r.row, field: 'passportNumber', message: 'Giấy tờ trùng với một dòng khác trong file' })
+      continue
+    }
+    if (row.phone) seenMain.set(key, row.phone)
+  }
+  return out
+}
+
 /** Nhập trong một transaction, upsert idempotent. Chỉ nhóm `settings`. */
 export async function runImport(db: DB, ctx: AccessContext, target: ImportTarget, rowsIn: NormalizedRow[]): Promise<{ created: number; updated: number }> {
   assertCan(ctx, 'settings')
@@ -39,6 +91,7 @@ export async function runImport(db: DB, ctx: AccessContext, target: ImportTarget
         if (!fac) {
           ;[fac] = await tx.insert(facilities).values({ code: r.facilityCode, name: r.facilityName ?? r.facilityCode }).returning()
           facByCode.set(r.facilityCode, fac)
+          await recordAudit(tx, ctx, { action: 'create', entity: 'facility', entityId: fac.id, facilityId: fac.id, after: fac })
         }
         const d = r.data
         const patch = {
@@ -47,14 +100,16 @@ export async function runImport(db: DB, ctx: AccessContext, target: ImportTarget
         }
         const [existing] = await tx.select().from(rooms).where(and(eq(rooms.facilityId, fac.id), eq(rooms.code, d.code)))
         if (!existing) {
-          await tx.insert(rooms).values({ facilityId: fac.id, code: d.code, ...patch })
+          const [room] = await tx.insert(rooms).values({ facilityId: fac.id, code: d.code, ...patch }).returning()
+          await recordAudit(tx, ctx, { action: 'create', entity: 'room', entityId: room.id, facilityId: fac.id, after: room })
           created++
         } else {
           const changes = Object.fromEntries(
             Object.entries(patch).filter(([k, v]) => v !== null && String(existing[k as keyof typeof existing]) !== String(v)),
           )
           if (Object.keys(changes).length) {
-            await tx.update(rooms).set({ ...changes, updatedAt: new Date() }).where(eq(rooms.id, existing.id))
+            const [after] = await tx.update(rooms).set({ ...changes, updatedAt: new Date() }).where(eq(rooms.id, existing.id)).returning()
+            await recordAudit(tx, ctx, { action: 'update', entity: 'room', entityId: existing.id, facilityId: fac.id, before: existing, after })
             updated++
           }
         }
@@ -62,29 +117,19 @@ export async function runImport(db: DB, ctx: AccessContext, target: ImportTarget
         const fac = facByCode.get(r.facilityCode)
         if (!fac) throw new UserError(`Dòng ${r.row}: Không tìm thấy cơ sở "${r.facilityCode}"`)
         const row = toTenantRow({ ...r.data, homeFacilityId: fac.id })
-
-        let existing: typeof tenants.$inferSelect | undefined
-        const keys: [ReturnType<typeof eq>][] = []
-        if (row.kind === 'foreign' && row.passportNumber) keys.push([and(eq(tenants.kind, 'foreign'), eq(tenants.passportNumber, row.passportNumber))!])
-        if (row.kind === 'vietnamese' && row.idNumber) keys.push([and(eq(tenants.kind, 'vietnamese'), eq(tenants.idNumber, row.idNumber))!])
-        if (row.kind === 'company' && row.taxCode) keys.push([and(eq(tenants.kind, 'company'), eq(tenants.taxCode, row.taxCode))!])
-        if (row.phone) keys.push([eq(tenants.phone, row.phone)])
-        for (const [cond] of keys) {
-          ;[existing] = await tx.select().from(tenants).where(cond)
-          if (existing) break
-        }
-
-        const dup = await findDuplicateField(tx, row, existing?.id)
-        if (dup) throw new UserError(`Dòng ${r.row}: ${DUP_FIELD_MSG[dup]}`)
+        const { existing, conflict } = await resolveTenant(tx, row)
+        if (conflict) throw new UserError(`Dòng ${r.row}: ${conflict.message}`, { [conflict.field]: conflict.message })
 
         if (!existing) {
-          await tx.insert(tenants).values(row)
+          const [t] = await tx.insert(tenants).values(row).returning()
+          await recordAudit(tx, ctx, { action: 'create', entity: 'tenant', entityId: t.id, facilityId: t.homeFacilityId, after: t })
           created++
         } else {
           const { searchText, ...cols } = row
           const changed = Object.entries(cols).some(([k, v]) => (existing as Record<string, unknown>)[k] !== v)
           if (changed) {
-            await tx.update(tenants).set({ ...cols, searchText, updatedAt: new Date() }).where(eq(tenants.id, existing.id))
+            const [after] = await tx.update(tenants).set({ ...cols, searchText, updatedAt: new Date() }).where(eq(tenants.id, existing.id)).returning()
+            await recordAudit(tx, ctx, { action: 'update', entity: 'tenant', entityId: existing.id, facilityId: after.homeFacilityId, before: existing, after })
             updated++
           }
         }
