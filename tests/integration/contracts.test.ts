@@ -123,6 +123,7 @@ describe('contracts', () => {
     await expect(getLease(db, ctxOf(['tenants_contracts'], [fb]), lease.id)).rejects.toThrow(NotFoundError)
     await expect(getLease(db, ctxOf(['billing'], [fa]), lease.id)).rejects.toThrow(ForbiddenError)
     await expect(createLease(db, ctxOf(['tenants_contracts'], [fb]), leaseInput({ roomId: r302 }))).rejects.toThrow(NotFoundError)
+    await expect(createLease(db, ctxOf(['meters', 'assets', 'incidents'], [fa]), leaseInput({ roomId: r302 }))).rejects.toThrow(ForbiddenError)
     await expect(createDepositContract(db, ctxOf(['meters'], [fa]), { roomId: r302, tenantId: tenant1, depositAmount: 1, agreedRent: 1, expectedMoveIn: '2026-11-01' })).rejects.toThrow(ForbiddenError)
     await expect(createLease(db, lan(), leaseInput({ roomId: rB }))).rejects.toThrow(NotFoundError)
   })
