@@ -1,3 +1,4 @@
+import { readUserId } from '@/server/auth-user'
 import { resolveSupabaseKey } from '@/lib/supabase/config'
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
@@ -8,17 +9,28 @@ export async function proxy(request: NextRequest) {
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, resolveSupabaseKey(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY), {
     cookies: {
       getAll: () => request.cookies.getAll(),
-      setAll: (list) => {
+      setAll: (list, headers) => {
         list.forEach(({ name, value }) => request.cookies.set(name, value))
+        const previous = response
         response = NextResponse.next({ request })
+        previous.cookies.getAll().forEach((cookie) => response.cookies.set(cookie))
+        previous.headers.forEach((value, key) => {
+          if (!key.startsWith('x-middleware-') && key !== 'set-cookie') response.headers.set(key, value)
+        })
         list.forEach(({ name, value, options }) => response.cookies.set(name, value, options))
+        Object.entries(headers).forEach(([key, value]) => response.headers.set(key, value))
       },
     },
   })
-  const { data } = await supabase.auth.getUser()
+  const userId = await readUserId(supabase)
   const isLogin = request.nextUrl.pathname.startsWith('/login')
-  if (!data.user && !isLogin) {
-    return NextResponse.redirect(new URL('/login', request.url))
+  if (!userId && !isLogin) {
+    const redirect = NextResponse.redirect(new URL('/login', request.url))
+    response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie))
+    response.headers.forEach((value, key) => {
+      if (!key.startsWith('x-middleware-') && key !== 'set-cookie') redirect.headers.set(key, value)
+    })
+    return redirect
   }
   return response
 }
