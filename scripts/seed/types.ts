@@ -1,4 +1,5 @@
 import type { DB } from '@/db/client'
+import type { StorageAdapter } from '@/server/storage/types'
 import type { Rng } from './rng'
 
 /** Phần Supabase Auth Admin mà seed cần (tách ra để test bằng bản giả). */
@@ -23,6 +24,7 @@ export type SeedCtx = {
   today: string
   auth: AuthAdmin
   password: string
+  storage: StorageAdapter
   state: SeedState
 }
 

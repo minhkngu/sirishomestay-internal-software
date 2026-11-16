@@ -21,4 +21,13 @@ export class SupabaseStorage implements StorageAdapter {
   async delete(key: string) {
     await this.bucket().remove([key])
   }
+  async read(key: string): Promise<ArrayBuffer> {
+    const { data, error } = await this.bucket().download(key)
+    if (error || !data) throw new Error(`Không đọc được tệp: ${error?.message}`)
+    return data.arrayBuffer()
+  }
+  async write(key: string, data: ArrayBuffer | Uint8Array, contentType: string) {
+    const { error } = await this.bucket().upload(key, data instanceof Uint8Array ? data : new Uint8Array(data), { contentType, upsert: true })
+    if (error) throw new Error(`Không lưu được tệp: ${error.message}`)
+  }
 }

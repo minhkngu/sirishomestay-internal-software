@@ -5,16 +5,19 @@ import { eq } from 'drizzle-orm'
 import { createRng } from './rng'
 import { facilitySeed } from './facilities'
 import { settingsSeed } from './settings'
+import { templateSeed } from './templates'
 import { tenantSeed } from './tenants'
+import { MemoryStorage } from '@/server/storage/memory'
+import type { StorageAdapter } from '@/server/storage/types'
 import { userSeed } from './users'
 import type { AuthAdmin, SeedCtx, SeedModule } from './types'
 
 export type { AuthAdmin } from './types'
 
 /** Thứ tự nạp: mỗi task thêm module của mình vào đây. */
-export const SEED_MODULES: SeedModule[] = [facilitySeed, settingsSeed, userSeed, tenantSeed]
+export const SEED_MODULES: SeedModule[] = [facilitySeed, settingsSeed, userSeed, tenantSeed, templateSeed]
 
-export type SeedOptions = { today?: string; password: string; reset?: boolean }
+export type SeedOptions = { today?: string; password: string; reset?: boolean; storage?: StorageAdapter }
 
 async function resetAll(db: DB, auth: AuthAdmin) {
   const demoUsers = await db.select({ id: userProfiles.id }).from(userProfiles).where(eq(userProfiles.isDemo, true))
@@ -27,7 +30,7 @@ async function resetAll(db: DB, auth: AuthAdmin) {
 export async function runSeed(db: DB, auth: AuthAdmin, opts: SeedOptions): Promise<void> {
   const today = opts.today ?? new Date().toISOString().slice(0, 10)
   if (opts.reset) await resetAll(db, auth)
-  const ctx: SeedCtx = { db, auth, today, password: opts.password, rng: createRng(), state: { facilityIds: {}, roomIds: {}, userIds: {} } }
+  const ctx: SeedCtx = { db, auth, today, password: opts.password, storage: opts.storage ?? new MemoryStorage(), rng: createRng(), state: { facilityIds: {}, roomIds: {}, userIds: {} } }
   for (const m of SEED_MODULES) await m.run(ctx)
 }
 
@@ -51,7 +54,8 @@ async function main() {
     },
     async deleteUser(id) { await supabase.auth.admin.deleteUser(id) },
   }
-  await runSeed(db, auth, { today: todayVN(), password, reset: process.argv.includes('--reset') })
+  const { getStorage } = await import('@/server/storage')
+  await runSeed(db, auth, { today: todayVN(), password, reset: process.argv.includes('--reset'), storage: getStorage() })
   await client.end()
   console.log('Đã nạp dữ liệu giả.')
 }

@@ -101,6 +101,17 @@ CREATE TABLE "app_settings" (
 	"value" jsonb NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "doc_templates" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"doc_type" text NOT NULL,
+	"name" text NOT NULL,
+	"file_id" uuid,
+	"is_default" boolean DEFAULT false NOT NULL,
+	"is_demo" boolean DEFAULT false NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "tenants" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"kind" "tenant_kind" NOT NULL,

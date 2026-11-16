@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { facilities, rooms, userProfiles, userPermissions, userFacilities, feeTypes, feeUnits, utilityRates, tenants } from '@/db'
+import { facilities, rooms, userProfiles, userPermissions, userFacilities, feeTypes, feeUnits, utilityRates, tenants, docTemplates, files } from '@/db'
 import { runSeed, type AuthAdmin } from '../../scripts/seed'
 import { addDays } from '@/domain/dates'
 import { createTestDb } from '../helpers/db'
@@ -57,6 +57,16 @@ describe('runSeed', () => {
     expect(foreign.map((t) => t.visaExpiry).sort()).toEqual([-5, 0, 3, 9, 16, 24, 29, 30, 45, 70, 120, 200, 260, 330].map((d) => addDays('2026-11-16', d)).sort())
     expect(all.every((t) => t.isDemo && t.searchText.length > 0)).toBe(true)
     expect(all.filter((t) => t.kind !== 'company').every((t) => /^\+\d{8,15}$/.test(t.phone!))).toBe(true)
+  })
+
+  it('nạp mẫu Word mẫu cho đủ 10 loại giấy tờ, mỗi loại một mẫu mặc định có file', async () => {
+    const db = await createTestDb()
+    await runSeed(db, fakeAuth(), { today: '2026-11-16', password: 'x' })
+    const t = await db.select().from(docTemplates)
+    expect(t).toHaveLength(10)
+    expect(t.every((x) => x.isDefault && x.fileId && x.isDemo)).toBe(true)
+    expect(new Set(t.map((x) => x.docType)).size).toBe(10)
+    expect((await db.select().from(files)).every((f) => f.ownerType === 'template' && f.confirmedAt)).toBe(true)
   })
 
   it('chạy hai lần trên hai CSDL trống cho kết quả giống hệt (PRNG cố định)', async () => {

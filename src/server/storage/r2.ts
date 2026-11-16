@@ -21,4 +21,12 @@ export class R2Storage implements StorageAdapter {
   async delete(key: string) {
     await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }))
   }
+  async read(key: string): Promise<ArrayBuffer> {
+    const res = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }))
+    const bytes = await res.Body!.transformToByteArray()
+    return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+  }
+  async write(key: string, data: ArrayBuffer | Uint8Array, contentType: string) {
+    await this.client.send(new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: data instanceof Uint8Array ? data : new Uint8Array(data), ContentType: contentType }))
+  }
 }

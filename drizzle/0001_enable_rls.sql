@@ -15,6 +15,8 @@ alter table "files" enable row level security;
 --> statement-breakpoint
 alter table "app_settings" enable row level security;
 --> statement-breakpoint
+alter table "doc_templates" enable row level security;
+--> statement-breakpoint
 alter table "tenants" enable row level security;
 --> statement-breakpoint
 alter table "user_facilities" enable row level security;
