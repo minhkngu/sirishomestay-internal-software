@@ -184,18 +184,13 @@ Lọc theo cơ sở người dùng được thấy, chỉ hiện mục người 
 - Tiền lưu dạng số nguyên VND. Ngày lưu dạng `date` (không giờ) cho nghiệp vụ; múi giờ Asia/Ho_Chi_Minh.
 - Logic tính tiền (lẻ ngày, hệ số, thay đồng hồ, đổi giá, thanh lý) gom trong một module thuần, có test đầy đủ.
 
-## 10. Lộ trình
+## 10. Lộ trình (người dùng đã quyết định)
 
-**Giai đoạn A — Giao diện toàn bộ hệ thống với dữ liệu giả (người dùng đã quyết định).** Dựng web Next.js thật cho mọi phần (cơ sở/phòng, khách, người dùng, hợp đồng/phụ lục, bàn giao, điện nước, hoá đơn, sổ cọc, thanh lý, tài sản, sự cố, nhắc việc, nhập Excel, cài đặt) nhưng dữ liệu là dữ liệu giả, lưu trên trình duyệt, đăng nhập giả bằng chọn vai trò. Màn hình lấy dữ liệu qua một lớp trung gian (repository) để sau này thay bằng Supabase mà không sửa giao diện. Logic tính tiền, phân quyền viết thật và có test ngay từ giai đoạn này. Người dùng duyệt giao diện và luồng → sửa tới khi ổn.
+Một kế hoạch duy nhất, dùng **Supabase ngay từ đầu**:
 
-**Giai đoạn B — Gắn cơ sở dữ liệu**, theo từng đợt dưới đây (thay repository giả bằng Supabase, đăng nhập thật, lưu file R2, PDF, sao lưu):
-
-1. Nền tảng: đăng nhập, người dùng + phân quyền, cơ sở/phòng, khách, nhập Excel (phần tương ứng), khung bảng nhắc việc (visa).
-2. Hợp đồng cọc/thuê/phụ lục, mẫu Word + xuất docx/PDF, biên bản bàn giao, nhắc hợp đồng hết hạn / chưa ký.
-3. Điện nước, loại phí/đơn vị, hoá đơn tháng, thu tiền, sổ cọc, hoá đơn thanh lý, xuất PDF/PNG, nhắc công nợ.
-4. Tài sản & kho, sự cố & sửa chữa (gắn với biên bản và phí phạt).
-
-Mỗi đợt dùng được độc lập; kế hoạch triển khai lập riêng cho từng đợt.
+1. Dựng giao diện và luồng cho **toàn bộ hệ thống** (cơ sở/phòng, khách, người dùng, mẫu Word, hợp đồng/phụ lục, bàn giao, điện nước, phí phát sinh, sổ cọc, hoá đơn, thanh lý, tài sản, sự cố, nhắc việc, nhập Excel, cài đặt) trên Supabase thật, với **dữ liệu giả** nạp bằng script (`db:seed`) và các tài khoản người dùng mẫu. Logic tính tiền và phân quyền viết thật, có test.
+2. **Điểm dừng:** người dùng bấm thử toàn bộ luồng với dữ liệu giả, góp ý → sửa tới khi ổn.
+3. Hoàn thiện để chạy thật: xuất PDF/PNG (Gotenberg), chuyển file sang R2, tự xoá ảnh sau thanh lý, sao lưu ra Google Drive, xoá dữ liệu giả, nhập dữ liệu thật từ Excel.
 
 ## 11. Để builder quyết định
 
