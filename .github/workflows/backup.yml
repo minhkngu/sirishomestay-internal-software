@@ -1,0 +1,55 @@
+name: Sao lưu cơ sở dữ liệu
+
+on:
+  schedule:
+    - cron: '0 19 * * *' # 02:00 giờ Việt Nam
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+      RCLONE_CONFIG_DRIVE_TYPE: drive
+      RCLONE_CONFIG_DRIVE_SCOPE: drive
+      RCLONE_CONFIG_DRIVE_SERVICE_ACCOUNT_CREDENTIALS: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+      RCLONE_CONFIG_DRIVE_ROOT_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+    steps:
+      - name: Cài postgresql-client 17 (cùng major version với Supabase)
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+          /usr/lib/postgresql/17/bin/pg_dump --version
+
+      - name: Cài rclone
+        run: curl -fsSL https://rclone.org/install.sh | sudo bash
+
+      - name: pg_dump (schema public + auth)
+        run: |
+          set -euo pipefail
+          FILE="siris-backup-$(TZ=Asia/Ho_Chi_Minh date +%F).dump"
+          /usr/lib/postgresql/17/bin/pg_dump --format=custom --no-owner --no-privileges \
+            --schema=public --schema=auth "$BACKUP_DATABASE_URL" -f "$FILE"
+          test -s "$FILE"
+          echo "FILE=$FILE" >> "$GITHUB_ENV"
+
+      - name: Tải lên Google Drive
+        run: |
+          set -euo pipefail
+          rclone copyto "$FILE" "drive:$FILE"
+          rclone lsf "drive:$FILE"
+
+      - name: Giữ 30 bản mới nhất
+        run: |
+          set -euo pipefail
+          rclone lsf drive: --files-only --include 'siris-backup-*.dump' | sort | head -n -30 | while read -r old; do
+            echo "Xoá bản cũ: $old"
+            rclone deletefile "drive:$old"
+          done
