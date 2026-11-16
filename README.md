@@ -13,7 +13,7 @@ Công nghệ: Next.js 16 (App Router), TypeScript, Tailwind v4 + shadcn/ui, Driz
 
 ## Cài đặt và chạy
 
-1. Tạo project Supabase và một bucket Storage **riêng tư** tên `siris`; lấy `DATABASE_URL` (Database → Connection string, **Session pooler** — địa chỉ direct `db.<ref>.supabase.co` chỉ có IPv6), `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` và `SUPABASE_SERVICE_ROLE_KEY` (Project Settings → API).
+1. Tạo project Supabase; script nạp dữ liệu sẽ tạo bucket Storage **riêng tư** `siris` khi cần. Lấy `DATABASE_URL` (Database → Connection string, **Session pooler** — địa chỉ direct `db.<ref>.supabase.co` chỉ có IPv6), `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` và `SUPABASE_SERVICE_ROLE_KEY` (Project Settings → API).
 2. Sao chép và điền biến môi trường:
 
    ```bash

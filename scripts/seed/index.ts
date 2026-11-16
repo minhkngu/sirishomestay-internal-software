@@ -3,6 +3,7 @@ import type { DB } from '@/db/client'
 import { userProfiles } from '@/db'
 import { eq } from 'drizzle-orm'
 import { createRng } from './rng'
+import { ensureSeedBucket } from './bucket'
 import { facilitySeed } from './facilities'
 import { assetSeed } from './assets'
 import { contractSeed } from './contracts'
@@ -58,6 +59,7 @@ async function main() {
     },
     async deleteUser(id) { await supabase.auth.admin.deleteUser(id) },
   }
+  if ((process.env.STORAGE_DRIVER ?? 'supabase') === 'supabase') await ensureSeedBucket(supabase.storage)
   const { getStorage } = await import('@/server/storage')
   await runSeed(db, auth, { today: todayVN(), password, reset: process.argv.includes('--reset'), storage: getStorage() })
   await client.end()
