@@ -1,5 +1,6 @@
 'use server'
 
+import './register'
 import { revalidatePath } from 'next/cache'
 import { db } from '@/db/client'
 import { toActionResult } from '@/lib/action-result'

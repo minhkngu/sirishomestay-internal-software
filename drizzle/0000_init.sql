@@ -193,6 +193,30 @@ CREATE TABLE "files" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "handover_items" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"handover_id" uuid NOT NULL,
+	"asset_id" uuid NOT NULL,
+	"condition" text DEFAULT 'Tốt' NOT NULL,
+	"note" text DEFAULT '' NOT NULL,
+	"damaged" boolean DEFAULT false NOT NULL,
+	"missing" boolean DEFAULT false NOT NULL,
+	"penalty" integer DEFAULT 0 NOT NULL,
+	"is_demo" boolean DEFAULT false NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "handovers" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"lease_id" uuid NOT NULL,
+	"room_id" uuid NOT NULL,
+	"kind" text NOT NULL,
+	"date" date NOT NULL,
+	"status" text DEFAULT 'draft' NOT NULL,
+	"is_demo" boolean DEFAULT false NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "meter_readings" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"meter_id" uuid NOT NULL,
@@ -309,6 +333,10 @@ ALTER TABLE "leases" ADD CONSTRAINT "leases_from_deposit_contract_id_deposit_con
 ALTER TABLE "rooms" ADD CONSTRAINT "rooms_facility_id_facilities_id_fk" FOREIGN KEY ("facility_id") REFERENCES "public"."facilities"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "fee_types" ADD CONSTRAINT "fee_types_unit_id_fee_units_id_fk" FOREIGN KEY ("unit_id") REFERENCES "public"."fee_units"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "utility_rates" ADD CONSTRAINT "utility_rates_facility_id_facilities_id_fk" FOREIGN KEY ("facility_id") REFERENCES "public"."facilities"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "handover_items" ADD CONSTRAINT "handover_items_handover_id_handovers_id_fk" FOREIGN KEY ("handover_id") REFERENCES "public"."handovers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "handover_items" ADD CONSTRAINT "handover_items_asset_id_assets_id_fk" FOREIGN KEY ("asset_id") REFERENCES "public"."assets"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "handovers" ADD CONSTRAINT "handovers_lease_id_leases_id_fk" FOREIGN KEY ("lease_id") REFERENCES "public"."leases"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "handovers" ADD CONSTRAINT "handovers_room_id_rooms_id_fk" FOREIGN KEY ("room_id") REFERENCES "public"."rooms"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "meter_readings" ADD CONSTRAINT "meter_readings_meter_id_meters_id_fk" FOREIGN KEY ("meter_id") REFERENCES "public"."meters"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "meters" ADD CONSTRAINT "meters_room_id_rooms_id_fk" FOREIGN KEY ("room_id") REFERENCES "public"."rooms"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "tenants" ADD CONSTRAINT "tenants_home_facility_id_facilities_id_fk" FOREIGN KEY ("home_facility_id") REFERENCES "public"."facilities"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint

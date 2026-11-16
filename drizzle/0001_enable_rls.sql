@@ -27,6 +27,10 @@ alter table "utility_rates" enable row level security;
 --> statement-breakpoint
 alter table "files" enable row level security;
 --> statement-breakpoint
+alter table "handover_items" enable row level security;
+--> statement-breakpoint
+alter table "handovers" enable row level security;
+--> statement-breakpoint
 alter table "meter_readings" enable row level security;
 --> statement-breakpoint
 alter table "meters" enable row level security;

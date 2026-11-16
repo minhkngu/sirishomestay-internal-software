@@ -6,6 +6,7 @@ import { createRng } from './rng'
 import { facilitySeed } from './facilities'
 import { assetSeed } from './assets'
 import { contractSeed } from './contracts'
+import { handoverSeed } from './handovers'
 import { meterSeed } from './meters'
 import { settingsSeed } from './settings'
 import { templateSeed } from './templates'
@@ -18,7 +19,7 @@ import type { AuthAdmin, SeedCtx, SeedModule } from './types'
 export type { AuthAdmin } from './types'
 
 /** Thứ tự nạp: mỗi task thêm module của mình vào đây. */
-export const SEED_MODULES: SeedModule[] = [facilitySeed, settingsSeed, userSeed, tenantSeed, templateSeed, contractSeed, assetSeed, meterSeed]
+export const SEED_MODULES: SeedModule[] = [facilitySeed, settingsSeed, userSeed, tenantSeed, templateSeed, contractSeed, assetSeed, meterSeed, handoverSeed]
 
 export type SeedOptions = { today?: string; password: string; reset?: boolean; storage?: StorageAdapter }
 

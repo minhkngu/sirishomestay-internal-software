@@ -30,7 +30,8 @@ async function Asset({ params }: { params: Promise<{ id: string }> }) {
         <dt className="text-muted-foreground">Loại</dt><dd>{a.category}</dd><dt className="text-muted-foreground">Giá trị</dt><dd>{formatVND(a.value)}</dd>
         <dt className="text-muted-foreground">Tình trạng</dt><dd>{a.condition}</dd><dt className="text-muted-foreground">Vị trí hiện tại</dt><dd>{await placeName(a.locationKind, a.locationId)}</dd>
       </dl>
-      <h2 className="font-medium">Lịch sử</h2>
+      {history.handovers.length > 0 && (<><h2 className="font-medium">Bàn giao</h2><ul className="space-y-1 text-sm">{history.handovers.map((h, i) => <li key={i}>{h.date} — {h.kind === 'check_in' ? 'Check-in' : 'Check-out'}: {h.missing ? 'Mất' : h.damaged ? 'Hư' : h.condition}{h.penalty ? ` (phạt ${formatVND(h.penalty)})` : ''}</li>)}</ul></>)}
+      <h2 className="font-medium">Lịch sử di chuyển</h2>
       <ul className="space-y-1 text-sm">
         {moves.map((m) => <li key={m.id}>{m.movedAt.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })} — {m.from} → {m.to}{m.reason ? ` (${m.reason})` : ''}</li>)}
         {moves.length === 0 && <li className="text-muted-foreground">Chưa có lần chuyển nào.</li>}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { facilities, rooms, userProfiles, userPermissions, userFacilities, feeTypes, feeUnits, utilityRates, tenants, docTemplates, files, leases, depositContracts, depositEntries, leaseOccupants, assets, meters, meterReadings } from '@/db'
+import { facilities, rooms, userProfiles, userPermissions, userFacilities, feeTypes, feeUnits, utilityRates, tenants, docTemplates, files, leases, depositContracts, depositEntries, leaseOccupants, assets, meters, meterReadings, handovers, handoverItems } from '@/db'
 import { runSeed, type AuthAdmin } from '../../scripts/seed'
 import { addDays } from '@/domain/dates'
 import { createTestDb } from '../helpers/db'
@@ -120,6 +120,16 @@ describe('runSeed', () => {
     const oct = rs.filter((r) => r.period === '2026-10' && ms.find((m) => m.id === r.meterId)?.utility === 'electric')
     expect(oct.length).toBeLessThan(40)
     expect(oct.length).toBeGreaterThanOrEqual(35)
+  })
+
+  it('nạp biên bản check-in đã hoàn tất cho mọi hợp đồng thuê, mỗi món tài sản trong phòng một dòng', async () => {
+    const db = await createTestDb()
+    await runSeed(db, fakeAuth(), { today: '2026-11-16', password: 'x' })
+    const hs = await db.select().from(handovers)
+    expect(hs).toHaveLength(26)
+    expect(hs.every((h) => h.kind === 'check_in' && h.status === 'done' && h.isDemo)).toBe(true)
+    const items = await db.select().from(handoverItems)
+    expect(items).toHaveLength(26 * 3)
   })
 
   it('chạy hai lần trên hai CSDL trống cho kết quả giống hệt (PRNG cố định)', async () => {

@@ -10,6 +10,8 @@ import { formatVND } from '@/domain/money'
 import { getAccessContext } from '@/server/session'
 import { listFiles } from '@/server/files/service'
 import { listTemplates } from '@/server/templates/service'
+import { listHandovers } from '@/server/handovers/service'
+import { StartHandoverButtons } from '@/features/handovers/components/start-handover-buttons'
 import { getDepositContract, getLease } from '@/server/contracts/service'
 import { ExportMenu } from '@/features/contracts/components/export-menu'
 import { SignStatus } from '@/features/contracts/components/sign-status'
@@ -74,6 +76,7 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
     )
   }
 
+  const handoverList = await listHandovers(db, ctx, lease.id)
   const [templates, exports] = await Promise.all([
     listTemplates(db, ctx, 'lease').then((t) => t.filter((x) => x.fileId)),
     listFiles(db, ctx, 'export', lease.id),
@@ -99,7 +102,13 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
           </dl>
         </TabsContent>
         <TabsContent value="addenda"><p className="py-3 text-sm text-muted-foreground">Phụ lục gia hạn, chuyển phòng, thanh lý sẽ có ở bước sau.</p></TabsContent>
-        <TabsContent value="handover"><p className="py-3 text-sm text-muted-foreground">Biên bản bàn giao sẽ có ở bước sau.</p></TabsContent>
+        <TabsContent value="handover">
+          <div className="space-y-3 py-3">
+            <StartHandoverButtons leaseId={lease.id} />
+            <ul className="space-y-1 text-sm">{handoverList.map((h) => <li key={h.id}><Link className="underline" href={`/handovers/${h.id}`}>{h.kind === 'check_in' ? 'Check-in' : 'Check-out'} {formatDateVN(h.date)}</Link> — {h.status === 'done' ? 'Đã hoàn tất' : 'Nháp'}</li>)}
+              {handoverList.length === 0 && <li className="text-muted-foreground">Chưa có biên bản nào.</li>}</ul>
+          </div>
+        </TabsContent>
         <TabsContent value="invoices"><p className="py-3 text-sm text-muted-foreground">Hoá đơn sẽ có ở bước sau.</p></TabsContent>
         <TabsContent value="deposit"><div className="py-3"><Ledger entries={lease.depositEntries} /></div></TabsContent>
         <TabsContent value="docs">
