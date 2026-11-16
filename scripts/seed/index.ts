@@ -6,6 +6,8 @@ import { createRng } from './rng'
 import { ensureSeedBucket } from './bucket'
 import { facilitySeed } from './facilities'
 import { assetSeed } from './assets'
+import { stockSeed } from './stock'
+import { loadSeedState } from './state'
 import { contractSeed } from './contracts'
 import { handoverSeed } from './handovers'
 import { meterSeed } from './meters'
@@ -20,7 +22,7 @@ import type { AuthAdmin, SeedCtx, SeedModule } from './types'
 export type { AuthAdmin } from './types'
 
 /** Thứ tự nạp: mỗi task thêm module của mình vào đây. */
-export const SEED_MODULES: SeedModule[] = [facilitySeed, settingsSeed, userSeed, tenantSeed, templateSeed, contractSeed, assetSeed, meterSeed, handoverSeed]
+export const SEED_MODULES: SeedModule[] = [facilitySeed, settingsSeed, userSeed, tenantSeed, templateSeed, contractSeed, assetSeed, stockSeed, meterSeed, handoverSeed]
 
 export type SeedOptions = { today?: string; password: string; reset?: boolean; storage?: StorageAdapter }
 
@@ -36,7 +38,15 @@ export async function runSeed(db: DB, auth: AuthAdmin, opts: SeedOptions): Promi
   const today = opts.today ?? new Date().toISOString().slice(0, 10)
   if (opts.reset) await resetAll(db, auth)
   const ctx: SeedCtx = { db, auth, today, password: opts.password, storage: opts.storage ?? new MemoryStorage(), rng: createRng(), state: { facilityIds: {}, roomIds: {}, userIds: {} } }
-  for (const m of SEED_MODULES) await m.run(ctx)
+  if (!opts.reset) await loadSeedState(ctx)
+  for (const m of SEED_MODULES) {
+    if (!opts.reset && await m.isSeeded(ctx)) continue
+    let seed = 2166136261
+    for (const c of m.name) seed = Math.imul(seed ^ c.charCodeAt(0), 16777619)
+    ctx.rng = createRng(seed >>> 0)
+    if (m.name === 'users' || m.name === 'templates') await m.run(ctx)
+    else await db.transaction(async (tx) => m.run({ ...ctx, db: tx as unknown as DB }))
+  }
 }
 
 async function main() {

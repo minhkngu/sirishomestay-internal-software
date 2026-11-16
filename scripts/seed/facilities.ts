@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { facilities, rooms } from '@/db'
 import type { SeedModule } from './types'
 
@@ -13,6 +14,7 @@ const TYPES = [
 
 export const facilitySeed: SeedModule = {
   name: 'facilities',
+  async isSeeded({ db }) { return (await db.select({ id: facilities.id }).from(facilities).where(eq(facilities.isDemo, true)).limit(1)).length > 0 },
   async run({ db, rng, state }) {
     for (const s of SITES) {
       const [f] = await db.insert(facilities).values({

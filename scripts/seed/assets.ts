@@ -1,4 +1,5 @@
-import { assets, facilities, rooms, stockItems, stockLevels } from '@/db'
+import { eq } from 'drizzle-orm'
+import { assets, facilities, rooms } from '@/db'
 import { buildSearchText } from '@/domain/text'
 import type { SeedModule } from './types'
 
@@ -12,9 +13,10 @@ const WAREHOUSE = [{ name: 'Máy lạnh dự phòng', category: 'Điện lạnh'
 
 export const assetSeed: SeedModule = {
   name: 'assets',
+  async isSeeded({ db }) { return (await db.select({ id: assets.id }).from(assets).where(eq(assets.isDemo, true)).limit(1)).length > 0 },
   async run({ db, rng, state }) {
-    const facs = await db.select().from(facilities)
-    const allRooms = await db.select().from(rooms)
+    const facs = await db.select().from(facilities).where(eq(facilities.isDemo, true))
+    const allRooms = await db.select().from(rooms).where(eq(rooms.isDemo, true))
     const insert = async (code: string, a: { name: string; category: string; value: number }, facilityId: string, kind: 'room' | 'common' | 'warehouse', locationId: string) => {
       await db.insert(assets).values({
         id: rng.uuid(), code, name: a.name, category: a.category, value: a.value, condition: rng.next() < 0.1 ? 'Trầy xước' : 'Tốt',
@@ -22,8 +24,6 @@ export const assetSeed: SeedModule = {
       })
     }
     for (const f of facs) {
-      const [stock] = await db.insert(stockItems).values({ id: rng.uuid(), facilityId: f.id, name: 'Bóng đèn LED', unit: 'cái', category: 'Điện', isDemo: true }).returning()
-      await db.insert(stockLevels).values({ id: rng.uuid(), itemId: stock.id, locationKind: 'warehouse', locationId: f.id, quantity: 20, isDemo: true })
       for (const r of allRooms.filter((x) => x.facilityId === f.id)) {
         for (const p of PER_ROOM) await insert(`${f.code}-${p.tag}-${r.code}`, p, f.id, 'room', r.id)
       }

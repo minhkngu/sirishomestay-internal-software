@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { depositContracts, depositEntries, facilities, leaseFees, leaseOccupants, leases, rooms, tenants } from '@/db'
 import { addDays } from '@/domain/dates'
 import type { SeedModule } from './types'
@@ -8,18 +9,21 @@ import type { SeedModule } from './types'
  */
 export const contractSeed: SeedModule = {
   name: 'contracts',
+  async isSeeded({ db }) { return (await db.select({ id: leases.id }).from(leases).where(eq(leases.isDemo, true)).limit(1)).length > 0 },
   async run({ db, rng, today, state }) {
-    const facs = await db.select().from(facilities)
+    const facs = await db.select().from(facilities).where(eq(facilities.isDemo, true))
     const codeOf = new Map(facs.map((f) => [f.id, f.code]))
-    const allRooms = (await db.select().from(rooms)).sort((a, b) => (codeOf.get(a.facilityId)! + a.code < codeOf.get(b.facilityId)! + b.code ? -1 : 1))
-    const allTenants = await db.select().from(tenants)
+    const occupied = new Set((await db.select().from(leases)).filter((l) => l.status === 'active').map((l) => l.roomId))
+    const pending = new Set((await db.select().from(depositContracts)).filter((d) => d.status === 'pending').map((d) => d.roomId))
+    const allRooms = (await db.select().from(rooms).where(eq(rooms.isDemo, true))).sort((a, b) => (codeOf.get(a.facilityId)! + a.code < codeOf.get(b.facilityId)! + b.code ? -1 : 1))
+    const allTenants = await db.select().from(tenants).where(eq(tenants.isDemo, true))
     const people = allTenants.filter((t) => t.kind !== 'company')
     const companies = allTenants.filter((t) => t.kind === 'company')
     const feeIds = state.feeTypeIds as Record<string, string>
     const seq: Record<string, number> = {}
 
     const endOffsets = [12, 20, 27, ...Array.from({ length: 23 }, (_, i) => 60 + i * 17)]
-    const leased = allRooms.slice(0, 26)
+    const leased = allRooms.filter((r) => !occupied.has(r.id)).slice(0, 26)
     const leaseIds: string[] = []
     for (let i = 0; i < leased.length; i++) {
       const room = leased[i]
@@ -52,7 +56,9 @@ export const contractSeed: SeedModule = {
     state.leaseIds = leaseIds
 
     // 3 hợp đồng cọc chờ: phòng đang có khách (có khách kế tiếp) + 2 phòng trống
-    const targets = [leased[1], allRooms[26], allRooms[27]]
+    const availableDeposits = allRooms.filter((r) => !occupied.has(r.id) && !pending.has(r.id) && !leased.some((l) => l.id === r.id))
+    const targets = [leased.find((r) => !pending.has(r.id))!, ...availableDeposits.slice(0, 2)]
+    if (leased.length < 26 || targets.length < 3 || targets.some((r) => !r)) throw new Error('Không đủ phòng demo trống để nạp hợp đồng mẫu')
     const depIds: string[] = []
     for (let i = 0; i < targets.length; i++) {
       const room = targets[i]

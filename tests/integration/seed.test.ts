@@ -1,5 +1,6 @@
+import { sql } from 'drizzle-orm'
 import { describe, it, expect } from 'vitest'
-import { facilities, rooms, userProfiles, userPermissions, userFacilities, feeTypes, feeUnits, utilityRates, tenants, docTemplates, files, leases, depositContracts, depositEntries, leaseOccupants, assets, meters, meterReadings, handovers, handoverItems } from '@/db'
+import { facilities, rooms, userProfiles, userPermissions, userFacilities, feeTypes, feeUnits, utilityRates, tenants, docTemplates, files, leases, depositContracts, depositEntries, leaseOccupants, assets, meters, meterReadings, handovers, handoverItems, stockItems, stockLevels, stockMoves } from '@/db'
 import { runSeed, type AuthAdmin } from '../../scripts/seed'
 import { addDays } from '@/domain/dates'
 import { createTestDb } from '../helpers/db'
@@ -138,6 +139,47 @@ describe('runSeed', () => {
     await runSeed(b, fakeAuth(), { today: '2026-11-16', password: 'x' })
     const strip = (r: Record<string, unknown>[]) => r.map(({ createdAt: _c, updatedAt: _u, ...rest }) => rest)
     expect(strip(await a.select().from(rooms))).toEqual(strip(await b.select().from(rooms)))
+  })
+
+  it('seed thêm dần giữ nguyên dữ liệu và chỉ nạp lại vật tư bị xoá', async () => {
+    const db = await createTestDb()
+    const auth = fakeAuth()
+    const opts = { today: '2026-11-16', password: 'x' }
+    await runSeed(db, auth, opts)
+    const snapshot = async () => ({
+      facilities: (await db.select().from(facilities)).map(x => x.id).sort(),
+      tenants: (await db.select().from(tenants)).map(x => x.id).sort(),
+      leases: (await db.select().from(leases)).map(x => x.id).sort(),
+      users: (await db.select().from(userProfiles)).map(x => x.id).sort(),
+      stock: (await db.select().from(stockItems)).map(x => x.id).sort(),
+      levels: (await db.select().from(stockLevels)).map(x => x.id).sort(),
+    })
+    const [realFacility] = await db.insert(facilities).values({ code: 'REAL', name: 'Cơ sở người dùng' }).returning()
+    await db.insert(rooms).values({ facilityId: realFacility.id, code: '101' })
+    const counts = async () => {
+      const names = await db.execute(sql`select tablename from pg_tables where schemaname = 'public' order by tablename`)
+      const result: Record<string, number> = {}
+      const nameRows = Array.isArray(names) ? names : names.rows
+      for (const row of nameRows as { tablename: string }[]) {
+        const count = await db.execute(sql.raw(`select count(*)::int as n from "${row.tablename.replaceAll('"', '""')}"`))
+        const countRows = Array.isArray(count) ? count : count.rows
+        result[row.tablename] = Number((countRows[0] as { n: number }).n)
+      }
+      return result
+    }
+    const original = await snapshot()
+    const originalCounts = await counts()
+    expect(original.stock.length).toBeGreaterThan(2)
+    await runSeed(db, auth, opts)
+    expect(await snapshot()).toEqual(original)
+    expect(await counts()).toEqual(originalCounts)
+    await db.delete(stockMoves)
+    await db.delete(stockLevels)
+    await db.delete(stockItems)
+    await runSeed(db, auth, opts)
+    expect(await snapshot()).toEqual(original)
+    expect(await counts()).toEqual(originalCounts)
+    expect((await db.select().from(stockItems)).some((x) => x.facilityId === realFacility.id)).toBe(false)
   })
 
   it('--reset xoá dữ liệu cũ rồi nạp lại, không nhân đôi', async () => {
