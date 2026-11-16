@@ -1,0 +1,37 @@
+import { feeTypes, feeUnits, utilityRates } from '@/db'
+import type { SeedModule } from './types'
+
+const UNITS = ['người', 'xe', 'phòng', 'kg', 'lần']
+const FEES: { name: string; unit: string; price: number; billing: 'monthly_fixed' | 'per_occurrence'; from: 'manual' | 'occupants' }[] = [
+  { name: 'Phí dịch vụ', unit: 'người', price: 200_000, billing: 'monthly_fixed', from: 'occupants' },
+  { name: 'Gửi xe máy', unit: 'xe', price: 100_000, billing: 'monthly_fixed', from: 'manual' },
+  { name: 'Internet', unit: 'phòng', price: 150_000, billing: 'monthly_fixed', from: 'manual' },
+  { name: 'Giặt ủi', unit: 'kg', price: 25_000, billing: 'per_occurrence', from: 'manual' },
+  { name: 'Dọn phòng thêm', unit: 'lần', price: 150_000, billing: 'per_occurrence', from: 'manual' },
+  { name: 'Nước theo người', unit: 'người', price: 80_000, billing: 'monthly_fixed', from: 'occupants' },
+]
+
+export const settingsSeed: SeedModule = {
+  name: 'settings',
+  async run({ db, state, today }) {
+    const unitIds: Record<string, string> = {}
+    for (const name of UNITS) {
+      const [u] = await db.insert(feeUnits).values({ name, isDemo: true }).returning()
+      unitIds[name] = u.id
+    }
+    const typeIds: Record<string, string> = {}
+    for (const f of FEES) {
+      const [t] = await db.insert(feeTypes).values({ name: f.name, unitId: unitIds[f.unit], defaultPrice: f.price, billing: f.billing, quantityFrom: f.from, isDemo: true }).returning()
+      typeIds[f.name] = t.id
+    }
+    state.feeTypeIds = typeIds
+    const monthStart = `${today.slice(0, 7)}-01`
+    for (const facilityId of Object.values(state.facilityIds)) {
+      await db.insert(utilityRates).values([
+        { facilityId, utility: 'electric', pricePerUnit: 3500, effectiveFrom: `${today.slice(0, 4)}-01-01`, isDemo: true },
+        { facilityId, utility: 'electric', pricePerUnit: 3800, effectiveFrom: monthStart, isDemo: true },
+        { facilityId, utility: 'water', pricePerUnit: 18000, effectiveFrom: `${today.slice(0, 4)}-01-01`, isDemo: true },
+      ])
+    }
+  },
+}

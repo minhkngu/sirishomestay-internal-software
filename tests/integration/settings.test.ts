@@ -20,6 +20,22 @@ describe('settings', () => {
     expect((await getSettings(db)).visaWarningDays).toBe(45)
   })
 
+  it('mặc định có quy tắc hạn thanh toán và số ngày giữ ảnh', async () => {
+    const s = await getSettings(db)
+    expect(s.dueRule).toEqual({ kind: 'days_after_approval', days: 5 })
+    expect(s.photoRetentionDays).toBe(30)
+  })
+
+  it('đổi quy tắc hạn thanh toán sang "ngày 5 của tháng sau" và kiểm tra giá trị', async () => {
+    await updateSettings(db, ctxOf(['settings']), { dueRule: { kind: 'day_of_next_month', day: 5 }, photoRetentionDays: 60 })
+    const s = await getSettings(db)
+    expect(s.dueRule).toEqual({ kind: 'day_of_next_month', day: 5 })
+    expect(s.photoRetentionDays).toBe(60)
+    await expect(updateSettings(db, ctxOf(['settings']), { dueRule: { kind: 'day_of_next_month', day: 0 } })).rejects.toThrow()
+    await expect(updateSettings(db, ctxOf(['settings']), { dueRule: { kind: 'days_after_approval', days: 400 } })).rejects.toThrow()
+    await expect(updateSettings(db, ctxOf(['settings']), { photoRetentionDays: 0 })).rejects.toThrow('Số ngày phải từ 1 đến 365')
+  })
+
   it('chỉ nhóm settings được sửa', async () => {
     await expect(updateSettings(db, ctxOf(['billing']), { visaWarningDays: 10 })).rejects.toThrow(ForbiddenError)
   })

@@ -5,6 +5,8 @@ import { assertCan, facilityScope, NotFoundError, type AccessContext } from '@/d
 import {  } from '@/lib/action-result'
 import { ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/server/audit'
+import { roomStatus, type RoomStatus } from '@/domain/room-status'
+import { todayVN } from '@/domain/dates'
 import { getFacility } from '../facilities/service'
 import { bulkInput, roomInput, roomUpdateInput, type BulkInput, type RoomInput } from './schemas'
 
@@ -106,4 +108,12 @@ export async function createRoomsBulk(db: DB, ctx: AccessContext, facilityId: st
     await recordAudit(tx, ctx, { action: 'create', entity: 'room_bulk', summary: 'Tạo nhiều phòng', facilityId, after: { created: toCreate, skipped } })
     return { created: toCreate.length, skipped }
   })
+}
+
+export type RoomWithStatus = Room & { status: RoomStatus }
+
+/** Phòng của một cơ sở kèm trạng thái suy ra (hợp đồng được nối ở Task 9; trước đó mọi phòng là Trống). */
+export async function listRoomsWithStatus(db: DB, ctx: AccessContext, opts: { facilityId: string; q?: string; floor?: string; includeInactive?: boolean }): Promise<RoomWithStatus[]> {
+  const list = await listRooms(db, ctx, opts)
+  return list.map((r) => ({ ...r, status: roomStatus(r, null, null, todayVN(), 30) }))
 }

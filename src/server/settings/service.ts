@@ -2,22 +2,31 @@ import { z } from 'zod'
 import { appSettings } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
-import {  } from '@/lib/action-result'
 import { ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/server/audit'
+
+import type { DueRule } from '@/domain/types'
 
 export const SETTINGS_DEFAULTS = {
   visaWarningDays: 30,
   contractWarningDays: 30,
   proration: 'actual_days' as 'days_30' | 'actual_days',
+  dueRule: { kind: 'days_after_approval', days: 5 } as DueRule,
+  photoRetentionDays: 30,
 }
 export type Settings = typeof SETTINGS_DEFAULTS
 
 const DAYS_MSG = 'Số ngày phải từ 1 đến 365'
 const days = z.number({ error: DAYS_MSG }).int(DAYS_MSG).min(1, DAYS_MSG).max(365, DAYS_MSG)
+export const dueRuleSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('day_of_next_month'), day: z.number().int().min(1, 'Ngày phải từ 1 đến 31').max(31, 'Ngày phải từ 1 đến 31') }),
+  z.object({ kind: z.literal('days_after_approval'), days: z.number().int().min(0, 'Số ngày phải từ 0 đến 90').max(90, 'Số ngày phải từ 0 đến 90') }),
+])
 const settingsPatch = z.object({
   visaWarningDays: days.optional(),
   contractWarningDays: days.optional(),
+  photoRetentionDays: days.optional(),
+  dueRule: dueRuleSchema.optional(),
   proration: z.enum(['days_30', 'actual_days']).optional(),
 })
 

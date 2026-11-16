@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { facilities, rooms, userProfiles, userPermissions, userFacilities } from '@/db'
+import { facilities, rooms, userProfiles, userPermissions, userFacilities, feeTypes, feeUnits, utilityRates } from '@/db'
 import { runSeed, type AuthAdmin } from '../../scripts/seed'
 import { createTestDb } from '../helpers/db'
 
@@ -27,6 +27,21 @@ describe('runSeed', () => {
     expect(perms.filter((p) => p.userId === hung.id).map((p) => p.permission).sort()).toEqual(['assets', 'incidents', 'meters'])
     const bt = facs.find((f) => f.code === 'BT')!
     expect((await db.select().from(userFacilities)).filter((u) => u.userId === hung.id).map((u) => u.facilityId)).toEqual([bt.id])
+  })
+
+  it('nạp 6 loại phí, đơn vị và đơn giá điện nước (điện đổi giá từ đầu tháng hiện tại)', async () => {
+    const db = await createTestDb()
+    await runSeed(db, fakeAuth(), { today: '2026-11-16', password: 'x' })
+    const types = await db.select().from(feeTypes)
+    expect(types.map((t) => t.name).sort()).toEqual(['Dọn phòng thêm', 'Giặt ủi', 'Gửi xe máy', 'Internet', 'Nước theo người', 'Phí dịch vụ'])
+    expect(types.find((t) => t.name === 'Phí dịch vụ')).toMatchObject({ billing: 'monthly_fixed', quantityFrom: 'occupants' })
+    expect(types.find((t) => t.name === 'Giặt ủi')).toMatchObject({ billing: 'per_occurrence' })
+    expect((await db.select().from(feeUnits)).map((u) => u.name).sort()).toEqual(['kg', 'lần', 'người', 'phòng', 'xe'])
+    const rates = await db.select().from(utilityRates)
+    const td = (await db.select().from(facilities)).find((f) => f.code === 'TD')!
+    const electric = rates.filter((r) => r.facilityId === td.id && r.utility === 'electric').sort((a, b) => (a.effectiveFrom < b.effectiveFrom ? -1 : 1))
+    expect(electric.map((r) => [r.pricePerUnit, r.effectiveFrom])).toEqual([[3500, '2026-01-01'], [3800, '2026-11-01']])
+    expect(rates.filter((r) => r.utility === 'water').every((r) => r.pricePerUnit === 18000)).toBe(true)
   })
 
   it('chạy hai lần trên hai CSDL trống cho kết quả giống hệt (PRNG cố định)', async () => {

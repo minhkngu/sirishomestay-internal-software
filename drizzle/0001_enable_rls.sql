@@ -5,6 +5,12 @@ alter table "facilities" enable row level security;
 --> statement-breakpoint
 alter table "rooms" enable row level security;
 --> statement-breakpoint
+alter table "fee_types" enable row level security;
+--> statement-breakpoint
+alter table "fee_units" enable row level security;
+--> statement-breakpoint
+alter table "utility_rates" enable row level security;
+--> statement-breakpoint
 alter table "app_settings" enable row level security;
 --> statement-breakpoint
 alter table "tenant_documents" enable row level security;
