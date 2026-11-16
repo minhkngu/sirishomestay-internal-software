@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { facilities, rooms, userProfiles, userPermissions, userFacilities, feeTypes, feeUnits, utilityRates, tenants, docTemplates, files, leases, depositContracts, depositEntries, leaseOccupants, assets } from '@/db'
+import { facilities, rooms, userProfiles, userPermissions, userFacilities, feeTypes, feeUnits, utilityRates, tenants, docTemplates, files, leases, depositContracts, depositEntries, leaseOccupants, assets, meters, meterReadings } from '@/db'
 import { runSeed, type AuthAdmin } from '../../scripts/seed'
 import { addDays } from '@/domain/dates'
 import { createTestDb } from '../helpers/db'
@@ -101,6 +101,25 @@ describe('runSeed', () => {
       expect(roomRows.find((r) => r.id === a.locationId)?.facilityId).toBe(a.facilityId)
     }
     expect(all.every((a) => a.isDemo && a.searchText.length > 0)).toBe(true)
+  })
+
+  it('nạp đồng hồ điện + nước mỗi phòng và chỉ số 3 tháng gần nhất (có một đồng hồ đã thay)', async () => {
+    const db = await createTestDb()
+    await runSeed(db, fakeAuth(), { today: '2026-11-16', password: 'x' })
+    const ms = await db.select().from(meters)
+    expect(ms.filter((m) => !m.removedOn)).toHaveLength(80)
+    expect(ms.filter((m) => m.removedOn)).toHaveLength(1)
+    const rs = await db.select().from(meterReadings)
+    expect(new Set(rs.map((r) => r.period))).toEqual(new Set(['2026-08', '2026-09', '2026-10']))
+    // chỉ số không giảm theo thời gian trên cùng đồng hồ
+    for (const m of ms) {
+      const mine = rs.filter((r) => r.meterId === m.id).sort((a, b) => (a.readOn < b.readOn ? -1 : 1)).map((r) => r.value)
+      expect([...mine].sort((a, b) => a - b)).toEqual(mine)
+    }
+    // vài phòng chưa ghi kỳ vừa rồi để nhắc việc
+    const oct = rs.filter((r) => r.period === '2026-10' && ms.find((m) => m.id === r.meterId)?.utility === 'electric')
+    expect(oct.length).toBeLessThan(40)
+    expect(oct.length).toBeGreaterThanOrEqual(35)
   })
 
   it('chạy hai lần trên hai CSDL trống cho kết quả giống hệt (PRNG cố định)', async () => {

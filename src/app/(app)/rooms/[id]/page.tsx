@@ -7,6 +7,7 @@ import { formatVND } from '@/domain/money'
 import { orNotFound } from '@/lib/or-not-found'
 import { getAccessContext } from '@/server/session'
 import { getRoom } from '@/server/rooms/service'
+import { roomMeterHistory } from '@/server/meters/service'
 import { listAssets } from '@/server/assets/service'
 import { getPendingDepositContract, listLeases } from '@/server/contracts/service'
 
@@ -18,6 +19,7 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
   const history = showContracts ? await listLeases(db, ctx, { roomId: id }) : []
   const deposit = showContracts ? await getPendingDepositContract(db, ctx, id) : null
   const roomAssets = can(ctx, 'assets', r.facilityId) ? await listAssets(db, ctx, { location: { kind: 'room', id } }) : null
+  const meterInfo = can(ctx, 'meters', r.facilityId) ? await roomMeterHistory(db, ctx, id) : null
   const active = history.find((l) => l.status === 'active')
   return (
     <div className="space-y-4">
@@ -52,7 +54,23 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
           <ul className="space-y-1 text-sm">{roomAssets.map((a) => <li key={a.id}><Link className="underline" href={`/assets/${a.id}`}>{a.code}</Link> — {a.name} ({a.condition})</li>)}</ul>
         </section>
       )}
-      <p className="text-xs text-muted-foreground">Điện nước và sự cố của phòng sẽ hiện ở các bước sau.</p>
+      {meterInfo && (
+        <section className="space-y-2 rounded-lg border p-4">
+          <h2 className="font-medium">Đồng hồ & chỉ số</h2>
+          {meterInfo.meters.map((m) => {
+            const rs = meterInfo.readings.filter((x) => x.meterId === m.id).slice(-3)
+            return (
+              <div key={m.id} className="text-sm">
+                <strong>{m.utility === 'electric' ? 'Điện' : 'Nước'} {m.serial ?? ''}</strong> — lắp {formatDateVN(m.installedOn)}, chỉ số đầu {m.startReading}
+                {m.removedOn ? `, gỡ ${formatDateVN(m.removedOn)} (cuối ${m.finalReading})` : ''}
+                {rs.length > 0 && <span className="text-muted-foreground"> · gần nhất: {rs.map((x) => `${x.period}: ${x.value}`).join('; ')}</span>}
+              </div>
+            )
+          })}
+          {meterInfo.meters.length === 0 && <p className="text-sm text-muted-foreground">Chưa có đồng hồ.</p>}
+        </section>
+      )}
+      <p className="text-xs text-muted-foreground">Sự cố của phòng sẽ hiện ở bước sau.</p>
     </div>
   )
 }
