@@ -1,4 +1,6 @@
-# Đợt 1 — Nền tảng: Implementation Plan
+# Giai đoạn B · Đợt 1 — Nền tảng (gắn cơ sở dữ liệu): Implementation Plan
+
+> **Trạng thái: CHƯA THỰC HIỆN.** Làm sau khi giao diện giai đoạn A (`2026-11-16-giai-doan-a-giao-dien-du-lieu-gia.md`) được người dùng duyệt. Kế hoạch này sẽ được viết lại khi đó: dự án đã có sẵn (bỏ phần khởi tạo), các hàm trong `src/domain/` dùng lại, việc chính là thay `MockRepo` bằng `SupabaseRepo` + server actions, đăng nhập thật, R2, sao lưu. Nội dung dưới đây (lược đồ, phân quyền server, test PGlite, sao lưu) giữ làm tham chiếu.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
