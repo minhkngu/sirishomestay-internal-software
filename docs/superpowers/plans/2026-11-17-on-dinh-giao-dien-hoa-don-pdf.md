@@ -100,7 +100,7 @@ Chạy: `node scripts/e2e-preflight.mjs && E2E_BASE_URL=$E2E_BASE_URL npx playwr
 **Interfaces:**
 - Consumes: `NAV_ITEMS` trong `src/components/app-shell/nav.ts`.
 
-- [ ] **Step 1: Viết test smoke**
+- [x] **Step 1: Viết test smoke**
 
 Với tài khoản Admin, làm như sau cho mỗi `href` trong `NAV_ITEMS`:
 - Mở trang, chờ `networkidle`.
@@ -109,17 +109,17 @@ Với tài khoản Admin, làm như sau cho mỗi `href` trong `NAV_ITEMS`:
 
 Lắng nghe `page.on('pageerror')` và kiểm tra mảng lỗi rỗng.
 
-- [ ] **Step 2: Chạy test trên bản production ở máy**
+- [x] **Step 2: Chạy test trên bản production ở máy**
 
 Chạy: `npm run build && npm start`. Sau đó chạy `E2E_BASE_URL=http://localhost:3000 npx playwright test tests/e2e/smoke-pages.spec.ts`. Môi trường cần `NEXT_PUBLIC_DEMO_MODE=1` và dữ liệu `npm run db:seed`.
 
 Ghi lại từng trang lỗi. Nếu người dùng đã cấp quyền Vercel MCP, đọc thêm `get_runtime_errors` của bản đã deploy và gộp vào danh sách.
 
-- [ ] **Step 3: Sửa từng lỗi theo `superpowers:systematic-debugging`**
+- [x] **Step 3: Sửa từng lỗi theo `superpowers:systematic-debugging`**
 
 Mỗi lỗi làm ba bước: viết test tái hiện (FAIL) → sửa → test PASS. Mỗi lỗi một commit dạng `fix: <trang> <mô tả>`.
 
-- [ ] **Step 4: Chạy lại smoke, xác nhận PASS mọi trang.**
+- [x] **Step 4: Chạy lại smoke, xác nhận PASS mọi trang.**
 
 ---
 
