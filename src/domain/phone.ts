@@ -25,3 +25,12 @@ export function normalizePhone(input: string): string | null {
   if (e164.length < 8 || e164.length > 15) return null
   return '+' + e164
 }
+
+/** "+84901234567" → "+84 90 123 4567" (số Việt Nam); số nước ngoài giữ nguyên. */
+export function formatPhoneDisplay(e164: string | null | undefined): string {
+  if (!e164) return ''
+  const m = /^\+84(\d{9,10})$/.exec(e164)
+  if (!m) return e164
+  const n = m[1]
+  return n.length === 9 ? `+84 ${n.slice(0, 2)} ${n.slice(2, 5)} ${n.slice(5)}` : `+84 ${n.slice(0, 2)} ${n.slice(2, 6)} ${n.slice(6)}`
+}

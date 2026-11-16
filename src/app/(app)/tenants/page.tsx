@@ -24,7 +24,7 @@ export default async function TenantsPage({ searchParams }: { searchParams: Prom
         <Link href="/tenants/new" className={buttonVariants()}>Thêm khách</Link>
       </div>
       <TenantSearch facilities={facs.map((f) => ({ id: f.id, name: f.name }))} />
-      <TenantTable tenants={list} visaWarningDays={(await getSettings(db)).visaWarningDays} />
+      <TenantTable tenants={list} facilityNames={Object.fromEntries(facs.map((f) => [f.id, f.name]))} visaWarningDays={(await getSettings(db)).visaWarningDays} />
     </div>
   )
 }

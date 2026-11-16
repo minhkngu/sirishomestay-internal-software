@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
+import { formatPhoneDisplay, normalizePhone } from '@/domain/phone'
 import { createTenantAction, updateTenantAction } from '@/server/tenants/actions'
 
 type Kind = 'foreign' | 'vietnamese' | 'company'
@@ -66,7 +67,7 @@ export function TenantForm({ facilities, tenant }: Props) {
       <div className="flex flex-wrap gap-2" role="tablist">
         {(Object.keys(KIND_LABELS) as Kind[]).map((k) => (
           <button key={k} type="button" role="tab" aria-selected={kind === k} onClick={() => setKind(k)}
-            className={cn('rounded-md border px-3 py-1.5 text-sm', kind === k && 'bg-primary text-primary-foreground')}>
+            className={cn('min-w-36 flex-1 rounded-lg border px-4 py-3 text-base font-medium', kind === k && 'bg-primary text-primary-foreground')}>
             {KIND_LABELS[k]}
           </button>
         ))}
@@ -83,6 +84,9 @@ export function TenantForm({ facilities, tenant }: Props) {
           <div key={f.key} className="space-y-1">
             <Label htmlFor={`t-${f.key}`}>{f.label}</Label>
             <Input id={`t-${f.key}`} type={f.type ?? 'text'} value={values[f.key] ?? ''} onChange={(e) => setValues({ ...values, [f.key]: e.target.value })} />
+            {f.key === 'phone' && values.phone && !fe.phone && (
+              <p className="text-xs text-muted-foreground">{normalizePhone(values.phone) ? `Sẽ lưu: ${formatPhoneDisplay(normalizePhone(values.phone))}` : 'Số điện thoại chưa hợp lệ'}</p>
+            )}
             {fe[f.key] && <p className="text-sm text-destructive">{fe[f.key]}</p>}
           </div>
         ))}

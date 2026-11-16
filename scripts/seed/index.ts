@@ -5,13 +5,14 @@ import { eq } from 'drizzle-orm'
 import { createRng } from './rng'
 import { facilitySeed } from './facilities'
 import { settingsSeed } from './settings'
+import { tenantSeed } from './tenants'
 import { userSeed } from './users'
 import type { AuthAdmin, SeedCtx, SeedModule } from './types'
 
 export type { AuthAdmin } from './types'
 
 /** Thứ tự nạp: mỗi task thêm module của mình vào đây. */
-export const SEED_MODULES: SeedModule[] = [facilitySeed, settingsSeed, userSeed]
+export const SEED_MODULES: SeedModule[] = [facilitySeed, settingsSeed, userSeed, tenantSeed]
 
 export type SeedOptions = { today?: string; password: string; reset?: boolean }
 
