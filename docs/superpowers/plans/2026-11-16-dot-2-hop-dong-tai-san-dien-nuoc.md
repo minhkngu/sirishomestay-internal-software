@@ -74,7 +74,7 @@ tests/helpers/db.ts  tests/unit/**  tests/integration/**  tests/e2e/**
 
 ---
 
-### Task 8: Mẫu giấy tờ Word
+### Task 8: Mẫu giấy tờ Word ✅
 
 **Files:**
 - Create: `src/db/schema/templates.ts`, `src/domain/template-fields.ts`, `src/lib/docx.ts`, `src/server/templates/{service.ts,actions.ts}`, `scripts/build-sample-templates.ts`, `public/templates/*.docx`, `src/app/(app)/templates/page.tsx`, `src/features/templates/components/*`, `scripts/seed/templates.ts`
@@ -90,17 +90,17 @@ tests/helpers/db.ts  tests/unit/**  tests/integration/**  tests/e2e/**
   - `buildTemplateData(docType, entities)`: định dạng sẵn tiền, ngày và số tiền bằng chữ.
   - `renderDocx(templateBuf, data): { blob; warnings: string[] }`: dùng docxtemplater với delimiters `{` `}` và `paragraphLoop`. Chỗ điền thiếu dữ liệu thì để trống và ghi vào `warnings`.
   - `exportDocument(db, ctx, { docType, entityId, templateId? }) → fileId`: lưu bản xuất với `ownerType = 'export'`.
-- [ ] **Step 1:** Test: `buildTemplateData('lease', …)` có `gia_thue = '9.000.000'`, `gia_thue_bang_chu = 'Chín triệu đồng'`, `ngay_bat_dau = '15/10/2026'`; `renderDocx` với `lease.docx` mẫu cho ra file chứa "Chín triệu đồng".
-- [ ] **Step 2:** Chạy → FAIL.
-- [ ] **Step 3:** Script sinh mẫu cho đủ 10 loại (dùng thư viện `docx`, cài dạng dev dependency). Trang Mẫu giấy tờ gồm:
+- [x] **Step 1:** Test: `buildTemplateData('lease', …)` có `gia_thue = '9.000.000'`, `gia_thue_bang_chu = 'Chín triệu đồng'`, `ngay_bat_dau = '15/10/2026'`; `renderDocx` với `lease.docx` mẫu cho ra file chứa "Chín triệu đồng".
+- [x] **Step 2:** Chạy → FAIL.
+- [x] **Step 3:** Script sinh mẫu cho đủ 10 loại (dùng thư viện `docx`, cài dạng dev dependency). Trang Mẫu giấy tờ gồm:
   - danh sách mẫu theo loại;
   - tải lên file `.docx` và đặt mẫu mặc định;
   - **bảng chỗ điền** (mã, ý nghĩa, ví dụ, nút sao chép `{mã}`);
   - nút "Thử xuất với dữ liệu mẫu".
-- [ ] **Step 4:** Chạy → PASS.
-- [ ] **Step 5:** Commit `feat: mẫu Word, bảng chỗ điền, xuất docx`.
+- [x] **Step 4:** Chạy → PASS.
+- [x] **Step 5:** Commit `feat: mẫu Word, bảng chỗ điền, xuất docx`.
 
-### Task 9: Hợp đồng cọc và hợp đồng thuê
+### Task 9: Hợp đồng cọc và hợp đồng thuê ✅
 
 **Files:**
 - Create: `src/db/schema/contracts.ts`, `src/server/contracts/{service.ts,actions.ts}`, `src/app/(app)/contracts/page.tsx`, `new/page.tsx`, `[id]/page.tsx`, `src/features/contracts/components/{deposit-form.tsx,lease-wizard.tsx,contract-summary.tsx,sign-status.tsx,export-menu.tsx}`, `scripts/seed/contracts.ts`
@@ -123,13 +123,13 @@ tests/helpers/db.ts  tests/unit/**  tests/integration/**  tests/e2e/**
   - `setSignStatus(kind, id, status, signedFileId?)`, `exportContract(kind, id, templateId?)`.
   - Cảnh báo (vẫn cho lưu): ngày vào ở dự kiến của cọc chờ trước ngày kết thúc của lease hiện tại.
   - Nối `roomStatus` vào sơ đồ phòng.
-- [ ] **Step 1:** Viết test.
+- [x] **Step 1:** Viết test.
   - Tạo cọc cho phòng trống → phòng thành `deposited`; tạo cọc thứ hai cho cùng phòng → lỗi.
   - Chuyển cọc thành lease → phòng thành `occupied`, sổ cọc có dòng `collect`.
   - Tạo lease chồng ngày → lỗi.
   - Người của cơ sở khác `getLease` → `NotFoundError`.
-- [ ] **Step 2:** Chạy → FAIL.
-- [ ] **Step 3:** Cài đặt.
+- [x] **Step 2:** Chạy → FAIL.
+- [x] **Step 3:** Cài đặt.
   - **Danh sách hợp đồng**, lọc: đang hiệu lực / sắp hết hạn / chưa ký / đã kết thúc / cọc chờ.
   - **Wizard tạo hợp đồng thuê:**
     1. Bên thuê & người ở.
@@ -140,10 +140,10 @@ tests/helpers/db.ts  tests/unit/**  tests/integration/**  tests/e2e/**
   - **Trang hợp đồng**, các tab: Tổng quan · Phụ lục · Bàn giao · Hoá đơn · Sổ cọc · Giấy tờ.
   - Dải trạng thái ký: Nháp → Đã xuất → Đã ký, kèm tải lên bản đã ký.
   - Trang phòng và trang khách hiện hợp đồng hiện tại.
-- [ ] **Step 4:** Chạy → PASS.
-- [ ] **Step 5:** Commit `feat: hợp đồng cọc, hợp đồng thuê, trạng thái ký, sổ cọc`.
+- [x] **Step 4:** Chạy → PASS.
+- [x] **Step 5:** Commit `feat: hợp đồng cọc, hợp đồng thuê, trạng thái ký, sổ cọc`.
 
-### Task 10: Tài sản và kho
+### Task 10: Tài sản và kho ✅
 
 **Files:**
 - Create: `src/db/schema/assets.ts`, `src/server/assets/{service.ts,actions.ts}`, `src/app/(app)/assets/page.tsx`, `[id]/page.tsx`, `src/features/assets/components/{asset-table.tsx,move-dialog.tsx,asset-form.tsx,location-tree.tsx}`, `scripts/seed/assets.ts`
@@ -155,17 +155,17 @@ tests/helpers/db.ts  tests/unit/**  tests/integration/**  tests/e2e/**
   - `asset_moves(asset_id, from_kind, from_id, to_kind, to_id, moved_at, moved_by, reason)`
   - Mỗi tài sản là một món có mã *(Claude quyết)*, để biên bản bàn giao liệt kê được từng món.
 - Produces: `listAssets(db, ctx, { facilityId?, location?, q?, status? })`, `getAsset`, `createAsset`, `updateAsset`, `moveAssets(db, ctx, assetIds, to, reason)` (ghi một `asset_moves` cho mỗi món), `assetHistory(id)` (gồm di chuyển, bàn giao, sự cố), `setAssetStatus`. Cần quyền `assets`.
-- [ ] **Step 1:** Test: chuyển 2 món từ kho sang phòng 301 → vị trí đổi và có 2 dòng lịch sử; người của cơ sở khác → `NotFoundError`; chuyển sang phòng thuộc cơ sở khác → `ValidationError`.
-- [ ] **Step 2:** Chạy → FAIL.
-- [ ] **Step 3:** Cài đặt UI:
+- [x] **Step 1:** Test: chuyển 2 món từ kho sang phòng 301 → vị trí đổi và có 2 dòng lịch sử; người của cơ sở khác → `NotFoundError`; chuyển sang phòng thuộc cơ sở khác → `ValidationError`.
+- [x] **Step 2:** Chạy → FAIL.
+- [x] **Step 3:** Cài đặt UI:
   - Bên trái là cây vị trí (Cơ sở → Kho / Khu chung / Phòng), bên phải là bảng tài sản.
   - Tick nhiều món thì hiện thanh nổi "Chuyển N tài sản".
   - Trên điện thoại: chọn món → Chuyển → chọn nơi đến.
   - Trang phòng hiện danh sách tài sản trong phòng.
-- [ ] **Step 4:** Chạy → PASS.
-- [ ] **Step 5:** Commit `feat: tài sản và kho, chuyển nhanh, lịch sử`.
+- [x] **Step 4:** Chạy → PASS.
+- [x] **Step 5:** Commit `feat: tài sản và kho, chuyển nhanh, lịch sử`.
 
-### Task 11: Điện nước
+### Task 11: Điện nước ✅
 
 **Files:**
 - Create: `src/db/schema/meters.ts`, `src/server/meters/{service.ts,actions.ts}`, `src/app/(app)/meters/page.tsx`, `src/features/meters/components/{reading-grid.tsx,replace-meter-dialog.tsx,meter-history.tsx}`, `scripts/seed/meters.ts`
@@ -178,17 +178,17 @@ tests/helpers/db.ts  tests/unit/**  tests/integration/**  tests/e2e/**
   - `saveReadings(db, ctx, period, rows)`: kiểm bằng `meterUsage`, trả lỗi theo từng dòng và vẫn lưu các dòng hợp lệ.
   - `replaceMeter(db, ctx, roomId, utility, { removedOn, finalReading, newSerial?, startReading })`.
   - Cần quyền `meters`.
-- [ ] **Step 1:** Test: chỉ số nhỏ hơn kỳ trước → dòng đó bị lỗi, các dòng khác vẫn lưu; thay đồng hồ (cũ cuối 1260, mới đầu 0, rồi nhập 45) → tiêu thụ 105.
-- [ ] **Step 2:** Chạy → FAIL.
-- [ ] **Step 3:** Cài đặt UI:
+- [x] **Step 1:** Test: chỉ số nhỏ hơn kỳ trước → dòng đó bị lỗi, các dòng khác vẫn lưu; thay đồng hồ (cũ cuối 1260, mới đầu 0, rồi nhập 45) → tiêu thụ 105.
+- [x] **Step 2:** Chạy → FAIL.
+- [x] **Step 3:** Cài đặt UI:
   - Lưới nhập nhanh, trên điện thoại hiện bàn phím số; Enter chuyển sang ô kế tiếp.
   - Cảnh báo tiêu thụ bất thường (> 2× trung bình 3 kỳ).
   - Hiện tiến độ "Đã ghi 12/16 phòng".
   - Trang phòng hiện lịch sử đồng hồ và chỉ số.
-- [ ] **Step 4:** Chạy → PASS.
-- [ ] **Step 5:** Commit `feat: ghi chỉ số điện nước, thay đồng hồ`.
+- [x] **Step 4:** Chạy → PASS.
+- [x] **Step 5:** Commit `feat: ghi chỉ số điện nước, thay đồng hồ`.
 
-### Task 12: Bàn giao check-in / check-out
+### Task 12: Bàn giao check-in / check-out ✅
 
 **Files:**
 - Create: `src/db/schema/handovers.ts`, `src/server/handovers/{service.ts,actions.ts}`, `src/app/(app)/handovers/[id]/page.tsx`, `src/features/handovers/components/{handover-form.tsx,asset-condition-row.tsx}`, `scripts/seed/handovers.ts`
@@ -201,11 +201,11 @@ tests/helpers/db.ts  tests/unit/**  tests/integration/**  tests/e2e/**
   - `saveHandover(db, ctx, id, { items, meterReadings })`: chỉ số đồng hồ được ghi thành `meter_readings`.
   - `completeHandover(id)`, `exportHandover(id, templateId?)`.
   - Check-out: món mất thì phạt gợi ý = giá trị tài sản.
-- [ ] **Step 1:** Test: check-in có đúng các tài sản trong phòng; check-out sao đúng danh sách; đánh dấu 1 món hư với phạt 500.000 → tổng phạt 500.000; chỉ số nhập ở bàn giao xuất hiện trong lịch sử đồng hồ.
-- [ ] **Step 2:** Chạy → FAIL.
-- [ ] **Step 3:** Cài đặt UI: danh sách dọc, nút to dễ bấm trên điện thoại; mỗi món chọn Tốt / Trầy xước / Hư, có ghi chú và chụp ảnh; check-out hiện cạnh tình trạng lúc check-in để so sánh.
-- [ ] **Step 4:** Chạy → PASS.
-- [ ] **Step 5:** Commit `feat: biên bản bàn giao check-in, check-out`.
+- [x] **Step 1:** Test: check-in có đúng các tài sản trong phòng; check-out sao đúng danh sách; đánh dấu 1 món hư với phạt 500.000 → tổng phạt 500.000; chỉ số nhập ở bàn giao xuất hiện trong lịch sử đồng hồ.
+- [x] **Step 2:** Chạy → FAIL.
+- [x] **Step 3:** Cài đặt UI: danh sách dọc, nút to dễ bấm trên điện thoại; mỗi món chọn Tốt / Trầy xước / Hư, có ghi chú và chụp ảnh; check-out hiện cạnh tình trạng lúc check-in để so sánh.
+- [x] **Step 4:** Chạy → PASS.
+- [x] **Step 5:** Commit `feat: biên bản bàn giao check-in, check-out`.
 
 ### Điểm dừng đợt 2: người dùng test
 

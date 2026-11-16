@@ -74,7 +74,7 @@ tests/helpers/db.ts  tests/unit/**  tests/integration/**  tests/e2e/**
 
 ---
 
-### Task 4: Lõi tính tiền (hàm thuần)
+### Task 4: Lõi tính tiền (hàm thuần) ✅
 
 **Files:**
 - Create: `src/domain/{proration,meters,rates,due-date,contract-terms,adjustments,invoice-builder,deposit,liquidation}.ts`, `src/domain/types.ts` (kiểu đầu vào thuần, không phụ thuộc Drizzle)
@@ -109,7 +109,7 @@ tests/helpers/db.ts  tests/unit/**  tests/integration/**  tests/e2e/**
     - Tiền phòng đã trả trước vượt `endDate` → thành dòng hoàn (âm).
     - Dòng trừ cọc = −(số dư cọc − phần mất cọc).
 
-- [ ] **Step 1: Viết test (giá trị lấy từ spec)**
+- [x] **Step 1: Viết test (giá trị lấy từ spec)**
 
 ```ts
 expect(prorate(9_000_000,'2026-10-15','2026-10-31','actual_days')).toEqual({ coefficient: 0.5484, amount: 4_935_484 })
@@ -131,8 +131,8 @@ expect(computeDueDate({kind:'day_of_next_month',day:31},'2027-01-20')).toBe('202
 //   không mất cọc → total -11_080_000; mất cọc toàn bộ → total -2_080_000
 ```
 
-- [ ] **Step 2:** Chạy → FAIL. **Step 3:** Cài đặt. **Step 4:** Chạy → PASS.
-- [ ] **Step 5:** Commit `feat(domain): lõi tính tiền — lẻ ngày, điện nước, điều chỉnh, sổ cọc, thanh lý`.
+- [x] **Step 2:** Chạy → FAIL. **Step 3:** Cài đặt. **Step 4:** Chạy → PASS.
+- [x] **Step 5:** Commit `feat(domain): lõi tính tiền — lẻ ngày, điện nước, điều chỉnh, sổ cọc, thanh lý`.
 
 ### Task 13: Phí phát sinh theo lần
 

@@ -74,7 +74,7 @@ tests/helpers/db.ts  tests/unit/**  tests/integration/**  tests/e2e/**
 
 ---
 
-### Task 1: Khởi tạo dự án, kết nối Supabase, hạ tầng test
+### Task 1: Khởi tạo dự án, kết nối Supabase, hạ tầng test ✅
 
 **Files:**
 - Create: dự án Next.js ở thư mục gốc (giữ `README.md`, `docs/`), `drizzle.config.ts`, `vitest.config.ts`, `playwright.config.ts`, `.env.example`, `src/db/client.ts`, `src/lib/supabase/{server.ts,admin.ts,client.ts}`, `src/components/app-shell/{sidebar.tsx,topbar.tsx,demo-banner.tsx,nav.ts}`, `src/app/(app)/layout.tsx`, `src/app/not-found.tsx`, `tests/helpers/db.ts`, `tests/unit/smoke.test.ts`, `scripts/seed/index.ts`
@@ -82,14 +82,14 @@ tests/helpers/db.ts  tests/unit/**  tests/integration/**  tests/e2e/**
 **Interfaces:**
 - Produces: `db` và `type DB` (`src/db/client.ts`); `createTestDb(): Promise<DB>` (PGlite mới, đã chạy mọi migration); `NAV_ITEMS: { href; label; icon; requires?: Permission }[]` — Nhắc việc `/`, Cơ sở & phòng `/facilities`, Khách thuê `/tenants` (tenants_contracts), Hợp đồng `/contracts` (tenants_contracts), Điện nước `/meters` (meters), Hoá đơn `/invoices` (billing), Tài sản `/assets` (assets), Sự cố `/incidents` (incidents); và cho `settings`: Người dùng `/users`, Mẫu giấy tờ `/templates`, Nhập dữ liệu `/import`, Cài đặt `/settings`, Nhật ký `/audit`.
 
-- [ ] **Step 1:** Chạy `npx create-next-app@latest . --ts --tailwind --eslint --app --src-dir --import-alias "@/*" --use-npm --yes`. Nếu báo thư mục không trống thì tạo ở thư mục tạm rồi chép vào, giữ `README.md` và `docs/`. Cài `drizzle-orm postgres zod react-hook-form @hookform/resolvers @supabase/ssr @supabase/supabase-js lucide-react`, dev `drizzle-kit vitest vite-tsconfig-paths @electric-sql/pglite @playwright/test tsx`. Chạy `npx shadcn@latest init --yes` rồi thêm button, input, select, checkbox, dialog, sheet, table, tabs, badge, card, dropdown-menu, sonner, form, textarea, popover, calendar, command.
-- [ ] **Step 2:** `.env.example` gồm `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_DEMO_MODE`, `DEMO_PASSWORD`, `STORAGE_DRIVER` (`supabase`|`r2`), `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `GOTENBERG_URL`. Scripts trong package.json: `db:generate`, `db:migrate`, `db:seed`, `test`, `test:e2e`.
-- [ ] **Step 3:** Khung giao diện: font Be Vietnam Pro (next/font, subset `vietnamese`), thanh bên trái thu thành menu trượt khi màn hình dưới 768px, thanh trên có bộ chọn cơ sở và tên người dùng, `demo-banner` khi bật demo mode.
-- [ ] **Step 4:** Viết `smoke.test.ts`: `createTestDb()` rồi `select 1` phải trả 1. Chạy `npm test` → PASS. Chạy `npm run build` → OK.
-- [ ] **Step 5:** README ghi cách tạo project Supabase Free, điền `.env.local`, chạy migrate và seed, chạy dev.
-- [ ] **Step 6:** Commit `chore: khởi tạo Next.js, Supabase, Drizzle, Vitest + PGlite, khung giao diện`.
+- [x] **Step 1:** Chạy `npx create-next-app@latest . --ts --tailwind --eslint --app --src-dir --import-alias "@/*" --use-npm --yes`. Nếu báo thư mục không trống thì tạo ở thư mục tạm rồi chép vào, giữ `README.md` và `docs/`. Cài `drizzle-orm postgres zod react-hook-form @hookform/resolvers @supabase/ssr @supabase/supabase-js lucide-react`, dev `drizzle-kit vitest vite-tsconfig-paths @electric-sql/pglite @playwright/test tsx`. Chạy `npx shadcn@latest init --yes` rồi thêm button, input, select, checkbox, dialog, sheet, table, tabs, badge, card, dropdown-menu, sonner, form, textarea, popover, calendar, command.
+- [x] **Step 2:** `.env.example` gồm `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_DEMO_MODE`, `DEMO_PASSWORD`, `STORAGE_DRIVER` (`supabase`|`r2`), `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `GOTENBERG_URL`. Scripts trong package.json: `db:generate`, `db:migrate`, `db:seed`, `test`, `test:e2e`.
+- [x] **Step 3:** Khung giao diện: font Be Vietnam Pro (next/font, subset `vietnamese`), thanh bên trái thu thành menu trượt khi màn hình dưới 768px, thanh trên có bộ chọn cơ sở và tên người dùng, `demo-banner` khi bật demo mode.
+- [x] **Step 4:** Viết `smoke.test.ts`: `createTestDb()` rồi `select 1` phải trả 1. Chạy `npm test` → PASS. Chạy `npm run build` → OK.
+- [x] **Step 5:** README ghi cách tạo project Supabase Free, điền `.env.local`, chạy migrate và seed, chạy dev.
+- [x] **Step 6:** Commit `chore: khởi tạo Next.js, Supabase, Drizzle, Vitest + PGlite, khung giao diện`.
 
-### Task 2: Tiện ích dữ liệu
+### Task 2: Tiện ích dữ liệu ✅
 
 **Files:**
 - Create: `src/domain/{phone,dates,text,money,errors}.ts`, `src/lib/action-result.ts`
@@ -98,7 +98,7 @@ tests/helpers/db.ts  tests/unit/**  tests/integration/**  tests/e2e/**
 **Interfaces:**
 - Produces: `normalizePhone(input): string | null`, `todayVN(now?)`, `parseFlexibleDate(input: string|number|Date|null|undefined): string | null`, `formatDateVN(iso)`, `addDays(iso, n)`, `diffDays(a, b)`, `daysInMonth('YYYY-MM')`, `removeDiacritics(s)`, `buildSearchText(parts)`, `formatVND(n)`, `numberToVietnameseWords(n)`; `NotFoundError`, `ForbiddenError`, `ValidationError(message, fieldErrors?)`; `toActionResult(fn)` chuyển các lỗi trên thành `ActionResult`.
 
-- [ ] **Step 1: Viết test**
+- [x] **Step 1: Viết test**
 
 ```ts
 expect(normalizePhone('0901 234 567')).toBe('+84901234567')
@@ -118,12 +118,12 @@ expect(numberToVietnameseWords(1500000)).toBe('Một triệu năm trăm nghìn �
 expect(numberToVietnameseWords(2005000)).toBe('Hai triệu không trăm linh năm nghìn đồng')
 ```
 
-- [ ] **Step 2:** Chạy → FAIL.
-- [ ] **Step 3:** Cài đặt. Lưu ý: chuỗi có `/` luôn đọc là `d/m/yyyy`; ngày dạng số của Excel tính từ mốc 1899-12-30; `todayVN` dùng `Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })`.
-- [ ] **Step 4:** Chạy → PASS.
-- [ ] **Step 5:** Commit `feat(domain): điện thoại, ngày VN, tìm không dấu, tiền bằng chữ`.
+- [x] **Step 2:** Chạy → FAIL.
+- [x] **Step 3:** Cài đặt. Lưu ý: chuỗi có `/` luôn đọc là `d/m/yyyy`; ngày dạng số của Excel tính từ mốc 1899-12-30; `todayVN` dùng `Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })`.
+- [x] **Step 4:** Chạy → PASS.
+- [x] **Step 5:** Commit `feat(domain): điện thoại, ngày VN, tìm không dấu, tiền bằng chữ`.
 
-### Task 3: Đăng nhập, người dùng, phân quyền, nhật ký
+### Task 3: Đăng nhập, người dùng, phân quyền, nhật ký ✅
 
 **Files:**
 - Create: `src/db/schema/users.ts`, `src/db/schema/audit.ts`, `src/domain/access.ts`, `src/server/session.ts`, `src/server/audit.ts`, `src/server/users/{service.ts,actions.ts}`, `src/middleware.ts`, `src/app/login/page.tsx`, `src/app/(app)/users/page.tsx`, `src/app/(app)/audit/page.tsx`, `src/features/users/components/{user-table.tsx,user-sheet.tsx}`, `src/components/require-permission.tsx`, `scripts/seed/users.ts`
@@ -139,19 +139,19 @@ expect(numberToVietnameseWords(2005000)).toBe('Hai triệu không trăm linh nă
   - Service users: `listUsers`, `createUser(db, ctx, { email, fullName, facilityIds, permissions })` (tạo auth user bằng service role với mật khẩu tạm ngẫu nhiên, trả về một lần), `updateUserAccess(db, ctx, id, { fullName, facilityIds, permissions, isActive })`, `resetPassword`. Chỉ `settings`. Admin không tự gỡ `settings` hay tự khoá mình: lỗi "Không thể tự gỡ quyền quản trị của chính bạn".
   - Seed: 5 tài khoản mẫu với mật khẩu `DEMO_PASSWORD`. Ở demo mode, trang đăng nhập có 5 nút đăng nhập nhanh (server action đăng nhập bằng `DEMO_PASSWORD`).
 
-- [ ] **Step 1:** Viết test.
+- [x] **Step 1:** Viết test.
   - `access.test.ts`: ctx có `meters` tại A → `can(meters, A)` true, `can(meters, B)` false, `can(billing, A)` false; ctx có `settings` → mọi `can` true và scope là `'all'`; `assertCan` sai cơ sở → `NotFoundError`, thiếu quyền → `ForbiddenError`.
   - `users.test.ts` (PGlite, mock admin client): `updateUserAccess` thay toàn bộ cơ sở và quyền; ctx không phải admin → `ForbiddenError`; admin tự gỡ `settings` → lỗi; có dòng audit; `is_active=false` → `loadAccessContext` trả null.
-- [ ] **Step 2:** Chạy → FAIL.
-- [ ] **Step 3:** Cài đặt.
+- [x] **Step 2:** Chạy → FAIL.
+- [x] **Step 3:** Cài đặt.
   - Middleware làm mới phiên.
   - Menu lọc theo `can`.
   - Trang Người dùng: bảng gồm tên, email, cơ sở, quyền (badge), trạng thái. Sheet có 2 nhóm checkbox "Cơ sở được truy cập" và "Nhóm quyền", mỗi quyền kèm mô tả một dòng; tick Cài đặt thì hiện "Thấy mọi cơ sở".
   - Trang Nhật ký: bảng lọc theo người, theo đối tượng.
-- [ ] **Step 4:** Chạy → PASS.
-- [ ] **Step 5:** Commit `feat(auth): đăng nhập, phân quyền theo cơ sở + nhóm quyền, người dùng, nhật ký`.
+- [x] **Step 4:** Chạy → PASS.
+- [x] **Step 5:** Commit `feat(auth): đăng nhập, phân quyền theo cơ sở + nhóm quyền, người dùng, nhật ký`.
 
-### Task 5: Cơ sở, phòng, cài đặt, loại phí, đơn giá
+### Task 5: Cơ sở, phòng, cài đặt, loại phí, đơn giá ✅
 
 **Files:**
 - Create: `src/db/schema/{facilities,settings,fees}.ts`, `src/domain/room-status.ts`, `src/server/{facilities,rooms,settings,fees}/{service.ts,actions.ts}`, `src/app/(app)/facilities/page.tsx`, `src/app/(app)/facilities/[id]/page.tsx`, `src/app/(app)/rooms/[id]/page.tsx`, `src/app/(app)/settings/page.tsx`, `src/features/rooms/components/{room-map.tsx,room-sheet.tsx,bulk-rooms-dialog.tsx}`, `src/features/settings/components/*`, `scripts/seed/{facilities,settings}.ts`
@@ -171,15 +171,15 @@ expect(numberToVietnameseWords(2005000)).toBe('Hai triệu không trăm linh nă
   - `roomStatus(room, activeLease?, pendingDeposit?, today, contractWarningDays)` → `'vacant'|'deposited'|'occupied'|'ending_soon'|'occupied_with_next'` (Trống / Đã cọc / Đang ở / Sắp trả / Đang ở · có cọc chờ). Hợp đồng được truyền vào từ Task 9; trước đó trạng thái là Trống.
   - Phí và đơn giá: `listFeeTypes`, `createFeeType`, `updateFeeType`, `archiveFeeType`, `listFeeUnits`, `createFeeUnit`, `listRates(facilityId)`, `createRate`.
 
-- [ ] **Step 1:** Viết test.
+- [x] **Step 1:** Viết test.
   - Người chỉ được giao A → chỉ thấy A; `getRoom` của B → `NotFoundError`.
   - Người không có `settings` tạo phòng → `ForbiddenError`.
   - Trùng mã phòng → "Mã phòng đã tồn tại trong cơ sở này".
   - `createRoomsBulk` 301–305 khi đã có 303 → `created 4, skipped ['303']`.
   - `updateSettings` với 0 hoặc 400 → lỗi.
   - `roomStatus` đúng cho cả 5 trạng thái.
-- [ ] **Step 2:** Chạy → FAIL.
-- [ ] **Step 3:** Cài đặt.
+- [x] **Step 2:** Chạy → FAIL.
+- [x] **Step 3:** Cài đặt.
   - **Trang cơ sở:** dải số liệu (tổng phòng, đang ở, trống, đã cọc, sắp trả) và **sơ đồ phòng theo tầng** (ô màu theo trạng thái, có lọc trạng thái). Nút "Thêm phòng" và "Tạo nhanh nhiều phòng" mở Sheet.
   - **Trang phòng:** thông tin phòng. Các khu hợp đồng, tài sản, điện nước, sự cố để chỗ sẵn, các task sau điền vào.
   - **Trang cài đặt (tabs):**
@@ -187,10 +187,10 @@ expect(numberToVietnameseWords(2005000)).toBe('Hai triệu không trăm linh nă
     - *Cơ sở:* thêm/sửa cơ sở, ngày tạo hoá đơn dự kiến.
     - *Đơn vị & loại phí.*
     - *Đơn giá điện nước:* lịch sử theo cơ sở, thêm mức mới kèm ngày hiệu lực.
-- [ ] **Step 4:** Chạy → PASS. Chạy `db:migrate` và `db:seed` lên Supabase dev, mở trang kiểm tra bằng tài khoản Admin.
-- [ ] **Step 5:** Commit `feat: cơ sở, sơ đồ phòng, cài đặt, loại phí, đơn giá`.
+- [x] **Step 4:** Chạy → PASS. Chạy `db:migrate` và `db:seed` lên Supabase dev, mở trang kiểm tra bằng tài khoản Admin.
+- [x] **Step 5:** Commit `feat: cơ sở, sơ đồ phòng, cài đặt, loại phí, đơn giá`.
 
-### Task 6: Lưu file
+### Task 6: Lưu file ✅
 
 **Files:**
 - Create: `src/server/storage/{types.ts,supabase.ts,r2.ts,memory.ts,index.ts}`, `src/db/schema/files.ts`, `src/app/api/files/[id]/route.ts`, `src/lib/image.ts`, `src/components/file-upload.tsx`
@@ -204,11 +204,11 @@ expect(numberToVietnameseWords(2005000)).toBe('Hai triệu không trăm linh nă
   - `fileAccessPermission(ownerType)`: `tenant_document` → tenants_contracts; `handover_photo` → tenants_contracts; `incident_photo` → incidents; `signed_contract` → tenants_contracts; `template` → settings; `export` → theo đối tượng gốc.
   - Route `GET /api/files/[id]?thumb=1`: kiểm quyền theo owner và cơ sở, rồi chuyển hướng 302 sang URL ký có hạn 5 phút.
   - `compressImage(file): Promise<{ main: Blob; thumb: Blob }>`; `<FileUpload ownerType ownerId accept capture multiple onUploaded>`.
-- [ ] **Step 1:** Viết test (memory adapter): người có quyền tải lên và xác nhận → có bản ghi; người khác cơ sở → `NotFoundError`; thiếu quyền → `ForbiddenError`; xoá → adapter `delete` được gọi cho cả file chính và thumbnail.
-- [ ] **Step 2:** Chạy → FAIL. **Step 3:** Cài đặt. **Step 4:** Chạy → PASS.
-- [ ] **Step 5:** Commit `feat(storage): lưu file qua adapter, nén ảnh, URL ký có kiểm quyền`.
+- [x] **Step 1:** Viết test (memory adapter): người có quyền tải lên và xác nhận → có bản ghi; người khác cơ sở → `NotFoundError`; thiếu quyền → `ForbiddenError`; xoá → adapter `delete` được gọi cho cả file chính và thumbnail.
+- [x] **Step 2:** Chạy → FAIL. **Step 3:** Cài đặt. **Step 4:** Chạy → PASS.
+- [x] **Step 5:** Commit `feat(storage): lưu file qua adapter, nén ảnh, URL ký có kiểm quyền`.
 
-### Task 7: Khách thuê
+### Task 7: Khách thuê ✅
 
 **Files:**
 - Create: `src/db/schema/tenants.ts`, `src/server/tenants/{schemas.ts,service.ts,actions.ts}`, `src/app/(app)/tenants/page.tsx`, `src/app/(app)/tenants/[id]/page.tsx`, `src/app/(app)/tenants/new/page.tsx`, `src/features/tenants/components/{tenant-form.tsx,tenant-table.tsx,tenant-documents.tsx}`, `scripts/seed/tenants.ts`
@@ -226,20 +226,20 @@ expect(numberToVietnameseWords(2005000)).toBe('Hai triệu không trăm linh nă
   - Lỗi trùng: "Số điện thoại đã thuộc về khách khác", "Số passport đã tồn tại", "Số CCCD đã tồn tại", "Mã số thuế đã tồn tại".
   - `searchTenants(db, ctx, { q?, kind?, facilityId?, limit, offset })`, `getTenant`, `displayName(t)`.
   - Ảnh giấy tờ dùng `ownerType = 'tenant_document'`.
-- [ ] **Step 1:** Viết test.
+- [x] **Step 1:** Viết test.
   - `0901 234 567` được lưu thành `+84901234567`; khách thứ hai nhập `+84 90 123 4567` → lỗi trùng.
   - Tìm `nguyen van an` hoặc `NGUYEN` ra "Nguyễn Văn An"; tìm theo đuôi passport cũng ra.
   - Khách nước ngoài thiếu passport → `fieldErrors.passportNumber`.
   - Người chỉ được giao cơ sở A không tìm thấy khách của B, và `getTenant` khách của B → `NotFoundError`.
-- [ ] **Step 2:** Chạy → FAIL.
-- [ ] **Step 3:** Cài đặt.
+- [x] **Step 2:** Chạy → FAIL.
+- [x] **Step 3:** Cài đặt.
   - **Bảng khách:** tên, loại, SĐT, giấy tờ, cơ sở, phòng đang ở, visa còn N ngày (đỏ khi ≤7, cam khi ≤ ngưỡng). Tìm kiếm có debounce, lọc theo loại và cơ sở.
   - **Form:** chọn loại khách trước (3 nút lớn) rồi mới hiện các trường tương ứng. Dưới ô SĐT hiện "Sẽ lưu: +84 90 123 4567".
   - **Trang chi tiết:** thông tin theo loại khách; ảnh giấy tờ (chụp hoặc tải lên, bấm để xem lớn); các khu hợp đồng và công nợ để chỗ sẵn cho task sau.
-- [ ] **Step 4:** Chạy → PASS.
-- [ ] **Step 5:** Commit `feat: khách thuê 3 loại, tìm không dấu, ảnh giấy tờ`.
+- [x] **Step 4:** Chạy → PASS.
+- [x] **Step 5:** Commit `feat: khách thuê 3 loại, tìm không dấu, ảnh giấy tờ`.
 
-### Task 7b: Trang nhắc việc (bản đầu — visa)
+### Task 7b: Trang nhắc việc (bản đầu — visa) ✅
 
 **Files:**
 - Create: `src/domain/reminders.ts`, `src/server/dashboard/service.ts`, `src/app/(app)/page.tsx`, `src/features/dashboard/components/{reminder-card.tsx,stat-strip.tsx}`
@@ -248,9 +248,9 @@ expect(numberToVietnameseWords(2005000)).toBe('Hai triệu không trăm linh nă
 **Interfaces:**
 - Produces: `Reminder { kind; title; count; items: { label; sub; href; severity: 'danger'|'warning'|'info' }[] }`; `buildReminders(snapshot, ctx, today, settings): Reminder[]` — đợt này chỉ có loại `visa_expiring` (tenants_contracts, lọc theo cơ sở): `visa_expiry ≤ today + visaWarningDays`, gồm cả đã hết hạn, sắp xếp tăng dần; các đợt sau thêm loại mới vào cùng hàm (Task 17). `getDashboard(db, ctx)`.
 
-- [ ] **Step 1:** Test với `today='2026-11-16'`, ngưỡng 30: visa còn 0 / −6 / 30 ngày có mặt, 31 ngày không; người không có `tenants_contracts` → không có thẻ; người chỉ cơ sở A không thấy khách B; đổi ngưỡng 60 → visa còn 55 ngày xuất hiện.
-- [ ] **Step 2:** Chạy → FAIL. **Step 3:** Cài đặt UI: dải số liệu (tổng phòng, số khách, số visa sắp hết), thẻ "Visa sắp hết hạn" tối đa 8 dòng + "Xem tất cả" (danh sách khách lọc sẵn); badge đỏ "Đã hết hạn" khi đã quá, cam khi ≤ 7 ngày. **Step 4:** Chạy → PASS.
-- [ ] **Step 5:** Commit `feat: trang nhắc việc — visa sắp hết hạn`.
+- [x] **Step 1:** Test với `today='2026-11-16'`, ngưỡng 30: visa còn 0 / −6 / 30 ngày có mặt, 31 ngày không; người không có `tenants_contracts` → không có thẻ; người chỉ cơ sở A không thấy khách B; đổi ngưỡng 60 → visa còn 55 ngày xuất hiện.
+- [x] **Step 2:** Chạy → FAIL. **Step 3:** Cài đặt UI: dải số liệu (tổng phòng, số khách, số visa sắp hết), thẻ "Visa sắp hết hạn" tối đa 8 dòng + "Xem tất cả" (danh sách khách lọc sẵn); badge đỏ "Đã hết hạn" khi đã quá, cam khi ≤ 7 ngày. **Step 4:** Chạy → PASS.
+- [x] **Step 5:** Commit `feat: trang nhắc việc — visa sắp hết hạn`.
 
 ### Điểm dừng đợt 1: người dùng test
 
