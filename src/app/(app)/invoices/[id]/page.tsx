@@ -5,6 +5,7 @@ import { db } from '@/db/client'
 import { NotFoundError } from '@/domain/errors'
 import { formatDateVN, todayVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
+import { InvoiceFeeQuantities } from '@/features/invoices/components/invoice-fee-quantities'
 import { InvoiceEditor } from '@/features/invoices/components/invoice-editor'
 import { InvoiceExport } from '@/features/invoices/components/invoice-export'
 import { InvoiceStatus } from '@/features/invoices/components/invoice-status'
@@ -95,6 +96,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
+      {inv.status === 'draft' && <InvoiceFeeQuantities key={inv.updatedAt.toISOString()} invoiceId={id} fees={d.periodFees} />}
       <InvoiceEditor
         key={inv.updatedAt.toISOString()}
         id={id}

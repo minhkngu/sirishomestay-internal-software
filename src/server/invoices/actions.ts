@@ -6,7 +6,7 @@ import type { DueRule, Proration } from '@/domain/types'
 import { toActionResult } from '@/lib/action-result'
 import { getAccessContext } from '@/server/session'
 import { getStorage } from '@/server/storage'
-import { addPayment, approveInvoice, createDrafts, deleteInvoice, exportReceipt, previewBatch, removePayment, setPeriod, updateLines } from './service'
+import { saveInvoiceFeeQuantities, addPayment, approveInvoice, createDrafts, deleteInvoice, exportReceipt, previewBatch, removePayment, setPeriod, updateLines } from './service'
 
 const refresh = () => { revalidatePath('/invoices', 'layout'); revalidatePath('/contracts', 'layout') }
 export async function previewBatchAction(input: { facilityId: string; period: string }) {
@@ -44,4 +44,9 @@ export async function removePaymentAction(paymentId: string) {
 export async function exportReceiptAction(paymentId: string, templateId?: string) {
   const ctx = await getAccessContext()
   return toActionResult(() => exportReceipt(db, ctx, getStorage(), paymentId, templateId, 'pdf'))
+}
+
+export async function saveInvoiceFeeQuantitiesAction(id: string, quantities: Array<{ leaseFeeId: string; quantity: number }>) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => { await saveInvoiceFeeQuantities(db, ctx, id, quantities); refresh(); return {} })
 }

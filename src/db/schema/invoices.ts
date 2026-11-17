@@ -1,5 +1,5 @@
-import { bigint, boolean, date, index, jsonb, numeric, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
-import { leases } from './contracts'
+import { bigint, boolean, date, index, integer, jsonb, numeric, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core'
+import { leaseFeeSnapshots, leases } from './contracts'
 import { facilities } from './facilities'
 
 export const invoices = pgTable('invoices', {
@@ -20,3 +20,9 @@ export const payments = pgTable('payments', {
   method: text('method').notNull(), receivedBy: uuid('received_by').notNull(), note: text('note').notNull().default(''), isDemo: boolean('is_demo').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [index('payments_invoice_idx').on(t.invoiceId)])
+
+export const invoiceFeeQuantities = pgTable('invoice_fee_quantities', {
+  invoiceId: uuid('invoice_id').notNull().references(() => invoices.id, { onDelete: 'cascade' }),
+  leaseFeeId: uuid('lease_fee_id').notNull().references(() => leaseFeeSnapshots.id),
+  quantity: integer('quantity').notNull(),
+}, t => [unique('invoice_fee_quantity_unique').on(t.invoiceId, t.leaseFeeId)]).enableRLS()

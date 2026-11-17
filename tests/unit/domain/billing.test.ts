@@ -372,3 +372,32 @@ it('hóa đơn trong tháng thanh lý chỉ tính đến ngày thanh lý', () =>
   const result = buildMonthlyInvoice({ lease: lease(), addenda: [termination], facilityId: 'TD', period: '2026-11', proration: 'days_30', meters: [], readings: [], rates: [], oneOffs: [], pending: [] })
   expect(result.lines.filter(line => line.type === 'rent').reduce((sum, line) => sum + line.amount, 0)).toBe(6_000_000)
 })
+
+describe('phí snapshot trong hóa đơn', () => {
+  const input = {
+    lease: lease({ feeModel: 'snapshot', occupantIds: ['a', 'b'], fees: [
+      fee({ feeTypeId: null, leaseFeeId: 'a', name: 'A', unit: 'người', quantitySource: 'occupants', unitPrice: 10_000 }),
+      fee({ feeTypeId: null, leaseFeeId: 'b', name: 'B', unit: 'phòng', quantitySource: 'room', unitPrice: 30_000 }),
+      fee({ feeTypeId: null, leaseFeeId: 'c', name: 'C', unit: 'm³', quantitySource: 'meter', unitPrice: 5_000 }),
+      fee({ feeTypeId: null, leaseFeeId: 'd', name: 'D', unit: 'lần', quantitySource: 'period_input', unitPrice: 7_000 }),
+    ] }), addenda: [], facilityId: 'TD', period: '2026-11', proration: 'actual_days' as const,
+    meters: [{ id: 'mc', roomId: 'R1', utility: 'water' as const, installedOn: '2026-01-01', startReading: 100 }],
+    readings: [{ meterId: 'mc', period: '2026-10', readOn: '2026-10-31', value: 104 }],
+    feeMeterLinks: [{ leaseFeeId: 'c', meterId: 'mc' }], periodQuantities: [{ leaseFeeId: 'd', period: '2026-11', quantity: 3 }],
+    rates: [{ facilityId: 'TD', utility: 'water' as const, pricePerUnit: 99_999, effectiveFrom: '2026-01-01' }], oneOffs: [], pending: [],
+  }
+  it('tính phí theo cấu hình, đơn giá hợp đồng và không tạo điện nước ngầm', () => {
+    const result = buildMonthlyInvoice(input)
+    expect(result.lines.find(l => l.description.startsWith('A'))?.amount).toBe(20_000)
+    expect(result.lines.find(l => l.description.startsWith('B'))?.amount).toBe(30_000)
+    expect(result.lines.find(l => l.description.startsWith('C'))?.amount).toBe(20_000)
+    expect(result.lines.find(l => l.description.startsWith('D'))?.amount).toBe(21_000)
+    expect(result.lines.filter(l => l.type === 'water' || l.type === 'electric')).toHaveLength(0)
+  })
+  it('thiếu lượng đo hoặc nhập tay cảnh báo và không tự tính 0', () => {
+    const result = buildMonthlyInvoice({ ...input, readings: [], periodQuantities: [] })
+    expect(result.lines.some(l => l.description.startsWith('C') || l.description.startsWith('D'))).toBe(false)
+    expect(result.warnings.join(' ')).toContain('C')
+    expect(result.warnings.join(' ')).toContain('D')
+  })
+})

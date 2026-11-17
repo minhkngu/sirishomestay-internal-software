@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { facilities, invoiceLines, leases, rooms, tenants, meters, meterReadings, utilityRates } from '@/db'
+import { facilities, invoiceLines, leaseFeeMeters, leaseFeeSnapshots, leases, rooms, tenants, meters, meterReadings, utilityRates } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import { auditLogs, files, invoices } from '@/db'
 import { eq } from 'drizzle-orm'
 import { addOneOff } from '@/server/charges/service'
-import { exportReceipt, addPayment, approveInvoice, createDrafts, deleteInvoice, invoiceStatus, listInvoices, previewBatch, removePayment, setPeriod, tenantBalance, updateLines } from '@/server/invoices/service'
+import { saveInvoiceFeeQuantities, exportReceipt, addPayment, approveInvoice, createDrafts, deleteInvoice, invoiceStatus, listInvoices, previewBatch, removePayment, setPeriod, tenantBalance, updateLines } from '@/server/invoices/service'
 import { DOCX_MIME } from '@/lib/docx'
 import { MemoryStorage } from '@/server/storage/memory'
 import { attachTemplateFile, createTemplate } from '@/server/templates/service'
@@ -25,6 +25,45 @@ describe('hoá đơn và thu tiền', () => {
     const [tenant] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: facilityId, fullName: 'Khách', phone: '+84901234567', idNumber: '012345678901' }).returning()
     const [lease] = await db.insert(leases).values({ code: 'HD1', roomId, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-12-31', monthlyRent: 9000000, depositAmount: 9000000 }).returning(); leaseId = lease.id
   })
+  it('lưu số lượng phí theo kỳ vào hóa đơn nháp và từ chối sửa sau duyệt', async () => {
+    const ctx = context(['billing'], facilityId)
+    await db.update(leases).set({ feeModel: 'snapshot' }).where(eq(leases.id, leaseId))
+    const [fee] = await db.insert(leaseFeeSnapshots).values({ leaseId, name: 'Dọn', unit: 'lần', quantitySource: 'period_input', unitPrice: 7000 }).returning()
+    const [inv] = await createDrafts(db, ctx, { facilityId, period: '2026-12' })
+    await expect(saveInvoiceFeeQuantities(db, ctx, inv.id, [{ leaseFeeId: crypto.randomUUID(), quantity: 1 }])).rejects.toThrow(ValidationError)
+    await expect(saveInvoiceFeeQuantities(db, context(['meters'], facilityId), inv.id, [{ leaseFeeId: fee.id, quantity: 1 }])).rejects.toThrow(ForbiddenError)
+    await expect(saveInvoiceFeeQuantities(db, ctx, inv.id, [{ leaseFeeId: fee.id, quantity: -1 }])).rejects.toThrow(ValidationError)
+    await saveInvoiceFeeQuantities(db, ctx, inv.id, [{ leaseFeeId: fee.id, quantity: 3 }])
+    await saveInvoiceFeeQuantities(db, ctx, inv.id, [{ leaseFeeId: fee.id, quantity: 4 }])
+    const lines = (await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, inv.id))).filter(l => l.description.startsWith('Dọn'))
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toMatchObject({ quantity: 4, unitPrice: 7000, amount: 28000 })
+    await approveInvoice(db, ctx, inv.id, { dueDate: '2027-01-05' })
+    await expect(saveInvoiceFeeQuantities(db, ctx, inv.id, [{ leaseFeeId: fee.id, quantity: 1 }])).rejects.toThrow(ValidationError)
+  })
+
+  it('không duyệt hóa đơn snapshot khi thiếu số lượng phí', async () => {
+    const ctx = context(['billing'], facilityId)
+    await db.update(leases).set({ feeModel: 'snapshot' }).where(eq(leases.id, leaseId))
+    const [fee] = await db.insert(leaseFeeSnapshots).values({ leaseId, name: 'Dọn', unit: 'lần', quantitySource: 'period_input', unitPrice: 7000 }).returning()
+    const [inv] = await createDrafts(db, ctx, { facilityId, period: '2026-12' })
+    await expect(approveInvoice(db, ctx, inv.id, { dueDate: '2027-01-05' })).rejects.toThrow('Dọn')
+    await saveInvoiceFeeQuantities(db, ctx, inv.id, [{ leaseFeeId: fee.id, quantity: 0 }])
+    expect((await approveInvoice(db, ctx, inv.id, { dueDate: '2027-01-05' })).status).toBe('approved')
+  })
+
+  it('hóa đơn phí đồng hồ dùng đúng đơn giá hợp đồng, không cộng điện nước ngầm', async () => {
+    const ctx = context(['billing'], facilityId)
+    await db.update(leases).set({ feeModel: 'snapshot' }).where(eq(leases.id, leaseId))
+    const [fee] = await db.insert(leaseFeeSnapshots).values({ leaseId, name: 'Bất kỳ', unit: 'đơn vị', quantitySource: 'meter', unitPrice: 5000 }).returning()
+    const [meter] = await db.insert(meters).values({ roomId, utility: 'fee', installedOn: '2026-01-01', startReading: 100 }).returning()
+    await db.insert(leaseFeeMeters).values({ leaseFeeId: fee.id, meterId: meter.id })
+    await db.insert(meterReadings).values({ meterId: meter.id, period: '2026-11', readOn: '2026-11-30', value: 104 })
+    const [inv] = await createDrafts(db, ctx, { facilityId, period: '2026-12' })
+    expect(inv.lines.find(l => l.description.startsWith('Bất kỳ'))?.amount).toBe(20000)
+    expect(inv.lines.some(l => l.type === 'electric' || l.type === 'water')).toBe(false)
+  })
+
   it('tạo nháp, tránh trùng, sửa kỳ ba tháng và theo dõi thu tiền', async () => {
     const ctx = context(['billing'], facilityId)
     const [meter] = await db.insert(meters).values({ roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 }).returning()
