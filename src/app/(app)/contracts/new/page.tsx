@@ -1,5 +1,5 @@
-import { and, inArray, ne } from 'drizzle-orm'
-import { assets } from '@/db'
+import { and, eq, inArray, isNull, ne } from 'drizzle-orm'
+import { assets, leaseFeeMeters, leaseFeeSnapshots, meters } from '@/db'
 import { notFound } from 'next/navigation'
 import { db } from '@/db/client'
 import { assertCan, can } from '@/domain/access'
@@ -8,7 +8,7 @@ import { getAccessContext } from '@/server/session'
 import { listFacilities } from '@/server/facilities/service'
 import { listRoomsWithStatus } from '@/server/rooms/service'
 import { searchTenants, displayName } from '@/server/tenants/service'
-import { listFeeTypes, listFeeUnits, listFeeTypePrices } from '@/server/fees/service'
+import { listFeeDefaults, listFeeTypes, listFeeUnits, listFeeTypePrices } from '@/server/fees/service'
 import { getSettings } from '@/server/settings/service'
 import { listAssets } from '@/server/assets/service'
 import { depositBalance } from '@/domain/deposit'
@@ -24,11 +24,14 @@ export default async function NewContractPage({ searchParams }: { searchParams: 
   const ctx = await getAccessContext()
   try { assertCan(ctx, 'tenants_contracts') } catch { notFound() }
   const kind = sp.kind === 'deposit' ? 'deposit' : 'lease'
-  const [facs, tenants, feeTypes, units, settings, prices] = await Promise.all([
-    listFacilities(db, ctx), searchTenants(db, ctx, { limit: 500 }), listFeeTypes(db, ctx), listFeeUnits(db, ctx), getSettings(db), listFeeTypePrices(db, ctx),
+  const [facs, tenants, feeTypes, units, settings, prices, feeDefaults] = await Promise.all([
+    listFacilities(db, ctx), searchTenants(db, ctx, { limit: 500 }), listFeeTypes(db, ctx), listFeeUnits(db, ctx), getSettings(db), listFeeTypePrices(db, ctx), listFeeDefaults(db, ctx),
   ])
   const allRooms = await listRoomsWithStatus(db, ctx, {})
   const rooms = facs.flatMap((f) => allRooms.filter((r) => r.facilityId === f.id).map((r) => ({ f, r })))
+  const roomIds = rooms.map(({ r }) => r.id)
+  const meterRows = roomIds.length ? await db.select({ id: meters.id, roomId: meters.roomId, feeTypeId: meters.feeTypeId, name: leaseFeeSnapshots.name, unit: leaseFeeSnapshots.unit }).from(meters).innerJoin(leaseFeeMeters, eq(leaseFeeMeters.meterId, meters.id)).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).where(and(inArray(meters.roomId, roomIds), eq(meters.utility, 'fee'), isNull(meters.removedOn))) : []
+  const roomMeters = [...new Map(meterRows.map(m => [m.id, m])).values()]
   const tenantOptions = tenants.map((t) => ({ id: t.id, name: displayName(t), kind: t.kind }))
   const unitName = new Map(units.map((u) => [u.id, u.name]))
 
@@ -46,7 +49,7 @@ export default async function NewContractPage({ searchParams }: { searchParams: 
       <h1 className="text-xl font-semibold">{kind === 'deposit' ? 'Tạo hợp đồng cọc' : 'Tạo hợp đồng thuê'}</h1>
       {kind === 'deposit'
         ? <DepositForm rooms={roomOptions((s) => s === 'vacant' || s === 'occupied' || s === 'ending_soon')} tenants={tenantOptions} initialRoomId={sp.room} initialTenantId={sp.tenant} />
-        : <LeaseWizard assets={assetOptions.map((a) => ({ id: a.id, name: a.name, model: a.model, facilityId: a.facilityId, locationKind: a.locationKind, locationId: a.locationId }))} canManageAssets={can(ctx, 'assets')} rooms={roomOptions((s) => s === 'vacant' || s === 'deposited')} tenants={tenantOptions} initial={initial}
+        : <LeaseWizard feeDefaults={feeDefaults} roomMeters={roomMeters} assets={assetOptions.map((a) => ({ id: a.id, name: a.name, model: a.model, facilityId: a.facilityId, locationKind: a.locationKind, locationId: a.locationId }))} canManageAssets={can(ctx, 'assets')} rooms={roomOptions((s) => s === 'vacant' || s === 'deposited')} tenants={tenantOptions} initial={initial}
             feeTypes={feeTypes.map((f) => ({ id: f.id, name: f.name, unit: unitName.get(f.unitId) ?? '', defaultPrice: f.defaultPrice, prices: prices[f.id] ?? {}, billing: f.billing, quantityFrom: f.quantityFrom }))}
             defaults={{ proration: settings.proration, dueRuleLabel: settings.dueRule.kind === 'day_of_next_month' ? `ngày ${settings.dueRule.day} của tháng sau` : `${settings.dueRule.days} ngày sau khi duyệt` }} />}
     </div>

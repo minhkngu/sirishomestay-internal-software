@@ -54,7 +54,7 @@ async function contractFees(tx: Pick<DB, 'select'>, leaseId: string): Promise<Co
   const [lease] = await tx.select({ feeModel: leases.feeModel }).from(leases).where(eq(leases.id, leaseId))
   if (lease?.feeModel === 'snapshot') {
     const rows = await tx.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, leaseId))
-    return rows.map(f => ({ leaseFeeId: f.id, feeTypeId: f.feeTypeId, name: f.name, unit: f.unit, billing: f.billing as ContractFee['billing'], quantityFrom: f.quantitySource === 'occupants' ? 'occupants' as const : 'manual' as const, quantitySource: f.quantitySource as NonNullable<ContractFee['quantitySource']>, quantity: 1, unitPrice: f.unitPrice }))
+    return rows.map(f => ({ leaseFeeId: f.id, feeTypeId: f.feeTypeId, name: f.name, unit: f.unit, billing: f.billing as ContractFee['billing'], quantityFrom: f.quantitySource === 'occupants' ? 'occupants' as const : 'manual' as const, quantitySource: f.quantitySource as NonNullable<ContractFee['quantitySource']>, quantity: f.quantity, unitPrice: f.unitPrice }))
   }
   const rows = await tx
     .select({ f: leaseFees, t: feeTypes, u: feeUnits })
@@ -125,7 +125,7 @@ export async function cancelDepositContract(db: DB, ctx: AccessContext, id: stri
 
 // ------------------------------------------------------------------ hợp đồng thuê
 
-export type LeaseFeeInput = { feeTypeId: string | null; name: string; unit: string; quantitySource: 'occupants' | 'room' | 'meter' | 'period_input'; unitPrice: number; initialReading?: number; existingMeterId?: string }
+export type LeaseFeeInput = { feeTypeId: string | null; name: string; unit: string; quantitySource: 'occupants' | 'room' | 'meter' | 'period_input'; unitPrice: number; quantity?: number; initialReading?: number; existingMeterId?: string }
 type LegacyFeeInput = { feeTypeId: string; quantity: number; unitPrice: number }
 export type LeaseInput = {
   roomId: string
@@ -177,18 +177,24 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
   }).returning()
   await tx.insert(leaseOccupants).values(occupants.map((tenantId) => ({ leaseId: lease.id, tenantId })))
   if (input.fees?.length && input.feeModel === 'snapshot') {
+    const fees = input.fees as LeaseFeeInput[]
+    const commonIds = fees.flatMap(f => f.feeTypeId ? [f.feeTypeId] : [])
+    const meterIds = fees.flatMap(f => f.existingMeterId ? [f.existingMeterId] : [])
+    if (new Set(commonIds).size !== commonIds.length || new Set(meterIds).size !== meterIds.length) throw new ValidationError('Phí hoặc đồng hồ bị chọn trùng')
     for (const fee of input.fees as LeaseFeeInput[]) {
-      if (!Number.isSafeInteger(fee.unitPrice) || fee.unitPrice < 0 || !['occupants', 'room', 'meter', 'period_input'].includes(fee.quantitySource)) throw new ValidationError('Phí dịch vụ không hợp lệ')
-      let name = fee.name?.trim(), unit = fee.unit?.trim(), source = fee.quantitySource
+      if (!Number.isSafeInteger(fee.unitPrice) || fee.unitPrice < 0 || fee.unitPrice > 2_147_483_647 || !['occupants', 'room', 'meter', 'period_input'].includes(fee.quantitySource)) throw new ValidationError('Phí dịch vụ không hợp lệ')
+      let name = fee.name?.trim(), unit = fee.unit?.trim(), source: NonNullable<ContractFee['quantitySource']> = fee.quantitySource
       let billing: ContractFee['billing'] = source === 'meter' || source === 'period_input' ? 'per_occurrence' : 'monthly_fixed'
       if (fee.feeTypeId) {
         const [row] = await tx.select({ type: feeTypes, unit: feeUnits }).from(feeTypes).innerJoin(feeUnits, eq(feeTypes.unitId, feeUnits.id)).where(eq(feeTypes.id, fee.feeTypeId))
         if (!row || !row.type.isActive) throw new ValidationError('Loại phí không tồn tại hoặc đã lưu trữ')
         name = row.type.name; unit = row.unit.name; billing = row.type.billing as ContractFee['billing']
-        source = row.type.quantityFrom === 'manual' ? 'period_input' : row.type.quantityFrom as LeaseFeeInput['quantitySource']
+        source = row.type.quantityFrom === 'manual' ? 'legacy_fixed' : row.type.quantityFrom as LeaseFeeInput['quantitySource']
       }
       if (!name || !unit) throw new ValidationError('Nhập tên và đơn vị phí')
-      const [savedFee] = await tx.insert(leaseFeeSnapshots).values({ leaseId: lease.id, feeTypeId: fee.feeTypeId, name, unit, quantitySource: source, billing, unitPrice: fee.unitPrice }).returning()
+      const quantity = source === 'legacy_fixed' ? (fee.quantity ?? 1) : 1
+      if (!Number.isSafeInteger(quantity) || quantity < 0 || quantity > 2_147_483_647) throw new ValidationError('Số lượng phí không hợp lệ')
+      const [savedFee] = await tx.insert(leaseFeeSnapshots).values({ leaseId: lease.id, feeTypeId: fee.feeTypeId, name, unit, quantitySource: source, quantity, billing, unitPrice: fee.unitPrice }).returning()
       if (source === 'meter') await ensureFeeMeter(tx, ctx, { roomId: room.id, feeTypeId: fee.feeTypeId, leaseFeeId: savedFee.id, initialReading: fee.initialReading, existingMeterId: fee.existingMeterId, installedOn: input.startDate })
     }
   } else if (input.fees?.length) await tx.insert(leaseFees).values((input.fees as LegacyFeeInput[]).map((f) => ({ leaseId: lease.id, ...f })))

@@ -77,9 +77,10 @@ export const leaseFeeSnapshots = pgTable('lease_fee_snapshots', {
   name: text('name').notNull(),
   unit: text('unit').notNull(),
   quantitySource: text('quantity_source').notNull(),
+  quantity: integer('quantity').notNull().default(1),
   billing: text('billing').notNull().default('monthly_fixed'),
   unitPrice: integer('unit_price').notNull(),
-})
+}).enableRLS()
 
 export const depositEntries = pgTable('deposit_entries', {
   id: uuid('id').primaryKey().defaultRandom(),

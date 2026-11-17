@@ -164,6 +164,18 @@ describe('contracts', () => {
     expect((await leaseData(db, lease.id)).fees.map(f => [f.name, f.unitPrice])).toEqual(expect.arrayContaining([['Giặt', 20_000], ['Dọn', 30_000]]))
   })
 
+  it('phí chung cũ nhập tay giữ số lượng cố định trong snapshot', async () => {
+    await updateFeeType(db, admin, feePerson, { quantityFrom: 'manual', billing: 'monthly_fixed' })
+    const { lease } = await createLease(db, lan(), { ...leaseInput(), feeModel: 'snapshot', fees: [{ feeTypeId: feePerson, name: '', unit: '', quantitySource: 'period_input', unitPrice: 20, quantity: 3 }] })
+    expect((await getLease(db, lan(), lease.id)).fees[0]).toMatchObject({ quantity: 3, billing: 'monthly_fixed' })
+  })
+
+  it('không cho chọn cùng phí chung hai lần trong hợp đồng snapshot', async () => {
+    const fee = { feeTypeId: feePerson, name: '', unit: '', quantitySource: 'room' as const, unitPrice: 20 }
+    await expect(createLease(db, lan(), { ...leaseInput(), feeModel: 'snapshot', fees: [fee, fee] })).rejects.toThrow(ValidationError)
+    expect(await db.select().from(leases)).toHaveLength(0)
+  })
+
   it('tạo và dùng lại đồng hồ theo định danh phí của phòng', async () => {
     await updateFeeType(db, admin, feePerson, { name: 'ABC', quantityFrom: 'meter' })
     const fee = { feeTypeId: feePerson, name: 'ABC', unit: 'người', quantitySource: 'meter' as const, unitPrice: 100, initialReading: 123 }

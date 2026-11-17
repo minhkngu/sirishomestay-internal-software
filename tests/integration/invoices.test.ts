@@ -33,6 +33,7 @@ describe('hoá đơn và thu tiền', () => {
     await expect(saveInvoiceFeeQuantities(db, ctx, inv.id, [{ leaseFeeId: crypto.randomUUID(), quantity: 1 }])).rejects.toThrow(ValidationError)
     await expect(saveInvoiceFeeQuantities(db, context(['meters'], facilityId), inv.id, [{ leaseFeeId: fee.id, quantity: 1 }])).rejects.toThrow(ForbiddenError)
     await expect(saveInvoiceFeeQuantities(db, ctx, inv.id, [{ leaseFeeId: fee.id, quantity: -1 }])).rejects.toThrow(ValidationError)
+    await expect(saveInvoiceFeeQuantities(db, ctx, inv.id, [{ leaseFeeId: fee.id, quantity: 2_147_483_648 }])).rejects.toThrow(ValidationError)
     await saveInvoiceFeeQuantities(db, ctx, inv.id, [{ leaseFeeId: fee.id, quantity: 3 }])
     await saveInvoiceFeeQuantities(db, ctx, inv.id, [{ leaseFeeId: fee.id, quantity: 4 }])
     const lines = (await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, inv.id))).filter(l => l.description.startsWith('Dọn'))
@@ -50,6 +51,18 @@ describe('hoá đơn và thu tiền', () => {
     await expect(approveInvoice(db, ctx, inv.id, { dueDate: '2027-01-05' })).rejects.toThrow('Dọn')
     await saveInvoiceFeeQuantities(db, ctx, inv.id, [{ leaseFeeId: fee.id, quantity: 0 }])
     expect((await approveInvoice(db, ctx, inv.id, { dueDate: '2027-01-05' })).status).toBe('approved')
+  })
+
+  it('không cho sửa hoặc xóa dòng phí snapshot trực tiếp trong hóa đơn', async () => {
+    const ctx = context(['billing'], facilityId)
+    await db.update(leases).set({ feeModel: 'snapshot' }).where(eq(leases.id, leaseId))
+    const [fee] = await db.insert(leaseFeeSnapshots).values({ leaseId, name: 'Dọn', unit: 'lần', quantitySource: 'period_input', unitPrice: 7000 }).returning()
+    const [inv] = await createDrafts(db, ctx, { facilityId, period: '2026-12' })
+    await saveInvoiceFeeQuantities(db, ctx, inv.id, [{ leaseFeeId: fee.id, quantity: 3 }])
+    const old = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, inv.id))
+    const lines = old.map(l => ({ ...l, meta: l.meta as Record<string, unknown> | null }))
+    await expect(updateLines(db, ctx, inv.id, lines.map(l => l.meta?.leaseFeeId === fee.id ? { ...l, unitPrice: 1 } : l))).rejects.toThrow(ValidationError)
+    await expect(updateLines(db, ctx, inv.id, lines.filter(l => l.meta?.leaseFeeId !== fee.id))).rejects.toThrow(ValidationError)
   })
 
   it('hóa đơn phí đồng hồ dùng đúng đơn giá hợp đồng, không cộng điện nước ngầm', async () => {

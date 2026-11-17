@@ -128,6 +128,22 @@ function FeePrices({ fee, facilities, prices }: { fee: FeeT; facilities: Fac[]; 
   </div></details>
 }
 
+function FeeDefaults({ fee, facilities, defaults }: { fee: FeeT; facilities: Fac[]; defaults: Record<string, string[]> }) {
+  const router = useRouter()
+  const [pending, start] = useTransition()
+  const [selected, setSelected] = useState<Record<string, boolean>>(Object.fromEntries(facilities.map(f => [f.id, defaults[f.id]?.includes(fee.id) ?? false])))
+  const [error, setError] = useState('')
+  function update(facilityId: string, enabled: boolean) {
+    setSelected(previous => ({ ...previous, [facilityId]: enabled }))
+    start(async () => {
+      const result = await setFeeDefaultAction({ facilityId, feeTypeId: fee.id, enabled })
+      if (!result.ok) { setSelected(previous => ({ ...previous, [facilityId]: !enabled })); setError(result.error) }
+      else { setError(''); router.refresh() }
+    })
+  }
+  return <div className="space-y-2 rounded border p-3"><p className="text-sm font-medium">Mặc định theo cơ sở — {fee.name}</p>{facilities.map(f => <label key={f.id} className="mr-4 inline-flex items-center gap-1 text-sm"><input type="checkbox" checked={selected[f.id] ?? false} disabled={pending} onChange={e => update(f.id, e.target.checked)} />{f.name}</label>)}{error && <p role="alert" className="text-sm text-destructive">{error}</p>}</div>
+}
+
 function FeesTab({ units, feeTypes, facilities, prices, defaults }: { units: Unit[]; feeTypes: FeeT[]; facilities: Fac[]; prices: Record<string, Record<string, number>>; defaults: Record<string, string[]> }) {
   const { pending, error, ok, run } = useRun()
   const [unit, setUnit] = useState('')
@@ -154,7 +170,7 @@ function FeesTab({ units, feeTypes, facilities, prices, defaults }: { units: Uni
           </tbody>
         </table>
       </div>
-      {feeTypes.map((fee) => <div key={fee.id} className="space-y-2 rounded border p-3"><p className="text-sm font-medium">Mặc định theo cơ sở — {fee.name}</p>{facilities.map(f => <label key={f.id} className="mr-4 inline-flex items-center gap-1 text-sm"><input type="checkbox" checked={defaults[f.id]?.includes(fee.id) ?? false} disabled={pending} onChange={e => run(() => setFeeDefaultAction({ facilityId: f.id, feeTypeId: fee.id, enabled: e.target.checked }))} />{f.name}</label>)}</div>)}
+      {feeTypes.map((fee) => <FeeDefaults key={fee.id} fee={fee} facilities={facilities} defaults={defaults} />)}
       {feeTypes.map((fee) => <FeePrices key={fee.id} fee={fee} facilities={facilities} prices={prices[fee.id] ?? {}} />)}
       <div className="grid max-w-xl gap-2 rounded-md border bg-card p-3 sm:grid-cols-2">
         <h3 className="text-sm font-medium sm:col-span-2">Thêm loại phí</h3>

@@ -188,7 +188,7 @@ export async function ensureFeeMeter(tx: DB, ctx: AccessContext, input: { roomId
     found = row.meter
   }
   if (!found) {
-    if (!Number.isSafeInteger(input.initialReading) || input.initialReading! < 0) throw new ValidationError('Nhập chỉ số ban đầu hợp lệ', { initialReading: 'Nhập chỉ số nguyên không âm' })
+    if (!Number.isSafeInteger(input.initialReading) || input.initialReading! < 0 || input.initialReading! > 2_147_483_647) throw new ValidationError('Nhập chỉ số ban đầu hợp lệ', { initialReading: 'Nhập chỉ số nguyên không âm' })
     ;[found] = await tx.insert(meters).values({ roomId: room.id, utility: 'fee', feeTypeId: input.feeTypeId, startReading: input.initialReading!, installedOn: input.installedOn }).returning()
     await recordAudit(tx, ctx, { action: 'create', entity: 'meter', entityId: found.id, facilityId: room.facilityId, summary: 'Tạo đồng hồ cho phí hợp đồng', after: found })
   }

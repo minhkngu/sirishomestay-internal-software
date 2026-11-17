@@ -42,6 +42,11 @@ describe('fees & rates', () => {
     expect((await listFeeDefaults(db, admin))[fa] ?? []).toEqual([])
   })
 
+  it('snapshot phí hợp đồng bật RLS', async () => {
+    const result = await db.execute(sql`select relrowsecurity from pg_class where oid = 'lease_fee_snapshots'::regclass`)
+    expect((result as unknown as { rows: { relrowsecurity: boolean }[] }).rows[0].relrowsecurity).toBe(true)
+  })
+
   it('bảng giá theo toà bật RLS', async () => {
     const result = await db.execute(sql`select relrowsecurity from pg_class where oid = 'fee_type_prices'::regclass`)
     expect((result as unknown as { rows: { relrowsecurity: boolean }[] }).rows[0].relrowsecurity).toBe(true)

@@ -7,7 +7,7 @@ export type DueRule = { kind: 'day_of_next_month'; day: number } | { kind: 'days
 export type ContractFee = {
   feeTypeId: string | null
   leaseFeeId?: string
-  quantitySource?: 'occupants' | 'room' | 'meter' | 'period_input'
+  quantitySource?: 'occupants' | 'room' | 'meter' | 'period_input' | 'legacy_fixed'
   name: string
   unit: string
   billing: 'monthly_fixed' | 'per_occurrence'

@@ -12,19 +12,19 @@ import { convertDepositToLeaseAction, createLeaseAction } from '@/server/contrac
 import { replaceSigner } from '../contract-occupants'
 import { uploadLeasePhotos } from '../lease-photo-retry'
 import { uploadOne } from '@/components/file-upload'
+import { LeaseFees, type FeeOption, type FeeDraft, type RoomFeeMeter } from './lease-fees'
 import { LeaseAssets, emptyChanges, type AssetOption } from './lease-assets'
 import type { RoomOption, TenantOption } from './deposit-form'
 
-export type FeeOption = { id: string; name: string; unit: string; defaultPrice: number; prices: Record<string, number>; billing: string; quantityFrom: string }
 type Initial = { roomId?: string; tenantId?: string; depositId?: string; rent?: number; deposit?: number; startDate?: string; receivedDeposit?: number }
 type Props = {
-  assets: AssetOption[]; canManageAssets: boolean
+  assets: AssetOption[]; canManageAssets: boolean; feeDefaults: Record<string, string[]>; roomMeters: RoomFeeMeter[]
   rooms: RoomOption[]; tenants: TenantOption[]; feeTypes: FeeOption[]; initial?: Initial
   defaults: { proration: 'days_30' | 'actual_days'; dueRuleLabel: string }
 }
 
 
-export function LeaseWizard({ assets, canManageAssets, rooms, tenants, feeTypes, initial = {}, defaults }: Props) {
+export function LeaseWizard({ assets, canManageAssets, feeDefaults, roomMeters, rooms, tenants, feeTypes, initial = {}, defaults }: Props) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [received, setReceived] = useState(String(initial.receivedDeposit ?? 0))
@@ -42,22 +42,19 @@ export function LeaseWizard({ assets, canManageAssets, rooms, tenants, feeTypes,
   const [endDate, setEndDate] = useState('')
   const [rent, setRent] = useState(String(initial.rent ?? ''))
   const [deposit, setDeposit] = useState(String(initial.deposit ?? ''))
-  const [fees, setFees] = useState<Record<string, { on: boolean; quantity: string; price: string }>>(
-    Object.fromEntries(feeTypes.map((f) => [f.id, { on: false, quantity: '1', price: String(resolveFeePrice(f.defaultPrice, f.prices, rooms.find((r) => r.id === initial.roomId)?.facilityId ?? null)) }])),
-  )
+  const makeFee = (f: FeeOption, facilityId?: string): FeeDraft => ({ key: crypto.randomUUID(), feeTypeId: f.id, name: f.name, unit: f.unit, quantitySource: f.quantityFrom === 'manual' ? 'period_input' : f.quantityFrom as FeeDraft['quantitySource'], legacyFixed: f.quantityFrom === 'manual', price: String(resolveFeePrice(f.defaultPrice, f.prices, facilityId ?? null)), quantity: '1', initialReading: '' })
+  const defaultFees = (facilityId?: string) => feeTypes.filter(f => (feeDefaults[facilityId ?? ''] ?? []).includes(f.id)).map(f => makeFee(f, facilityId))
+  const [fees, setFees] = useState<FeeDraft[]>(() => defaultFees(rooms.find(r => r.id === initial.roomId)?.facilityId))
   const [overrideProration, setOverrideProration] = useState('')
   const [dayOfMonth, setDayOfMonth] = useState('')
   const [cycle, setCycle] = useState('1')
-  const [waterByMeter, setWaterByMeter] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const fieldError = (name: string) => fieldErrors[name] ? <p role="alert" className="text-sm text-destructive">{fieldErrors[name]}</p> : null
 
   const individuals = tenants.filter((t) => t.kind !== 'company' && t.id !== tenantId)
   const tenant = tenants.find((t) => t.id === tenantId)
-  const chosenFees = feeTypes.filter((f) => fees[f.id].on)
-  const qty = (f: FeeOption) => (f.quantityFrom === 'occupants' ? Math.max(1, occupantIds.length) : Number(fees[f.id].quantity) || 0)
-  const monthlyFixed = chosenFees.filter((f) => f.billing === 'monthly_fixed').reduce((s, f) => s + qty(f) * (Number(fees[f.id].price) || 0), 0)
+  const monthlyFixed = fees.filter(f => f.quantitySource === 'room' || f.quantitySource === 'occupants' || f.legacyFixed).reduce((sum, f) => sum + (f.quantitySource === 'occupants' ? occupantIds.length : f.legacyFixed ? Number(f.quantity) : 1) * (Number(f.price) || 0), 0)
 
   function pickTenant(id: string) { setTenantId(id) }
   const toggleOccupant = (id: string) => setAdditionalOccupantIds(previous => previous.includes(id) ? previous.filter(x => x !== id) : [...previous, id])
@@ -80,14 +77,20 @@ export function LeaseWizard({ assets, canManageAssets, rooms, tenants, feeTypes,
     if (!rent || !Number.isSafeInteger(Number(rent)) || Number(rent) < 0) errors.monthlyRent = 'Nhập giá thuê hợp lệ'
     if (!deposit || !Number.isSafeInteger(Number(deposit)) || Number(deposit) < 0) errors.depositAmount = 'Nhập tiền cọc hợp lệ'
     if (!Number.isSafeInteger(Number(received)) || Number(received) < (initial.receivedDeposit ?? 0) || Number(received) > Number(deposit)) errors.receivedDeposit = 'Tiền thực nhận phải từ cọc kế thừa đến tiền cọc'
+    for (const fee of fees) {
+      const hasMeter = fee.feeTypeId ? roomMeters.some(m => m.roomId === roomId && m.feeTypeId === fee.feeTypeId) : !!fee.existingMeterId
+      if (!Number.isSafeInteger(Number(fee.price)) || fee.price.trim() === '' || Number(fee.price) < 0 || (fee.legacyFixed && (!Number.isSafeInteger(Number(fee.quantity)) || Number(fee.quantity) < 0))) errors.fees = `Kiểm tra đơn giá hoặc số lượng phí ${fee.name}`
+      if (fee.quantitySource === 'meter' && !hasMeter && (fee.initialReading.trim() === '' || !Number.isSafeInteger(Number(fee.initialReading)) || Number(fee.initialReading) < 0)) errors.fees = `Nhập chỉ số ban đầu hợp lệ cho ${fee.name}`
+    }
     setFieldErrors(errors)
     if (Object.keys(errors).length) return
     submitting.current = true
     const input = {
       roomId, tenantId, occupantIds, startDate, endDate, monthlyRent: Number(rent), depositAmount: Number(deposit), receivedDeposit: Number(received), note,
       handover: { expectedRoomAssetIds: assets.filter(a => a.locationKind === 'room' && a.locationId === roomId).map(a => a.id), expectedAddedLocations: changes.addAssetIds.map(id => { const a = assets.find(x => x.id === id)!; return { assetId: id, kind: a.locationKind, id: a.locationId } }), ...changes },
-      fees: chosenFees.map((f) => ({ feeTypeId: f.id, quantity: qty(f), unitPrice: Number(fees[f.id].price) || 0 })),
-      proration: overrideProration || null, billingCycleMonths: Number(cycle) || 1, billWaterByMeter: waterByMeter,
+      feeModel: 'snapshot' as const,
+      fees: fees.map(f => ({ feeTypeId: f.feeTypeId, name: f.name, unit: f.unit, quantitySource: f.quantitySource, unitPrice: Number(f.price), quantity: Number(f.quantity), initialReading: f.initialReading.trim() === '' ? undefined : Number(f.initialReading), existingMeterId: f.existingMeterId })),
+      proration: overrideProration || null, billingCycleMonths: Number(cycle) || 1,
       dueRule: dayOfMonth ? { kind: 'day_of_next_month', day: Number(dayOfMonth) } : null,
     }
     start(async () => {
@@ -105,7 +108,7 @@ export function LeaseWizard({ assets, canManageAssets, rooms, tenants, feeTypes,
       <h2 className="font-semibold">Bên thuê & người ở</h2>
         <div className="space-y-4">
           <div className="space-y-1"><Label htmlFor="room">Phòng</Label>
-            <select id="room" value={roomId} disabled={!!initial.depositId} onChange={(e) => { setRoomId(e.target.value); setChanges(emptyChanges()); const room = rooms.find((r) => r.id === e.target.value); setFees((previous) => Object.fromEntries(feeTypes.map((f) => [f.id, previous[f.id].on ? previous[f.id] : { ...previous[f.id], price: String(resolveFeePrice(f.defaultPrice, f.prices, room?.facilityId ?? null)) }]))); const p = room?.listPrice; if (p && !rent) setRent(String(p)) }} className="h-8 w-full rounded-lg border px-2 text-sm">
+            <select id="room" value={roomId} disabled={!!initial.depositId} onChange={(e) => { const oldFacility = rooms.find(r => r.id === roomId)?.facilityId; setRoomId(e.target.value); setChanges(emptyChanges()); const room = rooms.find((r) => r.id === e.target.value); if (room?.facilityId !== oldFacility) setFees(defaultFees(room?.facilityId)); else setFees(previous => previous.map(f => f.quantitySource === 'meter' ? { ...f, initialReading: '', existingMeterId: undefined } : f)); const p = room?.listPrice; if (p && !rent) setRent(String(p)) }} className="h-8 w-full rounded-lg border px-2 text-sm">
               <option value="">— chọn phòng —</option>{rooms.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}</select>{fieldError('roomId')}</div>
           <div className="space-y-1"><Label htmlFor="tenant">Bên thuê (khách hoặc công ty)</Label>
             <select id="tenant" value={tenantId} onChange={(e) => pickTenant(e.target.value)} className="h-8 w-full rounded-lg border px-2 text-sm">
@@ -122,22 +125,12 @@ export function LeaseWizard({ assets, canManageAssets, rooms, tenants, feeTypes,
           <div className="space-y-1"><Label htmlFor="start">Ngày bắt đầu</Label><Input id="start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />{fieldError('startDate')}</div>
           <div className="space-y-1"><Label htmlFor="end">Ngày kết thúc</Label><Input id="end" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
             {fieldError('endDate')}{startDate && <button type="button" className="text-xs underline" onClick={() => { const [y, m, d] = startDate.split('-').map(Number); setEndDate(addDays(`${y + 1}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`, -1)) }}>+12 tháng</button>}</div>
-          <div className="space-y-1"><Label htmlFor="rent">Giá thuê tháng (VND)</Label><Input id="rent" inputMode="numeric" value={rent} onChange={(e) => setRent(e.target.value)} />{fieldError('monthlyRent')}</div>
+          <div className="space-y-1 sm:col-span-2"><Label htmlFor="rent">Giá thuê tháng (VND)</Label><Input id="rent" inputMode="numeric" value={rent} onChange={(e) => setRent(e.target.value)} />{fieldError('monthlyRent')}</div>
           <div className="space-y-1"><Label htmlFor="deposit">Tiền cọc (VND)</Label><Input id="deposit" inputMode="numeric" value={deposit} onChange={(e) => setDeposit(e.target.value)} />{fieldError('depositAmount')}</div>
+          <div className="space-y-1"><Label htmlFor="received">Tiền đã cọc (VND)</Label><Input id="received" inputMode="numeric" value={received} onChange={e => setReceived(e.target.value)} />{fieldError('receivedDeposit')}<p className="text-sm text-muted-foreground">Còn thiếu: {formatVND(Math.max(0, Number(deposit) - Number(received)))}</p></div>
         </div>
-      <h2 className="font-semibold">Phí dịch vụ</h2>
-
-        <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">Chọn phí áp dụng. Phí theo người tự lấy số người ở ({occupantIds.length}).</p>
-          {feeTypes.map((f) => (
-            <div key={f.id} className="flex flex-wrap items-center gap-2 rounded-md border bg-card p-2 text-sm">
-              <label className="flex min-w-48 items-center gap-2"><input type="checkbox" checked={fees[f.id].on} onChange={(e) => setFees({ ...fees, [f.id]: { ...fees[f.id], on: e.target.checked } })} /> {f.name} <span className="text-muted-foreground">({f.unit}, {f.billing === 'monthly_fixed' ? 'hằng tháng' : 'theo lần'})</span></label>
-              {f.quantityFrom === 'occupants' ? <span className="text-muted-foreground">SL = {Math.max(1, occupantIds.length)}</span>
-                : <Input aria-label={`Số lượng ${f.name}`} className="w-20" inputMode="numeric" value={fees[f.id].quantity} onChange={(e) => setFees({ ...fees, [f.id]: { ...fees[f.id], quantity: e.target.value } })} />}
-              <Input aria-label={`Đơn giá ${f.name}`} className="w-32" inputMode="numeric" value={fees[f.id].price} onChange={(e) => setFees({ ...fees, [f.id]: { ...fees[f.id], price: e.target.value } })} />
-            </div>
-          ))}
-        </div>
+      <LeaseFees feeTypes={feeTypes} roomMeters={roomMeters} roomId={roomId} fees={fees} onChange={setFees} onAddCommon={id => { const fee = feeTypes.find(f => f.id === id); if (fee) setFees(previous => [...previous, makeFee(fee, rooms.find(r => r.id === roomId)?.facilityId)]) }} />
+      {fieldError('fees')}
       <h2 className="font-semibold">Thanh toán & lẻ ngày</h2>
 
         <div className="space-y-4">
@@ -148,9 +141,7 @@ export function LeaseWizard({ assets, canManageAssets, rooms, tenants, feeTypes,
           <div className="space-y-1"><Label htmlFor="cycle">Kỳ thanh toán mặc định (số tháng mỗi hoá đơn)</Label>
             <select id="cycle" value={cycle} onChange={(e) => setCycle(e.target.value)} className="h-8 w-full rounded-lg border px-2 text-sm">
               {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n} tháng</option>)}</select></div>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={waterByMeter} onChange={(e) => setWaterByMeter(e.target.checked)} /> Tính nước theo đồng hồ</label>
         </div>
-      <div><Label htmlFor="received">Tiền đã cọc (VND)</Label><Input id="received" inputMode="numeric" value={received} onChange={e => setReceived(e.target.value)} />{fieldError('receivedDeposit')}<p className="text-sm text-muted-foreground">Còn thiếu: {formatVND(Math.max(0, Number(deposit) - Number(received)))}</p></div>
       <div><Label htmlFor="note">Ghi chú</Label><textarea id="note" className="w-full rounded border p-2" value={note} onChange={e => setNote(e.target.value)} /></div>
       {canManageAssets ? <LeaseAssets key={roomId} assets={assets} roomId={roomId} facilityId={rooms.find(r => r.id === roomId)?.facilityId} changes={changes} onChange={setChanges} /> : <section className="rounded-lg border p-4"><h2 className="font-semibold">Biên bản bàn giao</h2><p className="text-sm">Tài sản trong phòng: {assets.filter(a => a.locationKind === 'room' && a.locationId === roomId).map(a => [a.name, a.model].filter(Boolean).join(' ')).join(', ') || 'không có'}</p></section>}
       <div><Label htmlFor="photos">Ảnh hợp đồng</Label><Input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e => setPhotos(Array.from(e.target.files ?? []))} /></div>
