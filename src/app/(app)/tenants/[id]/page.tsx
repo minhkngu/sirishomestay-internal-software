@@ -63,7 +63,7 @@ export default async function TenantPage({ params }: { params: Promise<{ id: str
               <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 {tenant.phone && <span>SĐT: <strong className="font-medium text-foreground">{tenant.phone}</strong></span>}
                 {tenant.email && <span>Email: {tenant.email}</span>}
-                {tenant.identityNumber && <span>CCCD/Passport: {tenant.identityNumber}</span>}
+                {(tenant.idNumber || tenant.passportNumber) && <span>CCCD/Passport: {tenant.idNumber || tenant.passportNumber}</span>}
               </div>
             </div>
           </div>
