@@ -1,3 +1,6 @@
+export const PDF_DOC_TYPES = ['invoice_monthly', 'invoice_termination', 'receipt'] as const
+export type PdfDocType = (typeof PDF_DOC_TYPES)[number]
+
 import { formatDateVN } from './dates'
 import { formatVND, numberToVietnameseWords } from './money'
 

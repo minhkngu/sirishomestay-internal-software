@@ -24,15 +24,20 @@ export async function getRoom(db: DB, ctx: AccessContext, id: string): Promise<R
 }
 
 export async function listRooms(
-  db: DB, ctx: AccessContext, opts: { facilityId: string; q?: string; floor?: string; includeInactive?: boolean },
+  db: DB, ctx: AccessContext, opts: { facilityId?: string; facilityIds?: string[]; q?: string; floor?: string; includeInactive?: boolean },
 ): Promise<Room[]> {
-  await getFacility(db, ctx, opts.facilityId)
-  const conds = [eq(rooms.facilityId, opts.facilityId)]
+  if (opts.facilityId) await getFacility(db, ctx, opts.facilityId)
+  const scope = facilityScope(ctx)
+  if (scope !== 'all' && scope.length === 0) return []
+  const conds = []
+  if (scope !== 'all') conds.push(inArray(rooms.facilityId, scope))
+  if (opts.facilityId) conds.push(eq(rooms.facilityId, opts.facilityId))
+  if (opts.facilityIds?.length) conds.push(inArray(rooms.facilityId, opts.facilityIds.filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))))
   if (!opts.includeInactive) conds.push(eq(rooms.isActive, true))
   if (opts.q?.trim()) conds.push(ilike(rooms.code, `%${opts.q.trim().replace(/[%_\\]/g, '\\$&')}%`))
   if (opts.floor) conds.push(eq(rooms.floor, opts.floor))
   const result = await db.select().from(rooms).where(and(...conds)).orderBy(asc(rooms.code))
-  return can(ctx, 'tenants_contracts', opts.facilityId) || can(ctx, 'billing', opts.facilityId) ? result : result.map((r) => ({ ...r, listPrice: null }))
+  return result.map((r) => can(ctx, 'tenants_contracts', r.facilityId) || can(ctx, 'billing', r.facilityId) ? r : { ...r, listPrice: null })
 }
 
 export async function countRoomsByFacility(db: DB, facilityIds: string[]): Promise<Map<string, number>> {
@@ -115,7 +120,7 @@ export type RoomWithStatus = Room & { status: RoomStatus; tenantName?: string | 
 
 /** Phòng của một cơ sở kèm trạng thái suy ra từ hợp đồng thuê đang hiệu lực và hợp đồng cọc đang chờ. */
 export async function listRoomsWithStatus(
-  db: DB, ctx: AccessContext, opts: { facilityId: string; q?: string; floor?: string; includeInactive?: boolean; today?: string },
+  db: DB, ctx: AccessContext, opts: { facilityId?: string; facilityIds?: string[]; q?: string; floor?: string; includeInactive?: boolean; today?: string },
 ): Promise<RoomWithStatus[]> {
   const list = await listRooms(db, ctx, opts)
   if (list.length === 0) return []

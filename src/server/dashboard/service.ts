@@ -42,12 +42,14 @@ export async function getDashboard(db: DB, ctx: AccessContext, today = todayVN()
   if (scope !== 'all' && scope.length === 0) return { stats: { occupied: 0, vacant: 0, deposited: 0, overdueDebt: 0 }, reminders: [] }
   const inScope = (col: Parameters<typeof inArray>[0]) => (scope === 'all' ? undefined : inArray(col, scope))
   const month = today.slice(0, 7), monthStart = `${month}-01`, monthEnd = addDays(`${new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5)), 1)).toISOString().slice(0, 7)}-01`, -1)
-  const settings = await getSettings(db)
   const wantBilling = can(ctx, 'billing'), wantTenants = can(ctx, 'tenants_contracts')
-
-  const facilityRows = await db.select().from(facilities).where(inScope(facilities.id))
-  const activeLeases = await db.select({ l: leases, roomCode: rooms.code, facilityId: rooms.facilityId, tenantName: sql<string>`coalesce(${tenants.fullName}, ${tenants.companyName}, '')` })
-    .from(leases).innerJoin(rooms, eq(rooms.id, leases.roomId)).innerJoin(tenants, eq(tenants.id, leases.tenantId)).where(and(eq(leases.status, 'active'), inScope(rooms.facilityId)))
+  const [settings, facilityRows, activeLeases, roomRows] = await Promise.all([
+    getSettings(db),
+    db.select().from(facilities).where(inScope(facilities.id)),
+    db.select({ l: leases, roomCode: rooms.code, facilityId: rooms.facilityId, tenantName: sql<string>`coalesce(${tenants.fullName}, ${tenants.companyName}, '')` })
+      .from(leases).innerJoin(rooms, eq(rooms.id, leases.roomId)).innerJoin(tenants, eq(tenants.id, leases.tenantId)).where(and(eq(leases.status, 'active'), inScope(rooms.facilityId))),
+    db.select({ id: rooms.id }).from(rooms).where(and(eq(rooms.isActive, true), inScope(rooms.facilityId))),
+  ])
   const terminated = activeLeases.length ? new Set((await db.select({ id: addenda.leaseId }).from(addenda).where(and(eq(addenda.type, 'termination'), inArray(addenda.leaseId, activeLeases.map(x => x.l.id))))).map(x => x.id)) : new Set<string>()
 
   let invoiceRows: Snapshot['invoices'] = []
@@ -55,8 +57,10 @@ export async function getDashboard(db: DB, ctx: AccessContext, today = todayVN()
   if (wantBilling) {
     const rows = await db.select({ inv: invoices, tenantName: sql<string>`coalesce(${tenants.fullName}, ${tenants.companyName}, '')` }).from(invoices).innerJoin(leases, eq(leases.id, invoices.leaseId)).innerJoin(tenants, eq(tenants.id, leases.tenantId)).where(and(eq(invoices.status, 'approved'), inScope(invoices.facilityId)))
     const ids = rows.map(r => r.inv.id)
-    const sums = ids.length ? await db.select({ id: invoiceLines.invoiceId, n: sql<number>`sum(${invoiceLines.amount})::float8` }).from(invoiceLines).where(inArray(invoiceLines.invoiceId, ids)).groupBy(invoiceLines.invoiceId) : []
-    const paid = ids.length ? await db.select({ id: payments.invoiceId, n: sql<number>`sum(${payments.amount})::float8` }).from(payments).where(inArray(payments.invoiceId, ids)).groupBy(payments.invoiceId) : []
+    const [sums, paid] = ids.length ? await Promise.all([
+      db.select({ id: invoiceLines.invoiceId, n: sql<number>`sum(${invoiceLines.amount})::float8` }).from(invoiceLines).where(inArray(invoiceLines.invoiceId, ids)).groupBy(invoiceLines.invoiceId),
+      db.select({ id: payments.invoiceId, n: sql<number>`sum(${payments.amount})::float8` }).from(payments).where(inArray(payments.invoiceId, ids)).groupBy(payments.invoiceId),
+    ]) : [[], []]
     invoiceRows = rows.map(r => ({ id: r.inv.id, code: r.inv.code, facilityId: r.inv.facilityId, dueDate: r.inv.dueDate, tenantName: r.tenantName, total: sums.find(x => x.id === r.inv.id)?.n ?? 0, paid: paid.find(x => x.id === r.inv.id)?.n ?? 0 }))
     overdueDebt = invoiceRows.filter(i => i.dueDate && i.dueDate < today && i.total > i.paid).reduce((n, i) => n + i.total - i.paid, 0)
   }
@@ -85,7 +89,6 @@ export async function getDashboard(db: DB, ctx: AccessContext, today = todayVN()
     invoices: invoiceRows, visas, metersMissing, facilities: facilitySnap, incidents: openIncidents, pendingDeposits, photos,
     leases: wantTenants ? activeLeases.map(x => ({ id: x.l.id, code: x.l.code, facilityId: x.facilityId, roomCode: x.roomCode, tenantName: x.tenantName, endDate: x.l.endDate, signStatus: x.l.signStatus, followedUp: terminated.has(x.l.id) })) : [],
   }
-  const roomRows = await db.select({ id: rooms.id }).from(rooms).where(and(eq(rooms.isActive, true), inScope(rooms.facilityId)))
   const occupiedIds = new Set(activeLeases.map(x => x.l.roomId))
   const depositRooms = new Set((await db.select({ r: depositContracts.roomId }).from(depositContracts).where(eq(depositContracts.status, 'pending'))).map(x => x.r))
   const deposited = roomRows.filter(r => !occupiedIds.has(r.id) && depositRooms.has(r.id)).length

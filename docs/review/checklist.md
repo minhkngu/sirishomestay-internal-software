@@ -64,8 +64,8 @@ Mỗi phụ lục có bước **Xem trước tiền** — xem trước không l�
 
 ## 12. Mẫu Word / PDF / ảnh
 - [ ] Mẫu giấy tờ: tải mẫu, "Thử xuất với dữ liệu mẫu". Ghi chú: ______
-- [ ] Xuất Word: hợp đồng, phụ lục, hoá đơn, phiếu thu (từ khoản thu). → Dữ liệu và định dạng tiền/ngày đúng. Ghi chú: ______
-- [ ] Xuất PDF (hợp đồng, hoá đơn) và Ảnh (chỉ hoá đơn). → Chỉ chạy khi đã cấu hình `GOTENBERG_URL`; chưa cấu hình phải báo rõ, không lỗi trắng. Ghi chú: ______
+- [ ] Xuất Word: hợp đồng, phụ lục và biên bản. → Dữ liệu và định dạng tiền/ngày đúng. Ghi chú: ______
+- [ ] Xuất PDF hoá đơn, phiếu thu và ảnh hoá đơn: dữ liệu, chỉ số điện nước và QR đúng; không cần Gotenberg. PDF hợp đồng, phụ lục, biên bản cần `GOTENBERG_URL`; chưa cấu hình phải báo rõ. Ghi chú: ______
 
 ## 13. Nhập Excel
 - [ ] Nhập → "Tải file mẫu" từng loại (khách, phòng, hợp đồng, số dư cọc, công nợ, chỉ số, tài sản). Ghi chú: ______

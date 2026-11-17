@@ -25,8 +25,8 @@ test('Hùng không thể mở trực tiếp trang khách thuê', async ({ page }
 })
 
 test('Admin thêm quyền cho Vy và khôi phục sau khi kiểm tra', async ({ browser }) => {
-  const adminContext = await browser.newContext({ baseURL: process.env.E2E_BASE_URL })
-  const vyContext = await browser.newContext({ baseURL: process.env.E2E_BASE_URL })
+  const adminContext = await browser.newContext({ baseURL: process.env.E2E_BASE_URL, storageState: process.env.E2E_STORAGE_STATE })
+  const vyContext = await browser.newContext({ baseURL: process.env.E2E_BASE_URL, storageState: process.env.E2E_STORAGE_STATE })
   const admin = await adminContext.newPage()
   const vy = await vyContext.newPage()
   await login(admin, /^Admin/)

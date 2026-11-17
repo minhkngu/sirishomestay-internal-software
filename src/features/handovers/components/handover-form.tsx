@@ -37,7 +37,7 @@ export function HandoverForm({ id, kind, readOnly, items: initial, checkInCondit
   return (
     <div className="space-y-4">
       {meters.length > 0 && (
-        <section className="space-y-2 rounded-lg border p-3">
+        <section className="space-y-2 rounded-lg border bg-card p-3">
           <h2 className="font-medium">Chỉ số điện nước</h2>
           {meters.map((m) => (
             <label key={m.meterId} className="flex items-center justify-between gap-2 text-sm">{m.utility === 'electric' ? 'Điện' : 'Nước'} {m.serial ?? ''}

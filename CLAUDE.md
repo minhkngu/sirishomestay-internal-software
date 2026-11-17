@@ -8,6 +8,7 @@ Web nội bộ cho nhân viên Siris quản lý cơ sở, phòng, khách thuê, 
 - Tailwind v4 + shadcn/ui (`@base-ui/react`), react-hook-form + zod, TanStack Query
 - Drizzle ORM + Postgres (Supabase), Supabase Auth (`@supabase/ssr`)
 - Lưu file: Cloudflare R2 / Supabase Storage (`STORAGE_DRIVER`); docxtemplater, exceljs
+- Hoá đơn và phiếu thu dựng PDF trong app bằng `@react-pdf/renderer`, mã QR bằng `qrcode`; Gotenberg dùng chuyển PDF hợp đồng, phụ lục và biên bản.
 - Vitest + PGlite (unit/integration), Playwright (e2e); triển khai Vercel
 
 ## Commands

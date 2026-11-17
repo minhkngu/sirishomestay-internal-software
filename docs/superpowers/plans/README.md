@@ -1,29 +1,32 @@
 # Kế hoạch triển khai Siris
 
-Spec: [../specs/2026-11-16-quan-ly-khach-thue-design.md](../specs/2026-11-16-quan-ly-khach-thue-design.md)
+Spec:
+- [Quản lý khách thuê](../specs/2026-11-16-quan-ly-khach-thue-design.md): toàn bộ nghiệp vụ.
+- [Ổn định app, hoá đơn PDF, giao diện](../specs/2026-11-17-on-dinh-giao-dien-hoa-don-pdf-design.md)
 
-Từ 16/11/2026 chỉ còn hai plan, làm theo thứ tự:
+Các plan đã làm xong (chức năng, kiểm thử tổng thể, ổn định / hoá đơn PDF / giao diện Bạc hà) đã được xoá khỏi thư mục này ngày 17/11/2026. Muốn xem lại thì tìm trong lịch sử git.
 
-| # | Plan | Nội dung | Tiến độ (16/11/2026) |
-|---|---|---|---|
-| 1 | [Chức năng](2026-11-16-chuc-nang.md) | Mọi chức năng nghiệp vụ (đợt 1–4 cũ, xuất PDF/ảnh, tăng tốc chuyển trang), danh sách test có tick, kiểm tra cuối và người dùng duyệt | Task 1–13, 4b, tăng tốc xong · Task 14, 15 đang làm · Task 16, 17, 20 chưa làm · Task 18 làm một phần |
-| 2 | [Lưu trữ và chạy thật](2026-11-16-luu-tru.md) | Chuyển file sang R2, tự xoá ảnh sau thanh lý, sao lưu Google Drive, xoá dữ liệu giả, chuyển sang dữ liệu thật | Task 22 (sao lưu) đã cài, chưa chạy thử khôi phục · còn lại làm sau khi người dùng duyệt plan 1 |
+## Plan đang mở
 
-Số Task giữ như cũ cho cả dự án. Các plan đợt 1–5, kế hoạch kiểm thử tổng thể và kế hoạch tăng tốc đã được gộp vào hai file trên; bản cũ xem trong lịch sử git (commit trước `docs: tách plan lưu trữ, gộp plan chức năng`).
+| Plan | Nội dung | Tiến độ (17/11/2026) |
+|---|---|---|
+| [Lưu trữ và chạy thật](2026-11-16-luu-tru.md) | Chuyển file sang R2, tự xoá ảnh sau thanh lý, sao lưu Google Drive, xoá dữ liệu giả, chuyển sang dữ liệu thật | Task 22 (sao lưu) đã cài, chưa thử khôi phục. Phần còn lại làm sau khi người dùng duyệt chức năng. |
 
-## Tiến độ
+## Việc còn lại trước khi người dùng duyệt
 
-- **16/11/2026:** Task 1–12 merge vào `main` (`f2a8a22`); 242/242 test đạt. Đã migrate + nạp dữ liệu giả lên Supabase `siris-pms`.
-- **16/11/2026:** e2e + checklist đợt 1 (`4d71407`); seed tự tạo bucket `siris` (`8c09af0`).
-- **16/11/2026 — rà soát plan với spec:** thêm Task 12b và 4b; sửa Task 13–15, 18, 21.
-- **16/11/2026:** Task 12b, điểm dừng đợt 1 và 2 hoàn thành theo xác nhận của người dùng; seed chạy thêm dần (không cần `--reset`).
-- **16/11/2026:** tăng tốc chuyển trang (getClaims, cache, loading, Vercel `bom1`) đã triển khai; Preview trung vị 409 ms, chưa đo `_rsc`.
-- **16/11/2026:** Task 4b, 13 xong (`f352374`, `a950290`); Task 14, 15 đang làm trên nhánh `my-plan-3`.
-- **16/11/2026 — tách plan:** theo yêu cầu người dùng, tách phần lưu trữ ra plan riêng và gộp mọi plan chức năng thành một file có danh sách test, để test chức năng trước.
+- [ ] Xác nhận xuất PDF và ảnh hoá đơn, phiếu thu trên bản preview mới nhất (sau commit `391ec48` đóng gói `pdfkit` và `@napi-rs/canvas`).
+- [ ] Chạy lại toàn bộ e2e (`node scripts/e2e-preflight.mjs` trước), xác nhận tất cả đạt.
+- [ ] Đo tốc độ chuyển trang trên bản production. Ghi kết quả vào `docs/operations/toc-do.md`.
+- [ ] `npm run db:migrate && npm run db:seed` trên Supabase dev (không `--reset`), deploy bản thử.
+- [ ] Gửi link bản thử và [checklist duyệt](../../review/checklist.md) cho người dùng. Mỗi góp ý sửa trong một commit `fix:` riêng.
 
 ## Ghi chú môi trường
 
-- Project Supabase dùng cho web: **siris-pms** (`giwatdbtmctydtiststh`, ap-south-1). Project "Siris" cũ là của app khác, không dùng.
-- `DATABASE_URL` phải dùng **Session pooler** (`aws-1-ap-south-1.pooler.supabase.com:5432`, user `postgres.<ref>`); địa chỉ `db.<ref>.supabase.co` chỉ có IPv6, máy không kết nối được.
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` nhận được cả publishable key mới (`sb_publishable_…`); `SUPABASE_SERVICE_ROLE_KEY` nhận được cả secret key mới (`sb_secret_…`).
-- Supabase Storage cần bucket riêng tư `siris`; `npm run db:seed` tự tạo nếu chưa có.
+- Project Supabase dùng cho web là **siris-pms** (`giwatdbtmctydtiststh`, ap-south-1). Project "Siris" cũ thuộc app khác, không dùng.
+- `DATABASE_URL` (máy local và Vercel) dùng **Transaction pooler**: `aws-1-ap-south-1.pooler.supabase.com:6543`, user `postgres.<ref>`.
+  - Không dùng Session pooler (cổng 5432): nhiều instance Vercel sẽ làm hết 15 chỗ và báo `EMAXCONNSESSION`.
+  - Địa chỉ `db.<ref>.supabase.co` chỉ có IPv6, máy không kết nối được.
+- Supavisor treo khi nhận nhiều truy vấn gửi dồn trên một kết nối. Vì vậy `src/db/client.ts` phải giữ `max_pipeline: 1` và `query_timeout`; test ở `tests/integration/db-pooler-hang.test.ts`.
+- Role `postgres` có `transaction_timeout = 60s`: kết nối nào kẹt quá 60 giây sẽ bị cắt. Migration dài hơn 60 giây phải tạm nâng giới hạn này.
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` nhận được cả publishable key mới (`sb_publishable_…`). `SUPABASE_SERVICE_ROLE_KEY` nhận được cả secret key mới (`sb_secret_…`).
+- Supabase Storage cần bucket riêng tư `siris`. `npm run db:seed` tự tạo nếu chưa có.

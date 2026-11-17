@@ -13,8 +13,8 @@ export class SupabaseStorage implements StorageAdapter {
     if (error || !data) throw new Error(`Không tạo được URL tải lên: ${error?.message}`)
     return data.signedUrl
   }
-  async createDownloadUrl(key: string, expiresSec: number) {
-    const { data, error } = await this.bucket().createSignedUrl(key, expiresSec)
+  async createDownloadUrl(key: string, expiresSec: number, downloadName?: string) {
+    const { data, error } = await this.bucket().createSignedUrl(key, expiresSec, downloadName ? { download: downloadName } : undefined)
     if (error || !data) throw new Error(`Không tạo được URL tải xuống: ${error?.message}`)
     return data.signedUrl
   }

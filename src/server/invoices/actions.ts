@@ -43,5 +43,5 @@ export async function removePaymentAction(paymentId: string) {
 }
 export async function exportReceiptAction(paymentId: string, templateId?: string) {
   const ctx = await getAccessContext()
-  return toActionResult(() => exportReceipt(db, ctx, getStorage(), paymentId, templateId))
+  return toActionResult(() => exportReceipt(db, ctx, getStorage(), paymentId, templateId, 'pdf'))
 }

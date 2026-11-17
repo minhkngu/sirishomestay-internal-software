@@ -49,15 +49,9 @@ describe('xuất PDF và ảnh (Gotenberg giả)', () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('ECONNREFUSED') }))
     await expect(exportDocument(db, admin, storage, { docType: 'lease', entityId: crypto.randomUUID(), format: 'pdf' })).rejects.toThrow(ValidationError)
   })
-  it('png chỉ cho hoá đơn; loại khác bị từ chối', async () => {
-    await addTemplate('lease'); await addTemplate('invoice_monthly')
+  it('không cho xuất hợp đồng thành ảnh', async () => {
+    await addTemplate('lease')
     await expect(exportDocument(db, admin, storage, { docType: 'lease', entityId: crypto.randomUUID(), format: 'png' })).rejects.toThrow('Chỉ hoá đơn mới xuất được ảnh')
-    const r = await exportDocument(db, admin, storage, { docType: 'invoice_monthly', entityId: crypto.randomUUID(), format: 'png' })
-    const [row] = await db.select().from(files).where(eq(files.id, r.fileId))
-    expect(row).toMatchObject({ contentType: 'image/png', name: 'tai-lieu.png' })
-    expect(calls.map((c) => c.url)).toEqual(['http://gotenberg.test/forms/libreoffice/convert'])
-    const png = new Uint8Array(await storage.read(row.storageKey))
-    expect(Array.from(png.slice(1, 4))).toEqual([0x50, 0x4e, 0x47]) // dấu hiệu PNG, vẽ tại chỗ không gọi dịch vụ thứ hai
   })
   it('chưa cấu hình dịch vụ → báo rõ, không crash', async () => {
     await addTemplate('lease'); vi.stubEnv('GOTENBERG_URL', '')

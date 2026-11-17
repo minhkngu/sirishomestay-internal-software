@@ -5,9 +5,11 @@ import { assertCan, type AccessContext } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/server/audit'
 
-import type { DueRule } from '@/domain/types'
+import type { BankAccount, DueRule } from '@/domain/types'
+import { bankAccountSchema } from './schemas'
 
 export const SETTINGS_DEFAULTS = {
+  bankAccount: null as BankAccount | null,
   visaWarningDays: 30,
   contractWarningDays: 30,
   proration: 'actual_days' as 'days_30' | 'actual_days',
@@ -23,6 +25,7 @@ export const dueRuleSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('days_after_approval'), days: z.number().int().min(0, 'Số ngày phải từ 0 đến 90').max(90, 'Số ngày phải từ 0 đến 90') }),
 ])
 const settingsPatch = z.object({
+  bankAccount: bankAccountSchema.nullable().optional(),
   visaWarningDays: days.optional(),
   contractWarningDays: days.optional(),
   photoRetentionDays: days.optional(),

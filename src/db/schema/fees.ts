@@ -36,3 +36,12 @@ export const utilityRates = pgTable(
   },
   (t) => [unique('utility_rates_facility_utility_from_unique').on(t.facilityId, t.utility, t.effectiveFrom)],
 )
+
+export const feeTypePrices = pgTable('fee_type_prices', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  feeTypeId: uuid('fee_type_id').notNull().references(() => feeTypes.id, { onDelete: 'cascade' }),
+  facilityId: uuid('facility_id').notNull().references(() => facilities.id, { onDelete: 'cascade' }),
+  price: integer('price').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique('fee_type_prices_fee_facility_unique').on(t.feeTypeId, t.facilityId)]).enableRLS()

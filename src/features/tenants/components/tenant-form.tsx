@@ -63,11 +63,11 @@ export function TenantForm({ facilities, tenant }: Props) {
   }
 
   return (
-    <div className="max-w-2xl space-y-4">
+    <div className="max-w-2xl space-y-4 rounded-lg border bg-card p-4 sm:p-6">
       <div className="flex flex-wrap gap-2" role="tablist">
         {(Object.keys(KIND_LABELS) as Kind[]).map((k) => (
           <button key={k} type="button" role="tab" aria-selected={kind === k} onClick={() => setKind(k)}
-            className={cn('min-w-36 flex-1 rounded-lg border px-4 py-3 text-base font-medium', kind === k && 'bg-primary text-primary-foreground')}>
+            className={cn('min-w-36 flex-1 rounded-lg border px-4 py-3 text-base font-medium', kind === k && 'bg-[var(--primary-strong)] text-primary-foreground')}>
             {KIND_LABELS[k]}
           </button>
         ))}

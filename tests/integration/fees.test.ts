@@ -1,7 +1,8 @@
+import { eq, sql } from 'drizzle-orm'
 import { describe, it, expect, beforeEach } from 'vitest'
-import { facilities } from '@/db'
+import { facilities, feeTypes, feeTypePrices } from '@/db'
 import {
-  createFeeUnit, listFeeUnits, createFeeType, updateFeeType, archiveFeeType, listFeeTypes, createRate, listRates,
+  setFeeTypePrice, removeFeeTypePrice, listFeeTypePrices, createFeeUnit, listFeeUnits, createFeeType, updateFeeType, archiveFeeType, listFeeTypes, createRate, listRates,
 } from '@/server/fees/service'
 import { ForbiddenError, NotFoundError } from '@/domain/errors'
 import type { AccessContext, Permission } from '@/domain/access'
@@ -21,6 +22,34 @@ describe('fees & rates', () => {
     db = await createTestDb()
     fa = (await db.insert(facilities).values({ code: 'A', name: 'A' }).returning())[0].id
     fb = (await db.insert(facilities).values({ code: 'B', name: 'B' }).returning())[0].id
+  })
+
+  it('bảng giá theo toà bật RLS', async () => {
+    const result = await db.execute(sql`select relrowsecurity from pg_class where oid = 'fee_type_prices'::regclass`)
+    expect((result as unknown as { rows: { relrowsecurity: boolean }[] }).rows[0].relrowsecurity).toBe(true)
+  })
+
+  it('đặt lại, xoá giá riêng, kiểm tra giá và phân quyền', async () => {
+    const unit = await createFeeUnit(db, admin, { name: 'người' })
+    const fee = await createFeeType(db, admin, { name: 'Dịch vụ', unitId: unit.id, defaultPrice: 200000, billing: 'monthly_fixed', quantityFrom: 'manual' })
+    const input = { feeTypeId: fee.id, facilityId: fa, price: 250000 }
+    await setFeeTypePrice(db, admin, input); await setFeeTypePrice(db, admin, { ...input, price: 0 })
+    expect(await listFeeTypePrices(db, admin)).toEqual({ [fee.id]: { [fa]: 0 } })
+    await expect(setFeeTypePrice(db, admin, { ...input, price: -1 })).rejects.toThrow('Đơn giá không hợp lệ')
+    await expect(setFeeTypePrice(db, ctxOf(['billing'], [fa]), input)).rejects.toThrow(ForbiddenError)
+    await removeFeeTypePrice(db, admin, input)
+    expect(await listFeeTypePrices(db, admin)).toEqual({})
+    await setFeeTypePrice(db, admin, input)
+    await db.delete(feeTypes).where(eq(feeTypes.id, fee.id))
+    expect(await db.select().from(feeTypePrices)).toHaveLength(0)
+  })
+
+  it('xoá toà kéo theo giá riêng', async () => {
+    const unit = await createFeeUnit(db, admin, { name: 'phòng' })
+    const fee = await createFeeType(db, admin, { name: 'Phí', unitId: unit.id, defaultPrice: 1, billing: 'monthly_fixed', quantityFrom: 'manual' })
+    await setFeeTypePrice(db, admin, { feeTypeId: fee.id, facilityId: fa, price: 2 })
+    await db.delete(facilities).where(eq(facilities.id, fa))
+    expect(await db.select().from(feeTypePrices)).toHaveLength(0)
   })
 
   it('đơn vị và loại phí: tạo, sửa, lưu trữ (không xoá cứng)', async () => {

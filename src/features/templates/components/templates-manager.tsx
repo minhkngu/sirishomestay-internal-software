@@ -5,7 +5,7 @@ import { useState, useTransition } from 'react'
 import { FileUpload } from '@/components/file-upload'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { DOC_TYPES, DOC_TYPE_LABELS, TEMPLATE_FIELDS, type DocType } from '@/domain/template-fields'
+import { DOC_TYPES, PDF_DOC_TYPES, DOC_TYPE_LABELS, TEMPLATE_FIELDS, type DocType } from '@/domain/template-fields'
 import { attachTemplateFileAction, createTemplateAction, removeTemplateAction, setDefaultTemplateAction, trialExportAction } from '@/server/templates/actions'
 
 type Tpl = { id: string; docType: string; name: string; hasFile: boolean; isDefault: boolean }
@@ -16,7 +16,7 @@ function FieldTable({ docType }: { docType: DocType }) {
   const [copied, setCopied] = useState('')
   const copy = (text: string) => { void navigator.clipboard?.writeText(text); setCopied(text) }
   return (
-    <div className="overflow-x-auto rounded-md border">
+    <div className="overflow-x-auto rounded-md border bg-card">
       <table className="w-full text-sm">
         <thead className="bg-muted/50 text-left"><tr><th className="p-2">Chỗ điền</th><th className="p-2">Ý nghĩa</th><th className="p-2">Ví dụ</th></tr></thead>
         <tbody>
@@ -64,10 +64,10 @@ export function TemplatesManager({ templates }: { templates: Tpl[] }) {
     <div className="space-y-6">
       {error && <p className="text-sm text-destructive">{error}</p>}
       {msg && <p className="text-sm text-green-700">{msg}</p>}
-      {DOC_TYPES.map((dt) => {
+      {DOC_TYPES.filter((dt) => !(PDF_DOC_TYPES as readonly string[]).includes(dt)).map((dt) => {
         const list = templates.filter((t) => t.docType === dt)
         return (
-          <section key={dt} className="space-y-3 rounded-lg border p-4">
+          <section key={dt} className="space-y-3 rounded-lg border bg-card p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-medium">{DOC_TYPE_LABELS[dt]}</h2>
               <button type="button" className="text-sm underline" onClick={() => setOpen(open === dt ? null : dt)}>{open === dt ? 'Ẩn bảng chỗ điền' : 'Xem bảng chỗ điền'}</button>

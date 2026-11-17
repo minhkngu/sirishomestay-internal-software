@@ -1,10 +1,10 @@
 import { eq } from 'drizzle-orm'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { addenda, assets, depositEntries, feeTypes, feeUnits, leaseFees, payments, facilities, files, invoiceLines, invoices, leaseOccupants, leases, meterReadings, meters, pendingAdjustments, rooms, tenants, utilityRates } from '@/db'
+import { addenda, assets, depositEntries, feeTypes, feeTypePrices, feeUnits, leaseFees, payments, facilities, files, invoiceLines, invoices, leaseOccupants, leases, meterReadings, meters, pendingAdjustments, rooms, tenants, utilityRates } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
-import { createExtension, createOccupantChange, createTermination, createTransfer, previewAddendum } from '@/server/addenda/service'
+import { addendumFormData, createExtension, createOccupantChange, createTermination, createTransfer, previewAddendum } from '@/server/addenda/service'
 import { saveHandover, startHandover } from '@/server/handovers/service'
 import { approveInvoice, getInvoiceDetail } from '@/server/invoices/service'
 import { createTestDb } from '../helpers/db'
@@ -24,6 +24,12 @@ describe('phụ lục hợp đồng', () => {
     const [inv] = await db.insert(invoices).values({ code: 'TD-HD-202611-0001', leaseId, facilityId, kind: 'monthly', periodStart: '2026-11-01', periodEnd: '2026-11-30', issueDate: '2026-11-01', dueDate: '2026-12-05', status: 'approved' }).returning(); invoiceId = inv.id
     await db.insert(invoiceLines).values({ invoiceId, type: 'rent', description: 'Tiền phòng', quantity: 1, unitPrice: 9000000, amount: 9000000 })
     await db.insert(utilityRates).values({ facilityId, utility: 'electric', effectiveFrom: '2026-01-01', pricePerUnit: 3500 })
+  })
+  it('ngữ cảnh phụ lục dùng giá phí riêng theo toà hợp đồng', async () => {
+    const [unit] = await db.insert(feeUnits).values({ name: 'tháng' }).returning()
+    const [fee] = await db.insert(feeTypes).values({ name: 'Dịch vụ', unitId: unit.id, defaultPrice: 200000 }).returning()
+    await db.insert(feeTypePrices).values({ feeTypeId: fee.id, facilityId, price: 250000 })
+    expect((await addendumFormData(db, ctx(), leaseId)).fees.find((f) => f.id === fee.id)?.defaultPrice).toBe(250000)
   })
   it('gia hạn đổi giá: sinh điều chỉnh chờ, cọc chờ thu và cập nhật ngày kết thúc; chạy lại không sinh lặp', async () => {
     const r = await createExtension(db, ctx(), leaseId, { effectiveDate: '2026-11-16', newEndDate: '2027-06-30', newMonthlyRent: 10000000, newDepositAmount: 10000000 })

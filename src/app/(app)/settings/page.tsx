@@ -3,7 +3,7 @@ import { RequirePermission } from '@/components/require-permission'
 import { getAccessContext } from '@/server/session'
 import { getSettings } from '@/server/settings/service'
 import { listFacilities } from '@/server/facilities/service'
-import { listFeeTypes, listFeeUnits, listRates } from '@/server/fees/service'
+import { listFeeTypes, listFeeUnits, listRates, listFeeTypePrices } from '@/server/fees/service'
 import { SettingsTabs } from '@/features/settings/components/settings-tabs'
 
 export default async function SettingsPage() {
@@ -16,12 +16,12 @@ export default async function SettingsPage() {
 }
 
 async function Settings({ ctx }: { ctx: Awaited<ReturnType<typeof getAccessContext>> }) {
-  const [settings, facilities, units, feeTypes] = await Promise.all([getSettings(db), listFacilities(db, ctx), listFeeUnits(db, ctx), listFeeTypes(db, ctx)])
+  const [settings, facilities, units, feeTypes, prices] = await Promise.all([getSettings(db), listFacilities(db, ctx), listFeeUnits(db, ctx), listFeeTypes(db, ctx), listFeeTypePrices(db, ctx)])
   const rates = (await Promise.all(facilities.map((f) => listRates(db, ctx, f.id)))).flat()
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Cài đặt</h1>
-      <SettingsTabs settings={settings} units={units} feeTypes={feeTypes} rates={rates}
+      <SettingsTabs settings={settings} units={units} feeTypes={feeTypes} rates={rates} prices={prices}
         facilities={facilities.map((f) => ({ id: f.id, code: f.code, name: f.name, address: f.address, expectedInvoiceDay: f.expectedInvoiceDay }))} />
     </div>
   )

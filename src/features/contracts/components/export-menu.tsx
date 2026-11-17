@@ -23,7 +23,7 @@ export function ExportMenu({ kind, id, templates }: { kind: 'lease' | 'deposit';
     })
 
   return (
-    <section className="space-y-2 rounded-lg border p-4">
+    <section className="space-y-2 rounded-lg border bg-card p-4">
       <h2 className="font-medium">Xuất giấy tờ</h2>
       {templates.length === 0 ? <p className="text-sm text-muted-foreground">Chưa có mẫu Word cho loại giấy tờ này (Cài đặt → Mẫu giấy tờ).</p> : (
         <div className="flex flex-wrap items-center gap-2">

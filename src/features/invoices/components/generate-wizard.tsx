@@ -28,12 +28,12 @@ export function GenerateWizard({ facilities, leaseLabels, defaultPeriod }: { fac
       {rows && (
         <div className="space-y-3">
           {due.map((r) => (
-            <div key={r.leaseId} className="rounded-md border p-3 text-sm">
+            <div key={r.leaseId} className="rounded-md border bg-card p-3 text-sm">
               <div className="font-medium">{leaseLabels[r.leaseId] ?? r.leaseId} · {formatDateVN(r.period!.start)} – {formatDateVN(r.period!.end)} · {formatVND(r.lines.reduce((n, l) => n + l.amount, 0))}</div>
               {r.warnings.map((w) => <p key={w} className="text-amber-700">⚠ {w}</p>)}
             </div>
           ))}
-          {prepaid.length > 0 && <div className="rounded-md border p-3 text-sm text-muted-foreground">{prepaid.map((r) => <p key={r.leaseId}>{leaseLabels[r.leaseId]}: Đã trả trước tới {formatDateVN(r.prepaidUntil)}</p>)}</div>}
+          {prepaid.length > 0 && <div className="rounded-md border bg-card p-3 text-sm text-muted-foreground">{prepaid.map((r) => <p key={r.leaseId}>{leaseLabels[r.leaseId]}: Đã trả trước tới {formatDateVN(r.prepaidUntil)}</p>)}</div>}
           {due.length === 0 && <p className="text-sm text-muted-foreground">Không có hợp đồng nào cần lập hoá đơn kỳ này</p>}
           <Button disabled={pending || due.length === 0} onClick={create}>Tạo {due.length} hoá đơn nháp</Button>
         </div>

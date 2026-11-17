@@ -21,7 +21,7 @@ export default async function IncidentPage({ params }: { params: Promise<{ id: s
     <div className="max-w-2xl space-y-4">
       <Link href="/incidents" className="text-sm underline">← Sự cố</Link>
       <h1 className="text-xl font-semibold">{inc.title}</h1>
-      <dl className="grid grid-cols-2 gap-2 text-sm">
+      <dl className="grid grid-cols-2 gap-3 rounded-lg border bg-card p-4 text-sm">
         <dt className="text-muted-foreground">Trạng thái</dt><dd>{STATUS[inc.status]}</dd>
         <dt className="text-muted-foreground">Phòng</dt><dd>{room?.code ?? '—'}</dd>
         <dt className="text-muted-foreground">Người xử lý</dt><dd>{assignee?.name ?? 'Chưa giao'}</dd>

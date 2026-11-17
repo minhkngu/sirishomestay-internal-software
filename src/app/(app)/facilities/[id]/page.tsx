@@ -1,10 +1,11 @@
 import { db } from '@/db/client'
 import { orNotFound } from '@/lib/or-not-found'
 import { ROOM_STATUS_LABELS, type RoomStatus } from '@/domain/room-status'
-import { canViewTenantIdentity } from '@/domain/access'
+import { can, canViewTenantIdentity } from '@/domain/access'
 import { getAccessContext } from '@/server/session'
 import { getFacility } from '@/server/facilities/service'
 import { listRoomsWithStatus } from '@/server/rooms/service'
+import { FacilityBankAccount } from '@/features/facilities/components/facility-form'
 import { RoomPanels } from '@/features/rooms/components/room-panels'
 import { RoomMap } from '@/features/rooms/components/room-map'
 
@@ -25,9 +26,10 @@ export default async function FacilityPage({ params }: { params: Promise<{ id: s
         <h1 className="text-xl font-semibold">{facility.name} <span className="text-sm text-muted-foreground">({facility.code})</span></h1>
         <p className="text-sm text-muted-foreground">{facility.address}</p>
       </div>
+      {can(ctx, 'settings') && <FacilityBankAccount id={facility.id} account={facility.bankAccount} />}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         {stats.map(([label, n]) => (
-          <div key={label} className="rounded-lg border p-3"><div className="text-2xl font-semibold">{n}</div><div className="text-xs text-muted-foreground">{label}</div></div>
+          <div key={label} className="rounded-lg border bg-card p-3"><div className="text-2xl font-semibold">{n}</div><div className="text-xs text-muted-foreground">{label}</div></div>
         ))}
       </div>
       {ctx.isAdmin && <RoomPanels facilityId={id} />}

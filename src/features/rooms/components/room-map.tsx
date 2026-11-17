@@ -22,9 +22,9 @@ export function RoomMap({ rooms }: { rooms: MapRoom[] }) {
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap gap-2" role="group" aria-label="Lọc theo trạng thái">
-        <button type="button" onClick={() => setFilter('')} className={cn('rounded-full border px-3 py-1 text-xs', !filter && 'bg-primary text-primary-foreground')}>Tất cả</button>
+        <button type="button" onClick={() => setFilter('')} className={cn('rounded-full border px-3 py-1 text-xs', !filter && 'bg-[var(--primary-strong)] text-primary-foreground')}>Tất cả</button>
         {(Object.keys(ROOM_STATUS_LABELS) as RoomStatus[]).map((s) => (
-          <button key={s} type="button" onClick={() => setFilter(s)} className={cn('rounded-full border px-3 py-1 text-xs', filter === s && 'bg-primary text-primary-foreground')}>
+          <button key={s} type="button" onClick={() => setFilter(s)} className={cn('rounded-full border px-3 py-1 text-xs', filter === s && 'bg-[var(--primary-strong)] text-primary-foreground')}>
             {ROOM_STATUS_LABELS[s]}
           </button>
         ))}
@@ -37,7 +37,7 @@ export function RoomMap({ rooms }: { rooms: MapRoom[] }) {
             <div className="text-xs font-medium text-muted-foreground">Tầng {fl}</div>
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
               {row.map((r) => (
-                <Link key={r.id} href={`/rooms/${r.id}`} className={cn('rounded-lg border p-2 text-sm', COLOR[r.status])}>
+                <Link key={r.id} href={`/rooms/${r.id}`} className={cn('rounded-lg border bg-card p-2 text-sm', COLOR[r.status])}>
                   <div className="font-semibold">{r.code}</div>
                   <div className="truncate text-xs">{ROOM_STATUS_LABELS[r.status]}</div>
                   {r.tenantName && <div className="truncate text-xs opacity-80">{r.tenantName}</div>}

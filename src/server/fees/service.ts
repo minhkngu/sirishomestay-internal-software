@@ -1,6 +1,6 @@
 import { and, asc, desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { feeTypes, feeUnits, utilityRates } from '@/db'
+import { feeTypes, feeTypePrices, feeUnits, utilityRates } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
@@ -109,5 +109,35 @@ export async function createRate(db: DB, ctx: AccessContext, input: unknown): Pr
       summary: `Thêm đơn giá ${r.utility === 'electric' ? 'điện' : 'nước'} ${r.pricePerUnit} từ ${r.effectiveFrom}`, after: r,
     })
     return r
+  })
+}
+
+const feePriceKey = z.object({ feeTypeId: z.uuid(), facilityId: z.uuid() })
+const feePriceInput = feePriceKey.extend({ price: z.number().int().min(0, 'Đơn giá không hợp lệ').max(2147483647, 'Đơn giá không hợp lệ') })
+
+export async function listFeeTypePrices(db: Pick<DB, 'select'>, ctx: AccessContext): Promise<Record<string, Record<string, number>>> {
+  const rows = await db.select().from(feeTypePrices)
+  const result: Record<string, Record<string, number>> = {}
+  for (const row of rows) {
+    if (!ctx.isAdmin && !ctx.facilityIds.has(row.facilityId)) continue
+    ;(result[row.feeTypeId] ??= {})[row.facilityId] = row.price
+  }
+  return result
+}
+export async function setFeeTypePrice(db: DB, ctx: AccessContext, input: unknown): Promise<void> {
+  assertCan(ctx, 'settings')
+  const data = parse(feePriceInput, input)
+  await db.transaction(async (tx) => {
+    const [before] = await tx.select().from(feeTypePrices).where(and(eq(feeTypePrices.feeTypeId, data.feeTypeId), eq(feeTypePrices.facilityId, data.facilityId)))
+    const [after] = await tx.insert(feeTypePrices).values(data).onConflictDoUpdate({ target: [feeTypePrices.feeTypeId, feeTypePrices.facilityId], set: { price: data.price, updatedAt: new Date() } }).returning()
+    await recordAudit(tx, ctx, { action: before ? 'update' : 'create', entity: 'fee_type_price', entityId: after.id, facilityId: data.facilityId, summary: 'Lưu giá phí theo toà', before, after })
+  })
+}
+export async function removeFeeTypePrice(db: DB, ctx: AccessContext, input: unknown): Promise<void> {
+  assertCan(ctx, 'settings')
+  const data = parse(feePriceKey, input)
+  await db.transaction(async (tx) => {
+    const [before] = await tx.delete(feeTypePrices).where(and(eq(feeTypePrices.feeTypeId, data.feeTypeId), eq(feeTypePrices.facilityId, data.facilityId))).returning()
+    if (before) await recordAudit(tx, ctx, { action: 'delete', entity: 'fee_type_price', entityId: before.id, facilityId: data.facilityId, summary: 'Xoá giá phí theo toà', before })
   })
 }

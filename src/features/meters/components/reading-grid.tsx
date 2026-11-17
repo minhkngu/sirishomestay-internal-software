@@ -69,7 +69,7 @@ export function ReadingGrid({ rows, period, readOn, progress }: { rows: GridRow[
   return (
     <div className="space-y-3">
       <p className="text-sm">Đã ghi <strong>{progress.recorded}/{progress.total}</strong> phòng (điện)</p>
-      <div className="overflow-x-auto rounded-md border">
+      <div className="overflow-x-auto rounded-md border bg-card">
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-left">
             <tr><th className="p-2" rowSpan={2}>Phòng</th><th className="p-2" colSpan={3}>Điện (kWh)</th><th className="p-2" colSpan={3}>Nước (m³)</th></tr>

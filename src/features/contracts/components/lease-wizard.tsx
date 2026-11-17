@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { addDays } from '@/domain/dates'
+import { resolveFeePrice } from '@/domain/fee-price'
 import { formatVND } from '@/domain/money'
 import { convertDepositToLeaseAction, createLeaseAction } from '@/server/contracts/actions'
 import type { RoomOption, TenantOption } from './deposit-form'
 
-export type FeeOption = { id: string; name: string; unit: string; defaultPrice: number; billing: string; quantityFrom: string }
+export type FeeOption = { id: string; name: string; unit: string; defaultPrice: number; prices: Record<string, number>; billing: string; quantityFrom: string }
 type Initial = { roomId?: string; tenantId?: string; depositId?: string; rent?: number; deposit?: number; startDate?: string }
 type Props = {
   rooms: RoomOption[]; tenants: TenantOption[]; feeTypes: FeeOption[]; initial?: Initial
@@ -31,7 +32,7 @@ export function LeaseWizard({ rooms, tenants, feeTypes, initial = {}, defaults }
   const [rent, setRent] = useState(String(initial.rent ?? ''))
   const [deposit, setDeposit] = useState(String(initial.deposit ?? ''))
   const [fees, setFees] = useState<Record<string, { on: boolean; quantity: string; price: string }>>(
-    Object.fromEntries(feeTypes.map((f) => [f.id, { on: false, quantity: '1', price: String(f.defaultPrice) }])),
+    Object.fromEntries(feeTypes.map((f) => [f.id, { on: false, quantity: '1', price: String(resolveFeePrice(f.defaultPrice, f.prices, rooms.find((r) => r.id === initial.roomId)?.facilityId ?? null)) }])),
   )
   const [overrideProration, setOverrideProration] = useState('')
   const [dayOfMonth, setDayOfMonth] = useState('')
@@ -82,13 +83,13 @@ export function LeaseWizard({ rooms, tenants, feeTypes, initial = {}, defaults }
       {step === 0 && (
         <div className="space-y-4">
           <div className="space-y-1"><Label htmlFor="room">Phòng</Label>
-            <select id="room" value={roomId} disabled={!!initial.depositId} onChange={(e) => { setRoomId(e.target.value); const p = rooms.find((r) => r.id === e.target.value)?.listPrice; if (p && !rent) setRent(String(p)) }} className="h-8 w-full rounded-lg border px-2 text-sm">
+            <select id="room" value={roomId} disabled={!!initial.depositId} onChange={(e) => { setRoomId(e.target.value); const room = rooms.find((r) => r.id === e.target.value); setFees((previous) => Object.fromEntries(feeTypes.map((f) => [f.id, previous[f.id].on ? previous[f.id] : { ...previous[f.id], price: String(resolveFeePrice(f.defaultPrice, f.prices, room?.facilityId ?? null)) }]))); const p = room?.listPrice; if (p && !rent) setRent(String(p)) }} className="h-8 w-full rounded-lg border px-2 text-sm">
               <option value="">— chọn phòng —</option>{rooms.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}</select></div>
           <div className="space-y-1"><Label htmlFor="tenant">Bên thuê (khách hoặc công ty)</Label>
             <select id="tenant" value={tenantId} onChange={(e) => pickTenant(e.target.value)} className="h-8 w-full rounded-lg border px-2 text-sm">
               <option value="">— chọn —</option>{tenants.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
           <fieldset className="space-y-1"><legend className="text-sm font-medium">Người ở trong phòng ({occupantIds.length})</legend>
-            <div className="grid max-h-56 gap-1 overflow-auto rounded-md border p-2 sm:grid-cols-2">
+            <div className="grid max-h-56 gap-1 overflow-auto rounded-md border bg-card p-2 sm:grid-cols-2">
               {individuals.map((t) => <label key={t.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={occupantIds.includes(t.id)} onChange={() => toggleOccupant(t.id)} /> {t.name}</label>)}
             </div></fieldset>
         </div>
@@ -108,7 +109,7 @@ export function LeaseWizard({ rooms, tenants, feeTypes, initial = {}, defaults }
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">Chọn phí áp dụng. Phí theo người tự lấy số người ở ({occupantIds.length}).</p>
           {feeTypes.map((f) => (
-            <div key={f.id} className="flex flex-wrap items-center gap-2 rounded-md border p-2 text-sm">
+            <div key={f.id} className="flex flex-wrap items-center gap-2 rounded-md border bg-card p-2 text-sm">
               <label className="flex min-w-48 items-center gap-2"><input type="checkbox" checked={fees[f.id].on} onChange={(e) => setFees({ ...fees, [f.id]: { ...fees[f.id], on: e.target.checked } })} /> {f.name} <span className="text-muted-foreground">({f.unit}, {f.billing === 'monthly_fixed' ? 'hằng tháng' : 'theo lần'})</span></label>
               {f.quantityFrom === 'occupants' ? <span className="text-muted-foreground">SL = {Math.max(1, occupantIds.length)}</span>
                 : <Input aria-label={`Số lượng ${f.name}`} className="w-20" inputMode="numeric" value={fees[f.id].quantity} onChange={(e) => setFees({ ...fees, [f.id]: { ...fees[f.id], quantity: e.target.value } })} />}
@@ -132,7 +133,7 @@ export function LeaseWizard({ rooms, tenants, feeTypes, initial = {}, defaults }
       )}
 
       {step === 4 && (
-        <dl className="grid grid-cols-2 gap-2 rounded-md border p-3 text-sm">
+        <dl className="grid grid-cols-2 gap-2 rounded-md border bg-card p-3 text-sm">
           <dt className="text-muted-foreground">Phòng</dt><dd>{rooms.find((r) => r.id === roomId)?.label}</dd>
           <dt className="text-muted-foreground">Bên thuê</dt><dd>{tenant?.name}</dd>
           <dt className="text-muted-foreground">Số người ở</dt><dd>{occupantIds.length}</dd>

@@ -24,11 +24,11 @@ export function SignStatus({ kind, id, status, signedFileId }: { kind: 'lease' |
     })
 
   return (
-    <section className="space-y-3 rounded-lg border p-4">
+    <section className="space-y-3 rounded-lg border bg-card p-4">
       <h2 className="font-medium">Trạng thái ký</h2>
       <ol className="flex items-center gap-2 text-sm">
         {STEPS.map(([k, label], i) => (
-          <li key={k} className={cn('rounded-full border px-3 py-1', i <= idx ? 'bg-primary text-primary-foreground' : 'text-muted-foreground')}>{label}</li>
+          <li key={k} className={cn('rounded-full border px-3 py-1', i <= idx ? 'bg-[var(--primary-strong)] text-primary-foreground' : 'text-muted-foreground')}>{label}</li>
         ))}
       </ol>
       {status === 'draft' && <Button size="sm" variant="outline" disabled={pending} onClick={() => set('exported')}>Đánh dấu đã xuất</Button>}

@@ -31,10 +31,28 @@ const PNG_SCALE = 150 / 72
  */
 export async function convertPdfToPng(pdf: Blob): Promise<Blob> {
   try {
+    const { createCanvas, DOMMatrix, Path2D } = await import('@napi-rs/canvas')
+    if (!globalThis.DOMMatrix) Object.defineProperty(globalThis, 'DOMMatrix', { value: DOMMatrix, configurable: true })
+    if (!globalThis.Path2D) Object.defineProperty(globalThis, 'Path2D', { value: Path2D, configurable: true })
+    type Canvas = ReturnType<typeof createCanvas>
+    class CanvasFactory {
+      create(width: number, height: number) {
+        const canvas = createCanvas(width, height)
+        return { canvas, context: canvas.getContext('2d') }
+      }
+      reset(pair: { canvas: Canvas }, width: number, height: number) {
+        pair.canvas.width = width; pair.canvas.height = height
+      }
+      destroy(pair: { canvas: Canvas | null; context: unknown }) {
+        if (pair.canvas) { pair.canvas.width = 0; pair.canvas.height = 0 }
+        pair.canvas = null; pair.context = null
+      }
+      getNoAlphaContext(canvas: Canvas) { return canvas.getContext('2d', { alpha: false }) }
+    }
     const g = globalThis as { pdfjsWorker?: unknown }
     g.pdfjsWorker ??= await import('pdfjs-dist/legacy/build/pdf.worker.mjs')
     const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs')
-    const task = getDocument({ data: new Uint8Array(await pdf.arrayBuffer()) })
+    const task = getDocument({ data: new Uint8Array(await pdf.arrayBuffer()), CanvasFactory })
     const doc = await task.promise
     try {
       const page = await doc.getPage(1)

@@ -39,7 +39,7 @@ export async function createFacility(db: DB, ctx: AccessContext, input: Facility
   })
 }
 
-export async function updateFacility(db: DB, ctx: AccessContext, id: string, input: Partial<FacilityInput> & { isActive?: boolean }): Promise<Facility> {
+export async function updateFacility(db: DB, ctx: AccessContext, id: string, input: unknown): Promise<Facility> {
   assertCan(ctx, 'settings')
   const data = facilityUpdateInput.parse(input)
   return db.transaction(async (tx) => {

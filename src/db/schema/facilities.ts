@@ -1,4 +1,7 @@
-import { boolean, integer, numeric, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core'
+// Kiểu dữ liệu dùng chung, không tạo phụ thuộc lúc chạy.
+// eslint-disable-next-line boundaries/dependencies
+import type { BankAccount } from '@/domain/types'
+import { boolean, integer, jsonb, numeric, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core'
 
 export const facilities = pgTable('facilities', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -8,6 +11,7 @@ export const facilities = pgTable('facilities', {
   note: text('note').notNull().default(''),
   isActive: boolean('is_active').notNull().default(true),
   expectedInvoiceDay: integer('expected_invoice_day').notNull().default(5),
+  bankAccount: jsonb('bank_account').$type<BankAccount | null>(),
   isDemo: boolean('is_demo').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

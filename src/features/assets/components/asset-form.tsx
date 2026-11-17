@@ -17,7 +17,7 @@ export function AssetForm({ facilities }: { facilities: TreeFacility[] }) {
 
   if (!open) return <Button onClick={() => setOpen(true)}>Thêm tài sản</Button>
   return (
-    <div className="grid max-w-xl gap-2 rounded-md border p-3 sm:grid-cols-2">
+    <div className="grid max-w-xl gap-2 rounded-md border bg-card p-3 sm:grid-cols-2">
       <Input aria-label="Mã tài sản" placeholder="Mã tài sản" value={v.code} onChange={(e) => setV({ ...v, code: e.target.value })} />
       <Input aria-label="Tên tài sản" placeholder="Tên tài sản" value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} />
       <Input aria-label="Loại" placeholder="Loại (điện lạnh, nội thất…)" value={v.category} onChange={(e) => setV({ ...v, category: e.target.value })} />

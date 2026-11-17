@@ -132,7 +132,7 @@ export async function getTenant(db: DB, ctx: AccessContext, id: string): Promise
 export async function searchTenants(
   db: DB,
   ctx: AccessContext,
-  opts: { q?: string; kind?: Tenant['kind']; facilityId?: string; limit?: number; offset?: number },
+  opts: { q?: string; kind?: Tenant['kind']; facilityId?: string; facilityIds?: string[]; limit?: number; offset?: number },
 ): Promise<Tenant[]> {
   assertCan(ctx, 'tenants_contracts', opts.facilityId)
   const conds = []
@@ -142,6 +142,7 @@ export async function searchTenants(
     conds.push(inArray(tenants.homeFacilityId, scope))
   }
   if (opts.facilityId) conds.push(eq(tenants.homeFacilityId, opts.facilityId))
+  if (opts.facilityIds?.length) conds.push(inArray(tenants.homeFacilityId, opts.facilityIds.filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))))
   if (opts.kind) conds.push(eq(tenants.kind, opts.kind))
   const q = opts.q ? removeDiacritics(opts.q).toLowerCase().replace(/\s+/g, ' ').trim() : ''
   if (q) {

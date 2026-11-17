@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { addenda, assets, depositContracts, depositEntries, facilities, feeTypes, feeUnits, handoverItems, handovers, invoiceLines, invoices, leaseOccupants, leases, meterReadings, meters, oneOffCharges, payments, pendingAdjustments, rooms, tenants, utilityRates } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
+import { resolveFeePrice } from '@/domain/fee-price'
+import { listFeeTypePrices } from '@/server/fees/service'
 import { midPeriodAdjustments } from '@/domain/adjustments'
 import { contractTermsAt } from '@/domain/contract-terms'
 import { addDays, todayVN } from '@/domain/dates'
@@ -298,5 +300,7 @@ export async function addendumFormData(db: DB, ctx: AccessContext, leaseId: stri
   const ms = (await db.select().from(meters).where(and(inArray(meters.roomId, ids), isNull(meters.removedOn)))).map(m => ({ meterId: m.id, roomId: m.roomId, utility: m.utility as 'electric' | 'water', serial: m.serial }))
   const people = await db.select({ id: tenants.id, name: tenants.fullName }).from(tenants).where(ne(tenants.kind, 'company')).orderBy(asc(tenants.fullName))
   const fees = await db.select({ id: feeTypes.id, name: feeTypes.name, defaultPrice: feeTypes.defaultPrice }).from(feeTypes)
-  return { currentRoomId: row.l.roomId, endDate: row.l.endDate, monthlyRent: row.l.monthlyRent, depositAmount: row.l.depositAmount, freeRooms: free.map(r => ({ id: r.id, code: r.code })), meters: ms, people: people.map(p => ({ id: p.id, name: p.name ?? '' })), fees, today: todayVN() }
+  const prices = await listFeeTypePrices(db, ctx)
+  const resolvedFees = fees.map((fee) => ({ ...fee, defaultPrice: resolveFeePrice(fee.defaultPrice, prices[fee.id], row.facilityId) }))
+  return { currentRoomId: row.l.roomId, endDate: row.l.endDate, monthlyRent: row.l.monthlyRent, depositAmount: row.l.depositAmount, freeRooms: free.map(r => ({ id: r.id, code: r.code })), meters: ms, people: people.map(p => ({ id: p.id, name: p.name ?? '' })), fees: resolvedFees, today: todayVN() }
 }
