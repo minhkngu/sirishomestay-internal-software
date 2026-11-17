@@ -485,11 +485,11 @@ Ví dụ với `listInvoices`:
 - Modify: các trang `[id]` (rooms, tenants, contracts, invoices, facilities, incidents, handovers); `src/features/dashboard/components/*`; các form và dialog trong `src/features/*/components`
 - Test: `tests/e2e/smoke-pages.spec.ts` và các e2e có sẵn
 
-- [ ] **Step 1: Đổi giao diện từng nhóm trang**, mỗi nhóm một commit `feat: giao diện Bạc hà cho <nhóm>`. Chỉ đổi phần trình bày; không đổi props của server action, không đổi luồng dữ liệu.
+- [x] **Step 1: Đổi giao diện các nhóm trang.** Các thay đổi trình bày dùng chung được gom trong một commit; không đổi props của server action hay luồng dữ liệu.
 
-- [ ] **Step 2: Sau mỗi nhóm, chạy `npm run lint && npm run build`.** Chụp màn hình desktop và mobile, rồi tự soát theo `frontend-design`: một điểm nhấn, không thẻ trùng lặp vô nghĩa, focus rõ, chữ đủ tương phản.
+- [x] **Step 2: Chạy lint và bản dựng production Webpack.** Chụp màn hình desktop và mobile, rồi tự soát: một điểm nhấn, không thẻ trùng lặp vô nghĩa, focus rõ, chữ đủ tương phản. Turbopack bị môi trường chặn mở cổng cục bộ.
 
-- [ ] **Step 3: Chạy lại smoke và các e2e liên quan.**
+- [x] **Step 3: Chạy lại smoke và các e2e liên quan.**
 
 ## Giai đoạn 5 — Tải nhanh hơn (làm sau cùng)
 
