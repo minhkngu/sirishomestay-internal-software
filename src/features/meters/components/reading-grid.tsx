@@ -8,7 +8,7 @@ import { saveReadingsAction } from '@/server/meters/actions'
 import { ReplaceMeterDialog } from './replace-meter-dialog'
 
 export type GridCell = { meterId: string; serial: string | null; previous: number; current: number | null; usage: number | null; abnormal: boolean; replaced: boolean }
-export type GridRow = { roomId: string; roomCode: string; electric: GridCell | null; water: GridCell | null }
+export type GridRow = { roomId: string; roomCode: string; electric: GridCell | null; water: GridCell | null; feeMeters?: Array<{ name: string; cell: GridCell }> }
 
 export function ReadingGrid({ rows, period, readOn, progress }: { rows: GridRow[]; period: string; readOn: string; progress: { recorded: number; total: number } }) {
   const router = useRouter()
@@ -18,7 +18,7 @@ export function ReadingGrid({ rows, period, readOn, progress }: { rows: GridRow[
   const [msg, setMsg] = useState<string | null>(null)
   const [replacing, setReplacing] = useState<{ roomId: string; roomCode: string; utility: 'electric' | 'water' } | null>(null)
   const refs = useRef<Record<string, HTMLInputElement | null>>({})
-  const order = rows.flatMap((r) => [r.electric?.meterId, r.water?.meterId].filter(Boolean) as string[])
+  const order = rows.flatMap((r) => [r.electric?.meterId, r.water?.meterId, ...(r.feeMeters ?? []).map(f => f.cell.meterId)].filter(Boolean) as string[])
 
   function onKey(e: React.KeyboardEvent, meterId: string) {
     if (e.key !== 'Enter') return
@@ -78,6 +78,11 @@ export function ReadingGrid({ rows, period, readOn, progress }: { rows: GridRow[
           <tbody>{rows.map((r) => <tr key={r.roomId} className="border-t"><td className="p-2 font-medium">{r.roomCode}</td>{cell(r, r.electric, 'electric')}{cell(r, r.water, 'water')}</tr>)}</tbody>
         </table>
       </div>
+      {rows.flatMap(r => (r.feeMeters ?? []).map(f => <div key={f.cell.meterId} className="flex flex-wrap items-center gap-3 rounded border p-3 text-sm">
+        <span>{r.roomCode} · {f.name}</span><span>Chỉ số cũ: {f.cell.previous}</span>
+        <input aria-label={`${f.name} phòng ${r.roomCode}`} inputMode="numeric" className="h-9 w-24 rounded border px-2 text-right" value={values[f.cell.meterId] ?? (f.cell.current != null ? String(f.cell.current) : '')} onChange={e => setValues({ ...values, [f.cell.meterId]: e.target.value })} />
+        {errors[f.cell.meterId] && <span className="text-destructive">{errors[f.cell.meterId]}</span>}
+      </div>))}
       {replacing && <ReplaceMeterDialog {...replacing} defaultDate={readOn} onCancel={() => setReplacing(null)} onDone={() => { setReplacing(null); router.refresh() }} />}
       <div className="flex items-center gap-3"><Button disabled={pending} onClick={save}>Lưu chỉ số</Button>{msg && <span className="text-sm">{msg}</span>}</div>
     </div>

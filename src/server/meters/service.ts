@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm'
-import { meterReadings, meters, rooms } from '@/db'
+import { leaseFeeMeters, leaseFeeSnapshots, meterReadings, meters, rooms } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { daysInMonth } from '@/domain/dates'
@@ -35,7 +35,7 @@ export type MeterCell = {
   abnormal: boolean
   replaced: boolean
 }
-export type ReadingRow = { roomId: string; roomCode: string; floor: string | null; electric: MeterCell | null; water: MeterCell | null }
+export type ReadingRow = { roomId: string; roomCode: string; floor: string | null; electric: MeterCell | null; water: MeterCell | null; feeMeters: Array<{ name: string; cell: MeterCell }> }
 
 function safeUsage(ms: Meter[], rs: MeterReading[], s: string, e: string): { usage: number | null; missing: boolean } {
   try {
@@ -64,8 +64,8 @@ export async function listReadingSheet(db: DB, ctx: AccessContext, facilityId: s
   const allMeters = pairs.flatMap((p) => (p.meter ? [p.meter] : []))
   const allReadings = [...older.map((x) => x.r), ...recent.map((x) => x.r)]
 
-  const cell = (roomId: string, utility: Utility): MeterCell | null => {
-    const ms = allMeters.filter((m) => m.roomId === roomId && m.utility === utility).map(toMeter)
+  const cell = (roomId: string, utility: Utility | 'fee', meterId?: string): MeterCell | null => {
+    const ms = allMeters.filter((m) => m.roomId === roomId && m.utility === utility && (!meterId || m.id === meterId)).map(toMeter)
     if (ms.length === 0) return null
     const rs = allReadings.map(toReading)
     const active = ms.find((m) => !m.removedOn) ?? ms[ms.length - 1]
@@ -86,7 +86,9 @@ export async function listReadingSheet(db: DB, ctx: AccessContext, facilityId: s
     return { meterId: active.id, serial: active.serial ?? null, previous, current: currentReading?.value ?? null, usage, abnormal: usage != null && avg > 0 && usage > 2 * avg, replaced }
   }
 
-  const rows: ReadingRow[] = roomRows.map((r) => ({ roomId: r.id, roomCode: r.code, floor: r.floor, electric: cell(r.id, 'electric'), water: cell(r.id, 'water') }))
+  const feeIds = allMeters.filter(m => m.utility === 'fee' && !m.removedOn).map(m => m.id)
+  const feeLabels = feeIds.length ? await db.select({ meterId: leaseFeeMeters.meterId, name: leaseFeeSnapshots.name }).from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).where(inArray(leaseFeeMeters.meterId, feeIds)) : []
+  const rows: ReadingRow[] = roomRows.map((r) => ({ roomId: r.id, roomCode: r.code, floor: r.floor, electric: cell(r.id, 'electric'), water: cell(r.id, 'water'), feeMeters: allMeters.filter(m => m.roomId === r.id && m.utility === 'fee' && !m.removedOn).map(m => ({ name: feeLabels.find(f => f.meterId === m.id)?.name ?? 'Phí', cell: cell(r.id, 'fee', m.id)! })) }))
   const withElectric = rows.filter((r) => r.electric)
   return { rows, progress: { recorded: withElectric.filter((r) => r.electric!.current != null).length, total: withElectric.length } }
 }
@@ -168,4 +170,28 @@ export async function roomMeterHistory(db: DB, ctx: AccessContext, roomId: strin
   const ms = await db.select().from(meters).where(eq(meters.roomId, roomId)).orderBy(asc(meters.installedOn))
   const rs = ms.length ? await db.select().from(meterReadings).where(inArray(meterReadings.meterId, ms.map((m) => m.id))).orderBy(asc(meterReadings.readOn)) : []
   return { meters: ms, readings: rs }
+}
+
+/** Tạo hoặc liên kết đồng hồ cho phí trong transaction hiện tại. */
+export async function ensureFeeMeter(tx: DB, ctx: AccessContext, input: { roomId: string; feeTypeId: string | null; leaseFeeId: string; existingMeterId?: string; initialReading?: number; installedOn: string }): Promise<{ id: string }> {
+  const [room] = await tx.select().from(rooms).where(eq(rooms.id, input.roomId)).for('update')
+  if (!room) throw new NotFoundError()
+  assertCan(ctx, 'tenants_contracts', room.facilityId)
+  let found: typeof meters.$inferSelect | undefined
+  if (input.feeTypeId) {
+    ;[found] = await tx.select().from(meters).where(and(eq(meters.roomId, room.id), eq(meters.feeTypeId, input.feeTypeId), isNull(meters.removedOn)))
+    if (input.existingMeterId && found?.id !== input.existingMeterId) throw new ValidationError('Đồng hồ không thuộc phí này')
+  } else if (input.existingMeterId) {
+    const [row] = await tx.select({ meter: meters, fee: leaseFeeSnapshots }).from(meters).innerJoin(leaseFeeMeters, eq(leaseFeeMeters.meterId, meters.id)).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).where(and(eq(meters.id, input.existingMeterId), eq(meters.roomId, room.id), isNull(meters.removedOn)))
+    const [current] = await tx.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.id, input.leaseFeeId))
+    if (!row || row.meter.feeTypeId || !current || row.fee.unit !== current.unit || row.fee.quantitySource !== 'meter') throw new ValidationError('Đồng hồ không phù hợp với phí')
+    found = row.meter
+  }
+  if (!found) {
+    if (!Number.isSafeInteger(input.initialReading) || input.initialReading! < 0) throw new ValidationError('Nhập chỉ số ban đầu hợp lệ', { initialReading: 'Nhập chỉ số nguyên không âm' })
+    ;[found] = await tx.insert(meters).values({ roomId: room.id, utility: 'fee', feeTypeId: input.feeTypeId, startReading: input.initialReading!, installedOn: input.installedOn }).returning()
+    await recordAudit(tx, ctx, { action: 'create', entity: 'meter', entityId: found.id, facilityId: room.facilityId, summary: 'Tạo đồng hồ cho phí hợp đồng', after: found })
+  }
+  await tx.insert(leaseFeeMeters).values({ leaseFeeId: input.leaseFeeId, meterId: found.id })
+  return { id: found.id }
 }

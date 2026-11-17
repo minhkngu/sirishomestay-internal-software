@@ -11,6 +11,7 @@ import { buildFirstInvoice } from '@/domain/invoice-builder'
 import { contractTermsAt } from '@/domain/contract-terms'
 import type { ContractFee, DepositEntry, InvoiceLineInput, LeaseTerms, Proration } from '@/domain/types'
 import { recordAudit } from '@/server/audit'
+import { ensureFeeMeter } from '@/server/meters/service'
 import { createAssetInTransaction, moveAssetsInTransaction, setAssetStatusInTransaction } from '@/server/assets/service'
 import { startHandoverInTransaction } from '@/server/handovers/service'
 import { registerExportOwnerResolver, registerOwnerResolver } from '@/server/files/owners'
@@ -187,7 +188,8 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
         source = row.type.quantityFrom === 'manual' ? 'period_input' : row.type.quantityFrom as LeaseFeeInput['quantitySource']
       }
       if (!name || !unit) throw new ValidationError('Nhập tên và đơn vị phí')
-      await tx.insert(leaseFeeSnapshots).values({ leaseId: lease.id, feeTypeId: fee.feeTypeId, name, unit, quantitySource: source, billing, unitPrice: fee.unitPrice })
+      const [savedFee] = await tx.insert(leaseFeeSnapshots).values({ leaseId: lease.id, feeTypeId: fee.feeTypeId, name, unit, quantitySource: source, billing, unitPrice: fee.unitPrice }).returning()
+      if (source === 'meter') await ensureFeeMeter(tx, ctx, { roomId: room.id, feeTypeId: fee.feeTypeId, leaseFeeId: savedFee.id, initialReading: fee.initialReading, existingMeterId: fee.existingMeterId, installedOn: input.startDate })
     }
   } else if (input.fees?.length) await tx.insert(leaseFees).values((input.fees as LegacyFeeInput[]).map((f) => ({ leaseId: lease.id, ...f })))
 

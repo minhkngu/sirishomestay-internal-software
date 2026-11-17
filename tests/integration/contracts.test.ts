@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { and, eq } from 'drizzle-orm'
-import { assets, handovers, handoverItems, depositContracts, depositEntries, facilities, feeTypes, feeUnits, leaseOccupants, leases, rooms } from '@/db'
+import { assets, meters, handovers, handoverItems, depositContracts, depositEntries, facilities, feeTypes, feeUnits, leaseOccupants, leases, rooms } from '@/db'
 import { assetHistory } from '@/server/assets/service'
+import { listReadingSheet } from '@/server/meters/service'
 import { leaseData } from '@/server/invoices/service'
 import { listFeeTypes, updateFeeType, archiveFeeType } from '@/server/fees/service'
 import { createTenant } from '@/server/tenants/service'
@@ -161,6 +162,55 @@ describe('contracts', () => {
     expect(detail.fees.map(f => [f.name, f.unitPrice])).toEqual(expect.arrayContaining([['Giặt', 20_000], ['Dọn', 30_000]]))
     expect((await listFeeTypes(db, admin)).some(f => f.name === 'Dọn')).toBe(false)
     expect((await leaseData(db, lease.id)).fees.map(f => [f.name, f.unitPrice])).toEqual(expect.arrayContaining([['Giặt', 20_000], ['Dọn', 30_000]]))
+  })
+
+  it('tạo và dùng lại đồng hồ theo định danh phí của phòng', async () => {
+    await updateFeeType(db, admin, feePerson, { name: 'ABC', quantityFrom: 'meter' })
+    const fee = { feeTypeId: feePerson, name: 'ABC', unit: 'người', quantitySource: 'meter' as const, unitPrice: 100, initialReading: 123 }
+    const first = await createLease(db, lan(), { ...leaseInput(), feeModel: 'snapshot', fees: [fee] })
+    const [meter] = await db.select().from(meters).where(eq(meters.roomId, r301))
+    expect(meter).toMatchObject({ startReading: 123, feeTypeId: feePerson })
+    const sheet = await listReadingSheet(db, admin, fa, '2026-11')
+    expect(sheet.rows.find(r => r.roomId === r301)?.feeMeters).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'ABC', cell: expect.objectContaining({ meterId: meter.id, previous: 123 }) })]))
+    await db.update(leases).set({ status: 'ended' }).where(eq(leases.id, first.lease.id))
+    await createLease(db, lan(), { ...leaseInput(), feeModel: 'snapshot', fees: [{ ...fee, initialReading: undefined }] })
+    const rows = await db.select().from(meters).where(eq(meters.roomId, r301))
+    expect(rows).toHaveLength(1)
+    expect(rows[0].id).toBe(meter.id)
+  })
+
+  it('hai phí cùng tên có đồng hồ riêng và rollback khi tài sản trùng mã', async () => {
+    await updateFeeType(db, admin, feePerson, { name: 'ABC', quantityFrom: 'meter' })
+    const [other] = await db.insert(feeTypes).values({ name: 'ABC', unitId: (await db.select().from(feeTypes).where(eq(feeTypes.id, feePerson)))[0].unitId, quantityFrom: 'meter' }).returning()
+    const fee = (id: string) => ({ feeTypeId: id, name: 'ABC', unit: 'người', quantitySource: 'meter' as const, unitPrice: 100, initialReading: 123 })
+    const [asset] = await db.insert(assets).values({ code: 'DUP-METER', name: 'Bàn', facilityId: fa, locationKind: 'room', locationId: r301 }).returning()
+    const handover = { expectedRoomAssetIds: [asset.id], addAssetIds: [], newAssets: [{ code: 'DUP-METER', name: 'Bàn', model: '', category: '', value: 0, condition: 'Tốt' }], remove: [] }
+    await expect(createLease(db, admin, { ...leaseInput(), feeModel: 'snapshot', fees: [fee(feePerson), fee(other.id)], handover })).rejects.toThrow(ValidationError)
+    expect(await db.select().from(leases)).toHaveLength(0)
+    expect(await db.select().from(meters)).toHaveLength(0)
+    await createLease(db, admin, { ...leaseInput(), feeModel: 'snapshot', fees: [fee(feePerson), fee(other.id)] })
+    const rows = await db.select().from(meters).where(eq(meters.roomId, r301))
+    expect(rows).toHaveLength(2)
+    expect(rows[0].id).not.toBe(rows[1].id)
+  })
+
+  it('phí riêng chỉ liên kết lại đồng hồ cùng phòng và cùng đơn vị', async () => {
+    const fee = { feeTypeId: null, name: 'Máy giặt', unit: 'lượt', quantitySource: 'meter' as const, unitPrice: 10, initialReading: 12 }
+    const first = await createLease(db, lan(), { ...leaseInput(), feeModel: 'snapshot', fees: [fee] })
+    const [meter] = await db.select().from(meters).where(eq(meters.roomId, r301))
+    await expect(createLease(db, lan(), { ...leaseInput(), roomId: r302, feeModel: 'snapshot', fees: [{ ...fee, existingMeterId: meter.id }] })).rejects.toThrow(ValidationError)
+    await db.update(leases).set({ status: 'ended' }).where(eq(leases.id, first.lease.id))
+    await expect(createLease(db, lan(), { ...leaseInput(), feeModel: 'snapshot', fees: [{ ...fee, unit: 'kg', existingMeterId: meter.id }] })).rejects.toThrow(ValidationError)
+    await createLease(db, lan(), { ...leaseInput(), feeModel: 'snapshot', fees: [{ ...fee, initialReading: undefined, existingMeterId: meter.id }] })
+    expect((await db.select().from(meters).where(eq(meters.roomId, r301))).map(m => m.id)).toEqual([meter.id])
+  })
+
+  it('thiếu chỉ số đầu từ chối và rollback hợp đồng', async () => {
+    await updateFeeType(db, admin, feePerson, { quantityFrom: 'meter' })
+    const fee = { feeTypeId: feePerson, name: 'ABC', unit: 'người', quantitySource: 'meter' as const, unitPrice: 100 }
+    for (const initialReading of [undefined, -1, 1.5]) await expect(createLease(db, lan(), { ...leaseInput(), feeModel: 'snapshot', fees: [{ ...fee, initialReading }] })).rejects.toThrow(ValidationError)
+    expect(await db.select().from(leases)).toHaveLength(0)
+    expect(await db.select().from(meters)).toHaveLength(0)
   })
 
   it('không cho công ty làm người ở', async () => {

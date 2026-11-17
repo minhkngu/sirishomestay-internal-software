@@ -23,7 +23,7 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
   const readOn = today.startsWith(period) ? today : end
   return (
     <div className="space-y-5">
-      <PageHeader title="Ghi chỉ số điện nước" />
+      <PageHeader title="Ghi chỉ số đồng hồ" />
       <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-2xs">
         <form method="get" className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
