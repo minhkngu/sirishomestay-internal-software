@@ -38,6 +38,7 @@ export const leases = pgTable(
     billingCycleMonths: integer('billing_cycle_months').notNull().default(1),
     billWaterByMeter: boolean('bill_water_by_meter').notNull().default(true),
     depositAmount: integer('deposit_amount').notNull(),
+    note: text('note').notNull().default(''),
     dueRule: jsonb('due_rule'),
     proration: text('proration'),
     fromDepositContractId: uuid('from_deposit_contract_id').references(() => depositContracts.id),

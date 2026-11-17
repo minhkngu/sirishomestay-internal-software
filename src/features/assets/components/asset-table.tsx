@@ -22,11 +22,11 @@ export function AssetTable({ assets, facilities }: { assets: AssetRow[]; facilit
 
   const roomCode = useMemo(() => new Map(facilities.flatMap((f) => f.rooms.map((r) => [r.id, `Phòng ${r.code}`] as const))), [facilities])
   const facName = useMemo(() => new Map(facilities.map((f) => [f.id, f.name])), [facilities])
-  const where = (a: AssetRow) => (a.locationKind === 'room' ? roomCode.get(a.locationId) : `${a.locationKind === 'warehouse' ? 'Kho' : 'Khu chung'} ${facName.get(a.locationId) ?? ''}`)
+  const where = (a: AssetRow) => (a.locationKind === 'room' ? roomCode.get(a.locationId) : `${a.locationKind === 'warehouse' ? 'Kho' : a.locationKind === 'unassigned' ? 'Chưa xếp' : 'Khu chung'} ${facName.get(a.locationId) ?? ''}`)
 
   const shown = assets.filter((a) => {
     if (sel.kind === 'facility' && a.facilityId !== sel.id) return false
-    if ((sel.kind === 'warehouse' || sel.kind === 'common' || sel.kind === 'room') && (a.locationKind !== sel.kind || a.locationId !== sel.id)) return false
+    if ((sel.kind === 'warehouse' || sel.kind === 'common' || sel.kind === 'unassigned' || sel.kind === 'room') && (a.locationKind !== sel.kind || a.locationId !== sel.id)) return false
     if (q.trim()) return removeDiacritics(`${a.code} ${a.name} ${a.category}`).toLowerCase().includes(removeDiacritics(q).toLowerCase().trim())
     return true
   })

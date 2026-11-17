@@ -3,7 +3,7 @@
 import { cn } from '@/lib/utils'
 
 export type TreeFacility = { id: string; name: string; rooms: { id: string; code: string }[] }
-export type Selected = { kind: 'all' } | { kind: 'warehouse' | 'common'; id: string } | { kind: 'room'; id: string } | { kind: 'facility'; id: string }
+export type Selected = { kind: 'all' } | { kind: 'warehouse' | 'common' | 'unassigned'; id: string } | { kind: 'room'; id: string } | { kind: 'facility'; id: string }
 
 const same = (a: Selected, b: Selected) => a.kind === b.kind && ('id' in a && 'id' in b ? a.id === b.id : true)
 
@@ -20,6 +20,7 @@ export function LocationTree({ facilities, value, onChange }: { facilities: Tree
           {item(f.name, { kind: 'facility', id: f.id })}
           {item('Kho', { kind: 'warehouse', id: f.id }, 1)}
           {item('Khu chung', { kind: 'common', id: f.id }, 1)}
+          {item('Chưa xếp', { kind: 'unassigned', id: f.id }, 1)}
           <details className="pl-3"><summary className="cursor-pointer text-xs text-muted-foreground">Phòng ({f.rooms.length})</summary>
             {f.rooms.map((r) => item(`Phòng ${r.code}`, { kind: 'room', id: r.id }, 1))}</details>
         </div>

@@ -14,7 +14,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
 async function placeName(kind: string, id: string) {
   if (kind === 'room') { const [r] = await db.select().from(rooms).where(eq(rooms.id, id)); return r ? `Phòng ${r.code}` : '?' }
   const [f] = await db.select().from(facilities).where(eq(facilities.id, id))
-  return `${kind === 'warehouse' ? 'Kho' : 'Khu chung'} ${f?.name ?? ''}`
+  return `${kind === 'warehouse' ? 'Kho' : kind === 'unassigned' ? 'Chưa xếp' : 'Khu chung'} ${f?.name ?? ''}`
 }
 
 async function Asset({ params }: { params: Promise<{ id: string }> }) {

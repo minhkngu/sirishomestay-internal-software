@@ -9,18 +9,19 @@ import { buildSearchText, removeDiacritics } from '@/domain/text'
 import { recordAudit } from '@/server/audit'
 
 export type Asset = typeof assets.$inferSelect
-export type LocationKind = 'room' | 'common' | 'warehouse'
+export type LocationKind = 'room' | 'common' | 'warehouse' | 'unassigned'
 export type Location = { kind: LocationKind; id: string }
 export type AssetStatus = 'in_use' | 'broken' | 'disposed'
 
 const createInput = z.object({
   code: z.string().trim().min(1, 'Nhập mã tài sản'),
   name: z.string().trim().min(1, 'Nhập tên tài sản'),
+  model: z.string().trim().default(''),
   category: z.string().trim().default(''),
   value: z.number().int().min(0, 'Giá trị không hợp lệ').default(0),
   condition: z.string().trim().default('Tốt'),
   facilityId: z.string().uuid(),
-  location: z.object({ kind: z.enum(['room', 'common', 'warehouse']), id: z.string().uuid() }),
+  location: z.object({ kind: z.enum(['room', 'common', 'warehouse', 'unassigned']), id: z.string().uuid() }),
 })
 const updateInput = createInput.omit({ facilityId: true, location: true }).partial()
 
