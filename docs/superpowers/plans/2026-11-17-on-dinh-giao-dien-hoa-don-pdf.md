@@ -254,7 +254,7 @@ export function renderInvoicePdf(data: InvoicePdfData): Promise<Uint8Array>
 export function renderReceiptPdf(data: ReceiptPdfData): Promise<Uint8Array>
 ```
 
-- [ ] **Step 1: Viết test**
+- [x] **Step 1: Viết test**
 
 Tạo hàm phụ `textOf(pdf)` dùng `pdfjs-dist/legacy` để lấy chữ của trang 1.
 
@@ -272,9 +272,9 @@ Tạo hàm phụ `textOf(pdf)` dùng `pdfjs-dist/legacy` để lấy chữ của
 - `it('phiếu thu có mã phiếu, số tiền, hình thức, không có QR')`
 - `it('PDF đổi được sang PNG')`: `convertPdfToPng(new Blob([pdf]))` trả về blob có type `image/png`.
 
-- [ ] **Step 2: Chạy `npx vitest run tests/integration/invoice-pdf.test.ts`, xác nhận FAIL.**
+- [x] **Step 2: Chạy `npx vitest run tests/integration/invoice-pdf.test.ts`, xác nhận FAIL.**
 
-- [ ] **Step 3: Viết bộ dựng theo bố cục mockup đã duyệt (spec §Phần 3 "Bố cục")**
+- [x] **Step 3: Viết bộ dựng theo bố cục mockup đã duyệt (spec §Phần 3 "Bố cục")**
 
 - Khổ A4, lề 40pt.
 - Tiêu đề: `kind === 'termination'` ghi `Hoá đơn thanh lý`; còn lại ghi `Hoá đơn tháng MM/YYYY`, lấy tháng từ `periodStart`.
@@ -285,9 +285,9 @@ Tạo hàm phụ `textOf(pdf)` dùng `pdfjs-dist/legacy` để lấy chữ của
   - `addInfo = toQrAddInfo(code)`.
 - Font: `Font.register` 4 độ đậm của Be Vietnam Pro. Thêm `Font.registerHyphenationCallback(w => [w])` để không ngắt chữ Việt.
 
-- [ ] **Step 4: Chạy lại test, xác nhận PASS. Chạy `npm run build`, xác nhận PASS** (font được đóng gói vào function).
+- [x] **Step 4: Chạy lại test, xác nhận PASS. Chạy `npx next build --webpack`, xác nhận PASS (Turbopack bị chặn mở cổng cục bộ)** (font được đóng gói vào function).
 
-- [ ] **Step 5: Commit** — `feat: dựng PDF hoá đơn và phiếu thu có QR VietQR`
+- [x] **Step 5: Commit** — `feat: dựng PDF hoá đơn và phiếu thu có QR VietQR`
 
 ### Task 6: Nối PDF vào luồng xuất; hoá đơn bỏ Word
 
