@@ -498,7 +498,7 @@ Ví dụ với `listInvoices`:
 **Files:**
 - Create: `tests/e2e/perf.spec.ts`, `docs/operations/toc-do.md`
 
-- [ ] **Step 1: Viết `perf.spec.ts`**
+- [x] **Step 1: Viết `perf.spec.ts`**
 
 Với mỗi `href` trong `NAV_ITEMS`:
 - Mở trang 3 lần.
