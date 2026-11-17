@@ -5,7 +5,9 @@ export type Utility = 'electric' | 'water'
 export type DueRule = { kind: 'day_of_next_month'; day: number } | { kind: 'days_after_approval'; days: number }
 
 export type ContractFee = {
-  feeTypeId: string
+  feeTypeId: string | null
+  leaseFeeId?: string
+  quantitySource?: 'occupants' | 'room' | 'meter' | 'period_input'
   name: string
   unit: string
   billing: 'monthly_fixed' | 'per_occurrence'
@@ -26,6 +28,7 @@ export type Lease = {
   occupantIds: string[]
   billingCycleMonths: number
   billWaterByMeter: boolean
+  feeModel?: 'legacy' | 'snapshot'
   dueRule?: DueRule | null
   proration?: Proration | null
 }

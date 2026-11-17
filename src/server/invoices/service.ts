@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, like, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { addenda, facilities, feeTypes, feeUnits, invoiceLines, invoices, leaseFees, leaseOccupants, leases, meterReadings, meters, oneOffCharges, payments, pendingAdjustments, rooms, tenants, utilityRates } from '@/db'
+import { addenda, facilities, feeTypes, feeUnits, invoiceLines, invoices, leaseFees, leaseFeeSnapshots, leaseOccupants, leases, meterReadings, meters, oneOffCharges, payments, pendingAdjustments, rooms, tenants, utilityRates } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { computeDueDate } from '@/domain/due-date'
@@ -32,11 +32,12 @@ async function getInvoice(db: Pick<DB, 'select'>, ctx: AccessContext, id: string
 async function leasesData(db: Pick<DB, 'select'>, ids: string[]): Promise<Map<string, { lease: Lease; addenda: Addendum[] }>> {
   const out = new Map<string, { lease: Lease; addenda: Addendum[] }>()
   if (!ids.length) return out
-  const [rows, occupants, feeRows, addendaRows] = await Promise.all([
+  const [rows, occupants, feeRows, addendaRows, snapshots] = await Promise.all([
     db.select().from(leases).where(inArray(leases.id, ids)),
     db.select().from(leaseOccupants).where(inArray(leaseOccupants.leaseId, ids)),
     db.select({ fee: leaseFees, type: feeTypes, unit: feeUnits }).from(leaseFees).innerJoin(feeTypes, eq(leaseFees.feeTypeId, feeTypes.id)).innerJoin(feeUnits, eq(feeTypes.unitId, feeUnits.id)).where(inArray(leaseFees.leaseId, ids)),
     db.select().from(addenda).where(inArray(addenda.leaseId, ids)).orderBy(asc(addenda.effectiveDate), asc(addenda.createdAt)),
+    db.select().from(leaseFeeSnapshots).where(inArray(leaseFeeSnapshots.leaseId, ids)),
   ])
   for (const row of rows) {
     const mine = addendaRows.filter(a => a.leaseId === row.id)
@@ -44,9 +45,9 @@ async function leasesData(db: Pick<DB, 'select'>, ids: string[]): Promise<Map<st
     const firstTransfer = mine.find(a => a.type === 'transfer'), firstOccupants = mine.find(a => a.type === 'occupants')
     const lease: Lease = {
       id: row.id, code: row.code, roomId: firstTransfer?.oldRoomId ?? row.roomId, startDate: row.startDate, endDate: row.endDate, monthlyRent: row.monthlyRent, depositAmount: row.depositAmount,
-      billingCycleMonths: row.billingCycleMonths, billWaterByMeter: row.billWaterByMeter, dueRule: row.dueRule as DueRule | null, proration: row.proration as Proration | null,
+      billingCycleMonths: row.billingCycleMonths, billWaterByMeter: row.billWaterByMeter, feeModel: row.feeModel as 'legacy' | 'snapshot', dueRule: row.dueRule as DueRule | null, proration: row.proration as Proration | null,
       occupantIds: (firstOccupants?.oldOccupantIds as string[] | undefined) ?? occupants.filter(x => x.leaseId === row.id).map(x => x.tenantId),
-      fees: feeRows.filter(f => f.fee.leaseId === row.id).map(({ fee, type, unit }) => ({ feeTypeId: type.id, name: type.name, unit: unit.name, billing: type.billing as ContractFee['billing'], quantityFrom: type.quantityFrom as ContractFee['quantityFrom'], quantity: fee.quantity, unitPrice: fee.unitPrice })),
+      fees: row.feeModel === 'snapshot' ? snapshots.filter(f => f.leaseId === row.id).map(f => ({ leaseFeeId: f.id, feeTypeId: f.feeTypeId, name: f.name, unit: f.unit, billing: f.billing as ContractFee['billing'], quantityFrom: f.quantitySource === 'occupants' ? 'occupants' as const : 'manual' as const, quantitySource: f.quantitySource as NonNullable<ContractFee['quantitySource']>, quantity: 1, unitPrice: f.unitPrice })) : feeRows.filter(f => f.fee.leaseId === row.id).map(({ fee, type, unit }) => ({ feeTypeId: type.id, name: type.name, unit: unit.name, billing: type.billing as ContractFee['billing'], quantityFrom: type.quantityFrom as ContractFee['quantityFrom'], quantity: fee.quantity, unitPrice: fee.unitPrice })),
     }
     out.set(row.id, { lease, addenda: mine.map(toAddendum) })
   }

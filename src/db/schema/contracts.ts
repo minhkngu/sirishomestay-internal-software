@@ -39,6 +39,7 @@ export const leases = pgTable(
     billWaterByMeter: boolean('bill_water_by_meter').notNull().default(true),
     depositAmount: integer('deposit_amount').notNull(),
     note: text('note').notNull().default(''),
+    feeModel: text('fee_model').notNull().default('legacy'),
     dueRule: jsonb('due_rule'),
     proration: text('proration'),
     fromDepositContractId: uuid('from_deposit_contract_id').references(() => depositContracts.id),
@@ -66,6 +67,17 @@ export const leaseFees = pgTable('lease_fees', {
   leaseId: uuid('lease_id').notNull().references(() => leases.id, { onDelete: 'cascade' }),
   feeTypeId: uuid('fee_type_id').notNull().references(() => feeTypes.id),
   quantity: integer('quantity').notNull().default(1),
+  unitPrice: integer('unit_price').notNull(),
+})
+
+export const leaseFeeSnapshots = pgTable('lease_fee_snapshots', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  leaseId: uuid('lease_id').notNull().references(() => leases.id, { onDelete: 'cascade' }),
+  feeTypeId: uuid('fee_type_id').references(() => feeTypes.id),
+  name: text('name').notNull(),
+  unit: text('unit').notNull(),
+  quantitySource: text('quantity_source').notNull(),
+  billing: text('billing').notNull().default('monthly_fixed'),
   unitPrice: integer('unit_price').notNull(),
 })
 

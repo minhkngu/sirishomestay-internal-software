@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { and, eq } from 'drizzle-orm'
 import { assets, handovers, handoverItems, depositContracts, depositEntries, facilities, feeTypes, feeUnits, leaseOccupants, leases, rooms } from '@/db'
 import { assetHistory } from '@/server/assets/service'
+import { leaseData } from '@/server/invoices/service'
+import { listFeeTypes, updateFeeType, archiveFeeType } from '@/server/fees/service'
 import { createTenant } from '@/server/tenants/service'
 import { listRoomsWithStatus } from '@/server/rooms/service'
 import {
@@ -128,6 +130,37 @@ describe('contracts', () => {
     expect(await db.select().from(leases)).toHaveLength(0)
     expect(await db.select().from(handovers)).toHaveLength(0)
     expect((await db.select().from(assets))[0].locationKind).toBe('room')
+  })
+
+  it('hợp đồng snapshot tính công ty ký là một người ở', async () => {
+    const company = await createTenant(db, admin, { kind: 'company', homeFacilityId: fa, companyName: 'Công ty A', phone: '0909876543', taxCode: '1234567890', representative: 'Nguyễn A' })
+    const { lease } = await createLease(db, lan(), { ...leaseInput(), feeModel: 'snapshot', fees: [], tenantId: company.id, occupantIds: [company.id] })
+    expect((await getLease(db, lan(), lease.id)).occupantIds).toEqual([company.id])
+  })
+
+  it('biểu mẫu hiện tại cho công ty ký là người ở', async () => {
+    const company = await createTenant(db, admin, { kind: 'company', homeFacilityId: fa, companyName: 'Công ty B', phone: '0909876544', taxCode: '1234567891', representative: 'Nguyễn B' })
+    const { lease } = await createLease(db, lan(), { ...leaseInput(), tenantId: company.id, occupantIds: [company.id] })
+    expect((await getLease(db, lan(), lease.id)).occupantIds).toEqual([company.id])
+  })
+
+  it('hợp đồng snapshot luôn tính bên ký và không đếm trùng người ở', async () => {
+    const { lease } = await createLease(db, lan(), { ...leaseInput(), feeModel: 'snapshot', fees: [], occupantIds: [tenant2, tenant2] })
+    expect((await getLease(db, lan(), lease.id)).occupantIds.sort()).toEqual([tenant1, tenant2].sort())
+  })
+
+  it('lưu snapshot phí chung và phí riêng độc lập danh mục', async () => {
+    await updateFeeType(db, admin, feePerson, { name: 'Giặt' })
+    const { lease } = await createLease(db, lan(), { ...leaseInput(), feeModel: 'snapshot', fees: [
+      { feeTypeId: feePerson, name: 'Không tin tên client', unit: 'x', quantitySource: 'room', unitPrice: 20_000 },
+      { feeTypeId: null, name: 'Dọn', unit: 'phòng', quantitySource: 'room', unitPrice: 30_000 },
+    ] })
+    await updateFeeType(db, admin, feePerson, { name: 'Tên đổi', defaultPrice: 777 })
+    await archiveFeeType(db, admin, feePerson)
+    const detail = await getLease(db, lan(), lease.id)
+    expect(detail.fees.map(f => [f.name, f.unitPrice])).toEqual(expect.arrayContaining([['Giặt', 20_000], ['Dọn', 30_000]]))
+    expect((await listFeeTypes(db, admin)).some(f => f.name === 'Dọn')).toBe(false)
+    expect((await leaseData(db, lease.id)).fees.map(f => [f.name, f.unitPrice])).toEqual(expect.arrayContaining([['Giặt', 20_000], ['Dọn', 30_000]]))
   })
 
   it('không cho công ty làm người ở', async () => {

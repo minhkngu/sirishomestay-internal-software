@@ -9,6 +9,7 @@ import { addDays } from '@/domain/dates'
 import { resolveFeePrice } from '@/domain/fee-price'
 import { formatVND } from '@/domain/money'
 import { convertDepositToLeaseAction, createLeaseAction } from '@/server/contracts/actions'
+import { replaceSigner } from '../contract-occupants'
 import { uploadLeasePhotos } from '../lease-photo-retry'
 import { uploadOne } from '@/components/file-upload'
 import { LeaseAssets, emptyChanges, type AssetOption } from './lease-assets'
@@ -35,7 +36,8 @@ export function LeaseWizard({ assets, canManageAssets, rooms, tenants, feeTypes,
   const submitting = useRef(false)
   const [roomId, setRoomId] = useState(initial.roomId ?? '')
   const [tenantId, setTenantId] = useState(initial.tenantId ?? '')
-  const [occupantIds, setOccupantIds] = useState<string[]>(initial.tenantId ? [initial.tenantId] : [])
+  const [additionalOccupantIds, setAdditionalOccupantIds] = useState<string[]>([])
+  const occupantIds = replaceSigner(tenantId, additionalOccupantIds)
   const [startDate, setStartDate] = useState(initial.startDate ?? '')
   const [endDate, setEndDate] = useState('')
   const [rent, setRent] = useState(String(initial.rent ?? ''))
@@ -51,18 +53,14 @@ export function LeaseWizard({ assets, canManageAssets, rooms, tenants, feeTypes,
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const fieldError = (name: string) => fieldErrors[name] ? <p role="alert" className="text-sm text-destructive">{fieldErrors[name]}</p> : null
 
-  const individuals = tenants.filter((t) => t.kind !== 'company')
+  const individuals = tenants.filter((t) => t.kind !== 'company' && t.id !== tenantId)
   const tenant = tenants.find((t) => t.id === tenantId)
   const chosenFees = feeTypes.filter((f) => fees[f.id].on)
   const qty = (f: FeeOption) => (f.quantityFrom === 'occupants' ? Math.max(1, occupantIds.length) : Number(fees[f.id].quantity) || 0)
   const monthlyFixed = chosenFees.filter((f) => f.billing === 'monthly_fixed').reduce((s, f) => s + qty(f) * (Number(fees[f.id].price) || 0), 0)
 
-  function pickTenant(id: string) {
-    setTenantId(id)
-    const t = tenants.find((x) => x.id === id)
-    if (t && t.kind !== 'company' && !occupantIds.includes(id)) setOccupantIds([id, ...occupantIds])
-  }
-  const toggleOccupant = (id: string) => setOccupantIds(occupantIds.includes(id) ? occupantIds.filter((x) => x !== id) : [...occupantIds, id])
+  function pickTenant(id: string) { setTenantId(id) }
+  const toggleOccupant = (id: string) => setAdditionalOccupantIds(previous => previous.includes(id) ? previous.filter(x => x !== id) : [...previous, id])
 
   async function uploadPhotos(id: string, list: File[]) {
     const failed = await uploadLeasePhotos(id, list, (photo, leaseId) => uploadOne(photo, 'lease_photo', leaseId))
@@ -114,6 +112,7 @@ export function LeaseWizard({ assets, canManageAssets, rooms, tenants, feeTypes,
               <option value="">— chọn —</option>{tenants.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>{fieldError('tenantId')}</div>
           <fieldset className="space-y-1"><legend className="text-sm font-medium">Người ở trong phòng ({occupantIds.length})</legend>
             <div className="grid max-h-56 gap-1 overflow-auto rounded-md border bg-card p-2 sm:grid-cols-2">
+              {tenant && <p className="text-sm">{tenant.name} (bên ký)</p>}
               {individuals.map((t) => <label key={t.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={occupantIds.includes(t.id)} onChange={() => toggleOccupant(t.id)} /> {t.name}</label>)}
             </div>{fieldError('occupantIds')}</fieldset>
         </div>
