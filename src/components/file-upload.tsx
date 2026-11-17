@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { compressImage } from '@/lib/image'
 import { confirmUploadAction, requestUploadAction } from '@/server/files/actions'
@@ -35,6 +36,7 @@ export async function uploadOne(file: File, ownerType: OwnerType, ownerId: strin
     let main: Blob = file
     let thumb: Blob | null = null
     if (file.type.startsWith('image/')) ({ main, thumb } = await compressImage(file))
+    if (ownerType === 'lease_photo' && (main.size > 2 * 1024 * 1024 || (thumb && thumb.size > 2 * 1024 * 1024))) throw new Error('Ảnh vượt quá 2 MiB')
     const contentType = main.type || file.type
     const req = await requestUploadAction({ ownerType, ownerId, contentType, name: name ?? file.name, meta })
     if (!req.ok) throw new Error(req.error)
@@ -49,6 +51,7 @@ export async function uploadOne(file: File, ownerType: OwnerType, ownerId: strin
 
 
 export function FileUpload({ ownerType, ownerId, accept = 'image/*', capture, multiple, label = 'Tải tệp lên', nameFor, meta, onUploaded }: Props) {
+  const router = useRouter()
   const input = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -59,6 +62,7 @@ export function FileUpload({ ownerType, ownerId, accept = 'image/*', capture, mu
     setBusy(true); setError(null)
     try {
       for (const f of Array.from(list)) { const id = await uploadOne(f, ownerType, ownerId, nameFor?.(f), meta); onUploaded?.(id, f) }
+      router.refresh()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không tải được tệp')
     } finally {

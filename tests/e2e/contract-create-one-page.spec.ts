@@ -1,0 +1,61 @@
+import { test, expect, type Page } from '@playwright/test'
+
+test.skip(!process.env.E2E_BASE_URL, 'Cần E2E_BASE_URL trỏ tới môi trường thử có dữ liệu mẫu')
+
+async function openForm(page: Page) {
+  await page.goto('/login')
+  await page.getByRole('button', { name: /^Admin/ }).click()
+  await page.goto('/contracts/new')
+}
+
+test('các mục cùng trang, lỗi cạnh trường và đổi phòng xóa tài sản mới', async ({ page }) => {
+  await openForm(page)
+  await expect(page.getByLabel('Phòng', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('Tiền đã cọc (VND)')).toBeVisible()
+  await expect(page.getByText('Biên bản bàn giao', { exact: false })).toBeVisible()
+  await expect(page.getByLabel('Ghi chú')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Tiếp tục' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Tạo hợp đồng thuê' }).click()
+  await expect(page.getByText('Chọn phòng', { exact: true })).toBeVisible()
+  const rooms = page.locator('#room option').filter({ hasText: 'Trống' })
+  test.skip(await rooms.count() < 2, 'Cần hai phòng trống')
+  await page.locator('#room').selectOption((await rooms.nth(0).getAttribute('value'))!)
+  await page.getByLabel('Mã tài sản mới').fill('TEST-TEMP')
+  await page.getByLabel('Tên tài sản mới').fill('Tài sản thử')
+  await page.getByRole('button', { name: 'Thêm tài sản mới' }).click()
+  await expect(page.getByRole('button', { name: /Tài sản thử/ })).toBeVisible()
+  await page.locator('#room').selectOption((await rooms.nth(1).getAttribute('value'))!)
+  await expect(page.getByRole('button', { name: /Tài sản thử/ })).toHaveCount(0)
+})
+
+test('tạo hợp đồng với tiền thực nhận, ghi chú và tài sản mới', async ({ page }) => {
+  await openForm(page)
+  const room = page.locator('#room option').filter({ hasText: 'Trống' }).first()
+  test.skip(await room.count() === 0, 'Cần phòng trống')
+  await page.locator('#room').selectOption((await room.getAttribute('value'))!)
+  const tenant = page.locator('#tenant option').filter({ hasText: 'Nguyễn Văn An' }).first()
+  await page.locator('#tenant').selectOption((await tenant.getAttribute('value'))!)
+  await page.getByLabel('Ngày bắt đầu').fill('2026-12-01')
+  await page.getByRole('button', { name: '+12 tháng' }).click()
+  await page.getByLabel('Giá thuê tháng (VND)').fill('9000000')
+  await page.getByLabel('Tiền cọc (VND)').fill('9000000')
+  await page.getByLabel('Tiền đã cọc (VND)').fill('3000000')
+  await page.getByLabel('Ghi chú').fill('Ghi chú kiểm thử')
+  await page.getByLabel('Mã tài sản mới').fill(`TEST-${Date.now()}`)
+  await page.getByLabel('Tên tài sản mới').fill('Bàn kiểm thử')
+  await page.getByRole('button', { name: 'Thêm tài sản mới' }).click()
+  await page.getByRole('button', { name: 'Tạo hợp đồng thuê' }).click()
+  await expect(page).toHaveURL(/\/contracts\/[a-f0-9-]+$/)
+  await expect(page.getByText('Ghi chú kiểm thử')).toBeVisible()
+  await page.getByRole('tab', { name: 'Bàn giao' }).click()
+  await expect(page.getByText('Nháp', { exact: true })).toBeVisible()
+  await page.getByRole('tab', { name: 'Sổ cọc' }).click()
+  await expect(page.getByText(/3\.000\.000/).first()).toBeVisible()
+  await expect(page.getByText(/6\.000\.000/).first()).toBeVisible()
+})
+
+test('bố cục di động hiển thị mục bàn giao', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 })
+  await openForm(page)
+  await expect(page.getByText('Biên bản bàn giao', { exact: false })).toBeVisible()
+})
