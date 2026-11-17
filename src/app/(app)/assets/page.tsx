@@ -20,7 +20,8 @@ async function Assets({ searchParams }: { searchParams: Promise<{ toa?: string |
   const ctx = await getAccessContext()
   const selected = parseFacilityFilter((await searchParams).toa).filter((id) => ctx.isAdmin || ctx.facilityIds.has(id))
   const facs = await listFacilities(db, ctx)
-  const tree = await Promise.all(facs.map(async (f) => ({ id: f.id, name: f.name, rooms: (await listRooms(db, ctx, { facilityId: f.id })).map((r) => ({ id: r.id, code: r.code })) })))
+  const allRooms = await listRooms(db, ctx, {})
+  const tree = facs.map((f) => ({ id: f.id, name: f.name, rooms: allRooms.filter((r) => r.facilityId === f.id).map((r) => ({ id: r.id, code: r.code })) }))
   const list = await listAssets(db, ctx, { facilityIds: selected })
   const stock = (await listStock(db, ctx, {})).filter((row) => !selected.length || selected.includes(row.facilityId))
   return (

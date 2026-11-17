@@ -4,7 +4,7 @@ import {
   listFacilities, getFacility, createFacility, updateFacility,
 } from '@/server/facilities/service'
 import {
-  getRoom, listRooms, createRoom, updateRoom, setRoomActive, createRoomsBulk,
+  getRoom, listRooms, listRoomsWithStatus, createRoom, updateRoom, setRoomActive, createRoomsBulk,
 } from '@/server/rooms/service'
 import { ForbiddenError, NotFoundError, type AccessContext, type Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'
@@ -88,4 +88,18 @@ describe('facilities & rooms', () => {
     expect((await listRooms(db, admin, { facilityId: fa, q: '20' })).map((x) => x.code)).toEqual(['202'])
     await expect(listRooms(db, ctxOf(['meters'], [fa]), { facilityId: fb })).rejects.toThrow(NotFoundError)
   })
+  it('liệt kê phòng nhiều toà đúng phạm vi, cả khi kèm trạng thái', async () => {
+    const fc = (await createFacility(db, admin, { code: 'C', name: 'Cơ sở C' })).id
+    await createRoom(db, admin, { facilityId: fa, code: 'A01' })
+    await createRoom(db, admin, { facilityId: fb, code: 'B01' })
+    await createRoom(db, admin, { facilityId: fc, code: 'C01' })
+    const staff = ctxOf(['tenants_contracts'], [fa, fb])
+    expect((await listRooms(db, staff, {})).map((r) => r.code)).toEqual(['A01', 'B01'])
+    expect((await listRoomsWithStatus(db, staff, {})).map((r) => [r.code, r.facilityId, r.status])).toEqual([
+      ['A01', fa, 'vacant'], ['B01', fb, 'vacant'],
+    ])
+    expect((await listRooms(db, admin, {})).map((r) => r.code)).toEqual(['A01', 'B01', 'C01'])
+    expect(await listRooms(db, ctxOf(['meters']), {})).toEqual([])
+  })
+
 })

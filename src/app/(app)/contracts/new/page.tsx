@@ -22,8 +22,8 @@ export default async function NewContractPage({ searchParams }: { searchParams: 
   const [facs, tenants, feeTypes, units, settings, prices] = await Promise.all([
     listFacilities(db, ctx), searchTenants(db, ctx, { limit: 500 }), listFeeTypes(db, ctx), listFeeUnits(db, ctx), getSettings(db), listFeeTypePrices(db, ctx),
   ])
-  const roomLists = await Promise.all(facs.map(async (f) => (await listRoomsWithStatus(db, ctx, { facilityId: f.id })).map((r) => ({ f, r }))))
-  const rooms = roomLists.flat()
+  const allRooms = await listRoomsWithStatus(db, ctx, {})
+  const rooms = facs.flatMap((f) => allRooms.filter((r) => r.facilityId === f.id).map((r) => ({ f, r })))
   const tenantOptions = tenants.map((t) => ({ id: t.id, name: displayName(t), kind: t.kind }))
   const unitName = new Map(units.map((u) => [u.id, u.name]))
 

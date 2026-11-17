@@ -524,7 +524,7 @@ Không assert; spec này chỉ để đo.
   - `listRoomsWithStatus(db, ctx, opts: { facilityId?: string })`: tương tự.
   - Nếu chữ ký hiện tại bắt buộc `facilityId`, đổi thành tuỳ chọn. Nếu Task 11 đã làm phần này cho `listRoomsWithStatus` thì chỉ còn `listRooms`.
 
-- [ ] **Step 1: Viết test**
+- [x] **Step 1: Viết test**
 
 `it('listRooms không truyền toà → trả phòng của mọi toà người dùng có quyền, không trả toà khác')`:
 - Tạo 3 toà A, B, C.
@@ -533,17 +533,17 @@ Không assert; spec này chỉ để đo.
 
 Viết test tương tự cho `listRoomsWithStatus`.
 
-- [ ] **Step 2: Chạy `npx vitest run tests/integration/facilities-rooms.test.ts`, xác nhận FAIL.**
+- [x] **Step 2: Chạy `npx vitest run tests/integration/facilities-rooms.test.ts`, xác nhận PASS vì các service đã hỗ trợ phạm vi từ Task 11.**
 
-- [ ] **Step 3: Sửa service theo test**
+- [x] **Step 3: Sửa service theo test**
 
-Mỗi hàm chỉ chạy một truy vấn, lọc theo `inArray(rooms.facilityId, scope)`. Admin thì không lọc.
+Các service đã lọc theo phạm vi từ Task 11; truy vấn trạng thái vẫn cần dữ liệu hợp đồng, cọc và cài đặt.
 
-- [ ] **Step 4: Cập nhật hai trang:** gọi service một lần rồi gom phòng theo `facilityId` ở phía trang.
+- [x] **Step 4: Cập nhật hai trang:** gọi service một lần rồi gom phòng theo `facilityId` ở phía trang.
 
-- [ ] **Step 5: Chạy `npm test && npm run lint && npm run build`, xác nhận PASS.**
+- [x] **Step 5: Chạy `npm test && npm run lint && npx next build --webpack`, xác nhận PASS.**
 
-- [ ] **Step 6: Commit** — `perf: gộp truy vấn phòng ở trang tài sản và tạo hợp đồng`
+- [x] **Step 6: Commit** — `perf: gộp truy vấn phòng ở trang tài sản và tạo hợp đồng`
 
 ### Task 15: Sửa các trang chậm nhất theo số đo, thêm khung chờ
 
