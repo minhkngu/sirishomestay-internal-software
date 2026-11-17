@@ -281,13 +281,20 @@ export async function getInvoiceDetail(db: DB, ctx: AccessContext, id: string) {
   const total = lines.reduce((n, l) => n + l.amount, 0), paid = pays.reduce((n, p) => n + p.amount, 0)
   return { invoice: inv, lines, payments: pays, total, paid, state: invoiceStatus(total, paid, inv.status, inv.dueDate, todayVN()), ...row }
 }
+function pdfLine(line: typeof invoiceLines.$inferSelect) {
+  const meta = line.meta as { segments?: { start?: unknown; end?: unknown }[] } | null
+  const segments = (line.type === 'electric' || line.type === 'water') && Array.isArray(meta?.segments)
+    ? meta.segments.filter((segment) => typeof segment.start === 'number' && typeof segment.end === 'number').map((segment) => `${segment.start} đến ${segment.end}`)
+    : []
+  return { description: segments.length ? `${line.description} (${segments.join('; ')})` : line.description, quantity: line.quantity, unitLabel: line.type === 'electric' ? 'kWh' : line.type === 'water' ? 'm³' : '', unitPrice: line.unitPrice, amount: line.amount }
+}
 for (const [docType, kind] of [['invoice_monthly', 'monthly'], ['invoice_termination', 'termination']] as const) {
   registerPdfLoader(docType, async (db, ctx, id) => {
     const d = await getInvoiceDetail(db, ctx, id)
     if (kind === 'termination' ? d.invoice.kind !== 'termination' : !['monthly', 'first'].includes(d.invoice.kind)) throw new ValidationError('Loại hoá đơn không phù hợp')
     const [row] = await db.select({ tenant: tenants, facility: facilities }).from(leases).innerJoin(tenants, eq(tenants.id, leases.tenantId)).innerJoin(facilities, eq(facilities.id, d.invoice.facilityId)).where(eq(leases.id, d.invoice.leaseId))
     const settings = await getSettings(db)
-    return { facilityId: d.invoice.facilityId, baseName: d.invoice.code, render: () => renderInvoicePdf({ kind, code: d.invoice.code, issueDate: d.invoice.issueDate, periodStart: d.invoice.periodStart, periodEnd: d.invoice.periodEnd, dueDate: d.invoice.dueDate, facility: { name: row.facility.name, address: row.facility.address }, room: d.roomCode, tenant: { name: row.tenant.fullName || row.tenant.companyName || '', phone: row.tenant.phone }, lines: d.lines.map(l => ({ description: l.description, quantity: l.quantity, unitLabel: '', unitPrice: l.unitPrice, amount: l.amount })), total: d.total, paid: d.paid, bank: resolveBankAccount(row.facility.bankAccount, settings.bankAccount) }) }
+    return { facilityId: d.invoice.facilityId, baseName: d.invoice.code, render: () => renderInvoicePdf({ kind, code: d.invoice.code, issueDate: d.invoice.issueDate, periodStart: d.invoice.periodStart, periodEnd: d.invoice.periodEnd, dueDate: d.invoice.dueDate, facility: { name: row.facility.name, address: row.facility.address }, room: d.roomCode, tenant: { name: row.tenant.fullName || row.tenant.companyName || '', phone: row.tenant.phone }, lines: d.lines.map(pdfLine), total: d.total, paid: d.paid, bank: resolveBankAccount(row.facility.bankAccount, settings.bankAccount) }) }
   })
 }
 // Bản xuất hoá đơn / phiếu thu: tìm cơ sở theo hoá đơn hoặc khoản thu gốc

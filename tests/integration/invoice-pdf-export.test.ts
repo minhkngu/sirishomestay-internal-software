@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { eq } from 'drizzle-orm'
 import QRCode from 'qrcode'
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { facilities, rooms, tenants, leases, invoices, invoiceLines, payments, files } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
@@ -35,6 +36,15 @@ describe('xuất hoá đơn và phiếu thu', () => {
   it('xuất PNG không gọi dịch vụ ngoài', async () => {
     const spy = vi.spyOn(globalThis, 'fetch')
     try { expect(await exported('invoice_monthly', invoiceId, 'png')).toMatchObject({ contentType: 'image/png', name: 'HD-01.png' }); expect(spy.mock.calls.filter(([url]) => /^https?:/.test(String(url)))).toHaveLength(0) } finally { spy.mockRestore() }
+  })
+  it('ghi chỉ số đầu và cuối của dòng điện vào PDF', async () => {
+    await db.insert(invoiceLines).values({ invoiceId, type: 'electric', description: 'Tiền điện', quantity: 333, unitPrice: 3000, amount: 999000, meta: { segments: [{ meterId: 'm1', start: 123, end: 456 }] } })
+    const row = await exported('invoice_monthly', invoiceId)
+    const pdf = await getDocument({ data: new Uint8Array(await storage.read(row.storageKey)), useSystemFonts: true }).promise
+    const content = await (await pdf.getPage(1)).getTextContent()
+    const text = content.items.map((item) => 'str' in item ? item.str : '').join(' ')
+    expect(text).toContain('123 đến 456')
+    expect(text).toContain('kWh')
   })
   it('liên kết tải dùng đúng tên tệp xuất', async () => {
     const row = await exported('invoice_monthly', invoiceId)
