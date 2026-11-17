@@ -1,9 +1,22 @@
 import Link from 'next/link'
+import { notFound } from 'next/navigation'
+import {
+  ArrowLeft,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  Coins,
+  FileCheck,
+  FileText,
+  Home,
+  Receipt,
+  User,
+  Users,
+} from 'lucide-react'
 import { can } from '@/domain/access'
 import { listOneOffs } from '@/server/charges/service'
 import { OneOffDialog } from '@/features/charges/components/one-off-dialog'
 import { DepositLedger } from '@/features/deposits/components/deposit-ledger'
-import { notFound } from 'next/navigation'
 import { buttonVariants } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { db } from '@/db/client'
@@ -25,8 +38,15 @@ import { OccupantDialog } from '@/features/contracts/components/occupant-dialog'
 import { TerminationWizard } from '@/features/contracts/components/termination-wizard'
 import { TransferWizard } from '@/features/contracts/components/transfer-wizard'
 import { addendumFormData, listAddenda } from '@/server/addenda/service'
+import { cn } from '@/lib/utils'
 
-const ENTRY: Record<string, string> = { collect: 'Thu cọc', topup: 'Thu cọc bổ sung', deduct: 'Khấu trừ', refund: 'Hoàn cọc', forfeit: 'Mất cọc' }
+const ENTRY: Record<string, string> = {
+  collect: 'Thu cọc',
+  topup: 'Thu cọc bổ sung',
+  deduct: 'Khấu trừ',
+  refund: 'Hoàn cọc',
+  forfeit: 'Mất cọc',
+}
 
 type Entry = { id: string; date: string; type: string; amount: number; status: string }
 
@@ -42,18 +62,70 @@ function runningBalances(entries: Entry[]): number[] {
 
 function Ledger({ entries }: { entries: Entry[] }) {
   const done = runningBalances(entries)
+  const currentBalance = depositBalance(
+    entries.map((e) => ({
+      id: e.id,
+      date: e.date,
+      type: e.type as 'collect',
+      amount: e.amount,
+      status: e.status as 'done',
+    }))
+  )
+
   return (
-    <div className="space-y-2">
-      <div className="overflow-x-auto rounded-md border bg-card">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50 text-left"><tr><th className="p-2">Ngày</th><th className="p-2">Loại</th><th className="p-2">Số tiền</th><th className="p-2">Trạng thái</th><th className="p-2">Số dư luỹ kế</th></tr></thead>
-          <tbody>
-            {entries.map((e, i) => <tr key={e.id} className="border-t"><td className="p-2">{formatDateVN(e.date)}</td><td className="p-2">{ENTRY[e.type]}</td><td className="p-2">{formatVND(e.amount)}</td><td className="p-2">{e.status === 'done' ? 'Đã xong' : 'Chờ'}</td><td className="p-2">{formatVND(done[i])}</td></tr>)}
-            {entries.length === 0 && <tr><td colSpan={5} className="p-3 text-center text-muted-foreground">Chưa có dòng nào</td></tr>}
+    <div className="space-y-3">
+      <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-2xs">
+        <table className="w-full text-left text-xs">
+          <thead className="border-b border-border/70 bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <th className="px-4 py-3">Ngày</th>
+              <th className="px-4 py-3">Nghiệp vụ</th>
+              <th className="px-4 py-3 text-right">Số tiền</th>
+              <th className="px-4 py-3 text-center">Trạng thái</th>
+              <th className="px-4 py-3 text-right">Số dư luỹ kế</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/60">
+            {entries.map((e, i) => (
+              <tr key={e.id} className="transition-colors hover:bg-muted/30">
+                <td className="px-4 py-3 font-medium text-foreground">{formatDateVN(e.date)}</td>
+                <td className="px-4 py-3">
+                  <span className="font-medium text-foreground">{ENTRY[e.type] || e.type}</span>
+                </td>
+                <td className="px-4 py-3 text-right font-medium tabular-nums text-foreground">
+                  {formatVND(e.amount)}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <span
+                    className={cn(
+                      'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium',
+                      e.status === 'done'
+                        ? 'border border-emerald-200/80 bg-emerald-50 text-emerald-700'
+                        : 'border border-amber-200/80 bg-amber-50 text-amber-700'
+                    )}
+                  >
+                    {e.status === 'done' ? 'Đã xong' : 'Chờ'}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-right font-semibold tabular-nums text-foreground">
+                  {formatVND(done[i])}
+                </td>
+              </tr>
+            ))}
+            {entries.length === 0 && (
+              <tr>
+                <td colSpan={5} className="py-8 text-center text-xs text-muted-foreground">
+                  Chưa có dòng ghi sổ cọc nào.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
-      <p className="text-sm">Số dư cọc: <strong>{formatVND(depositBalance(entries.map((e) => ({ id: e.id, date: e.date, type: e.type as 'collect', amount: e.amount, status: e.status as 'done' }))))}</strong></p>
+      <div className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/20 px-4 py-2.5 text-xs">
+        <span className="text-muted-foreground">Số dư cọc hiện tại:</span>
+        <strong className="text-sm font-bold text-foreground tabular-nums">{formatVND(currentBalance)}</strong>
+      </div>
     </div>
   )
 }
@@ -62,26 +134,117 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
   const { id } = await params
   const ctx = await getAccessContext()
   let lease: Awaited<ReturnType<typeof getLease>> | null = null
-  try { lease = await getLease(db, ctx, id) } catch (e) { if (!(e instanceof NotFoundError)) throw e }
+  try {
+    lease = await getLease(db, ctx, id)
+  } catch (e) {
+    if (!(e instanceof NotFoundError)) throw e
+  }
 
   if (!lease) {
     let deposit
-    try { deposit = await getDepositContract(db, ctx, id) } catch (e) { if (e instanceof NotFoundError) notFound(); throw e }
+    try {
+      deposit = await getDepositContract(db, ctx, id)
+    } catch (e) {
+      if (e instanceof NotFoundError) notFound()
+      throw e
+    }
     const templates = (await listTemplates(db, ctx, 'deposit_contract')).filter((t) => t.fileId)
+    const statusLabels: Record<string, string> = {
+      pending: 'Đang chờ',
+      converted: 'Đã chuyển thành hợp đồng thuê',
+      cancelled: 'Đã huỷ',
+    }
+
     return (
-      <div className="space-y-4">
-        <h1 className="text-xl font-semibold">Hợp đồng cọc — phòng {deposit.roomCode}</h1>
-        <dl className="grid max-w-md grid-cols-2 gap-3 rounded-lg border bg-card p-4 text-sm">
-          <dt className="text-muted-foreground">Bên thuê</dt><dd>{deposit.tenantName}</dd>
-          <dt className="text-muted-foreground">Tiền cọc</dt><dd>{formatVND(deposit.depositAmount)}</dd>
-          <dt className="text-muted-foreground">Giá thuê thoả thuận</dt><dd>{formatVND(deposit.agreedRent)}</dd>
-          <dt className="text-muted-foreground">Vào ở dự kiến</dt><dd>{formatDateVN(deposit.expectedMoveIn)}</dd>
-          <dt className="text-muted-foreground">Trạng thái</dt><dd>{{ pending: 'Đang chờ', converted: 'Đã chuyển thành hợp đồng thuê', cancelled: 'Đã huỷ' }[deposit.status]}</dd>
-        </dl>
-        {deposit.status === 'pending' && <Link href={`/contracts/new?deposit=${deposit.id}`} className={buttonVariants()}>Chuyển thành hợp đồng thuê</Link>}
-        <SignStatus kind="deposit" id={deposit.id} status={deposit.signStatus as 'draft'} signedFileId={deposit.signedFileId} />
-        <ExportMenu kind="deposit" id={deposit.id} templates={templates.map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault }))} />
-        <h2 className="font-medium">Sổ cọc</h2><Ledger entries={deposit.entries} />
+      <div className="max-w-4xl space-y-6">
+        <div className="space-y-3">
+          <Link
+            href="/contracts"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="size-3.5" />
+            <span>Danh sách hợp đồng</span>
+          </Link>
+
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-xl font-bold tracking-tight text-foreground">
+                  Hợp đồng cọc — phòng {deposit.roomCode}
+                </h1>
+                <span
+                  className={cn(
+                    'rounded-full px-2.5 py-0.5 text-xs font-medium border',
+                    deposit.status === 'pending'
+                      ? 'border-amber-200/80 bg-amber-50 text-amber-700'
+                      : deposit.status === 'converted'
+                      ? 'border-emerald-200/80 bg-emerald-50 text-emerald-700'
+                      : 'border-border/80 bg-muted/60 text-muted-foreground'
+                  )}
+                >
+                  {statusLabels[deposit.status] || deposit.status}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Khách thuê: <strong className="font-medium text-foreground">{deposit.tenantName}</strong>
+              </p>
+            </div>
+
+            {deposit.status === 'pending' && (
+              <Link
+                href={`/contracts/new?deposit=${deposit.id}`}
+                className={cn(buttonVariants({ size: 'sm' }), 'rounded-xl shadow-2xs')}
+              >
+                Chuyển thành hợp đồng thuê
+              </Link>
+            )}
+          </div>
+        </div>
+
+        {/* Deposit Summary Details */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
+            <div className="text-[11px] font-medium text-muted-foreground">Bên thuê</div>
+            <div className="mt-1 text-sm font-semibold text-foreground truncate">{deposit.tenantName}</div>
+          </div>
+          <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
+            <div className="text-[11px] font-medium text-muted-foreground">Tiền cọc giữ chỗ</div>
+            <div className="mt-1 text-sm font-bold tabular-nums text-primary">
+              {formatVND(deposit.depositAmount)}
+            </div>
+          </div>
+          <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
+            <div className="text-[11px] font-medium text-muted-foreground">Giá thuê thoả thuận</div>
+            <div className="mt-1 text-sm font-bold tabular-nums text-foreground">
+              {formatVND(deposit.agreedRent)}
+            </div>
+          </div>
+          <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
+            <div className="text-[11px] font-medium text-muted-foreground">Vào ở dự kiến</div>
+            <div className="mt-1 text-sm font-semibold text-foreground">
+              {formatDateVN(deposit.expectedMoveIn)}
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-2xs space-y-4">
+          <SignStatus
+            kind="deposit"
+            id={deposit.id}
+            status={deposit.signStatus as 'draft'}
+            signedFileId={deposit.signedFileId}
+          />
+          <ExportMenu
+            kind="deposit"
+            id={deposit.id}
+            templates={templates.map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault }))}
+          />
+        </div>
+
+        <section className="space-y-3 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
+          <h2 className="text-sm font-semibold tracking-tight text-foreground">Sổ cọc</h2>
+          <Ledger entries={deposit.entries} />
+        </section>
       </div>
     )
   }
@@ -95,53 +258,259 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
     listTemplates(db, ctx, 'lease').then((t) => t.filter((x) => x.fileId)),
     listFiles(db, ctx, 'export', lease.id),
   ])
+
+  const isActive = lease.status === 'active'
+
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">{lease.code}</h1>
-        <p className="text-sm text-muted-foreground">Phòng {lease.roomCode} · {lease.tenantName} · {lease.status === 'active' ? 'Đang hiệu lực' : 'Đã kết thúc'}</p>
+    <div className="max-w-5xl space-y-6">
+      <div className="space-y-3">
+        <Link
+          href="/contracts"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="size-3.5" />
+          <span>Danh sách hợp đồng</span>
+        </Link>
+
+        {/* Hero Contract Header */}
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
+          <div>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h1 className="text-xl font-bold tracking-tight text-foreground">{lease.code}</h1>
+              <span
+                className={cn(
+                  'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
+                  isActive
+                    ? 'border border-emerald-200/80 bg-emerald-50 text-emerald-700'
+                    : 'border border-border/80 bg-muted/60 text-muted-foreground'
+                )}
+              >
+                {isActive ? 'Đang hiệu lực' : 'Đã kết thúc'}
+              </span>
+              <span className="rounded-full border border-border/80 bg-muted/60 px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                Phòng {lease.roomCode}
+              </span>
+            </div>
+
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1.5 font-medium text-foreground">
+                <User className="size-3.5 text-primary" />
+                <span>{lease.tenantName}</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Calendar className="size-3.5 text-muted-foreground" />
+                <span>
+                  {formatDateVN(lease.startDate)} – {formatDateVN(lease.terms.endDate)}
+                </span>
+              </span>
+              {lease.legacyCode && (
+                <span className="flex items-center gap-1.5 font-mono text-[11px]">
+                  <span>Mã cũ: {lease.legacyCode}</span>
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
-      <Tabs defaultValue="overview">
-        <TabsList>
-          <TabsTrigger value="overview">Tổng quan</TabsTrigger><TabsTrigger value="addenda">Phụ lục</TabsTrigger><TabsTrigger value="handover">Bàn giao</TabsTrigger>
-          <TabsTrigger value="invoices">Hoá đơn</TabsTrigger><TabsTrigger value="deposit">Sổ cọc</TabsTrigger><TabsTrigger value="docs">Giấy tờ</TabsTrigger>
+
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList className="h-10 rounded-xl bg-muted/60 p-1">
+          <TabsTrigger value="overview" className="rounded-lg text-xs font-medium">Tổng quan</TabsTrigger>
+          <TabsTrigger value="addenda" className="rounded-lg text-xs font-medium">Phụ lục</TabsTrigger>
+          <TabsTrigger value="handover" className="rounded-lg text-xs font-medium">Bàn giao</TabsTrigger>
+          <TabsTrigger value="invoices" className="rounded-lg text-xs font-medium">Hoá đơn</TabsTrigger>
+          <TabsTrigger value="deposit" className="rounded-lg text-xs font-medium">Sổ cọc</TabsTrigger>
+          <TabsTrigger value="docs" className="rounded-lg text-xs font-medium">Giấy tờ</TabsTrigger>
         </TabsList>
-        <TabsContent value="overview">
-          <dl className="grid max-w-lg grid-cols-2 gap-2 py-3 text-sm">
-            {lease.legacyCode && <><dt className="text-muted-foreground">Mã hợp đồng cũ</dt><dd>{lease.legacyCode}</dd></>}
-            <dt className="text-muted-foreground">Thời hạn</dt><dd>{formatDateVN(lease.startDate)} – {formatDateVN(lease.terms.endDate)}</dd>
-            <dt className="text-muted-foreground">Giá thuê</dt><dd>{formatVND(lease.terms.monthlyRent)} /tháng</dd>
-            <dt className="text-muted-foreground">Tiền cọc</dt><dd>{formatVND(lease.terms.depositAmount)}</dd>
-            <dt className="text-muted-foreground">Số người ở</dt><dd>{lease.terms.occupantIds.length}</dd>
-            <dt className="text-muted-foreground">Phí dịch vụ</dt><dd>{lease.terms.fees.map((f) => `${f.name} ${formatVND(f.unitPrice)}`).join(', ') || '—'}</dd>
-          </dl>
-          {billing && <OneOffDialog leaseId={lease.id} charges={charges} />}
-          {form && <div className="py-2"><OccupantDialog leaseId={lease.id} people={form.people} currentIds={lease.terms.occupantIds} today={form.today} /></div>}
-        </TabsContent>
-        <TabsContent value="addenda">
-          <div className="space-y-3 py-3">
-            <AddendaList items={addendaList.map((a) => ({ id: a.id, type: a.type, effectiveDate: a.effectiveDate, signStatus: a.signStatus }))} />
-            {form && <div className="flex flex-wrap items-start gap-2">
-              <ExtensionDialog leaseId={lease.id} endDate={form.endDate} today={form.today} />
-              <TransferWizard leaseId={lease.id} currentRoomId={form.currentRoomId} freeRooms={form.freeRooms} meters={form.meters} today={form.today} />
-              <TerminationWizard leaseId={lease.id} meters={form.meters.filter((m) => m.roomId === form.currentRoomId)} today={form.today} />
-            </div>}
+
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
+              <div className="text-[11px] font-medium text-muted-foreground">Giá thuê hàng tháng</div>
+              <div className="mt-1 text-sm font-bold tabular-nums text-foreground">
+                {formatVND(lease.terms.monthlyRent)} <span className="text-xs font-normal text-muted-foreground">/tháng</span>
+              </div>
+            </div>
+            <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
+              <div className="text-[11px] font-medium text-muted-foreground">Tiền cọc giữ</div>
+              <div className="mt-1 text-sm font-bold tabular-nums text-foreground">
+                {formatVND(lease.terms.depositAmount)}
+              </div>
+            </div>
+            <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
+              <div className="text-[11px] font-medium text-muted-foreground">Thời hạn hợp đồng</div>
+              <div className="mt-1 text-xs font-semibold text-foreground">
+                {formatDateVN(lease.startDate)} – {formatDateVN(lease.terms.endDate)}
+              </div>
+            </div>
+            <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
+              <div className="text-[11px] font-medium text-muted-foreground">Số người ở</div>
+              <div className="mt-1 text-sm font-bold text-foreground">
+                {lease.terms.occupantIds.length} <span className="text-xs font-normal text-muted-foreground">người</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-2xs space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Phí dịch vụ & Cố định</h3>
+            <div className="text-xs text-foreground">
+              {lease.terms.fees.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {lease.terms.fees.map((f, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-border/70 bg-muted/40 px-2.5 py-1 text-xs"
+                    >
+                      <span className="font-medium">{f.name}:</span>
+                      <strong className="font-bold text-foreground tabular-nums">{formatVND(f.unitPrice)}</strong>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-muted-foreground">Không có phụ phí dịch vụ riêng.</span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {billing && <OneOffDialog leaseId={lease.id} charges={charges} />}
+            {form && (
+              <OccupantDialog
+                leaseId={lease.id}
+                people={form.people}
+                currentIds={lease.terms.occupantIds}
+                today={form.today}
+              />
+            )}
           </div>
         </TabsContent>
-        <TabsContent value="handover">
-          <div className="space-y-3 py-3">
-            <StartHandoverButtons leaseId={lease.id} />
-            <ul className="space-y-1 text-sm">{handoverList.map((h) => <li key={h.id}><Link className="underline" href={`/handovers/${h.id}`}>{h.kind === 'check_in' ? 'Check-in' : 'Check-out'} {formatDateVN(h.date)}</Link> — {h.status === 'done' ? 'Đã hoàn tất' : 'Nháp'}</li>)}
-              {handoverList.length === 0 && <li className="text-muted-foreground">Chưa có biên bản nào.</li>}</ul>
+
+        <TabsContent value="addenda" className="space-y-4">
+          <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-2xs space-y-4">
+            <AddendaList
+              items={addendaList.map((a) => ({
+                id: a.id,
+                type: a.type,
+                effectiveDate: a.effectiveDate,
+                signStatus: a.signStatus,
+              }))}
+            />
+            {form && (
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/60">
+                <ExtensionDialog leaseId={lease.id} endDate={form.endDate} today={form.today} />
+                <TransferWizard
+                  leaseId={lease.id}
+                  currentRoomId={form.currentRoomId}
+                  freeRooms={form.freeRooms}
+                  meters={form.meters}
+                  today={form.today}
+                />
+                <TerminationWizard
+                  leaseId={lease.id}
+                  meters={form.meters.filter((m) => m.roomId === form.currentRoomId)}
+                  today={form.today}
+                />
+              </div>
+            )}
           </div>
         </TabsContent>
-        <TabsContent value="invoices"><p className="py-3 text-sm text-muted-foreground">Hoá đơn sẽ có ở bước sau.</p></TabsContent>
-        <TabsContent value="deposit"><div className="py-3"><DepositLedger entries={lease.depositEntries} canEdit={billing} leaseId={lease.id} /></div></TabsContent>
-        <TabsContent value="docs">
-          <div className="space-y-3 py-3">
-            <SignStatus kind="lease" id={lease.id} status={lease.signStatus as 'draft'} signedFileId={lease.signedFileId} />
-            <ExportMenu kind="lease" id={lease.id} templates={templates.map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault }))} />
-            {exports.length > 0 && <ul className="space-y-1 text-sm">{exports.map((f) => <li key={f.id}><a className="underline" href={`/api/files/${f.id}`}>{f.name}</a></li>)}</ul>}
+
+        <TabsContent value="handover" className="space-y-4">
+          <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-2xs space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold tracking-tight text-foreground">Biên bản bàn giao</h3>
+                <p className="text-xs text-muted-foreground">Biên bản check-in nhận phòng và check-out trả phòng</p>
+              </div>
+              <StartHandoverButtons leaseId={lease.id} />
+            </div>
+
+            {handoverList.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border/80 p-6 text-center text-xs text-muted-foreground">
+                Chưa có biên bản bàn giao nào.
+              </div>
+            ) : (
+              <div className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border/70 bg-card">
+                {handoverList.map((h) => (
+                  <div
+                    key={h.id}
+                    className="flex flex-wrap items-center justify-between gap-3 p-3 text-xs transition-colors hover:bg-muted/30"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="font-semibold text-foreground">
+                        {h.kind === 'check_in' ? 'Check-in' : 'Check-out'}
+                      </span>
+                      <span className="text-muted-foreground">·</span>
+                      <span className="text-muted-foreground">{formatDateVN(h.date)}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2.5">
+                      <span
+                        className={cn(
+                          'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium',
+                          h.status === 'done'
+                            ? 'border border-emerald-200/80 bg-emerald-50 text-emerald-700'
+                            : 'border border-border/80 bg-muted/60 text-muted-foreground'
+                        )}
+                      >
+                        {h.status === 'done' ? 'Đã hoàn tất' : 'Nháp'}
+                      </span>
+                      <Link
+                        href={`/handovers/${h.id}`}
+                        className="font-medium text-primary hover:underline underline-offset-2"
+                      >
+                        Xem biên bản →
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="invoices">
+          <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-2xs text-center text-xs text-muted-foreground">
+            Hoá đơn sẽ có ở bước sau.
+          </div>
+        </TabsContent>
+
+        <TabsContent value="deposit">
+          <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
+            <DepositLedger entries={lease.depositEntries} canEdit={billing} leaseId={lease.id} />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="docs" className="space-y-4">
+          <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-2xs space-y-4">
+            <SignStatus
+              kind="lease"
+              id={lease.id}
+              status={lease.signStatus as 'draft'}
+              signedFileId={lease.signedFileId}
+            />
+            <ExportMenu
+              kind="lease"
+              id={lease.id}
+              templates={templates.map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault }))}
+            />
+            {exports.length > 0 && (
+              <div className="space-y-2 pt-3 border-t border-border/60">
+                <h4 className="text-xs font-semibold text-foreground">Tệp đã xuất</h4>
+                <div className="space-y-1">
+                  {exports.map((f) => (
+                    <div key={f.id} className="text-xs">
+                      <a
+                        className="font-medium text-primary hover:underline underline-offset-2"
+                        href={`/api/files/${f.id}`}
+                      >
+                        {f.name}
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>

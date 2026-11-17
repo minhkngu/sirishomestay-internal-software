@@ -22,14 +22,56 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
   const end = `${period}-${String(daysInMonth(period)).padStart(2, '0')}`
   const readOn = today.startsWith(period) ? today : end
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <PageHeader title="Ghi chỉ số điện nước" />
-      <form method="get" className="flex flex-wrap gap-2">
-        <select name="facility" defaultValue={facilityId} aria-label="Cơ sở" className="h-9 rounded-lg border bg-card px-2 text-sm">{facs.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select>
-        <input type="month" name="period" defaultValue={period} aria-label="Kỳ" className="h-9 rounded-lg border bg-card px-2 text-sm" />
-        <button className="h-9 rounded-lg border bg-card px-3 text-sm" type="submit">Xem</button>
-      </form>
-      {sheet ? <ReadingGrid key={`${facilityId}-${period}`} rows={sheet.rows} period={period} readOn={readOn} progress={sheet.progress} /> : <p className="text-muted-foreground">Chưa có cơ sở nào.</p>}
+      <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-2xs">
+        <form method="get" className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Chọn cơ sở:</span>
+            <select
+              name="facility"
+              defaultValue={facilityId}
+              aria-label="Cơ sở"
+              className="h-9 rounded-xl border border-border/80 bg-card px-3 text-xs text-foreground shadow-2xs outline-none focus:border-ring"
+            >
+              {facs.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Kỳ ghi:</span>
+            <input
+              type="month"
+              name="period"
+              defaultValue={period}
+              aria-label="Kỳ"
+              className="h-9 rounded-xl border border-border/80 bg-card px-3 text-xs text-foreground shadow-2xs outline-none focus:border-ring"
+            />
+          </div>
+          <button
+            className="h-9 rounded-xl bg-primary px-4 text-xs font-medium text-primary-foreground shadow-xs transition-colors hover:bg-[var(--primary-strong)] active:scale-95"
+            type="submit"
+          >
+            Xem bảng ghi
+          </button>
+        </form>
+      </div>
+      {sheet ? (
+        <ReadingGrid
+          key={`${facilityId}-${period}`}
+          rows={sheet.rows}
+          period={period}
+          readOn={readOn}
+          progress={sheet.progress}
+        />
+      ) : (
+        <div className="rounded-2xl border border-dashed border-border/80 bg-card/60 p-8 text-center text-xs text-muted-foreground">
+          Chưa có cơ sở nào.
+        </div>
+      )}
     </div>
   )
 }

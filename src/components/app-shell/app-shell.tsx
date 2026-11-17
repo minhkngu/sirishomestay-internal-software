@@ -21,20 +21,39 @@ export function AppShell({ children, hrefs, userName, demo, logoutAction }: Prop
     <div className="flex min-h-screen flex-col">
       {demo && <DemoBanner />}
       <Topbar onMenu={() => setOpen(true)}>
-        <span className="text-sm font-medium">{userName}</span>
-        <form action={logoutAction}><button type="submit" className="text-sm text-muted-foreground underline underline-offset-4">Đăng xuất</button></form>
+        <div className="flex h-8 items-center gap-2 rounded-xl border border-border/80 bg-muted/40 px-2.5">
+          <div className="flex size-5.5 items-center justify-center rounded-lg bg-primary/15 text-[11px] font-bold text-primary">
+            {(userName || 'U')[0].toUpperCase()}
+          </div>
+          <span className="text-xs font-medium text-foreground">{userName}</span>
+        </div>
+        <form action={logoutAction}>
+          <button
+            type="submit"
+            className="flex h-8 items-center gap-1.5 rounded-xl border border-border/80 bg-card px-3 text-xs font-medium text-muted-foreground transition-all hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive active:scale-95 shadow-2xs"
+          >
+            <span>Đăng xuất</span>
+          </button>
+        </form>
       </Topbar>
       <div className="flex flex-1">
-        <aside className="hidden w-56 shrink-0 border-r bg-sidebar md:block"><Sidebar items={items} /></aside>
+        <aside className="hidden w-60 shrink-0 border-r border-border/70 bg-sidebar md:block">
+          <Sidebar items={items} />
+        </aside>
         {open && (
           <div className="fixed inset-0 z-40 md:hidden" onClick={() => setOpen(false)}>
-            <div className="absolute inset-0 bg-black/40" />
-            <aside role="dialog" aria-label="Menu" className="absolute left-0 top-0 h-full w-64 bg-sidebar shadow-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute inset-0 bg-black/30 backdrop-blur-xs" />
+            <aside
+              role="dialog"
+              aria-label="Menu"
+              className="absolute left-0 top-0 h-full w-64 border-r border-border/70 bg-sidebar shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
               <Sidebar items={items} onNavigate={() => setOpen(false)} />
             </aside>
           </div>
         )}
-        <main className="min-w-0 flex-1 p-3 md:p-6">{children}</main>
+        <main className="min-w-0 flex-1 p-4 md:p-8">{children}</main>
       </div>
     </div>
   )
