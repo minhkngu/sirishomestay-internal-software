@@ -24,6 +24,7 @@ test('nhập và chuyển vật tư theo số lượng', async ({ page }) => {
   await login(page, /^Admin/)
   await page.goto('/assets')
   const uniqueName = `Bóng đèn thử ${Date.now()}`
+  await page.getByLabel('Cơ sở vật tư').selectOption({ label: 'Thảo Điền' })
   await page.getByLabel('Tên vật tư').fill(uniqueName)
   await page.getByLabel('Đơn vị', { exact: true }).fill('cái')
   await page.getByLabel('Loại vật tư').fill('Điện')
@@ -101,6 +102,7 @@ test('chuyển hai tài sản mới từ kho vào phòng', async ({ page }) => {
   const prefix = `E2E${Date.now()}`
   for (const suffix of ['A', 'B']) {
     await page.getByRole('button', { name: 'Thêm tài sản' }).click()
+    await page.getByLabel('Cơ sở', { exact: true }).selectOption({ label: 'Thảo Điền' })
     await page.getByLabel('Mã tài sản').fill(prefix + suffix)
     await page.getByLabel('Tên tài sản').fill('Tài sản kiểm thử')
     await page.getByLabel('Giá trị', { exact: true }).fill('100000')

@@ -507,7 +507,9 @@ Với mỗi `href` trong `NAV_ITEMS`:
 
 Không assert; spec này chỉ để đo.
 
-- [ ] **Step 2: Chạy trên bản production ở máy và trên bản preview Vercel. Ghi bảng "trước" vào `docs/operations/toc-do.md`.**
+- [x] **Step 2a: Đo bản production trên máy trước và sau tối ưu, và đo preview sau tối ưu.** Kết quả trong `docs/operations/toc-do.md`.
+
+- [ ] **Step 2b: Đo preview trước tối ưu trên bản tương ứng.** Chưa có số đo cùng phiên bản và dữ liệu để so sánh.
 
 - [x] **Step 3: Commit số đo local ban đầu** — `docs: ghi số đo tốc độ trang trên máy`
 
@@ -586,6 +588,6 @@ Test phải trả về đúng dữ liệu như cũ, kể cả khi đổi sang tr
 
 - [x] **Step 1: Chạy `npm test && npm run lint && npx next build --webpack`.** 362 test đạt, lint không lỗi (12 cảnh báo), bản dựng đạt.
 
-- [ ] **Step 2: Kiểm tra e2e.** Lượt đầy đủ: 32/34 đạt, 2 trường hợp quá thời hạn; chạy lại riêng cả 2 đều đạt. Cần xác nhận lượt đầy đủ đạt.
+- [ ] **Step 2: Kiểm tra e2e.** Preview commit `51fed67`: 30/34 đạt; hai kiểm thử chọn cơ sở không có phòng và một kiểm thử gặp giới hạn kết nối đã đạt khi chạy lại. Xuất PDF/ảnh chưa đạt do thiếu font PDF trong bản triển khai; đã chuẩn bị bản sửa local, cần triển khai và kiểm tra lại. Cần xác nhận lượt đầy đủ đạt.
 
 - [x] **Step 3: Commit** — `docs: cập nhật stack, checklist và số đo tốc độ`
