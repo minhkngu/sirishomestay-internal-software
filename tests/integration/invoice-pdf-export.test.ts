@@ -7,6 +7,7 @@ import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
 import { ForbiddenError } from '@/domain/errors'
 import { getDownloadUrl } from '@/server/files/service'
+import { convertPdfToPng } from '@/server/convert'
 import { exportDocument } from '@/server/templates/service'
 import '@/server/invoices/service'
 import { MemoryStorage } from '@/server/storage/memory'
@@ -50,6 +51,27 @@ describe('xuất hoá đơn và phiếu thu', () => {
     const row = await exported('invoice_monthly', invoiceId)
     const spy = vi.spyOn(storage, 'createDownloadUrl')
     try { await getDownloadUrl(db, ctx, storage, row.id, false); expect(spy).toHaveBeenCalledWith(row.storageKey, 300, 'HD-01.pdf') } finally { spy.mockRestore() }
+  })
+  it('xem PDF không ép tải xuống và vẫn kiểm tra quyền', async () => {
+    const row = await exported('invoice_monthly', invoiceId)
+    const spy = vi.spyOn(storage, 'createDownloadUrl')
+    try {
+      await getDownloadUrl(db, ctx, storage, row.id, false, true)
+      expect(spy).toHaveBeenCalledWith(row.storageKey, 300, undefined)
+      ctx.permissions = new Set(['meters'])
+      await expect(getDownloadUrl(db, ctx, storage, row.id, false, true)).rejects.toThrow(ForbiddenError)
+    } finally { spy.mockRestore() }
+  })
+  it('xuất ảnh không phụ thuộc đường dẫn require nội bộ của pdf.js', async () => {
+    const row = await exported('invoice_monthly', invoiceId)
+    const pdf = new Blob([new Uint8Array(await storage.read(row.storageKey))])
+    const original = process.getBuiltinModule.bind(process)
+    const spy = vi.spyOn(process, 'getBuiltinModule').mockImplementation((name) => {
+      const builtin = original(name)
+      if (name !== 'module') return builtin
+      return { ...builtin, createRequire: () => () => { throw new Error('Không tìm được canvas từ pdf.js') } }
+    })
+    try { expect((await convertPdfToPng(pdf)).type).toBe('image/png') } finally { spy.mockRestore() }
   })
   it('từ chối Word', async () => expect(exported('invoice_monthly', invoiceId, 'docx')).rejects.toThrow('Hoá đơn và phiếu thu chỉ xuất PDF hoặc ảnh'))
   it('hoá đơn đầu tiên xuất theo mẫu hoá đơn tháng', async () => {

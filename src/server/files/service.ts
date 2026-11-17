@@ -78,8 +78,8 @@ export async function deleteFile(db: DB, ctx: AccessContext, storage: StorageAda
 }
 
 /** URL ký có hạn 5 phút (không bao giờ trả URL công khai cố định). */
-export async function getDownloadUrl(db: DB, ctx: AccessContext, storage: StorageAdapter, fileId: string, thumb: boolean): Promise<string> {
+export async function getDownloadUrl(db: DB, ctx: AccessContext, storage: StorageAdapter, fileId: string, thumb: boolean, inline = false): Promise<string> {
   const f = await loadFile(db, ctx, fileId)
   if (!f.confirmedAt) throw new NotFoundError()
-  return storage.createDownloadUrl(thumb && f.thumbKey ? f.thumbKey : f.storageKey, 300, f.ownerType === 'export' && !thumb ? f.name : undefined)
+  return storage.createDownloadUrl(thumb && f.thumbKey ? f.thumbKey : f.storageKey, 300, f.ownerType === 'export' && !thumb && !(inline && f.contentType === 'application/pdf') ? f.name : undefined)
 }
