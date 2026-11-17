@@ -588,6 +588,12 @@ Test phải trả về đúng dữ liệu như cũ, kể cả khi đổi sang tr
 
 - [x] **Step 1: Chạy `npm test && npm run lint && npx next build --webpack`.** 362 test đạt, lint không lỗi (12 cảnh báo), bản dựng đạt.
 
-- [ ] **Step 2: Kiểm tra e2e.** Preview commit `51fed67`: 30/34 đạt; hai kiểm thử chọn cơ sở không có phòng và một kiểm thử gặp giới hạn kết nối đã đạt khi chạy lại. Xuất PDF/ảnh chưa đạt do thiếu font PDF trong bản triển khai; đã chuẩn bị bản sửa local, cần triển khai và kiểm tra lại. Cần xác nhận lượt đầy đủ đạt.
+- [x] **Step 2a: Chạy lượt e2e đầy đủ trên preview.** Commit `51fed67`: 30/34 đạt; lưu kết quả và nguyên nhân các trường hợp chưa đạt.
+
+- [x] **Step 2b: Kiểm tra lại hai luồng vật tư/tài sản và luồng sự cố.** Chọn cơ sở mẫu có phòng; cả ba đã đạt khi chạy lại sau lỗi giới hạn kết nối.
+
+- [ ] **Step 2c: Xác nhận xuất PDF và ảnh trên preview mới nhất.** Các commit `2fa3a65`, `6e11ddc`, `391ec48` đã bổ sung font và thư viện chuyển ảnh vào bản dựng; chưa xác nhận được bản cuối vì session pooler đã chạm giới hạn 15 kết nối.
+
+- [ ] **Step 2d: Chạy lại toàn bộ e2e và xác nhận tất cả đạt.**
 
 - [x] **Step 3: Commit** — `docs: cập nhật stack, checklist và số đo tốc độ`
