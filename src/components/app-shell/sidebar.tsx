@@ -13,8 +13,8 @@ export function Sidebar({ items, onNavigate, className }: { items: NavItem[]; on
         const active = i.href === '/' ? pathname === '/' : pathname.startsWith(i.href)
         const Icon = i.icon
         return (
-          <Link key={i.href} href={i.href} onClick={onNavigate}
-            className={cn('flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted', active && 'bg-muted font-semibold')}>
+          <Link key={i.href} href={i.href} onClick={onNavigate} aria-current={active ? 'page' : undefined}
+            className={cn('flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted', active && 'bg-primary font-semibold text-primary-foreground hover:bg-primary/90')}>
             <Icon className="size-4" /> {i.label}
           </Link>
         )

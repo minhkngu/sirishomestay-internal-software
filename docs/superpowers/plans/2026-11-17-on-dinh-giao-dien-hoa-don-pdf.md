@@ -410,13 +410,13 @@ Mở trang tạo hợp đồng trong preview: chọn phòng ở toà có giá ri
 - Modify: `src/app/login/page.tsx` theo phong cách mới
 - Test: `tests/e2e/smoke-pages.spec.ts` (đã có)
 
-- [ ] **Step 1: Sửa token và khung app.**
+- [x] **Step 1: Sửa token và khung app.**
 
-- [ ] **Step 2: Chạy `npm run lint && npm run build`, xác nhận PASS.** Chạy preview, chụp màn hình trang Nhắc việc ở cỡ desktop và mobile (375px), so với mockup A. Kiểm tra viền focus bàn phím còn thấy rõ.
+- [x] **Step 2: Chạy `npm run lint && npx next build --webpack`, xác nhận PASS.** Chạy preview, chụp màn hình trang Nhắc việc ở cỡ desktop và mobile (375px), so với mockup A. Kiểm tra viền focus bàn phím còn thấy rõ.
 
-- [ ] **Step 3: Chạy lại `smoke-pages.spec.ts`, xác nhận PASS.**
+- [x] **Step 3: Chạy lại `smoke-pages.spec.ts`, xác nhận PASS.**
 
-- [ ] **Step 4: Commit** — `feat: giao diện Bạc hà cho khung app và đăng nhập`
+- [x] **Step 4: Commit** — `feat: giao diện Bạc hà cho khung app và đăng nhập`
 
 ### Task 10: Thành phần dùng chung cho trang danh sách
 

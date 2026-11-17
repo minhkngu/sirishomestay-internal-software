@@ -24,3 +24,11 @@ for (const { href, label } of NAV_ITEMS) {
     expect(errors).toEqual([])
   })
 }
+
+test('khung Bạc hà bỏ bộ chọn cũ và hiển thị mục đang chọn', async ({ page }) => {
+  await page.goto('/login')
+  await page.getByRole('button', { name: /^Admin/ }).click()
+  await expect(page.getByRole('heading', { name: 'Nhắc việc' })).toBeVisible()
+  await expect(page.getByLabel('Chọn cơ sở')).toHaveCount(0)
+  await expect(page.getByRole('navigation', { name: 'Menu chính' }).getByRole('link', { name: 'Nhắc việc' })).toHaveAttribute('aria-current', 'page')
+})
