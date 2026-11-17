@@ -16,7 +16,7 @@ Tạo hợp đồng với bên ký được tính mặc định là một ngư�
 - Khi chọn bên ký, mặc định thêm chính bên ký làm một người ở. Người lập có thể thêm người ở khác; mỗi người được tính một lần khi tính phí theo người. Khi đổi bên ký, cập nhật người ở mặc định theo bên ký mới và giữ những người được thêm chủ động, không tính trùng.
 - Công ty là một bên thuê hợp lệ và được tính là một người ở; mã số thuế thay cho CCCD. Cho phép công ty qua kiểm tra tạo hợp đồng, đồng thời giữ nguyên các kiểm soát quyền và phạm vi cơ sở; chưa thay đổi phụ lục người ở.
 
-## Phí và tiền nước
+## Phí
 
 - Màn hình tạo hợp đồng ban đầu chỉ hiển thị phí mặc định của cơ sở phòng đã chọn. Người lập có thể xóa từng phí, chọn thêm phí từ danh mục chung hoặc nhập một phí mới chỉ cho hợp đồng này. Lưu đủ tên, đơn vị, cách tính, số lượng và đơn giá để hiển thị, lập hóa đơn và xuất tài liệu sau này; không phụ thuộc vào loại phí chung để đọc phí riêng.
 - Mọi khoản phí dùng đơn giá ghi trong hợp đồng. Số lượng theo phương thức của dịch vụ: theo số người ở của hợp đồng, theo phòng (luôn là 1), hoặc theo lượng sử dụng thực tế. Với dịch vụ định lượng được cấu hình nhập tay, nhân viên nhập số lượng thực tế cho từng kỳ hóa đơn. Những giá trị cần nhập và nguồn số lượng phải rõ trong giao diện.
