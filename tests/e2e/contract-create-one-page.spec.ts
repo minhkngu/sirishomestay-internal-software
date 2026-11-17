@@ -5,6 +5,7 @@ test.skip(!process.env.E2E_BASE_URL, 'Cần E2E_BASE_URL trỏ tới môi trư�
 async function openForm(page: Page) {
   await page.goto('/login')
   await page.getByRole('button', { name: /^Admin/ }).click()
+  await expect(page.getByRole('heading', { name: 'Nhắc việc' })).toBeVisible()
   await page.goto('/contracts/new')
 }
 
