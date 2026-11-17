@@ -2,7 +2,7 @@ import { eq, sql } from 'drizzle-orm'
 import { describe, it, expect, beforeEach } from 'vitest'
 import { facilities, feeTypes, feeTypePrices } from '@/db'
 import {
-  setFeeTypePrice, removeFeeTypePrice, listFeeTypePrices, createFeeUnit, listFeeUnits, createFeeType, updateFeeType, archiveFeeType, listFeeTypes, createRate, listRates,
+  setFeeDefault, listFeeDefaults, setFeeTypePrice, removeFeeTypePrice, listFeeTypePrices, createFeeUnit, listFeeUnits, createFeeType, updateFeeType, archiveFeeType, listFeeTypes, createRate, listRates,
 } from '@/server/fees/service'
 import { ForbiddenError, NotFoundError } from '@/domain/errors'
 import type { AccessContext, Permission } from '@/domain/access'
@@ -22,6 +22,24 @@ describe('fees & rates', () => {
     db = await createTestDb()
     fa = (await db.insert(facilities).values({ code: 'A', name: 'A' }).returning())[0].id
     fb = (await db.insert(facilities).values({ code: 'B', name: 'B' }).returning())[0].id
+  })
+
+  it('đánh dấu phí mặc định riêng theo cơ sở, độc lập giá và quyền', async () => {
+    const unit = await createFeeUnit(db, admin, { name: 'phòng' })
+    const rac = await createFeeType(db, admin, { name: 'Rác', unitId: unit.id, defaultPrice: 20, billing: 'monthly_fixed', quantityFrom: 'room' })
+    await createFeeType(db, admin, { name: 'Nước', unitId: unit.id, defaultPrice: 10, billing: 'monthly_fixed', quantityFrom: 'meter' })
+    await setFeeTypePrice(db, admin, { facilityId: fa, feeTypeId: rac.id, price: 30 })
+    await setFeeDefault(db, admin, { facilityId: fa, feeTypeId: rac.id, enabled: true })
+    await setFeeDefault(db, admin, { facilityId: fa, feeTypeId: rac.id, enabled: true })
+    expect((await listFeeDefaults(db, admin))[fa]).toEqual([rac.id])
+    expect((await listFeeDefaults(db, admin))[fb] ?? []).not.toContain(rac.id)
+    expect(await listFeeTypePrices(db, admin)).toEqual({ [rac.id]: { [fa]: 30 } })
+    await expect(setFeeDefault(db, ctxOf(['billing'], [fa]), { facilityId: fa, feeTypeId: rac.id, enabled: true })).rejects.toThrow(ForbiddenError)
+    await setFeeDefault(db, admin, { facilityId: fa, feeTypeId: rac.id, enabled: false })
+    expect((await listFeeDefaults(db, admin))[fa] ?? []).toEqual([])
+    await setFeeDefault(db, admin, { facilityId: fa, feeTypeId: rac.id, enabled: true })
+    await archiveFeeType(db, admin, rac.id)
+    expect((await listFeeDefaults(db, admin))[fa] ?? []).toEqual([])
   })
 
   it('bảng giá theo toà bật RLS', async () => {

@@ -1,6 +1,6 @@
 import { and, asc, desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { feeTypes, feeTypePrices, feeUnits, utilityRates } from '@/db'
+import { feeTypes, feeTypePrices, feeUnits, utilityRates, feeDefaults, facilities } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
@@ -17,7 +17,7 @@ const feeTypeInput = z.object({
   unitId: z.string().uuid('Chọn đơn vị'),
   defaultPrice: z.number().int().min(0, 'Đơn giá không hợp lệ'),
   billing: z.enum(['monthly_fixed', 'per_occurrence']),
-  quantityFrom: z.enum(['manual', 'occupants']),
+  quantityFrom: z.enum(['manual', 'occupants', 'room', 'meter', 'period_input']),
 })
 const rateInput = z.object({
   facilityId: z.string().uuid(),
@@ -139,5 +139,31 @@ export async function removeFeeTypePrice(db: DB, ctx: AccessContext, input: unkn
   await db.transaction(async (tx) => {
     const [before] = await tx.delete(feeTypePrices).where(and(eq(feeTypePrices.feeTypeId, data.feeTypeId), eq(feeTypePrices.facilityId, data.facilityId))).returning()
     if (before) await recordAudit(tx, ctx, { action: 'delete', entity: 'fee_type_price', entityId: before.id, facilityId: data.facilityId, summary: 'Xoá giá phí theo toà', before })
+  })
+}
+
+export type FeeQuantitySource = 'occupants' | 'room' | 'meter' | 'period_input'
+
+export async function listFeeDefaults(db: Pick<DB, 'select'>, ctx: AccessContext): Promise<Record<string, string[]>> {
+  const rows = await db.select({ facilityId: feeDefaults.facilityId, feeTypeId: feeDefaults.feeTypeId }).from(feeDefaults).innerJoin(feeTypes, eq(feeTypes.id, feeDefaults.feeTypeId)).where(eq(feeTypes.isActive, true))
+  const result: Record<string, string[]> = {}
+  for (const row of rows) {
+    if (!ctx.isAdmin && !ctx.facilityIds.has(row.facilityId)) continue
+    ;(result[row.facilityId] ??= []).push(row.feeTypeId)
+  }
+  return result
+}
+
+export async function setFeeDefault(db: DB, ctx: AccessContext, input: { facilityId: string; feeTypeId: string; enabled: boolean }): Promise<void> {
+  assertCan(ctx, 'settings')
+  const data = parse(z.object({ facilityId: z.uuid(), feeTypeId: z.uuid(), enabled: z.boolean() }), input)
+  await db.transaction(async (tx) => {
+    const [facility] = await tx.select().from(facilities).where(eq(facilities.id, data.facilityId))
+    const [fee] = await tx.select().from(feeTypes).where(eq(feeTypes.id, data.feeTypeId))
+    if (!facility || !fee) throw new NotFoundError()
+    if (data.enabled && !fee.isActive) throw new ValidationError('Loại phí đã lưu trữ')
+    if (data.enabled) await tx.insert(feeDefaults).values({ facilityId: data.facilityId, feeTypeId: data.feeTypeId }).onConflictDoNothing()
+    else await tx.delete(feeDefaults).where(and(eq(feeDefaults.facilityId, data.facilityId), eq(feeDefaults.feeTypeId, data.feeTypeId)))
+    await recordAudit(tx, ctx, { action: 'update', entity: 'fee_default', facilityId: data.facilityId, entityId: data.feeTypeId, summary: 'Cập nhật phí mặc định', after: { enabled: data.enabled } })
   })
 }

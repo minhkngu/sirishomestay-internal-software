@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { createFacilityAction, updateFacilityAction } from '@/server/facilities/actions'
-import { setFeeTypePriceAction, removeFeeTypePriceAction, archiveFeeTypeAction, createFeeTypeAction, createFeeUnitAction, createRateAction } from '@/server/fees/actions'
+import { setFeeDefaultAction, setFeeTypePriceAction, removeFeeTypePriceAction, archiveFeeTypeAction, createFeeTypeAction, createFeeUnitAction, createRateAction } from '@/server/fees/actions'
 import { updateSettingsAction } from '@/server/settings/actions'
 import type { Settings } from '@/server/settings/service'
 
@@ -19,7 +19,7 @@ type Unit = { id: string; name: string }
 type FeeT = { id: string; name: string; unitId: string; defaultPrice: number; billing: string; quantityFrom: string }
 type Rate = { id: string; facilityId: string; utility: string; pricePerUnit: number; effectiveFrom: string }
 
-type Props = { prices: Record<string, Record<string, number>>; settings: Settings; facilities: Fac[]; units: Unit[]; feeTypes: FeeT[]; rates: Rate[] }
+type Props = { defaults: Record<string, string[]>; prices: Record<string, Record<string, number>>; settings: Settings; facilities: Fac[]; units: Unit[]; feeTypes: FeeT[]; rates: Rate[] }
 
 function useRun() {
   const router = useRouter()
@@ -128,7 +128,7 @@ function FeePrices({ fee, facilities, prices }: { fee: FeeT; facilities: Fac[]; 
   </div></details>
 }
 
-function FeesTab({ units, feeTypes, facilities, prices }: { units: Unit[]; feeTypes: FeeT[]; facilities: Fac[]; prices: Record<string, Record<string, number>> }) {
+function FeesTab({ units, feeTypes, facilities, prices, defaults }: { units: Unit[]; feeTypes: FeeT[]; facilities: Fac[]; prices: Record<string, Record<string, number>>; defaults: Record<string, string[]> }) {
   const { pending, error, ok, run } = useRun()
   const [unit, setUnit] = useState('')
   const [t, setT] = useState({ name: '', unitId: units[0]?.id ?? '', defaultPrice: '', billing: 'monthly_fixed', quantityFrom: 'manual' })
@@ -154,6 +154,7 @@ function FeesTab({ units, feeTypes, facilities, prices }: { units: Unit[]; feeTy
           </tbody>
         </table>
       </div>
+      {feeTypes.map((fee) => <div key={fee.id} className="space-y-2 rounded border p-3"><p className="text-sm font-medium">Mặc định theo cơ sở — {fee.name}</p>{facilities.map(f => <label key={f.id} className="mr-4 inline-flex items-center gap-1 text-sm"><input type="checkbox" checked={defaults[f.id]?.includes(fee.id) ?? false} disabled={pending} onChange={e => run(() => setFeeDefaultAction({ facilityId: f.id, feeTypeId: fee.id, enabled: e.target.checked }))} />{f.name}</label>)}</div>)}
       {feeTypes.map((fee) => <FeePrices key={fee.id} fee={fee} facilities={facilities} prices={prices[fee.id] ?? {}} />)}
       <div className="grid max-w-xl gap-2 rounded-md border bg-card p-3 sm:grid-cols-2">
         <h3 className="text-sm font-medium sm:col-span-2">Thêm loại phí</h3>
@@ -164,7 +165,7 @@ function FeesTab({ units, feeTypes, facilities, prices }: { units: Unit[]; feeTy
           <option value="monthly_fixed">Cố định hằng tháng (trả trước)</option><option value="per_occurrence">Theo lần / tiêu thụ (trả sau)</option>
         </select>
         <select aria-label="Số lượng lấy từ" value={t.quantityFrom} onChange={(e) => setT({ ...t, quantityFrom: e.target.value })} className="h-8 rounded-lg border px-2 text-sm">
-          <option value="manual">Nhập tay</option><option value="occupants">Theo số người ở</option>
+          <option value="manual">Nhập tay (kiểu cũ)</option><option value="occupants">Theo số người ở</option><option value="room">Theo phòng</option><option value="meter">Theo đồng hồ</option><option value="period_input">Nhập lượng mỗi kỳ</option>
         </select>
         <Button disabled={pending} onClick={() => run(async () => { const r = await createFeeTypeAction({ ...t, defaultPrice: Number(t.defaultPrice) }); if (r.ok) setT({ ...t, name: '', defaultPrice: '' }); return r })}>Thêm loại phí</Button>
       </div>
@@ -202,7 +203,7 @@ function RatesTab({ facilities, rates }: { facilities: Fac[]; rates: Rate[] }) {
   )
 }
 
-export function SettingsTabs({ settings, facilities, units, feeTypes, rates, prices }: Props) {
+export function SettingsTabs({ settings, facilities, units, feeTypes, rates, prices, defaults }: Props) {
   return (
     <Tabs defaultValue="general">
       <TabsList>
@@ -215,7 +216,7 @@ export function SettingsTabs({ settings, facilities, units, feeTypes, rates, pri
       <TabsContent value="general"><GeneralTab s={settings} /></TabsContent>
       <TabsContent value="bank"><BankAccountTab settings={settings} /></TabsContent>
       <TabsContent value="facilities"><FacilitiesTab facilities={facilities} /></TabsContent>
-      <TabsContent value="fees"><FeesTab units={units} feeTypes={feeTypes} facilities={facilities} prices={prices} /></TabsContent>
+      <TabsContent value="fees"><FeesTab defaults={defaults} units={units} feeTypes={feeTypes} facilities={facilities} prices={prices} /></TabsContent>
       <TabsContent value="rates"><RatesTab facilities={facilities} rates={rates} /></TabsContent>
     </Tabs>
   )
