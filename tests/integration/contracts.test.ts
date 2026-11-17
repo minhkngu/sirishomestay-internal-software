@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { and, eq } from 'drizzle-orm'
 import { assets, handovers, handoverItems, depositContracts, depositEntries, facilities, feeTypes, feeUnits, leaseOccupants, leases, rooms } from '@/db'
+import { assetHistory } from '@/server/assets/service'
 import { createTenant } from '@/server/tenants/service'
 import { listRoomsWithStatus } from '@/server/rooms/service'
 import {
@@ -58,6 +59,12 @@ describe('contracts', () => {
     expect(result.firstInvoiceLines.find(l => l.type === 'deposit')?.amount).toBe(6_000_000)
   })
 
+  it('chấp nhận cọc bằng 0 và từ chối số cọc thực nhận âm, lẻ hoặc vượt mức', async () => {
+    for (const receivedDeposit of [-1, 1.5, 10_000_000]) await expect(createLease(db, lan(), leaseInput({ receivedDeposit }))).rejects.toThrow(ValidationError)
+    const { lease } = await createLease(db, lan(), leaseInput({ depositAmount: 0, receivedDeposit: 0 }))
+    expect((await getLease(db, lan(), lease.id)).depositEntries).toHaveLength(0)
+  })
+
   it('chuyển cọc chỉ ghi khoản nhận thêm và từ chối số không hợp lệ', async () => {
     const { contract } = await createDepositContract(db, lan(), { roomId: r301, tenantId: tenant1, depositAmount: 5_000_000, agreedRent: 9_000_000, expectedMoveIn: '2026-10-15' })
     for (const receivedDeposit of [-1, 4_000_000, 10_000_000]) {
@@ -68,10 +75,16 @@ describe('contracts', () => {
     expect(result.firstInvoiceLines.find(l => l.type === 'deposit')?.amount).toBe(2_000_000)
   })
 
+  it('không nhân đôi dòng cọc chờ khi chuyển hợp đồng cọc chưa thu', async () => {
+    const { contract } = await createDepositContract(db, lan(), { roomId: r301, tenantId: tenant1, depositAmount: 5_000_000, agreedRent: 9_000_000, expectedMoveIn: '2026-10-15', collected: false })
+    const result = await convertDepositToLease(db, lan(), contract.id, leaseInput({ receivedDeposit: 3_000_000 }))
+    expect((await getLease(db, lan(), result.lease.id)).depositEntries.map(e => [e.amount, e.status]).sort()).toEqual([[3_000_000, 'done'], [6_000_000, 'pending']].sort())
+  })
+
   it('tạo biên bản cùng hợp đồng và từ chối snapshot tài sản cũ', async () => {
     const [asset] = await db.insert(assets).values({ code: 'A1', name: 'Bàn', facilityId: fa, locationKind: 'room', locationId: r301 }).returning()
     const handover = { expectedRoomAssetIds: [asset.id], addAssetIds: [], newAssets: [], remove: [] }
-    await expect(createLease(db, lan(), leaseInput({ handover }))).rejects.toThrow(ForbiddenError)
+    await expect(createLease(db, lan(), leaseInput({ handover: { ...handover, remove: [{ assetId: asset.id, action: 'dispose' }] } }))).rejects.toThrow(ForbiddenError)
     await expect(createLease(db, admin, leaseInput({ handover: { ...handover, expectedRoomAssetIds: [] } }))).rejects.toThrow(ValidationError)
     expect(await db.select().from(leases)).toHaveLength(0)
     const { lease } = await createLease(db, admin, leaseInput({ handover }))
@@ -80,14 +93,29 @@ describe('contracts', () => {
     expect((await db.select().from(handoverItems).where(eq(handoverItems.handoverId, h.id))).map(x => x.assetId)).toEqual([asset.id])
   })
 
+  it('nhân viên hợp đồng không có quyền tài sản vẫn tạo được biên bản không thay đổi tài sản', async () => {
+    const [asset] = await db.insert(assets).values({ code: 'KEEP', name: 'Bàn', facilityId: fa, locationKind: 'room', locationId: r301 }).returning()
+    const handover = { expectedRoomAssetIds: [asset.id], addAssetIds: [], newAssets: [], remove: [] }
+    const { lease } = await createLease(db, lan(), leaseInput({ handover }))
+    expect(await db.select().from(handovers).where(eq(handovers.leaseId, lease.id))).toHaveLength(1)
+  })
+
+  it('từ chối tài sản được chọn đã chuyển khỏi vị trí gốc', async () => {
+    const [a] = await db.insert(assets).values({ code: 'OLD', name: 'Bàn', facilityId: fa, locationKind: 'common', locationId: fa }).returning()
+    const handover = { expectedRoomAssetIds: [], addAssetIds: [a.id], expectedAddedLocations: [{ assetId: a.id, kind: 'warehouse', id: fa }], newAssets: [], remove: [] }
+    await expect(createLease(db, admin, leaseInput({ handover }))).rejects.toThrow(ValidationError)
+    expect(await db.select().from(leases)).toHaveLength(0)
+  })
+
   it('áp dụng tài sản và tạo snapshot bàn giao trong cùng giao dịch', async () => {
     const rows = await db.insert(assets).values(['A', 'B', 'C'].map(code => ({ code, name: code, facilityId: fa, locationKind: 'room', locationId: r301 }))).returning()
     const [extra] = await db.insert(assets).values({ code: 'D', name: 'D', facilityId: fa, locationKind: 'warehouse', locationId: fa }).returning()
-    const handover = { expectedRoomAssetIds: rows.map(a => a.id), addAssetIds: [extra.id], newAssets: [{ code: 'E', name: 'E', model: 'M', category: '', value: 1, condition: 'Tốt' }], remove: [{ assetId: rows[1].id, action: 'warehouse' }, { assetId: rows[2].id, action: 'dispose' }] }
+    const handover = { expectedRoomAssetIds: rows.map(a => a.id), addAssetIds: [extra.id], expectedAddedLocations: [{ assetId: extra.id, kind: 'warehouse', id: fa }], newAssets: [{ code: 'E', name: 'E', model: 'M', category: '', value: 1, condition: 'Tốt' }], remove: [{ assetId: rows[1].id, action: 'warehouse' }, { assetId: rows[2].id, action: 'dispose' }] }
     const { lease } = await createLease(db, admin, leaseInput({ handover }))
     const all = await db.select().from(assets)
     expect(all.find(a => a.id === rows[1].id)?.locationKind).toBe('warehouse')
     expect(all.find(a => a.id === rows[2].id)?.status).toBe('disposed')
+    expect((await assetHistory(db, admin, rows[2].id)).moves.some(m => m.reason === 'Thanh lý')).toBe(true)
     expect(all.find(a => a.code === 'E')?.model).toBe('M')
     const [h] = await db.select().from(handovers).where(eq(handovers.leaseId, lease.id))
     expect((await db.select().from(handoverItems).where(eq(handoverItems.handoverId, h.id))).map(x => x.assetId).sort()).toEqual([rows[0].id, extra.id, all.find(a => a.code === 'E')!.id].sort())

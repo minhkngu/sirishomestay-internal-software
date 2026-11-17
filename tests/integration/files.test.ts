@@ -41,7 +41,12 @@ describe('files', () => {
     const up = await requestUpload(db, staffA, storage, req)
     expect(up.thumbUploadUrl).toBeTruthy()
     expect(await listFiles(db, staffA, 'lease_photo', lease.id)).toHaveLength(0)
-    await confirmUpload(db, staffA, up.fileId)
+    const [stored] = await db.select().from(files).where(eq(files.id, up.fileId))
+    await storage.write(stored.storageKey, new Uint8Array(2 * 1024 * 1024 + 1), 'image/jpeg')
+    await expect(confirmUpload(db, staffA, up.fileId, storage)).rejects.toThrow(ValidationError)
+    await storage.write(stored.storageKey, new Uint8Array(10), 'image/jpeg')
+    await storage.write(stored.thumbKey!, new Uint8Array(10), 'image/jpeg')
+    await confirmUpload(db, staffA, up.fileId, storage)
     expect(await listFiles(db, staffA, 'lease_photo', lease.id)).toHaveLength(1)
   })
 

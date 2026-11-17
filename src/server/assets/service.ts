@@ -56,6 +56,7 @@ export async function createAsset(db: DB, ctx: AccessContext, input: unknown): P
 export async function createAssetInTransaction(tx: DB, ctx: AccessContext, input: unknown): Promise<Asset> {
     const data = parse(createInput, input)
     assertCan(ctx, 'assets', data.facilityId)
+    await tx.select({ id: facilities.id }).from(facilities).where(eq(facilities.id, data.facilityId)).for('update')
     if ((await locationFacility(tx, data.location)) !== data.facilityId) throw new ValidationError('Vị trí không thuộc cơ sở này')
     const [dup] = await tx.select({ id: assets.id }).from(assets).where(eq(assets.code, data.code))
     if (dup) throw new ValidationError('Mã tài sản đã tồn tại', { code: 'Mã tài sản đã tồn tại' })
@@ -114,6 +115,9 @@ export async function moveAssets(db: DB, ctx: AccessContext, assetIds: string[],
 
 export async function moveAssetsInTransaction(tx: DB, ctx: AccessContext, assetIds: string[], to: Location, reason: string): Promise<void> {
     if (assetIds.length === 0) throw new ValidationError('Chọn ít nhất một tài sản')
+    const initial = await tx.select().from(assets).where(inArray(assets.id, assetIds))
+    const facilityIds = [...new Set(initial.map(a => a.facilityId))].sort()
+    for (const id of facilityIds) await tx.select({ id: facilities.id }).from(facilities).where(eq(facilities.id, id)).for('update')
     const found = await tx.select().from(assets).where(inArray(assets.id, assetIds))
     if (found.length !== new Set(assetIds).size) throw new NotFoundError()
     for (const a of found) assertCan(ctx, 'assets', a.facilityId)
@@ -137,8 +141,11 @@ export async function setAssetStatus(db: DB, ctx: AccessContext, id: string, sta
 }
 
 export async function setAssetStatusInTransaction(tx: DB, ctx: AccessContext, id: string, status: AssetStatus): Promise<void> {
+    const first = await loadAsset(tx, ctx, id)
+    await tx.select({ id: facilities.id }).from(facilities).where(eq(facilities.id, first.facilityId)).for('update')
     const before = await loadAsset(tx, ctx, id)
     await tx.update(assets).set({ status, updatedAt: new Date() }).where(eq(assets.id, id))
+    if (status === 'disposed' && before.status !== 'disposed') await tx.insert(assetMoves).values({ assetId: id, fromKind: before.locationKind, fromId: before.locationId, toKind: before.locationKind, toId: before.locationId, movedBy: ctx.userId, reason: 'Thanh lý' })
     await recordAudit(tx, ctx, { action: 'update', entity: 'asset', entityId: id, facilityId: before.facilityId, summary: `Đổi trạng thái tài sản ${before.code} → ${status}`, before: { status: before.status }, after: { status } })
 }
 

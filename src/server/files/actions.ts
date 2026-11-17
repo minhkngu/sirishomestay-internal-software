@@ -16,7 +16,7 @@ export async function requestUploadAction(req: UploadRequest) {
 export async function confirmUploadAction(fileId: string, revalidate?: string) {
   const ctx = await getAccessContext()
   return toActionResult(async () => {
-    await confirmUpload(db, ctx, fileId)
+    await confirmUpload(db, ctx, fileId, getStorage())
     if (revalidate) revalidatePath(revalidate)
     return {}
   })

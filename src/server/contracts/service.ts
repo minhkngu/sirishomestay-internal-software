@@ -132,6 +132,7 @@ export type LeaseInput = {
   handover?: {
     expectedRoomAssetIds: string[]
     addAssetIds: string[]
+    expectedAddedLocations?: Array<{ assetId: string; kind: string; id: string }>
     newAssets: Array<{ code: string; name: string; model: string; category: string; value: number; condition: string }>
     remove: Array<{ assetId: string; action: 'warehouse' | 'dispose' | 'unassigned' }>
   }
@@ -171,7 +172,7 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
   // sổ cọc: cọc giữ chỗ chuyển sang hợp đồng thuê; phần còn thiếu ghi dòng thu chờ
   let held = 0
   if (fromDepositId) {
-    const moved = await tx.update(depositEntries).set({ leaseId: lease.id, updatedAt: new Date() }).where(eq(depositEntries.depositContractId, fromDepositId)).returning()
+    const moved = await tx.update(depositEntries).set({ leaseId: lease.id, updatedAt: new Date() }).where(and(eq(depositEntries.depositContractId, fromDepositId), eq(depositEntries.status, 'done'))).returning()
     held = depositBalance(moved.map(toDomainEntry))
   }
   const received = input.receivedDeposit ?? held
@@ -188,7 +189,8 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
 
   if (input.handover) {
     const h = input.handover
-    assertCan(ctx, 'assets', room.facilityId)
+    if (h.addAssetIds.length || h.newAssets.length || h.remove.length) assertCan(ctx, 'assets', room.facilityId)
+    await tx.select({ id: facilities.id }).from(facilities).where(eq(facilities.id, room.facilityId)).for('update')
     const current = await tx.select().from(assets).where(and(eq(assets.locationKind, 'room'), eq(assets.locationId, room.id), ne(assets.status, 'disposed'))).for('update')
     const expected = new Set(h.expectedRoomAssetIds)
     const added = new Set(h.addAssetIds)
@@ -198,7 +200,7 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
     }
     if (h.addAssetIds.length) {
       const additions = await tx.select().from(assets).where(inArray(assets.id, h.addAssetIds)).for('update')
-      if (additions.length !== h.addAssetIds.length || additions.some((a) => a.facilityId !== room.facilityId || a.status === 'disposed')) throw new ValidationError('Tài sản không hợp lệ hoặc không thuộc cơ sở')
+      if (additions.length !== h.addAssetIds.length || additions.some((a) => a.facilityId !== room.facilityId || a.status === 'disposed' || (!h.expectedAddedLocations?.some((loc) => loc.assetId === a.id && loc.kind === a.locationKind && loc.id === a.locationId)))) throw new ValidationError('Tài sản không hợp lệ hoặc không thuộc cơ sở')
       await moveAssetsInTransaction(tx, ctx, h.addAssetIds, { kind: 'room', id: room.id }, 'Bàn giao nhận phòng')
     }
     for (const item of h.remove) {

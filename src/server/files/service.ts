@@ -43,10 +43,17 @@ async function loadFile(db: Pick<DB, 'select'>, ctx: AccessContext, fileId: stri
   return f
 }
 
-export async function confirmUpload(db: DB, ctx: AccessContext, fileId: string): Promise<FileRow> {
+export async function confirmUpload(db: DB, ctx: AccessContext, fileId: string, storage?: StorageAdapter): Promise<FileRow> {
   return db.transaction(async (tx) => {
     const f = await loadFile(tx, ctx, fileId)
     if (f.confirmedAt) return f
+    if (f.ownerType === 'lease_photo') {
+      if (!storage) throw new ValidationError('Không thể kiểm tra ảnh')
+      const main = await storage.read(f.storageKey)
+      if (main.byteLength > ALLOWED_TYPES.lease_photo.maxBytes) throw new ValidationError('Ảnh vượt quá 2 MiB')
+      const thumb = f.thumbKey ? await storage.read(f.thumbKey) : null
+      if (!thumb || thumb.byteLength > ALLOWED_TYPES.lease_photo.maxBytes) throw new ValidationError('Ảnh vượt quá 2 MiB')
+    }
     const [after] = await tx.update(files).set({ confirmedAt: new Date(), updatedAt: new Date() }).where(eq(files.id, fileId)).returning()
     await recordAudit(tx, ctx, {
       action: 'create', entity: 'file', entityId: fileId, facilityId: f.facilityId ?? undefined,
