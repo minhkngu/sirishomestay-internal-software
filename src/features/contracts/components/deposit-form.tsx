@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createDepositContractAction } from '@/server/contracts/actions'
 
-export type RoomOption = { id: string; label: string; listPrice?: number | null }
+export type RoomOption = { id: string; facilityId: string; label: string; listPrice?: number | null }
 export type TenantOption = { id: string; name: string; kind: 'foreign' | 'vietnamese' | 'company' }
 
 export function DepositForm({ rooms, tenants, initialRoomId, initialTenantId }: { rooms: RoomOption[]; tenants: TenantOption[]; initialRoomId?: string; initialTenantId?: string }) {

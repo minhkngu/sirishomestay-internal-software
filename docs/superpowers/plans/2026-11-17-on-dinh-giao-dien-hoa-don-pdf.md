@@ -383,15 +383,15 @@ Bấm "Tải PDF" → bắt sự kiện `download`, tên file kết thúc bằng
 **Interfaces:**
 - Consumes: `resolveFeePrice`, `listFeeTypePrices`, các action ở Task 7.
 
-- [ ] **Step 1: Viết test** — `it('ngữ cảnh chuyển phòng trả giá phí theo toà của hợp đồng')`: toà A có giá riêng 250.000, giá chung 200.000 → `fees[0].defaultPrice === 250000`.
+- [x] **Step 1: Viết test** — `it('ngữ cảnh chuyển phòng trả giá phí theo toà của hợp đồng')`: toà A có giá riêng 250.000, giá chung 200.000 → `fees[0].defaultPrice === 250000`.
 
-- [ ] **Step 2: FAIL → sửa → PASS.**
+- [x] **Step 2: FAIL → sửa → PASS.**
 
-- [ ] **Step 3: Chạy `npm test && npm run lint && npm run build`, xác nhận PASS.**
+- [x] **Step 3: Chạy `npm test && npm run lint && npx next build --webpack`, xác nhận PASS.**
 
 Mở trang tạo hợp đồng trong preview: chọn phòng ở toà có giá riêng → ô giá phí đổi đúng. Chụp màn hình làm bằng chứng.
 
-- [ ] **Step 4: Commit** — `feat: điền sẵn giá phí theo toà khi tạo hợp đồng và phụ lục`
+- [x] **Step 4: Commit** — `feat: điền sẵn giá phí theo toà khi tạo hợp đồng và phụ lục`
 
 ---
 

@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { addDays } from '@/domain/dates'
+import { resolveFeePrice } from '@/domain/fee-price'
 import { formatVND } from '@/domain/money'
 import { convertDepositToLeaseAction, createLeaseAction } from '@/server/contracts/actions'
 import type { RoomOption, TenantOption } from './deposit-form'
 
-export type FeeOption = { id: string; name: string; unit: string; defaultPrice: number; billing: string; quantityFrom: string }
+export type FeeOption = { id: string; name: string; unit: string; defaultPrice: number; prices: Record<string, number>; billing: string; quantityFrom: string }
 type Initial = { roomId?: string; tenantId?: string; depositId?: string; rent?: number; deposit?: number; startDate?: string }
 type Props = {
   rooms: RoomOption[]; tenants: TenantOption[]; feeTypes: FeeOption[]; initial?: Initial
@@ -31,7 +32,7 @@ export function LeaseWizard({ rooms, tenants, feeTypes, initial = {}, defaults }
   const [rent, setRent] = useState(String(initial.rent ?? ''))
   const [deposit, setDeposit] = useState(String(initial.deposit ?? ''))
   const [fees, setFees] = useState<Record<string, { on: boolean; quantity: string; price: string }>>(
-    Object.fromEntries(feeTypes.map((f) => [f.id, { on: false, quantity: '1', price: String(f.defaultPrice) }])),
+    Object.fromEntries(feeTypes.map((f) => [f.id, { on: false, quantity: '1', price: String(resolveFeePrice(f.defaultPrice, f.prices, rooms.find((r) => r.id === initial.roomId)?.facilityId ?? null)) }])),
   )
   const [overrideProration, setOverrideProration] = useState('')
   const [dayOfMonth, setDayOfMonth] = useState('')
@@ -82,7 +83,7 @@ export function LeaseWizard({ rooms, tenants, feeTypes, initial = {}, defaults }
       {step === 0 && (
         <div className="space-y-4">
           <div className="space-y-1"><Label htmlFor="room">Phòng</Label>
-            <select id="room" value={roomId} disabled={!!initial.depositId} onChange={(e) => { setRoomId(e.target.value); const p = rooms.find((r) => r.id === e.target.value)?.listPrice; if (p && !rent) setRent(String(p)) }} className="h-8 w-full rounded-lg border px-2 text-sm">
+            <select id="room" value={roomId} disabled={!!initial.depositId} onChange={(e) => { setRoomId(e.target.value); const room = rooms.find((r) => r.id === e.target.value); setFees((previous) => Object.fromEntries(feeTypes.map((f) => [f.id, previous[f.id].on ? previous[f.id] : { ...previous[f.id], price: String(resolveFeePrice(f.defaultPrice, f.prices, room?.facilityId ?? null)) }]))); const p = room?.listPrice; if (p && !rent) setRent(String(p)) }} className="h-8 w-full rounded-lg border px-2 text-sm">
               <option value="">— chọn phòng —</option>{rooms.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}</select></div>
           <div className="space-y-1"><Label htmlFor="tenant">Bên thuê (khách hoặc công ty)</Label>
             <select id="tenant" value={tenantId} onChange={(e) => pickTenant(e.target.value)} className="h-8 w-full rounded-lg border px-2 text-sm">

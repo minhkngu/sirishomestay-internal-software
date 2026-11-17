@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { createFacilityAction, updateFacilityAction } from '@/server/facilities/actions'
-import { archiveFeeTypeAction, createFeeTypeAction, createFeeUnitAction, createRateAction } from '@/server/fees/actions'
+import { setFeeTypePriceAction, removeFeeTypePriceAction, archiveFeeTypeAction, createFeeTypeAction, createFeeUnitAction, createRateAction } from '@/server/fees/actions'
 import { updateSettingsAction } from '@/server/settings/actions'
 import type { Settings } from '@/server/settings/service'
 
@@ -19,7 +19,7 @@ type Unit = { id: string; name: string }
 type FeeT = { id: string; name: string; unitId: string; defaultPrice: number; billing: string; quantityFrom: string }
 type Rate = { id: string; facilityId: string; utility: string; pricePerUnit: number; effectiveFrom: string }
 
-type Props = { settings: Settings; facilities: Fac[]; units: Unit[]; feeTypes: FeeT[]; rates: Rate[] }
+type Props = { prices: Record<string, Record<string, number>>; settings: Settings; facilities: Fac[]; units: Unit[]; feeTypes: FeeT[]; rates: Rate[] }
 
 function useRun() {
   const router = useRouter()
@@ -116,7 +116,19 @@ function FacilitiesTab({ facilities }: { facilities: Fac[] }) {
   )
 }
 
-function FeesTab({ units, feeTypes }: { units: Unit[]; feeTypes: FeeT[] }) {
+function FeePrices({ fee, facilities, prices }: { fee: FeeT; facilities: Fac[]; prices: Record<string, number> }) {
+  const { pending, error, ok, run } = useRun()
+  const [facilityId, setFacilityId] = useState(facilities[0]?.id ?? '')
+  const [price, setPrice] = useState('')
+  return <details className="rounded-md border p-3"><summary>Giá riêng theo toà — {fee.name}</summary><div className="space-y-2 pt-3">
+    {Object.entries(prices).map(([id, amount]) => <div className="flex items-center gap-2" key={id}><span>{facilities.find((f) => f.id === id)?.name ?? id}: {formatVND(amount)} ₫</span><Button size="sm" variant="outline" disabled={pending} onClick={() => run(() => removeFeeTypePriceAction({ feeTypeId: fee.id, facilityId: id }))}>Xoá</Button></div>)}
+    <label>Toà <select className="rounded border p-1" value={facilityId} onChange={(e) => setFacilityId(e.target.value)}>{facilities.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select></label>
+    <Input aria-label={`Giá riêng ${fee.name}`} inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value)} />
+    <Button disabled={pending || !facilityId || price.trim() === ''} onClick={() => run(() => setFeeTypePriceAction({ feeTypeId: fee.id, facilityId, price: Number(price) }))}>Lưu giá</Button><Msg error={error} ok={ok} />
+  </div></details>
+}
+
+function FeesTab({ units, feeTypes, facilities, prices }: { units: Unit[]; feeTypes: FeeT[]; facilities: Fac[]; prices: Record<string, Record<string, number>> }) {
   const { pending, error, ok, run } = useRun()
   const [unit, setUnit] = useState('')
   const [t, setT] = useState({ name: '', unitId: units[0]?.id ?? '', defaultPrice: '', billing: 'monthly_fixed', quantityFrom: 'manual' })
@@ -142,6 +154,7 @@ function FeesTab({ units, feeTypes }: { units: Unit[]; feeTypes: FeeT[] }) {
           </tbody>
         </table>
       </div>
+      {feeTypes.map((fee) => <FeePrices key={fee.id} fee={fee} facilities={facilities} prices={prices[fee.id] ?? {}} />)}
       <div className="grid max-w-xl gap-2 rounded-md border p-3 sm:grid-cols-2">
         <h3 className="text-sm font-medium sm:col-span-2">Thêm loại phí</h3>
         <Input placeholder="Tên loại phí" value={t.name} onChange={(e) => setT({ ...t, name: e.target.value })} />
@@ -189,7 +202,7 @@ function RatesTab({ facilities, rates }: { facilities: Fac[]; rates: Rate[] }) {
   )
 }
 
-export function SettingsTabs({ settings, facilities, units, feeTypes, rates }: Props) {
+export function SettingsTabs({ settings, facilities, units, feeTypes, rates, prices }: Props) {
   return (
     <Tabs defaultValue="general">
       <TabsList>
@@ -202,7 +215,7 @@ export function SettingsTabs({ settings, facilities, units, feeTypes, rates }: P
       <TabsContent value="general"><GeneralTab s={settings} /></TabsContent>
       <TabsContent value="bank"><BankAccountTab settings={settings} /></TabsContent>
       <TabsContent value="facilities"><FacilitiesTab facilities={facilities} /></TabsContent>
-      <TabsContent value="fees"><FeesTab units={units} feeTypes={feeTypes} /></TabsContent>
+      <TabsContent value="fees"><FeesTab units={units} feeTypes={feeTypes} facilities={facilities} prices={prices} /></TabsContent>
       <TabsContent value="rates"><RatesTab facilities={facilities} rates={rates} /></TabsContent>
     </Tabs>
   )
