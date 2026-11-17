@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/db/client'
 import { toActionResult } from '@/lib/action-result'
 import { getAccessContext } from '@/server/session'
-import { archiveFeeType, createFeeType, createFeeUnit, createRate, updateFeeType } from './service'
+import { setFeeTypePrice, removeFeeTypePrice, archiveFeeType, createFeeType, createFeeUnit, createRate, updateFeeType } from './service'
 
 export async function createFeeUnitAction(input: unknown) {
   const ctx = await getAccessContext()
@@ -25,4 +25,13 @@ export async function archiveFeeTypeAction(id: string) {
 export async function createRateAction(input: unknown) {
   const ctx = await getAccessContext()
   return toActionResult(async () => { const r = await createRate(db, ctx, input); revalidatePath('/settings'); return { id: r.id } })
+}
+
+export async function setFeeTypePriceAction(input: unknown) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => { await setFeeTypePrice(db, ctx, input); revalidatePath('/settings'); return {} })
+}
+export async function removeFeeTypePriceAction(input: unknown) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => { await removeFeeTypePrice(db, ctx, input); revalidatePath('/settings'); return {} })
 }

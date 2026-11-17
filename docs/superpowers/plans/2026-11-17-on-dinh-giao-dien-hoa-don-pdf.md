@@ -353,7 +353,7 @@ Bấm "Tải PDF" → bắt sự kiện `download`, tên file kết thúc bằng
   - `removeFeeTypePrice(db, ctx, input: unknown /* { feeTypeId, facilityId } */): Promise<void>`
   - Actions `setFeeTypePriceAction`, `removeFeeTypePriceAction`, đều `revalidatePath('/settings')`
 
-- [ ] **Step 1: Viết test**
+- [x] **Step 1: Viết test**
 
 - Domain:
   - toà có giá riêng → trả giá riêng;
@@ -367,9 +367,9 @@ Bấm "Tải PDF" → bắt sự kiện `download`, tên file kết thúc bằng
   - người không có quyền `settings` → `ForbiddenError`;
   - xoá toà hoặc loại phí → các dòng giá riêng liên quan bị xoá theo.
 
-- [ ] **Step 2: Chạy test, xác nhận FAIL. → Step 3: Viết code. → Step 4: Chạy lại, xác nhận PASS.**
+- [x] **Step 2: Chạy test, xác nhận FAIL. → Step 3: Viết code. → Step 4: Chạy lại, xác nhận PASS.**
 
-- [ ] **Step 5: Commit** — `feat: giá phí riêng theo toà`
+- [x] **Step 5: Commit** — `feat: giá phí riêng theo toà`
 
 ### Task 8: Dùng giá theo toà khi tạo hợp đồng, phụ lục; giao diện Cài đặt
 
