@@ -509,7 +509,7 @@ Không assert; spec này chỉ để đo.
 
 - [x] **Step 2a: Đo bản production trên máy trước và sau tối ưu, và đo preview sau tối ưu.** Kết quả trong `docs/operations/toc-do.md`.
 
-- [ ] **Step 2b: Đo preview trước tối ưu trên bản tương ứng.** Chưa có số đo cùng phiên bản và dữ liệu để so sánh.
+- [x] **Step 2b: Hoàn tất phần đo theo quyết định của người dùng.** Chấp nhận không đo preview trước tối ưu; không có số liệu tương ứng để so sánh.
 
 - [x] **Step 3: Commit số đo local ban đầu** — `docs: ghi số đo tốc độ trang trên máy`
 
