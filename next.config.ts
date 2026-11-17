@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  outputFileTracingIncludes: { '/*': ['./src/server/pdf/fonts/*.ttf', './node_modules/pdfkit/js/standard-fonts/*.cjs'] },
+  outputFileTracingIncludes: { '/*': ['./src/server/pdf/fonts/*.ttf', './node_modules/pdfkit/js/standard-fonts/**/*.cjs'] },
   experimental: {
     // Nhập Excel gửi file/dòng dữ liệu qua server action (mặc định chỉ 1MB)
     serverActions: { bodySizeLimit: '12mb' },
