@@ -461,7 +461,7 @@ Mở trang tạo hợp đồng trong preview: chọn phòng ở toà có giá ri
 **Interfaces:**
 - Consumes: `parseFacilityFilter` và các thành phần ở Task 10.
 
-- [ ] **Step 1: Viết test cho mỗi service**
+- [x] **Step 1: Viết test cho mỗi service**
 
 Ví dụ với `listInvoices`:
 - Có toà A, B, C; người dùng có quyền A, B.
@@ -469,15 +469,15 @@ Ví dụ với `listInvoices`:
 - `facilityIds: []` → trả hoá đơn của A và B.
 - Admin với `[C]` → trả hoá đơn của C.
 
-- [ ] **Step 2: FAIL → sửa service (giao `facilityIds` với phạm vi quyền) → PASS.**
+- [x] **Step 2: FAIL → sửa service (giao `facilityIds` với phạm vi quyền) → PASS.**
 
-- [ ] **Step 3: Đổi từng trang.** Chạy `npm run lint && npm run build`. Chụp màn hình trang Hoá đơn và Khách thuê ở cỡ desktop và mobile.
+- [x] **Step 3: Đổi từng trang.** Chạy `npm run lint && npx next build --webpack`. Chụp màn hình trang Hoá đơn và Khách thuê ở cỡ desktop và mobile.
 
-- [ ] **Step 4: Thêm e2e vào `smoke-pages.spec.ts`**
+- [x] **Step 4: Thêm e2e vào `smoke-pages.spec.ts`**
 
 Ở `/invoices`, chọn một toà trong bộ lọc → URL chứa `toa=`. Tải lại trang → toà đó vẫn đang được chọn.
 
-- [ ] **Step 5: Commit** — `feat: hiện chung mọi toà, lọc theo toà trên các trang danh sách`
+- [x] **Step 5: Commit** — `feat: hiện chung mọi toà, lọc theo toà trên các trang danh sách`
 
 ### Task 12: Trang chi tiết, form, hộp thoại, trang Nhắc việc
 

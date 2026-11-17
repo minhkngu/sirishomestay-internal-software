@@ -39,18 +39,18 @@ export function AssetTable({ assets, facilities }: { assets: AssetRow[]; facilit
       <aside className="rounded-md border p-2 md:max-h-[70vh] md:overflow-auto"><LocationTree facilities={facilities} value={sel} onChange={setSel} /></aside>
       <div className="min-w-0 space-y-3">
         <input aria-label="Tìm tài sản" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm mã, tên, loại…" className="h-8 w-full max-w-sm rounded-lg border px-2 text-sm" />
-        <div className="overflow-x-auto rounded-md border">
+        <div className="overflow-x-auto rounded-md border bg-card">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-left"><tr><th className="p-2 w-8" /><th className="p-2">Mã</th><th className="p-2">Tên</th><th className="p-2">Loại</th><th className="p-2">Vị trí</th><th className="p-2">Tình trạng</th><th className="p-2">Giá trị</th></tr></thead>
+            <thead className="bg-muted/50 text-left"><tr><th className="p-2 w-8" /><th className="p-2">Mã</th><th className="p-2">Tên</th><th className="p-2">Loại</th><th className="p-2">Vị trí</th>{facilities.length > 1 && <th className="p-2">Toà</th>}<th className="p-2">Tình trạng</th><th className="p-2">Giá trị</th></tr></thead>
             <tbody>
               {shown.map((a) => (
                 <tr key={a.id} className="border-t">
                   <td className="p-2"><input type="checkbox" aria-label={`Chọn ${a.code}`} checked={checked.includes(a.id)} onChange={() => toggle(a.id)} /></td>
                   <td className="p-2"><Link className="underline" href={`/assets/${a.id}`}>{a.code}</Link></td><td className="p-2">{a.name}</td><td className="p-2">{a.category}</td>
-                  <td className="p-2">{where(a)}</td><td className="p-2">{a.status === 'in_use' ? a.condition : STATUS[a.status]}</td><td className="p-2">{formatVND(a.value)}</td>
+                  <td className="p-2">{where(a)}</td>{facilities.length > 1 && <td className="p-2">{facName.get(a.facilityId)}</td>}<td className="p-2">{a.status === 'in_use' ? a.condition : STATUS[a.status]}</td><td className="p-2">{formatVND(a.value)}</td>
                 </tr>
               ))}
-              {shown.length === 0 && <tr><td colSpan={7} className="p-4 text-center text-muted-foreground">Không có tài sản nào</td></tr>}
+              {shown.length === 0 && <tr><td colSpan={facilities.length > 1 ? 8 : 7} className="p-4 text-center text-muted-foreground">Không có tài sản nào</td></tr>}
             </tbody>
           </table>
         </div>

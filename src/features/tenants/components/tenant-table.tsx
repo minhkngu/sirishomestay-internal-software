@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { StatusDot } from '@/components/list/status-dot'
 import { diffDays, formatDateVN, todayVN } from '@/domain/dates'
 import { formatPhoneDisplay } from '@/domain/phone'
 import { displayName, type Tenant } from '@/server/tenants/service'
@@ -8,10 +9,10 @@ const KIND: Record<Tenant['kind'], string> = { foreign: 'Nước ngoài', vietna
 export function TenantTable({ tenants, facilityNames = {}, visaWarningDays = 30 }: { tenants: Tenant[]; facilityNames?: Record<string, string>; visaWarningDays?: number }) {
   const today = todayVN()
   return (
-    <div className="overflow-x-auto rounded-md border">
+    <div className="overflow-x-auto rounded-md border bg-card">
       <table className="w-full text-sm">
         <thead className="bg-muted/50 text-left">
-          <tr><th className="p-2">Tên</th><th className="p-2">Loại</th><th className="p-2">Điện thoại</th><th className="p-2">Giấy tờ</th><th className="p-2">Cơ sở</th><th className="p-2">Phòng</th><th className="p-2">Visa</th></tr>
+          <tr><th className="p-2">Tên</th><th className="p-2">Loại</th><th className="p-2">Điện thoại</th><th className="p-2">Giấy tờ</th><th className="p-2">Toà</th><th className="p-2">Phòng</th><th className="p-2">Visa</th></tr>
         </thead>
         <tbody>
           {tenants.map((t) => (
@@ -34,5 +35,5 @@ export function TenantTable({ tenants, facilityNames = {}, visaWarningDays = 30 
 
 function VisaBadge({ expiry, days, warn }: { expiry: string; days: number; warn: number }) {
   const cls = days <= 7 ? 'text-red-600 font-medium' : days <= warn ? 'text-orange-600 font-medium' : ''
-  return <span className={cls}>{days < 0 ? `Đã hết hạn ${-days} ngày` : days === 0 ? 'Hết hạn hôm nay' : `Còn ${days} ngày`} <span className="text-xs text-muted-foreground">({formatDateVN(expiry)})</span></span>
+  return <StatusDot tone={days <= 7 ? 'danger' : days <= warn ? 'warn' : 'ok'}><span className={cls}>{days < 0 ? `Đã hết hạn ${-days} ngày` : days === 0 ? 'Hết hạn hôm nay' : `Còn ${days} ngày`} <span className="text-xs text-muted-foreground">({formatDateVN(expiry)})</span></span></StatusDot>
 }

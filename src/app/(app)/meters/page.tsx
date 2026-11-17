@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/list/page-header'
 import { RequirePermission } from '@/components/require-permission'
 import { db } from '@/db/client'
 import { daysInMonth, todayVN } from '@/domain/dates'
@@ -22,11 +23,11 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
   const readOn = today.startsWith(period) ? today : end
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Ghi chỉ số điện nước</h1>
+      <PageHeader title="Ghi chỉ số điện nước" />
       <form method="get" className="flex flex-wrap gap-2">
-        <select name="facility" defaultValue={facilityId} aria-label="Cơ sở" className="h-9 rounded-lg border px-2 text-sm">{facs.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select>
-        <input type="month" name="period" defaultValue={period} aria-label="Kỳ" className="h-9 rounded-lg border px-2 text-sm" />
-        <button className="h-9 rounded-lg border px-3 text-sm" type="submit">Xem</button>
+        <select name="facility" defaultValue={facilityId} aria-label="Cơ sở" className="h-9 rounded-lg border bg-card px-2 text-sm">{facs.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select>
+        <input type="month" name="period" defaultValue={period} aria-label="Kỳ" className="h-9 rounded-lg border bg-card px-2 text-sm" />
+        <button className="h-9 rounded-lg border bg-card px-3 text-sm" type="submit">Xem</button>
       </form>
       {sheet ? <ReadingGrid key={`${facilityId}-${period}`} rows={sheet.rows} period={period} readOn={readOn} progress={sheet.progress} /> : <p className="text-muted-foreground">Chưa có cơ sở nào.</p>}
     </div>

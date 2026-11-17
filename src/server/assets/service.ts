@@ -85,7 +85,7 @@ export async function updateAsset(db: DB, ctx: AccessContext, id: string, input:
 }
 
 export async function listAssets(
-  db: DB, ctx: AccessContext, opts: { facilityId?: string; location?: Location; q?: string; status?: AssetStatus },
+  db: DB, ctx: AccessContext, opts: { facilityId?: string; facilityIds?: string[]; location?: Location; q?: string; status?: AssetStatus },
 ): Promise<Asset[]> {
   assertCan(ctx, 'assets', opts.facilityId)
   const scope = facilityScope(ctx)
@@ -93,6 +93,7 @@ export async function listAssets(
   const conds = []
   if (scope !== 'all') conds.push(inArray(assets.facilityId, scope))
   if (opts.facilityId) conds.push(eq(assets.facilityId, opts.facilityId))
+  if (opts.facilityIds?.length) conds.push(inArray(assets.facilityId, opts.facilityIds.filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))))
   if (opts.location) conds.push(eq(assets.locationKind, opts.location.kind), eq(assets.locationId, opts.location.id))
   conds.push(opts.status ? eq(assets.status, opts.status) : ne(assets.status, 'disposed'))
   const q = opts.q ? removeDiacritics(opts.q).toLowerCase().replace(/\s+/g, ' ').trim() : ''

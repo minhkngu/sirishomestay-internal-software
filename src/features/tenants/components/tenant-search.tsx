@@ -3,7 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 
-export function TenantSearch({ facilities }: { facilities: { id: string; name: string }[] }) {
+export function TenantSearch() {
   const router = useRouter()
   const pathname = usePathname()
   const sp = useSearchParams()
@@ -34,10 +34,6 @@ export function TenantSearch({ facilities }: { facilities: { id: string; name: s
         <option value="foreign">Nước ngoài</option>
         <option value="vietnamese">Việt Nam</option>
         <option value="company">Công ty</option>
-      </select>
-      <select defaultValue={sp.get('facility') ?? ''} onChange={(e) => push({ facility: e.target.value })} className="h-8 rounded-lg border px-2 text-sm">
-        <option value="">Mọi cơ sở</option>
-        {facilities.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
       </select>
     </div>
   )

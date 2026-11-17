@@ -215,7 +215,7 @@ export type LeaseListItem = Lease & { roomCode: string; facilityId: string; tena
 
 export async function listLeases(
   db: DB, ctx: AccessContext,
-  opts: { status?: 'active' | 'ended'; facilityId?: string; expiringWithinDays?: number; unsigned?: boolean; today?: string; roomId?: string; tenantId?: string },
+  opts: { status?: 'active' | 'ended'; facilityId?: string; facilityIds?: string[]; expiringWithinDays?: number; unsigned?: boolean; today?: string; roomId?: string; tenantId?: string },
 ): Promise<LeaseListItem[]> {
   assertCan(ctx, 'tenants_contracts', opts.facilityId)
   const scope = facilityScope(ctx)
@@ -223,6 +223,7 @@ export async function listLeases(
   const conds = []
   if (scope !== 'all') conds.push(inArray(rooms.facilityId, scope))
   if (opts.facilityId) conds.push(eq(rooms.facilityId, opts.facilityId))
+  if (opts.facilityIds?.length) conds.push(inArray(rooms.facilityId, opts.facilityIds.filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))))
   if (opts.status) conds.push(eq(leases.status, opts.status))
   if (opts.expiringWithinDays != null) conds.push(eq(leases.status, 'active'), lte(leases.endDate, addDays(opts.today ?? todayVN(), opts.expiringWithinDays)))
   if (opts.unsigned) conds.push(ne(leases.signStatus, 'signed'))
@@ -365,13 +366,14 @@ registerDocLoader('deposit_contract', async (db, ctx, id) => {
 
 export type DepositListItem = DepositContract & { roomCode: string; facilityId: string; tenantName: string }
 
-export async function listDepositContracts(db: DB, ctx: AccessContext, opts: { status?: 'pending' | 'converted' | 'cancelled'; facilityId?: string }): Promise<DepositListItem[]> {
+export async function listDepositContracts(db: DB, ctx: AccessContext, opts: { status?: 'pending' | 'converted' | 'cancelled'; facilityId?: string; facilityIds?: string[] }): Promise<DepositListItem[]> {
   assertCan(ctx, 'tenants_contracts', opts.facilityId)
   const scope = facilityScope(ctx)
   if (scope !== 'all' && scope.length === 0) return []
   const conds = []
   if (scope !== 'all') conds.push(inArray(rooms.facilityId, scope))
   if (opts.facilityId) conds.push(eq(rooms.facilityId, opts.facilityId))
+  if (opts.facilityIds?.length) conds.push(inArray(rooms.facilityId, opts.facilityIds.filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))))
   if (opts.status) conds.push(eq(depositContracts.status, opts.status))
   const rows = await db
     .select({ c: depositContracts, roomCode: rooms.code, facilityId: rooms.facilityId, fullName: tenants.fullName, companyName: tenants.companyName })

@@ -32,3 +32,16 @@ test('khung Bạc hà bỏ bộ chọn cũ và hiển thị mục đang chọn',
   await expect(page.getByLabel('Chọn cơ sở')).toHaveCount(0)
   await expect(page.getByRole('navigation', { name: 'Menu chính' }).getByRole('link', { name: 'Nhắc việc' })).toHaveAttribute('aria-current', 'page')
 })
+
+
+test('lọc hoá đơn theo toà được giữ sau khi tải lại', async ({ page }) => {
+  await page.goto('/login'); await page.getByRole('button', { name: /^Admin/ }).click()
+  await expect(page.getByRole('heading', { name: 'Nhắc việc' })).toBeVisible()
+  await page.goto('/invoices?view=all')
+  await page.locator('summary').filter({ hasText: 'Tất cả toà' }).click()
+  const box = page.locator('details').getByRole('checkbox').first()
+  const label = await box.locator('..').textContent()
+  await box.check(); await expect(page).toHaveURL(/toa=/)
+  await page.reload(); await page.getByText('Toà (1)').click()
+  await expect(page.getByRole('checkbox', { name: label?.trim() })).toBeChecked()
+})

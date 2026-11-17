@@ -229,8 +229,10 @@ export async function removePayment(db: DB, ctx: AccessContext, paymentId: strin
     await recordAudit(tx, ctx, { action: 'delete', entity: 'payment', entityId: paymentId, facilityId: inv.facilityId, summary: `Gỡ khoản thu của ${inv.code}`, before: row })
   })
 }
-export async function listInvoices(db: DB, ctx: AccessContext, input: { facilityId?: string; status?: 'draft' | 'unpaid' | 'overdue' | 'open'; period?: string; overdue?: boolean } = {}) {
-  const facilityIds = input.facilityId ? [input.facilityId] : ctx.isAdmin ? null : [...ctx.facilityIds]
+export async function listInvoices(db: DB, ctx: AccessContext, input: { facilityId?: string; facilityIds?: string[]; status?: 'draft' | 'unpaid' | 'overdue' | 'open'; period?: string; overdue?: boolean } = {}) {
+  const requested = input.facilityIds?.filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))
+  const scope = ctx.isAdmin ? null : [...ctx.facilityIds]
+  const facilityIds = input.facilityId ? [input.facilityId] : requested?.length ? requested.filter((id) => !scope || scope.includes(id)) : scope
   if (input.facilityId) assertCan(ctx, 'billing', input.facilityId)
   // Một truy vấn: tổng dòng và tổng đã thu tính bằng truy vấn con, không cộng dồn thêm lượt đi về DB
   const rows = await db.select({
