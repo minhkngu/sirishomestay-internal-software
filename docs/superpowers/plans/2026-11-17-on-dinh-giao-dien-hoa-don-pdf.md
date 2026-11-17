@@ -434,15 +434,15 @@ Mở trang tạo hợp đồng trong preview: chọn phòng ở toà có giá ri
   - `StatusDot({ tone: 'ok' | 'warn' | 'muted' | 'danger'; children })`
   - `EmptyState({ title: string; action?: ReactNode })`
 
-- [ ] **Step 1: Viết test** cho `parseFacilityFilter`:
+- [x] **Step 1: Viết test** cho `parseFacilityFilter`:
   - `'a,b'` với hai uuid hợp lệ → hai id;
   - mảng có id trùng → id chỉ còn một lần;
   - `'abc'` → `[]`;
   - `undefined` → `[]`.
 
-- [ ] **Step 2: FAIL → viết code → PASS.**
+- [x] **Step 2: FAIL → viết code → PASS.**
 
-- [ ] **Step 3: Commit** — `feat: thành phần dùng chung cho trang danh sách và bộ lọc toà`
+- [x] **Step 3: Commit** — `feat: thành phần dùng chung cho trang danh sách và bộ lọc toà`
 
 ### Task 11: Service nhận nhiều toà; áp dụng giao diện mới và bộ lọc Toà cho mọi trang danh sách
 
