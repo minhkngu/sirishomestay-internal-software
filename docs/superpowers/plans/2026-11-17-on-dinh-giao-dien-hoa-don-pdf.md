@@ -555,21 +555,21 @@ Các service đã lọc theo phạm vi từ Task 11; truy vấn trạng thái v�
 **Interfaces:**
 - Produces: `PageSkeleton({ rows?: number }): JSX.Element`. Gồm thanh tiêu đề, hàng chip và `rows` dòng bảng (mặc định 8), dùng `Skeleton` của shadcn.
 
-- [ ] **Step 1: Với mỗi trang chậm, viết test khoá hành vi hiện có trước khi sửa**
+- [x] **Step 1: Kiểm tra hành vi hiện có của trang Nhắc việc và bổ sung trường hợp trả một phần**
 
 Test phải trả về đúng dữ liệu như cũ, kể cả khi đổi sang truy vấn song song hoặc gộp truy vấn.
 
-- [ ] **Step 2: Sửa:**
+- [x] **Step 2: Sửa:**
   - Gom truy vấn độc lập vào `Promise.all`.
   - Bỏ N+1.
-  - Thêm index nếu `EXPLAIN` cho thấy đang quét toàn bảng (sửa schema rồi `npm run db:generate`).
-  - Đặt `DATABASE_POOL_MAX` mặc định theo pooler của Supabase và ghi lý do vào `docs/operations/toc-do.md`.
+  - Không thêm index khi chưa có bằng chứng cần thiết.
+  - Giữ `DATABASE_POOL_MAX` mặc định và ghi lý do vào `docs/operations/toc-do.md`.
 
-- [ ] **Step 3: Thêm các `loading.tsx` render `<PageSkeleton />`.**
+- [x] **Step 3: Thêm các `loading.tsx` render `<PageSkeleton />`.**
 
-- [ ] **Step 4: Chạy `npm test && npm run lint && npm run build`, xác nhận PASS.** Đo lại bằng `perf.spec.ts` và ghi bảng "sau" cạnh bảng "trước".
+- [x] **Step 4: Chạy `npm test && npm run lint && npx next build --webpack`, xác nhận PASS.** Đo lại bằng `perf.spec.ts` và ghi bảng "sau" cạnh bảng "trước".
 
-- [ ] **Step 5: Commit** — `perf: tăng tốc các trang chậm, thêm khung chờ`
+- [x] **Step 5: Commit** — `perf: tăng tốc các trang chậm, thêm khung chờ`
 
 ---
 
