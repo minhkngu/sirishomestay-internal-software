@@ -50,6 +50,24 @@ describe('contracts', () => {
     fees: [{ feeTypeId: feePerson, quantity: 1, unitPrice: 200_000 }], ...over,
   })
 
+  it('ghi nhận cọc thực nhận và ghi chú khi tạo hợp đồng', async () => {
+    const result = await createLease(db, lan(), leaseInput({ receivedDeposit: 3_000_000, note: 'Ghi chú' }))
+    const detail = await getLease(db, lan(), result.lease.id)
+    expect(detail.note).toBe('Ghi chú')
+    expect(detail.depositEntries.map(e => [e.amount, e.status]).sort()).toEqual([[3_000_000, 'done'], [6_000_000, 'pending']].sort())
+    expect(result.firstInvoiceLines.find(l => l.type === 'deposit')?.amount).toBe(6_000_000)
+  })
+
+  it('chuyển cọc chỉ ghi khoản nhận thêm và từ chối số không hợp lệ', async () => {
+    const { contract } = await createDepositContract(db, lan(), { roomId: r301, tenantId: tenant1, depositAmount: 5_000_000, agreedRent: 9_000_000, expectedMoveIn: '2026-10-15' })
+    for (const receivedDeposit of [-1, 4_000_000, 10_000_000]) {
+      await expect(convertDepositToLease(db, lan(), contract.id, leaseInput({ receivedDeposit }))).rejects.toThrow(ValidationError)
+    }
+    const result = await convertDepositToLease(db, lan(), contract.id, leaseInput({ receivedDeposit: 7_000_000 }))
+    expect((await getLease(db, lan(), result.lease.id)).depositEntries.map(e => [e.amount, e.status]).sort()).toEqual([[5_000_000, 'done'], [2_000_000, 'done'], [2_000_000, 'pending']].sort())
+    expect(result.firstInvoiceLines.find(l => l.type === 'deposit')?.amount).toBe(2_000_000)
+  })
+
   it('không cho công ty làm người ở', async () => {
     const company = await createTenant(db, admin, { kind: 'company', homeFacilityId: fa, companyName: 'Công ty A', phone: '0909876543', taxCode: '1234567890', representative: 'Nguyễn A' })
     await expect(createLease(db, lan(), leaseInput({ occupantIds: [company.id] }))).rejects.toThrow('Người ở phải là khách cá nhân')

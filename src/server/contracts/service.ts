@@ -125,6 +125,8 @@ export type LeaseInput = {
   endDate: string
   monthlyRent: number
   depositAmount: number
+  receivedDeposit?: number
+  note?: string
   fees?: { feeTypeId: string; quantity: number; unitPrice: number }[]
   dueRule?: unknown
   proration?: Proration | null
@@ -153,7 +155,7 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
   const code = await nextLeaseCode(tx, fac.code, input.startDate)
   const [lease] = await tx.insert(leases).values({
     code, roomId: room.id, tenantId: tenant.id, startDate: input.startDate, endDate: input.endDate, monthlyRent: input.monthlyRent,
-    depositAmount: input.depositAmount, dueRule: input.dueRule ?? null, proration: input.proration ?? null, billingCycleMonths: input.billingCycleMonths ?? 1, billWaterByMeter: input.billWaterByMeter ?? true, fromDepositContractId: fromDepositId,
+    depositAmount: input.depositAmount, note: input.note ?? '', dueRule: input.dueRule ?? null, proration: input.proration ?? null, billingCycleMonths: input.billingCycleMonths ?? 1, billWaterByMeter: input.billWaterByMeter ?? true, fromDepositContractId: fromDepositId,
   }).returning()
   await tx.insert(leaseOccupants).values(occupants.map((tenantId) => ({ leaseId: lease.id, tenantId })))
   if (input.fees?.length) await tx.insert(leaseFees).values(input.fees.map((f) => ({ leaseId: lease.id, ...f })))
@@ -164,7 +166,14 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
     const moved = await tx.update(depositEntries).set({ leaseId: lease.id, updatedAt: new Date() }).where(eq(depositEntries.depositContractId, fromDepositId)).returning()
     held = depositBalance(moved.map(toDomainEntry))
   }
-  const missing = input.depositAmount - held
+  const received = input.receivedDeposit ?? held
+  if (!Number.isSafeInteger(input.depositAmount) || !Number.isSafeInteger(received) || received < held || received < 0 || received > input.depositAmount) {
+    throw new ValidationError('Tiền cọc thực nhận không hợp lệ', { receivedDeposit: 'Tiền thực nhận phải từ số cọc kế thừa đến số cọc hợp đồng' })
+  }
+  if (received > held) {
+    await tx.insert(depositEntries).values({ leaseId: lease.id, date: todayVN(), type: 'collect', amount: received - held, status: 'done', note: 'Cọc thực nhận khi tạo hợp đồng' })
+  }
+  const missing = input.depositAmount - received
   if (missing > 0) {
     await tx.insert(depositEntries).values({ leaseId: lease.id, date: input.startDate, type: 'collect', amount: missing, status: 'pending', note: 'Cọc còn thiếu theo hợp đồng thuê' })
   }
@@ -178,7 +187,7 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
     roomId: lease.roomId, startDate: lease.startDate, endDate: lease.endDate, monthlyRent: lease.monthlyRent,
     depositAmount: lease.depositAmount, fees, occupantIds: occupants,
   }
-  const firstInvoiceLines = buildFirstInvoice(terms, lease.startDate, proration, held)
+  const firstInvoiceLines = buildFirstInvoice(terms, lease.startDate, proration, received)
   // Hoá đơn đầu tiên (nháp thật): từ ngày vào ở tới hết tháng (hoặc hết hợp đồng); nhân viên duyệt vào lúc họ chọn
   const monthEnd = `${lease.startDate.slice(0, 7)}-${String(daysInMonth(lease.startDate.slice(0, 7))).padStart(2, '0')}`
   const [firstInvoice] = await tx.insert(invoices).values({
