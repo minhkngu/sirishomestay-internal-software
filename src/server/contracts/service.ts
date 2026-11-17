@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, like, lte, ne } from 'drizzle-orm'
 import {
-  depositContracts, depositEntries, facilities, feeTypes, feeUnits, files, invoiceLines, invoices, leaseFees, leaseOccupants, leases, rooms, tenants,
+  assets, depositContracts, depositEntries, facilities, feeTypes, feeUnits, files, invoiceLines, invoices, leaseFees, leaseOccupants, leases, rooms, tenants,
 } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, facilityScope, type AccessContext } from '@/domain/access'
@@ -11,6 +11,8 @@ import { buildFirstInvoice } from '@/domain/invoice-builder'
 import { contractTermsAt } from '@/domain/contract-terms'
 import type { ContractFee, DepositEntry, InvoiceLineInput, LeaseTerms, Proration } from '@/domain/types'
 import { recordAudit } from '@/server/audit'
+import { createAssetInTransaction, moveAssetsInTransaction, setAssetStatusInTransaction } from '@/server/assets/service'
+import { startHandoverInTransaction } from '@/server/handovers/service'
 import { registerExportOwnerResolver, registerOwnerResolver } from '@/server/files/owners'
 import type { ExportFormat } from '@/server/convert'
 import { leaseData, loadAddenda, nextInvoiceCode } from '@/server/invoices/service'
@@ -127,6 +129,12 @@ export type LeaseInput = {
   depositAmount: number
   receivedDeposit?: number
   note?: string
+  handover?: {
+    expectedRoomAssetIds: string[]
+    addAssetIds: string[]
+    newAssets: Array<{ code: string; name: string; model: string; category: string; value: number; condition: string }>
+    remove: Array<{ assetId: string; action: 'warehouse' | 'dispose' | 'unassigned' }>
+  }
   fees?: { feeTypeId: string; quantity: number; unitPrice: number }[]
   dueRule?: unknown
   proration?: Proration | null
@@ -176,6 +184,30 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
   const missing = input.depositAmount - received
   if (missing > 0) {
     await tx.insert(depositEntries).values({ leaseId: lease.id, date: input.startDate, type: 'collect', amount: missing, status: 'pending', note: 'Cọc còn thiếu theo hợp đồng thuê' })
+  }
+
+  if (input.handover) {
+    const h = input.handover
+    assertCan(ctx, 'assets', room.facilityId)
+    const current = await tx.select().from(assets).where(and(eq(assets.locationKind, 'room'), eq(assets.locationId, room.id), ne(assets.status, 'disposed'))).for('update')
+    const expected = new Set(h.expectedRoomAssetIds)
+    const added = new Set(h.addAssetIds)
+    const removed = new Set(h.remove.map((x) => x.assetId))
+    if (expected.size !== h.expectedRoomAssetIds.length || added.size !== h.addAssetIds.length || removed.size !== h.remove.length || current.length !== expected.size || current.some((a) => !expected.has(a.id)) || h.remove.some((x) => !expected.has(x.assetId)) || h.addAssetIds.some((id) => expected.has(id))) {
+      throw new ValidationError('Danh sách tài sản đã thay đổi hoặc không hợp lệ, vui lòng tải lại')
+    }
+    if (h.addAssetIds.length) {
+      const additions = await tx.select().from(assets).where(inArray(assets.id, h.addAssetIds)).for('update')
+      if (additions.length !== h.addAssetIds.length || additions.some((a) => a.facilityId !== room.facilityId || a.status === 'disposed')) throw new ValidationError('Tài sản không hợp lệ hoặc không thuộc cơ sở')
+      await moveAssetsInTransaction(tx, ctx, h.addAssetIds, { kind: 'room', id: room.id }, 'Bàn giao nhận phòng')
+    }
+    for (const item of h.remove) {
+      if (item.action === 'dispose') await setAssetStatusInTransaction(tx, ctx, item.assetId, 'disposed')
+      else if (item.action === 'warehouse' || item.action === 'unassigned') await moveAssetsInTransaction(tx, ctx, [item.assetId], { kind: item.action, id: room.facilityId }, 'Bàn giao nhận phòng')
+      else throw new ValidationError('Cách xử lý tài sản không hợp lệ')
+    }
+    for (const asset of h.newAssets) await createAssetInTransaction(tx, ctx, { ...asset, facilityId: room.facilityId, location: { kind: 'room', id: room.id } })
+    await startHandoverInTransaction(tx, ctx, lease.id, 'check_in')
   }
 
   // hoá đơn đầu tiên (nháp) — bảng hoá đơn nối ở Task 14, trước đó trả về dòng nháp

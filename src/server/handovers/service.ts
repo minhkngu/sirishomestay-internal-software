@@ -28,7 +28,10 @@ async function loadHandover(db: Pick<DB, 'select'>, ctx: AccessContext, id: stri
 
 /** Check-in: tài sản đang ở phòng. Check-out: sao danh sách từ check-in (nếu có). Còn bản nháp cùng loại thì trả về bản đó. */
 export async function startHandover(db: DB, ctx: AccessContext, leaseId: string, kind: HandoverKind): Promise<Handover> {
-  return db.transaction(async (tx) => {
+  return db.transaction((tx) => startHandoverInTransaction(tx as unknown as DB, ctx, leaseId, kind))
+}
+
+export async function startHandoverInTransaction(tx: DB, ctx: AccessContext, leaseId: string, kind: HandoverKind): Promise<Handover> {
     const { l, facilityId, roomCode } = await leaseRoom(tx, ctx, leaseId)
     const [draft] = await tx.select().from(handovers).where(and(eq(handovers.leaseId, leaseId), eq(handovers.kind, kind), eq(handovers.status, 'draft')))
     if (draft) return draft
@@ -48,7 +51,6 @@ export async function startHandover(db: DB, ctx: AccessContext, leaseId: string,
     }
     await recordAudit(tx, ctx, { action: 'create', entity: 'handover', entityId: h.id, facilityId, summary: `Tạo biên bản ${kind === 'check_in' ? 'check-in' : 'check-out'} phòng ${roomCode}`, after: h })
     return h
-  })
 }
 
 export async function getHandover(db: DB, ctx: AccessContext, id: string) {

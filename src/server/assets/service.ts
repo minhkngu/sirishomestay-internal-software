@@ -50,7 +50,12 @@ async function locationFacility(db: Pick<DB, 'select'>, loc: Location): Promise<
 export async function createAsset(db: DB, ctx: AccessContext, input: unknown): Promise<Asset> {
   const data = parse(createInput, input)
   assertCan(ctx, 'assets', data.facilityId)
-  return db.transaction(async (tx) => {
+  return db.transaction((tx) => createAssetInTransaction(tx as unknown as DB, ctx, input))
+}
+
+export async function createAssetInTransaction(tx: DB, ctx: AccessContext, input: unknown): Promise<Asset> {
+    const data = parse(createInput, input)
+    assertCan(ctx, 'assets', data.facilityId)
     if ((await locationFacility(tx, data.location)) !== data.facilityId) throw new ValidationError('Vị trí không thuộc cơ sở này')
     const [dup] = await tx.select({ id: assets.id }).from(assets).where(eq(assets.code, data.code))
     if (dup) throw new ValidationError('Mã tài sản đã tồn tại', { code: 'Mã tài sản đã tồn tại' })
@@ -58,7 +63,6 @@ export async function createAsset(db: DB, ctx: AccessContext, input: unknown): P
     const [a] = await tx.insert(assets).values({ ...rest, locationKind: location.kind, locationId: location.id, searchText: buildSearchText([data.code, data.name, data.category]) }).returning()
     await recordAudit(tx, ctx, { action: 'create', entity: 'asset', entityId: a.id, facilityId: a.facilityId, summary: `Tạo tài sản ${a.code} — ${a.name}`, after: a })
     return a
-  })
 }
 
 async function loadAsset(db: Pick<DB, 'select'>, ctx: AccessContext, id: string): Promise<Asset> {
@@ -105,7 +109,11 @@ export async function listAssets(
 /** Chuyển nhiều món cùng lúc; tất cả hoặc không món nào. Mỗi món ghi một dòng lịch sử + nhật ký. */
 export async function moveAssets(db: DB, ctx: AccessContext, assetIds: string[], to: Location, reason: string): Promise<void> {
   if (assetIds.length === 0) throw new ValidationError('Chọn ít nhất một tài sản')
-  await db.transaction(async (tx) => {
+  await db.transaction((tx) => moveAssetsInTransaction(tx as unknown as DB, ctx, assetIds, to, reason))
+}
+
+export async function moveAssetsInTransaction(tx: DB, ctx: AccessContext, assetIds: string[], to: Location, reason: string): Promise<void> {
+    if (assetIds.length === 0) throw new ValidationError('Chọn ít nhất một tài sản')
     const found = await tx.select().from(assets).where(inArray(assets.id, assetIds))
     if (found.length !== new Set(assetIds).size) throw new NotFoundError()
     for (const a of found) assertCan(ctx, 'assets', a.facilityId)
@@ -122,15 +130,16 @@ export async function moveAssets(db: DB, ctx: AccessContext, assetIds: string[],
         before: { kind: a.locationKind, id: a.locationId }, after: { kind: to.kind, id: to.id, reason },
       })
     }
-  })
 }
 
 export async function setAssetStatus(db: DB, ctx: AccessContext, id: string, status: AssetStatus): Promise<void> {
-  await db.transaction(async (tx) => {
+  await db.transaction((tx) => setAssetStatusInTransaction(tx as unknown as DB, ctx, id, status))
+}
+
+export async function setAssetStatusInTransaction(tx: DB, ctx: AccessContext, id: string, status: AssetStatus): Promise<void> {
     const before = await loadAsset(tx, ctx, id)
     await tx.update(assets).set({ status, updatedAt: new Date() }).where(eq(assets.id, id))
     await recordAudit(tx, ctx, { action: 'update', entity: 'asset', entityId: id, facilityId: before.facilityId, summary: `Đổi trạng thái tài sản ${before.code} → ${status}`, before: { status: before.status }, after: { status } })
-  })
 }
 
 /** Lịch sử của tài sản: di chuyển (bàn giao và sự cố được nối thêm ở các bước sau). */

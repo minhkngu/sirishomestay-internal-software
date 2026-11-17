@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { and, eq } from 'drizzle-orm'
-import { depositContracts, depositEntries, facilities, feeTypes, feeUnits, leaseOccupants, leases, rooms } from '@/db'
+import { assets, handovers, handoverItems, depositContracts, depositEntries, facilities, feeTypes, feeUnits, leaseOccupants, leases, rooms } from '@/db'
 import { createTenant } from '@/server/tenants/service'
 import { listRoomsWithStatus } from '@/server/rooms/service'
 import {
@@ -66,6 +66,40 @@ describe('contracts', () => {
     const result = await convertDepositToLease(db, lan(), contract.id, leaseInput({ receivedDeposit: 7_000_000 }))
     expect((await getLease(db, lan(), result.lease.id)).depositEntries.map(e => [e.amount, e.status]).sort()).toEqual([[5_000_000, 'done'], [2_000_000, 'done'], [2_000_000, 'pending']].sort())
     expect(result.firstInvoiceLines.find(l => l.type === 'deposit')?.amount).toBe(2_000_000)
+  })
+
+  it('tạo biên bản cùng hợp đồng và từ chối snapshot tài sản cũ', async () => {
+    const [asset] = await db.insert(assets).values({ code: 'A1', name: 'Bàn', facilityId: fa, locationKind: 'room', locationId: r301 }).returning()
+    const handover = { expectedRoomAssetIds: [asset.id], addAssetIds: [], newAssets: [], remove: [] }
+    await expect(createLease(db, lan(), leaseInput({ handover }))).rejects.toThrow(ForbiddenError)
+    await expect(createLease(db, admin, leaseInput({ handover: { ...handover, expectedRoomAssetIds: [] } }))).rejects.toThrow(ValidationError)
+    expect(await db.select().from(leases)).toHaveLength(0)
+    const { lease } = await createLease(db, admin, leaseInput({ handover }))
+    const [h] = await db.select().from(handovers).where(eq(handovers.leaseId, lease.id))
+    expect(h).toMatchObject({ kind: 'check_in', status: 'draft' })
+    expect((await db.select().from(handoverItems).where(eq(handoverItems.handoverId, h.id))).map(x => x.assetId)).toEqual([asset.id])
+  })
+
+  it('áp dụng tài sản và tạo snapshot bàn giao trong cùng giao dịch', async () => {
+    const rows = await db.insert(assets).values(['A', 'B', 'C'].map(code => ({ code, name: code, facilityId: fa, locationKind: 'room', locationId: r301 }))).returning()
+    const [extra] = await db.insert(assets).values({ code: 'D', name: 'D', facilityId: fa, locationKind: 'warehouse', locationId: fa }).returning()
+    const handover = { expectedRoomAssetIds: rows.map(a => a.id), addAssetIds: [extra.id], newAssets: [{ code: 'E', name: 'E', model: 'M', category: '', value: 1, condition: 'Tốt' }], remove: [{ assetId: rows[1].id, action: 'warehouse' }, { assetId: rows[2].id, action: 'dispose' }] }
+    const { lease } = await createLease(db, admin, leaseInput({ handover }))
+    const all = await db.select().from(assets)
+    expect(all.find(a => a.id === rows[1].id)?.locationKind).toBe('warehouse')
+    expect(all.find(a => a.id === rows[2].id)?.status).toBe('disposed')
+    expect(all.find(a => a.code === 'E')?.model).toBe('M')
+    const [h] = await db.select().from(handovers).where(eq(handovers.leaseId, lease.id))
+    expect((await db.select().from(handoverItems).where(eq(handoverItems.handoverId, h.id))).map(x => x.assetId).sort()).toEqual([rows[0].id, extra.id, all.find(a => a.code === 'E')!.id].sort())
+  })
+
+  it('rollback toàn bộ khi mã tài sản mới trùng', async () => {
+    const [a] = await db.insert(assets).values({ code: 'DUP', name: 'Bàn', facilityId: fa, locationKind: 'room', locationId: r301 }).returning()
+    const handover = { expectedRoomAssetIds: [a.id], addAssetIds: [], newAssets: [{ code: 'DUP', name: 'Mới', model: '', category: '', value: 0, condition: 'Tốt' }], remove: [{ assetId: a.id, action: 'unassigned' }] }
+    await expect(createLease(db, admin, leaseInput({ handover }))).rejects.toThrow(ValidationError)
+    expect(await db.select().from(leases)).toHaveLength(0)
+    expect(await db.select().from(handovers)).toHaveLength(0)
+    expect((await db.select().from(assets))[0].locationKind).toBe('room')
   })
 
   it('không cho công ty làm người ở', async () => {
