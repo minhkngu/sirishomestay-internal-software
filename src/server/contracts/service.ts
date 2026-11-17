@@ -341,6 +341,12 @@ export async function exportContract(db: DB, ctx: AccessContext, storage: Storag
 
 // ------------------------------------------------------------------ nối với tệp và giấy tờ
 
+registerOwnerResolver('lease_photo', async (db, ownerId) => {
+  const [row] = await db.select({ facilityId: rooms.facilityId }).from(leases).innerJoin(rooms, eq(rooms.id, leases.roomId)).where(eq(leases.id, ownerId))
+  if (!row) throw new NotFoundError()
+  return row
+})
+
 registerOwnerResolver('signed_contract', async (db, ownerId) => {
   for (const t of [leases, depositContracts] as const) {
     const [row] = await db.select({ roomId: t.roomId }).from(t).where(eq(t.id, ownerId))

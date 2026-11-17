@@ -1,3 +1,4 @@
+import { FileUpload } from '@/components/file-upload'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import {
@@ -254,9 +255,10 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
   const handoverList = await listHandovers(db, ctx, lease.id)
   const addendaList = await listAddenda(db, ctx, lease.id)
   const form = lease.status === 'active' ? await addendumFormData(db, ctx, lease.id) : null
-  const [templates, exports] = await Promise.all([
+  const [templates, exports, photos] = await Promise.all([
     listTemplates(db, ctx, 'lease').then((t) => t.filter((x) => x.fileId)),
     listFiles(db, ctx, 'export', lease.id),
+    listFiles(db, ctx, 'lease_photo', lease.id),
   ])
 
   const isActive = lease.status === 'active'
@@ -324,6 +326,7 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
+          {lease.note && <p className="rounded-xl border p-4 text-sm whitespace-pre-wrap">{lease.note}</p>}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
               <div className="text-[11px] font-medium text-muted-foreground">Giá thuê hàng tháng</div>
@@ -482,6 +485,10 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
         </TabsContent>
 
         <TabsContent value="docs" className="space-y-4">
+          <section className="space-y-3 rounded-2xl border p-5"><h3 className="font-semibold">Ảnh hợp đồng</h3>
+            <div className="flex flex-wrap gap-3">{photos.map((f) => <a key={f.id} href={`/api/files/${f.id}`}><img src={`/api/files/${f.id}?thumb=1`} alt={f.name || 'Ảnh hợp đồng'} className="h-24 w-24 rounded object-cover" /></a>)}</div>
+            <FileUpload ownerType="lease_photo" ownerId={lease.id} multiple label="Thêm ảnh hợp đồng" />
+          </section>
           <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-2xs space-y-4">
             <SignStatus
               kind="lease"
