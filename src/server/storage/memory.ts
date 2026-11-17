@@ -6,8 +6,8 @@ export class MemoryStorage implements StorageAdapter {
   async createUploadUrl(key: string, contentType: string, maxBytes: number) {
     return `memory://upload/${key}?type=${encodeURIComponent(contentType)}&max=${maxBytes}`
   }
-  async createDownloadUrl(key: string, expiresSec: number) {
-    return `memory://download/${key}?expires=${expiresSec}`
+  async createDownloadUrl(key: string, expiresSec: number, downloadName?: string) {
+    return `memory://download/${key}?expires=${expiresSec}${downloadName ? `&download=${encodeURIComponent(downloadName)}` : ''}`
   }
   private blobs = new Map<string, Uint8Array>()
   async delete(key: string) {

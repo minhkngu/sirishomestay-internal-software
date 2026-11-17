@@ -13,7 +13,9 @@ import { finalizeTermination } from '@/server/addenda/finalize'
 import { recordAudit, recordAuditBatch } from '@/server/audit'
 import { registerExportOwnerResolver } from '@/server/files/owners'
 import { getSettings } from '@/server/settings/service'
-import { registerDocLoader } from '@/server/templates/service'
+import { registerPdfLoader } from '@/server/templates/service'
+import { resolveBankAccount } from '@/domain/vietqr'
+import { renderInvoicePdf, renderReceiptPdf } from '@/server/pdf'
 
 const batchSchema = z.object({ facilityId: z.uuid(), period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) })
 const periodSchema = z.object({ start: z.iso.date(), end: z.iso.date(), coefficient: z.number().positive().finite().optional(), fullMonth: z.boolean().optional(), proration: z.enum(['days_30', 'actual_days']).optional() }).refine(x => x.end >= x.start, { message: 'Ngày kết thúc phải sau ngày bắt đầu' })
@@ -260,20 +262,11 @@ export async function exportReceipt(db: DB, ctx: AccessContext, storage: Paramet
   return exportDocument(db, ctx, storage, { docType: 'receipt', entityId: paymentId, templateId, format })
 }
 const METHOD_LABEL = { cash: 'Tiền mặt', transfer: 'Chuyển khoản', other: 'Khác' } as const
-registerDocLoader('receipt', async (db, ctx, id) => {
+registerPdfLoader('receipt', async (db, ctx, id) => {
   const [p] = await db.select().from(payments).where(eq(payments.id, id)); if (!p) throw new NotFoundError()
   const inv = await getInvoice(db, ctx, p.invoiceId)
-  const [row] = await db.select({ lease: leases, room: rooms, tenant: tenants, facility: facilities }).from(leases).innerJoin(rooms, eq(rooms.id, leases.roomId)).innerJoin(tenants, eq(tenants.id, leases.tenantId)).innerJoin(facilities, eq(facilities.id, rooms.facilityId)).where(eq(leases.id, inv.leaseId))
-  const t = row.tenant
-  return {
-    facilityId: inv.facilityId, baseName: `phieu-thu-${inv.code}`,
-    entities: {
-      now: todayVN(), tenant: { kind: t.kind as 'foreign' | 'vietnamese' | 'company', fullName: t.fullName, companyName: t.companyName, taxCode: t.taxCode, idDocument: t.kind === 'foreign' ? t.passportNumber : t.idNumber, phone: t.phone, email: t.email },
-      facility: { name: row.facility.name, address: row.facility.address }, room: { code: row.room.code },
-      payment: { code: `${inv.code}-PT-${p.id.slice(0, 4).toUpperCase()}`, paidOn: p.paidOn, amount: p.amount, method: METHOD_LABEL[p.method as keyof typeof METHOD_LABEL] ?? p.method, receivedBy: ctx.userId === p.receivedBy ? ctx.fullName ?? '' : '' },
-      invoice: { code: inv.code, periodStart: inv.periodStart, periodEnd: inv.periodEnd, dueDate: inv.dueDate, lines: [] },
-    },
-  }
+  const [row] = await db.select({ room: rooms, tenant: tenants, facility: facilities }).from(leases).innerJoin(rooms, eq(rooms.id, leases.roomId)).innerJoin(tenants, eq(tenants.id, leases.tenantId)).innerJoin(facilities, eq(facilities.id, inv.facilityId)).where(eq(leases.id, inv.leaseId))
+  return { facilityId: inv.facilityId, baseName: `phieu-thu-${inv.code}`, render: () => renderReceiptPdf({ code: `${inv.code}-PT-${p.id.slice(0, 4).toUpperCase()}`, invoiceCode: inv.code, paidOn: p.paidOn, amount: p.amount, method: METHOD_LABEL[p.method as keyof typeof METHOD_LABEL] ?? p.method, receivedBy: ctx.userId === p.receivedBy ? ctx.fullName ?? '' : '', facility: { name: row.facility.name, address: row.facility.address }, room: row.room.code, tenant: { name: row.tenant.fullName || row.tenant.companyName || '', phone: row.tenant.phone } }) }
 })
 
 export async function getInvoiceDetail(db: DB, ctx: AccessContext, id: string) {
@@ -286,19 +279,15 @@ export async function getInvoiceDetail(db: DB, ctx: AccessContext, id: string) {
   const total = lines.reduce((n, l) => n + l.amount, 0), paid = pays.reduce((n, p) => n + p.amount, 0)
   return { invoice: inv, lines, payments: pays, total, paid, state: invoiceStatus(total, paid, inv.status, inv.dueDate, todayVN()), ...row }
 }
-registerDocLoader('invoice_monthly', async (db, ctx, id) => {
-  const d = await getInvoiceDetail(db, ctx, id)
-  const [row] = await db.select({ tenant: tenants, facility: facilities }).from(leases).innerJoin(rooms, eq(rooms.id, leases.roomId)).innerJoin(tenants, eq(tenants.id, leases.tenantId)).innerJoin(facilities, eq(facilities.id, rooms.facilityId)).where(eq(leases.id, d.invoice.leaseId))
-  const t = row.tenant
-  return {
-    facilityId: d.invoice.facilityId, baseName: d.invoice.code,
-    entities: {
-      now: d.invoice.issueDate, tenant: { kind: t.kind as 'foreign' | 'vietnamese' | 'company', fullName: t.fullName, companyName: t.companyName, taxCode: t.taxCode, idDocument: t.kind === 'foreign' ? t.passportNumber : t.idNumber, phone: t.phone, email: t.email },
-      facility: { name: row.facility.name, address: row.facility.address }, room: { code: d.roomCode },
-      invoice: { code: d.invoice.code, periodStart: d.invoice.periodStart, periodEnd: d.invoice.periodEnd, dueDate: d.invoice.dueDate, lines: d.lines.map(l => ({ description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, amount: l.amount })) },
-    },
-  }
-})
+for (const [docType, kind] of [['invoice_monthly', 'monthly'], ['invoice_termination', 'termination']] as const) {
+  registerPdfLoader(docType, async (db, ctx, id) => {
+    const d = await getInvoiceDetail(db, ctx, id)
+    if (kind === 'termination' ? d.invoice.kind !== 'termination' : !['monthly', 'first'].includes(d.invoice.kind)) throw new ValidationError('Loại hoá đơn không phù hợp')
+    const [row] = await db.select({ tenant: tenants, facility: facilities }).from(leases).innerJoin(tenants, eq(tenants.id, leases.tenantId)).innerJoin(facilities, eq(facilities.id, d.invoice.facilityId)).where(eq(leases.id, d.invoice.leaseId))
+    const settings = await getSettings(db)
+    return { facilityId: d.invoice.facilityId, baseName: d.invoice.code, render: () => renderInvoicePdf({ kind, code: d.invoice.code, issueDate: d.invoice.issueDate, periodStart: d.invoice.periodStart, periodEnd: d.invoice.periodEnd, dueDate: d.invoice.dueDate, facility: { name: row.facility.name, address: row.facility.address }, room: d.roomCode, tenant: { name: row.tenant.fullName || row.tenant.companyName || '', phone: row.tenant.phone }, lines: d.lines.map(l => ({ description: l.description, quantity: l.quantity, unitLabel: '', unitPrice: l.unitPrice, amount: l.amount })), total: d.total, paid: d.paid, bank: resolveBankAccount(row.facility.bankAccount, settings.bankAccount) }) }
+  })
+}
 // Bản xuất hoá đơn / phiếu thu: tìm cơ sở theo hoá đơn hoặc khoản thu gốc
 registerExportOwnerResolver(async (db, id) => {
   const [inv] = await db.select({ f: invoices.facilityId }).from(invoices).where(eq(invoices.id, id))

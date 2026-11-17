@@ -15,8 +15,8 @@ export class R2Storage implements StorageAdapter {
     // R2 không ép được kích thước qua presigned PUT; giới hạn được kiểm ở trình duyệt (nén ảnh).
     return getSignedUrl(this.client, new PutObjectCommand({ Bucket: this.bucket, Key: key, ContentType: contentType }), { expiresIn: 600 })
   }
-  async createDownloadUrl(key: string, expiresSec: number) {
-    return getSignedUrl(this.client, new GetObjectCommand({ Bucket: this.bucket, Key: key }), { expiresIn: expiresSec })
+  async createDownloadUrl(key: string, expiresSec: number, downloadName?: string) {
+    return getSignedUrl(this.client, new GetObjectCommand({ Bucket: this.bucket, Key: key, ...(downloadName ? { ResponseContentDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(downloadName)}` } : {}) }), { expiresIn: expiresSec })
   }
   async delete(key: string) {
     await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }))

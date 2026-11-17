@@ -100,3 +100,16 @@ test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → 
   await page.goto(leaseUrl)
   await expect(page.getByText('Đã kết thúc')).toBeVisible()
 })
+
+test('tải hoá đơn dưới dạng PDF và ảnh', async ({ page }) => {
+  await login(page, /^Admin/)
+  await page.goto('/invoices')
+  const detail = page.locator('main a[href^="/invoices/"]').filter({ hasNotText: 'Tạo' }).first()
+  await expect(detail).toBeVisible()
+  await detail.click()
+  for (const [label, extension] of [['Tải PDF', '.pdf'], ['Tải ảnh', '.png']] as const) {
+    const download = page.waitForEvent('download')
+    await page.getByRole('button', { name: label }).click()
+    expect((await download).suggestedFilename()).toMatch(new RegExp(`${extension.replace('.', '\\.')}$`, 'i'))
+  }
+})

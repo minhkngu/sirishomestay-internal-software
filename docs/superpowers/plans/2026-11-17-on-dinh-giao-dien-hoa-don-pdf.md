@@ -309,7 +309,7 @@ Tạo hàm phụ `textOf(pdf)` dùng `pdfjs-dist/legacy` để lấy chữ của
   - `registerPdfLoader(docType: PdfDocType, loader: (db, ctx, id) => Promise<{ facilityId: string; baseName: string; render: () => Promise<Uint8Array> }>)`
   - `type PdfDocType = (typeof PDF_DOC_TYPES)[number]`
 
-- [ ] **Step 1: Viết test (không đặt `GOTENBERG_URL`; `fetch` bị spy và không được gọi)**
+- [x] **Step 1: Viết test (không đặt `GOTENBERG_URL`; `fetch` bị spy và không được gọi)**
 
 - `it('xuất hoá đơn tháng không truyền format → file application/pdf tên <mã>.pdf')`
 - `it('format png → image/png, không gọi Gotenberg')`
@@ -320,17 +320,17 @@ Tạo hàm phụ `textOf(pdf)` dùng `pdfjs-dist/legacy` để lấy chữ của
 - `it('người không có quyền billing ở toà đó → ForbiddenError')`
 - `it('hợp đồng vẫn xuất Word như cũ')`
 
-- [ ] **Step 2: Chạy test, xác nhận FAIL.**
+- [x] **Step 2: Chạy test, xác nhận FAIL.**
 
-- [ ] **Step 3: Viết code theo phần Files.**
+- [x] **Step 3: Viết code theo phần Files.**
 
-- [ ] **Step 4: Chạy `npm test && npm run lint && npm run build`, xác nhận PASS.**
+- [x] **Step 4: Chạy `npm test && npm run lint && npx next build --webpack`, xác nhận PASS.**
 
-- [ ] **Step 5: Sửa e2e `tests/e2e/invoices.spec.ts`**
+- [x] **Step 5: Sửa e2e `tests/e2e/invoices.spec.ts`**
 
 Bấm "Tải PDF" → bắt sự kiện `download`, tên file kết thúc bằng `.pdf`. Bấm "Tải ảnh" → tên file kết thúc bằng `.png`. Chạy riêng spec này.
 
-- [ ] **Step 6: Commit** — `feat: hoá đơn và phiếu thu xuất PDF mặc định, ảnh từ PDF, bỏ Word`
+- [x] **Step 6: Commit** — `feat: hoá đơn và phiếu thu xuất PDF mặc định, ảnh từ PDF, bỏ Word`
 
 ---
 

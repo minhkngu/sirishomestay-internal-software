@@ -30,7 +30,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       <InvoiceEditor key={inv.updatedAt.toISOString()} id={id} status={inv.status} start={inv.periodStart} end={inv.periodEnd} coefficient={inv.coefficient} fullMonth={inv.fullMonth} dueDate={inv.dueDate ? formatDateVN(inv.dueDate) : null}
         lines={d.lines.map((l) => ({ type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta: (l.meta as Record<string, unknown> | null) ?? null }))} />
       <PaymentDialog invoiceId={id} approved={inv.status === 'approved'} payments={d.payments.map((p) => ({ id: p.id, paidOn: p.paidOn, amount: p.amount, method: p.method, note: p.note }))} remaining={d.total - d.paid} today={todayVN()} />
-      <section className="space-y-2 rounded-lg border p-4"><h2 className="font-medium">Xuất hoá đơn</h2><InvoiceExport invoiceId={id} /></section>
+      <section className="space-y-2 rounded-lg border p-4"><h2 className="font-medium">Xuất hoá đơn</h2><InvoiceExport invoiceId={id} kind={d.invoice.kind} /></section>
     </div>
   )
 }

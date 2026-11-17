@@ -81,5 +81,5 @@ export async function deleteFile(db: DB, ctx: AccessContext, storage: StorageAda
 export async function getDownloadUrl(db: DB, ctx: AccessContext, storage: StorageAdapter, fileId: string, thumb: boolean): Promise<string> {
   const f = await loadFile(db, ctx, fileId)
   if (!f.confirmedAt) throw new NotFoundError()
-  return storage.createDownloadUrl(thumb && f.thumbKey ? f.thumbKey : f.storageKey, 300)
+  return storage.createDownloadUrl(thumb && f.thumbKey ? f.thumbKey : f.storageKey, 300, f.ownerType === 'export' && !thumb ? f.name : undefined)
 }
