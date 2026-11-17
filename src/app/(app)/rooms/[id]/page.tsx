@@ -31,7 +31,7 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2"><h1 className="text-xl font-semibold">Phòng {r.code}</h1>{can(ctx, 'incidents', r.facilityId) && <Link href={`/incidents/new?room=${id}`} className={buttonVariants({ variant: 'outline' })}>Báo sự cố</Link>}</div>
-      <dl className="grid max-w-md grid-cols-2 gap-2 text-sm">
+      <dl className="grid max-w-md grid-cols-2 gap-3 rounded-lg border bg-card p-4 text-sm">
         <dt className="text-muted-foreground">Trạng thái</dt><dd>{ROOM_STATUS_LABELS[detail.status]}</dd>
         <dt className="text-muted-foreground">Tầng</dt><dd>{r.floor ?? ''}</dd>
         <dt className="text-muted-foreground">Loại phòng</dt><dd>{r.roomType ?? ''}</dd>
@@ -40,10 +40,10 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
         <dt className="text-muted-foreground">Sức chứa</dt><dd>{r.capacity ?? ''}</dd>
         <dt className="text-muted-foreground">Ghi chú</dt><dd>{r.note}</dd>
       </dl>
-      {detail.money && <section className="space-y-1 rounded-lg border p-4 text-sm"><h2 className="font-medium">Thông tin thanh toán</h2>{detail.money.monthlyRent != null && <p>Tiền thuê: {formatVND(detail.money.monthlyRent)}</p>}<p>Số dư cọc: {formatVND(detail.money.depositBalance)}</p></section>}
-      {billingLease && <section className="space-y-3 rounded-lg border p-4"><OneOffDialog leaseId={billingLease} /><h2 className="font-medium">Sổ cọc</h2><DepositLedger leaseId={billingLease} entries={depositLedger} canEdit /></section>}
+      {detail.money && <section className="space-y-1 rounded-lg border bg-card p-4 text-sm"><h2 className="font-medium">Thông tin thanh toán</h2>{detail.money.monthlyRent != null && <p>Tiền thuê: {formatVND(detail.money.monthlyRent)}</p>}<p>Số dư cọc: {formatVND(detail.money.depositBalance)}</p></section>}
+      {billingLease && <section className="space-y-3 rounded-lg border bg-card p-4"><OneOffDialog leaseId={billingLease} /><h2 className="font-medium">Sổ cọc</h2><DepositLedger leaseId={billingLease} entries={depositLedger} canEdit /></section>}
       {showContracts && (
-        <section className="space-y-3 rounded-lg border p-4">
+        <section className="space-y-3 rounded-lg border bg-card p-4">
           <h2 className="font-medium">Hợp đồng</h2>
           <div className="flex flex-wrap gap-2">
             {!deposit && <Link href={`/contracts/new?kind=deposit&room=${id}`} className={buttonVariants({ variant: 'outline' })}>Tạo hợp đồng cọc</Link>}
@@ -60,13 +60,13 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
         </section>
       )}
       {roomAssets && (
-        <section className="space-y-2 rounded-lg border p-4">
+        <section className="space-y-2 rounded-lg border bg-card p-4">
           <h2 className="font-medium">Tài sản trong phòng ({roomAssets.length})</h2>
           <ul className="space-y-1 text-sm">{roomAssets.map((a) => <li key={a.id}><Link className="underline" href={`/assets/${a.id}`}>{a.code}</Link> — {a.name} ({a.condition})</li>)}</ul>
         </section>
       )}
       {meterInfo && (
-        <section className="space-y-2 rounded-lg border p-4">
+        <section className="space-y-2 rounded-lg border bg-card p-4">
           <h2 className="font-medium">Đồng hồ & chỉ số</h2>
           {meterInfo.meters.map((m) => {
             const rs = meterInfo.readings.filter((x) => x.meterId === m.id).slice(-3)

@@ -22,7 +22,7 @@ export default async function TenantPage({ params }: { params: Promise<{ id: str
     <div className="space-y-6">
       <h1 className="text-xl font-semibold">{tenant.fullName ?? tenant.companyName}</h1>
       <TenantForm facilities={facs.map((f) => ({ id: f.id, name: f.name }))} tenant={tenant as never} />
-      <section className="space-y-2">
+      <section className="space-y-2 rounded-lg border bg-card p-4">
         <div className="flex items-center justify-between"><h2 className="text-lg font-medium">Hợp đồng</h2>
           <div className="flex gap-3 text-sm"><Link className="underline" href={`/contracts/new?kind=deposit&tenant=${id}`}>Tạo hợp đồng cọc</Link><Link className="underline" href={`/contracts/new?tenant=${id}`}>Tạo hợp đồng thuê</Link></div></div>
         {contracts.length === 0 ? <p className="text-sm text-muted-foreground">Chưa có hợp đồng.</p> : (

@@ -22,7 +22,7 @@ export function InvoiceEditor(p: Props) {
   const approved = p.status === 'approved'
   return (
     <div className="space-y-4">
-      <section className="space-y-2 rounded-lg border p-4">
+      <section className="space-y-2 rounded-lg border bg-card p-4">
         <h2 className="font-medium">Kỳ hoá đơn</h2>
         <div className="flex flex-wrap items-end gap-2 text-sm">
           <label>Từ<input type="date" value={period.start} onChange={(e) => setPeriod({ ...period, start: e.target.value })} className="block h-8 rounded border px-2" /></label>
@@ -32,7 +32,7 @@ export function InvoiceEditor(p: Props) {
           <Button size="sm" variant="outline" disabled={pending} onClick={() => run(() => setPeriodAction(p.id, { start: period.start, end: period.end, coefficient: period.coefficient ? Number(period.coefficient) : undefined, fullMonth: period.fullMonth }), 'Đã tính lại tiền phòng và phí cố định')}>Áp dụng kỳ</Button>
         </div>
       </section>
-      <section className="space-y-2 rounded-lg border p-4">
+      <section className="space-y-2 rounded-lg border bg-card p-4">
         <h2 className="font-medium">Các dòng</h2>
         <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead className="text-left"><tr><th>Loại</th><th>Mô tả</th><th>SL</th><th>Đơn giá</th><th className="text-right">Thành tiền</th><th /></tr></thead>
@@ -52,7 +52,7 @@ export function InvoiceEditor(p: Props) {
           <Button size="sm" disabled={pending} onClick={() => run(() => updateLinesAction(p.id, lines), 'Đã lưu các dòng')}>Lưu các dòng</Button>
         </div>
       </section>
-      <section className="flex flex-wrap items-end gap-2 rounded-lg border p-4 text-sm">
+      <section className="flex flex-wrap items-end gap-2 rounded-lg border bg-card p-4 text-sm">
         {!approved && <>
           <label>Hạn thanh toán: ngày … tháng sau (trống = theo hợp đồng/cài đặt)<input inputMode="numeric" value={dueDay} onChange={(e) => setDueDay(e.target.value)} className="block h-8 w-24 rounded border px-2" /></label>
           <Button disabled={pending} onClick={() => run(() => approveInvoiceAction(p.id, dueDay ? { dueRule: { kind: 'day_of_next_month', day: Number(dueDay) } } : {}), 'Đã duyệt hoá đơn')}>Duyệt hoá đơn</Button>

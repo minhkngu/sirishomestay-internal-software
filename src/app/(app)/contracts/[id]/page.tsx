@@ -44,7 +44,7 @@ function Ledger({ entries }: { entries: Entry[] }) {
   const done = runningBalances(entries)
   return (
     <div className="space-y-2">
-      <div className="overflow-x-auto rounded-md border">
+      <div className="overflow-x-auto rounded-md border bg-card">
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-left"><tr><th className="p-2">Ngày</th><th className="p-2">Loại</th><th className="p-2">Số tiền</th><th className="p-2">Trạng thái</th><th className="p-2">Số dư luỹ kế</th></tr></thead>
           <tbody>
@@ -71,7 +71,7 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
     return (
       <div className="space-y-4">
         <h1 className="text-xl font-semibold">Hợp đồng cọc — phòng {deposit.roomCode}</h1>
-        <dl className="grid max-w-md grid-cols-2 gap-2 text-sm">
+        <dl className="grid max-w-md grid-cols-2 gap-3 rounded-lg border bg-card p-4 text-sm">
           <dt className="text-muted-foreground">Bên thuê</dt><dd>{deposit.tenantName}</dd>
           <dt className="text-muted-foreground">Tiền cọc</dt><dd>{formatVND(deposit.depositAmount)}</dd>
           <dt className="text-muted-foreground">Giá thuê thoả thuận</dt><dd>{formatVND(deposit.agreedRent)}</dd>

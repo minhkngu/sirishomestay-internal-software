@@ -16,10 +16,10 @@ export function IncidentBoard({ items }: { items: BoardItem[] }) {
   return (
     <div className="grid gap-3 md:grid-cols-3">
       {COLS.map(([status, label]) => (
-        <section key={status} className="space-y-2 rounded-lg border p-3">
+        <section key={status} className="space-y-2 rounded-lg border bg-card p-3">
           <h2 className="font-medium">{label} ({items.filter((i) => i.status === status).length})</h2>
           {items.filter((i) => i.status === status).map((i) => (
-            <div key={i.id} className="space-y-1 rounded-md border p-2 text-sm">
+            <div key={i.id} className="space-y-1 rounded-md border bg-card p-2 text-sm">
               <Link className="font-medium underline" href={`/incidents/${i.id}`}>{i.title}</Link>
               <p className="text-muted-foreground">{i.place}{PRIORITY[i.priority] ? ` · Mức ${PRIORITY[i.priority]}` : ''}{i.assigneeName ? ` · ${i.assigneeName}` : ''}</p>
               {NEXT[i.status] && <Button size="xs" variant="outline" disabled={pending} onClick={() => start(async () => { const r = await setIncidentStatusAction(i.id, NEXT[i.status][0]); if (!r.ok) toast.error(r.error); else router.refresh() })}>{NEXT[i.status][1]}</Button>}

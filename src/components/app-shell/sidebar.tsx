@@ -14,7 +14,7 @@ export function Sidebar({ items, onNavigate, className }: { items: NavItem[]; on
         const Icon = i.icon
         return (
           <Link key={i.href} href={i.href} onClick={onNavigate} aria-current={active ? 'page' : undefined}
-            className={cn('flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted', active && 'bg-primary font-semibold text-primary-foreground hover:bg-primary/90')}>
+            className={cn('flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted', active && 'bg-[var(--primary-strong)] font-semibold text-primary-foreground hover:bg-[var(--primary-strong)]/90')}>
             <Icon className="size-4" /> {i.label}
           </Link>
         )

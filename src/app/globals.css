@@ -52,7 +52,7 @@
   --background: #F3F7F5; --foreground: #1C2B27;
   --card: #FFFFFF; --card-foreground: #1C2B27;
   --popover: #FFFFFF; --popover-foreground: #1C2B27;
-  --primary: #0E9F6E; --primary-foreground: #FFFFFF;
+  --primary: #0E9F6E; --primary-strong: #087650; --primary-foreground: #FFFFFF;
   --secondary: #E8F2ED; --secondary-foreground: #1C2B27;
   --muted: #EDF3F0; --muted-foreground: #4B5E58;
   --accent: #E2F4EB; --accent-foreground: #1C2B27;
@@ -65,7 +65,7 @@
 .dark {
   --background: #14211C; --foreground: #EAF5EF;
   --card: #1C2D26; --card-foreground: #EAF5EF; --popover: #1C2D26; --popover-foreground: #EAF5EF;
-  --primary: #0E9F6E; --primary-foreground: #FFFFFF; --secondary: #293D33; --secondary-foreground: #EAF5EF;
+  --primary: #0E9F6E; --primary-strong: #087650; --primary-foreground: #FFFFFF; --secondary: #293D33; --secondary-foreground: #EAF5EF;
   --muted: #293D33; --muted-foreground: #B0C3B8; --accent: #29493A; --accent-foreground: #EAF5EF;
   --destructive: #F17171; --border: #385044; --input: #496358; --ring: #43C996;
   --chart-1: #43C996; --chart-2: #F2A900; --chart-3: #B0C3B8; --chart-4: #7A8B85; --chart-5: #EAF5EF;
@@ -82,5 +82,12 @@
   }
   html {
     @apply font-sans;
+  }
+  select {
+    @apply bg-card text-foreground;
+  }
+  a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
   }
 }

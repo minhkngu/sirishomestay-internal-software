@@ -36,7 +36,7 @@ export function AssetTable({ assets, facilities }: { assets: AssetRow[]; facilit
 
   return (
     <div className="grid gap-4 md:grid-cols-[14rem_1fr]">
-      <aside className="rounded-md border p-2 md:max-h-[70vh] md:overflow-auto"><LocationTree facilities={facilities} value={sel} onChange={setSel} /></aside>
+      <aside className="rounded-md border bg-card p-2 md:max-h-[70vh] md:overflow-auto"><LocationTree facilities={facilities} value={sel} onChange={setSel} /></aside>
       <div className="min-w-0 space-y-3">
         <input aria-label="Tìm tài sản" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm mã, tên, loại…" className="h-8 w-full max-w-sm rounded-lg border px-2 text-sm" />
         <div className="overflow-x-auto rounded-md border bg-card">

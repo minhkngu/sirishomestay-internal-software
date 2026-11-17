@@ -90,7 +90,7 @@ function FacilitiesTab({ facilities }: { facilities: Fac[] }) {
   const [days, setDays] = useState<Record<string, string>>(Object.fromEntries(facilities.map((f) => [f.id, String(f.expectedInvoiceDay)])))
   return (
     <div className="space-y-4">
-      <div className="overflow-x-auto rounded-md border">
+      <div className="overflow-x-auto rounded-md border bg-card">
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-left"><tr><th className="p-2">Mã</th><th className="p-2">Tên</th><th className="p-2">Ngày tạo hoá đơn dự kiến</th><th className="p-2" /></tr></thead>
           <tbody>
@@ -104,7 +104,7 @@ function FacilitiesTab({ facilities }: { facilities: Fac[] }) {
           </tbody>
         </table>
       </div>
-      <div className="max-w-md space-y-2 rounded-md border p-3">
+      <div className="max-w-md space-y-2 rounded-md border bg-card p-3">
         <h3 className="text-sm font-medium">Thêm cơ sở</h3>
         {(['code', 'name', 'address'] as const).map((k) => (
           <Input key={k} placeholder={{ code: 'Mã cơ sở', name: 'Tên cơ sở', address: 'Địa chỉ' }[k]} value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} />
@@ -120,7 +120,7 @@ function FeePrices({ fee, facilities, prices }: { fee: FeeT; facilities: Fac[]; 
   const { pending, error, ok, run } = useRun()
   const [facilityId, setFacilityId] = useState(facilities[0]?.id ?? '')
   const [price, setPrice] = useState('')
-  return <details className="rounded-md border p-3"><summary>Giá riêng theo toà — {fee.name}</summary><div className="space-y-2 pt-3">
+  return <details className="rounded-md border bg-card p-3"><summary>Giá riêng theo toà — {fee.name}</summary><div className="space-y-2 pt-3">
     {Object.entries(prices).map(([id, amount]) => <div className="flex items-center gap-2" key={id}><span>{facilities.find((f) => f.id === id)?.name ?? id}: {formatVND(amount)} ₫</span><Button size="sm" variant="outline" disabled={pending} onClick={() => run(() => removeFeeTypePriceAction({ feeTypeId: fee.id, facilityId: id }))}>Xoá</Button></div>)}
     <label>Toà <select className="rounded border p-1" value={facilityId} onChange={(e) => setFacilityId(e.target.value)}>{facilities.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select></label>
     <Input aria-label={`Giá riêng ${fee.name}`} inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value)} />
@@ -140,7 +140,7 @@ function FeesTab({ units, feeTypes, facilities, prices }: { units: Unit[]; feeTy
         <Button disabled={pending} onClick={() => run(async () => { const r = await createFeeUnitAction({ name: unit }); if (r.ok) setUnit(''); return r })}>Thêm đơn vị</Button>
         <span className="text-sm text-muted-foreground">Đơn vị: {units.map((u) => u.name).join(', ') || '—'}</span>
       </div>
-      <div className="overflow-x-auto rounded-md border">
+      <div className="overflow-x-auto rounded-md border bg-card">
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-left"><tr><th className="p-2">Loại phí</th><th className="p-2">Đơn vị</th><th className="p-2">Đơn giá</th><th className="p-2">Kiểu</th><th className="p-2" /></tr></thead>
           <tbody>
@@ -155,7 +155,7 @@ function FeesTab({ units, feeTypes, facilities, prices }: { units: Unit[]; feeTy
         </table>
       </div>
       {feeTypes.map((fee) => <FeePrices key={fee.id} fee={fee} facilities={facilities} prices={prices[fee.id] ?? {}} />)}
-      <div className="grid max-w-xl gap-2 rounded-md border p-3 sm:grid-cols-2">
+      <div className="grid max-w-xl gap-2 rounded-md border bg-card p-3 sm:grid-cols-2">
         <h3 className="text-sm font-medium sm:col-span-2">Thêm loại phí</h3>
         <Input placeholder="Tên loại phí" value={t.name} onChange={(e) => setT({ ...t, name: e.target.value })} />
         <select aria-label="Đơn vị" value={t.unitId} onChange={(e) => setT({ ...t, unitId: e.target.value })} className="h-8 rounded-lg border px-2 text-sm">{units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select>
@@ -181,7 +181,7 @@ function RatesTab({ facilities, rates }: { facilities: Fac[]; rates: Rate[] }) {
   return (
     <div className="space-y-4">
       <select aria-label="Cơ sở" value={fac} onChange={(e) => setFac(e.target.value)} className="h-8 rounded-lg border px-2 text-sm">{facilities.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select>
-      <div className="overflow-x-auto rounded-md border">
+      <div className="overflow-x-auto rounded-md border bg-card">
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-left"><tr><th className="p-2">Loại</th><th className="p-2">Đơn giá</th><th className="p-2">Hiệu lực từ</th></tr></thead>
           <tbody>
@@ -190,7 +190,7 @@ function RatesTab({ facilities, rates }: { facilities: Fac[]; rates: Rate[] }) {
           </tbody>
         </table>
       </div>
-      <div className="grid max-w-xl gap-2 rounded-md border p-3 sm:grid-cols-3">
+      <div className="grid max-w-xl gap-2 rounded-md border bg-card p-3 sm:grid-cols-3">
         <select aria-label="Loại" value={n.utility} onChange={(e) => setN({ ...n, utility: e.target.value })} className="h-8 rounded-lg border px-2 text-sm"><option value="electric">Điện</option><option value="water">Nước</option></select>
         <Input placeholder="Đơn giá" inputMode="numeric" value={n.pricePerUnit} onChange={(e) => setN({ ...n, pricePerUnit: e.target.value })} />
         <Input aria-label="Ngày hiệu lực" type="date" value={n.effectiveFrom} onChange={(e) => setN({ ...n, effectiveFrom: e.target.value })} />

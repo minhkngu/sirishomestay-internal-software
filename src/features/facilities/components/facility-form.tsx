@@ -19,7 +19,7 @@ export function NewFacilityButton() {
 
   if (!open) return <Button onClick={() => setOpen(true)}>Thêm cơ sở</Button>
   return (
-    <div className="w-full max-w-md space-y-3 rounded-md border p-4">
+    <div className="w-full max-w-md space-y-3 rounded-md border bg-card p-4">
       {(['code', 'name', 'address'] as const).map((k) => (
         <div key={k} className="space-y-1">
           <Label htmlFor={`f-${k}`}>{{ code: 'Mã cơ sở', name: 'Tên cơ sở', address: 'Địa chỉ' }[k]}</Label>
@@ -47,7 +47,7 @@ export function FacilityBankAccount({ id, account }: { id: string; account: Bank
   const [value, setValue] = useState(account ?? emptyBankAccount)
   const [pending, start] = useTransition()
   const [message, setMessage] = useState<string | null>(null)
-  return <section className="max-w-md space-y-3 rounded-md border p-4">
+  return <section className="max-w-md space-y-3 rounded-md border bg-card p-4">
     <label className="flex items-center gap-2"><input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Dùng tài khoản riêng</label>
     {enabled && <BankAccountFields value={value} onChange={setValue} prefix="facility-bank" />}
     {message && <p role="status" className="text-sm">{message}</p>}

@@ -14,7 +14,7 @@ export function PaymentDialog({ invoiceId, approved, payments, remaining, today 
   const [open, setOpen] = useState(false)
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>, ok: string) => start(async () => { const r = await fn(); if (!r.ok) toast.error(r.error); else { toast.success(ok); setOpen(false) } })
   return (
-    <section className="space-y-2 rounded-lg border p-4">
+    <section className="space-y-2 rounded-lg border bg-card p-4">
       <h2 className="font-medium">Khoản thu</h2>
       {payments.length === 0 && <p className="text-sm text-muted-foreground">Chưa có khoản thu nào</p>}
       <ul className="space-y-1 text-sm">

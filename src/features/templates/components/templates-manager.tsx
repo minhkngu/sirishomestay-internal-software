@@ -16,7 +16,7 @@ function FieldTable({ docType }: { docType: DocType }) {
   const [copied, setCopied] = useState('')
   const copy = (text: string) => { void navigator.clipboard?.writeText(text); setCopied(text) }
   return (
-    <div className="overflow-x-auto rounded-md border">
+    <div className="overflow-x-auto rounded-md border bg-card">
       <table className="w-full text-sm">
         <thead className="bg-muted/50 text-left"><tr><th className="p-2">Chỗ điền</th><th className="p-2">Ý nghĩa</th><th className="p-2">Ví dụ</th></tr></thead>
         <tbody>
@@ -67,7 +67,7 @@ export function TemplatesManager({ templates }: { templates: Tpl[] }) {
       {DOC_TYPES.filter((dt) => !(PDF_DOC_TYPES as readonly string[]).includes(dt)).map((dt) => {
         const list = templates.filter((t) => t.docType === dt)
         return (
-          <section key={dt} className="space-y-3 rounded-lg border p-4">
+          <section key={dt} className="space-y-3 rounded-lg border bg-card p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-medium">{DOC_TYPE_LABELS[dt]}</h2>
               <button type="button" className="text-sm underline" onClick={() => setOpen(open === dt ? null : dt)}>{open === dt ? 'Ẩn bảng chỗ điền' : 'Xem bảng chỗ điền'}</button>

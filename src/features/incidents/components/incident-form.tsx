@@ -19,7 +19,7 @@ export function IncidentForm({ roomId, assetId, facilityId, assignees }: { roomI
       })
     }}>
       <label className="grid gap-1">Tiêu đề<input name="title" required className="h-10 rounded-lg border px-2" /></label>
-      <label className="grid gap-1">Mô tả<textarea name="description" rows={3} className="rounded-lg border p-2" /></label>
+      <label className="grid gap-1">Mô tả<textarea name="description" rows={3} className="rounded-lg border bg-card p-2" /></label>
       <label className="grid gap-1">Mức độ<select name="priority" defaultValue="normal" className="h-10 rounded-lg border px-2"><option value="low">Thấp</option><option value="normal">Bình thường</option><option value="high">Cao</option></select></label>
       <label className="grid gap-1">Người xử lý<select name="assigneeId" className="h-10 rounded-lg border px-2"><option value="">— Chưa giao —</option>{assignees.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
       {error && <p className="text-destructive">{error}</p>}

@@ -29,7 +29,7 @@ export default async function FacilityPage({ params }: { params: Promise<{ id: s
       {can(ctx, 'settings') && <FacilityBankAccount id={facility.id} account={facility.bankAccount} />}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         {stats.map(([label, n]) => (
-          <div key={label} className="rounded-lg border p-3"><div className="text-2xl font-semibold">{n}</div><div className="text-xs text-muted-foreground">{label}</div></div>
+          <div key={label} className="rounded-lg border bg-card p-3"><div className="text-2xl font-semibold">{n}</div><div className="text-xs text-muted-foreground">{label}</div></div>
         ))}
       </div>
       {ctx.isAdmin && <RoomPanels facilityId={id} />}

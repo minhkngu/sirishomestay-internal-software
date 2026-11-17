@@ -22,7 +22,7 @@ export function AddendumShell({ label, kind, leaseId, input, create, children }:
   const save = () => start(async () => { const r = await create(leaseId, input); if (!r.ok) toast.error(r.error); else { toast.success('Đã lưu phụ lục'); setOpen(false); setPreview(null); router.refresh() } })
   if (!open) return <Button variant="outline" size="sm" onClick={() => setOpen(true)}>{label}</Button>
   return (
-    <section className="max-w-xl space-y-3 rounded-lg border p-4">
+    <section className="max-w-xl space-y-3 rounded-lg border bg-card p-4">
       <h3 className="font-medium">{label}</h3>
       <div className="grid gap-2 text-sm">{children}</div>
       <div className="flex gap-2">

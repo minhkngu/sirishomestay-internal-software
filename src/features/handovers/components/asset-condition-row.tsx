@@ -14,7 +14,7 @@ export function AssetConditionRow({ item, readOnly, checkInCondition, onChange, 
 }) {
   const pick = (c: string) => onChange({ condition: c, damaged: c === 'Hư', ...(c !== 'Hư' ? {} : {}) })
   return (
-    <li className="space-y-2 rounded-lg border p-3">
+    <li className="space-y-2 rounded-lg border bg-card p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div><span className="font-medium">{item.assetName}</span> <span className="text-xs text-muted-foreground">({item.assetCode} · {formatVND(item.assetValue)})</span></div>
         {checkInCondition && <span className="text-xs text-muted-foreground">Lúc check-in: {checkInCondition}</span>}
@@ -22,7 +22,7 @@ export function AssetConditionRow({ item, readOnly, checkInCondition, onChange, 
       <div className="flex flex-wrap gap-2" role="group" aria-label={`Tình trạng ${item.assetCode}`}>
         {CONDITIONS.map((c) => (
           <button key={c} type="button" disabled={readOnly || item.missing} onClick={() => pick(c)}
-            className={cn('min-h-11 flex-1 rounded-lg border px-3 text-sm', item.condition === c && !item.missing && 'bg-primary text-primary-foreground')}>{c}</button>
+            className={cn('min-h-11 flex-1 rounded-lg border px-3 text-sm', item.condition === c && !item.missing && 'bg-[var(--primary-strong)] text-primary-foreground')}>{c}</button>
         ))}
         <button type="button" disabled={readOnly} onClick={() => onChange({ missing: !item.missing, condition: !item.missing ? 'Mất' : 'Tốt', damaged: false })}
           className={cn('min-h-11 flex-1 rounded-lg border px-3 text-sm', item.missing && 'bg-destructive text-white')}>Mất</button>

@@ -26,7 +26,7 @@ export function RoomPanels({ facilityId }: { facilityId: string }) {
       </div>
       {msg && <p className="text-sm text-green-700">{msg}</p>}
       {mode === 'one' && (
-        <div className="max-w-md space-y-3 rounded-md border p-4">
+        <div className="max-w-md space-y-3 rounded-md border bg-card p-4">
           {([['code', 'Mã phòng'], ['floor', 'Tầng'], ['roomType', 'Loại phòng'], ['listPrice', 'Giá niêm yết (VND)'], ['capacity', 'Sức chứa']] as const).map(([k, label]) => (
             <div key={k} className="space-y-1">
               <Label htmlFor={`r-${k}`}>{label}</Label>
@@ -46,7 +46,7 @@ export function RoomPanels({ facilityId }: { facilityId: string }) {
         </div>
       )}
       {mode === 'bulk' && (
-        <div className="max-w-md space-y-3 rounded-md border p-4">
+        <div className="max-w-md space-y-3 rounded-md border bg-card p-4">
           {([['prefix', 'Tiền tố mã (tuỳ chọn)'], ['floor', 'Tầng'], ['from', 'Từ số'], ['to', 'Đến số'], ['listPrice', 'Giá niêm yết (VND)']] as const).map(([k, label]) => (
             <div key={k} className="space-y-1">
               <Label htmlFor={`b-${k}`}>{label}</Label>
