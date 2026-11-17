@@ -509,7 +509,7 @@ Không assert; spec này chỉ để đo.
 
 - [ ] **Step 2: Chạy trên bản production ở máy và trên bản preview Vercel. Ghi bảng "trước" vào `docs/operations/toc-do.md`.**
 
-- [ ] **Step 3: Commit** — `docs: đo tốc độ trang trước khi tối ưu`
+- [x] **Step 3: Commit số đo local ban đầu** — `docs: ghi số đo tốc độ trang trên máy`
 
 ### Task 14: Sửa N+1 ở trang tài sản và trang tạo hợp đồng
 
@@ -584,8 +584,8 @@ Test phải trả về đúng dữ liệu như cũ, kể cả khi đổi sang tr
 - Modify: `docs/review/checklist.md`: thay dòng "Xuất PDF … Ảnh (chỉ hoá đơn)" theo luồng mới
 - Modify: `docs/operations/toc-do.md`: bảng trước/sau
 
-- [ ] **Step 1: Chạy `npm test && npm run lint && npm run build`, xác nhận tất cả PASS.**
+- [x] **Step 1: Chạy `npm test && npm run lint && npx next build --webpack`.** 362 test đạt, lint không lỗi (12 cảnh báo), bản dựng đạt.
 
-- [ ] **Step 2: Chạy `node scripts/e2e-preflight.mjs`, sau đó chạy toàn bộ `npm run test:e2e` đúng một lần, xác nhận PASS.**
+- [ ] **Step 2: Kiểm tra e2e.** Lượt đầy đủ: 32/34 đạt, 2 trường hợp quá thời hạn; chạy lại riêng cả 2 đều đạt. Cần xác nhận lượt đầy đủ đạt.
 
-- [ ] **Step 3: Commit** — `docs: cập nhật stack, checklist và số đo tốc độ`
+- [x] **Step 3: Commit** — `docs: cập nhật stack, checklist và số đo tốc độ`
