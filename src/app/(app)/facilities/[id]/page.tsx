@@ -34,7 +34,7 @@ export default async function FacilityPage({ params }: { params: Promise<{ id: s
         ))}
       </div>
       {ctx.isAdmin && <RoomPanels facilityId={id} facilities={[{ id, name: facility.name }]} amenities={amenities.map((a) => ({ id: a.id, name: a.name }))} />}
-      <RoomMap rooms={rooms.map((r) => ({ id: r.id, code: r.code, floor: r.floor, status: r.status, tenantName: canViewTenantIdentity(ctx, id) ? r.tenantName : null }))} />
+      <RoomMap rooms={rooms.map((r) => ({ id: r.id, code: r.code, floor: r.floor, status: r.status, tenantName: canViewTenantIdentity(ctx, id) ? r.tenantName : null, monthlyRent: r.monthlyRent, depositBalance: r.depositBalance, leaseEndDate: r.leaseEndDate }))} />
     </div>
   )
 }
