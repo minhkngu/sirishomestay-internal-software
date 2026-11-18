@@ -79,7 +79,7 @@ export function FeeFacilitiesDialog({ fee, facilities, selected, prices, onSelec
                           <Input
                             aria-label={`Giá riêng ${fee.name} tại ${f.name}`}
                             inputMode="numeric"
-                            className="w-40"
+                            className="w-full min-w-48"
                             disabled={!isOn}
                             placeholder={`Theo giá chung ${formatVND(fee.defaultPrice)}`}
                             value={value}
