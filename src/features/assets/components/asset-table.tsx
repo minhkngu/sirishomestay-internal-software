@@ -32,7 +32,7 @@ export function AssetTable({ assets, facilities }: { assets: AssetRow[]; facilit
     if (q.trim()) return removeDiacritics(`${a.code} ${a.name} ${a.category}`).toLowerCase().includes(removeDiacritics(q).toLowerCase().trim())
     return true
   })
-  const { pageRows, pager } = usePager(shown, 'assets', `${sel.kind}:${'id' in sel ? sel.id : ''}|${q}|${shown.map((a) => a.id).join(',')}`)
+  const { pageRows, pager } = usePager(shown, 'assets', `${sel.kind}:${'id' in sel ? sel.id : ''}|${q}`)
   const chosen = assets.filter((a) => checked.includes(a.id))
   const oneFacility = new Set(chosen.map((a) => a.facilityId)).size === 1
   const toggle = (id: string) => setChecked(checked.includes(id) ? checked.filter((x) => x !== id) : [...checked, id])

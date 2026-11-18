@@ -22,7 +22,7 @@ export function StockTable({ facilities, rows }: { facilities: TreeFacility[]; r
   const [to, setTo] = useState('')
   const [quantity, setQuantity] = useState('1')
   const [reason, setReason] = useState('')
-  const { pageRows, pager } = usePager(rows, 'stock', rows.map((r) => `${r.itemId}:${r.locationId ?? ''}`).join(','))
+  const { pageRows, pager } = usePager(rows, 'stock', '')
   const selected = rows.find((r) => r.itemId === itemId)
   const facility = facilities.find((f) => f.id === selected?.facilityId)
   const locations = facility ? [{ value: `warehouse:${facility.id}`, label: 'Kho' }, { value: `common:${facility.id}`, label: 'Khu chung' }, ...facility.rooms.map((r) => ({ value: `room:${r.id}`, label: `Phòng ${r.code}` }))] : []

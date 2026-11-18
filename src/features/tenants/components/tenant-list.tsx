@@ -19,7 +19,8 @@ export function TenantList({
   visaWarningDays: number
 }) {
   const q = useListParam('q') ?? ''
-  const kind = useListParam('kind') ?? ''
+  const rawKind = useListParam('kind') ?? ''
+  const kind = ['foreign', 'vietnamese', 'company'].includes(rawKind) ? rawKind : ''
   const allowed = useMemo(() => facilities.map((f) => f.id), [facilities])
   const selected = useFacilitySelection(allowed)
   const names = useMemo(() => Object.fromEntries(facilities.map((f) => [f.id, f.name])), [facilities])

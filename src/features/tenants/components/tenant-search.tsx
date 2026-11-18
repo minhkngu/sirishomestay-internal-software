@@ -5,7 +5,14 @@ import { Search } from 'lucide-react'
 import { setListParams, useListParam } from '@/components/list/use-list-params'
 
 export function TenantSearch() {
-  const [q, setQ] = useState(useListParam('q') ?? '')
+  const urlQ = useListParam('q') ?? ''
+  const [q, setQ] = useState(urlQ)
+  const [prevUrlQ, setPrevUrlQ] = useState(urlQ)
+  // URL đổi từ ngoài (bấm lại menu, mở link khác): ô tìm theo URL
+  if (urlQ !== prevUrlQ) {
+    setPrevUrlQ(urlQ)
+    setQ(urlQ)
+  }
   const kind = useListParam('kind') ?? ''
   const first = useRef(true)
 

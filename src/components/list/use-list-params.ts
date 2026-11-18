@@ -51,6 +51,8 @@ export function usePager<T>(rows: T[], tableKey: string, resetKey: string): { pa
     setSize(saved)
   }, [tableKey])
 
+  // Đổi bộ lọc: về trang 1 và ghi nhận khoá mới (quay lại bộ lọc cũ không đưa về trang cũ)
+  if (state.resetKey !== resetKey) setState({ page: 1, resetKey })
   const requested = state.resetKey === resetKey ? state.page : 1
   const p = paginate(rows.length, requested, size)
   const pageRows = useMemo(() => rows.slice(p.start, p.end), [rows, p.start, p.end])
