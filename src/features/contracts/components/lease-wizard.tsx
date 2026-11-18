@@ -19,16 +19,18 @@ import type { RoomOption, TenantOption } from './deposit-form'
 type Initial = { roomId?: string; tenantId?: string; depositId?: string; rent?: number; deposit?: number; startDate?: string; receivedDeposit?: number }
 type Props = {
   assets: AssetOption[]; canManageAssets: boolean; feeDefaults: Record<string, string[]>; roomMeters: RoomFeeMeter[]
+  templates: { id: string; name: string; isDefault: boolean }[]
   rooms: RoomOption[]; tenants: TenantOption[]; feeTypes: FeeOption[]; initial?: Initial
   defaults: { proration: 'days_30' | 'actual_days'; dueRuleLabel: string }
 }
 
 
-export function LeaseWizard({ assets, canManageAssets, feeDefaults, roomMeters, rooms, tenants, feeTypes, initial = {}, defaults }: Props) {
+export function LeaseWizard({ templates, assets, canManageAssets, feeDefaults, roomMeters, rooms, tenants, feeTypes, initial = {}, defaults }: Props) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [received, setReceived] = useState(String(initial.receivedDeposit ?? 0))
   const [note, setNote] = useState('')
+  const [contractTemplateId, setContractTemplateId] = useState(templates.find(t => t.isDefault)?.id ?? templates[0]?.id ?? '')
   const [changes, setChanges] = useState(emptyChanges)
   const [photos, setPhotos] = useState<File[]>([])
   const [failedPhotos, setFailedPhotos] = useState<File[]>([])
@@ -86,7 +88,7 @@ export function LeaseWizard({ assets, canManageAssets, feeDefaults, roomMeters, 
     if (Object.keys(errors).length) return
     submitting.current = true
     const input = {
-      roomId, tenantId, occupantIds, startDate, endDate, monthlyRent: Number(rent), depositAmount: Number(deposit), receivedDeposit: Number(received), note,
+      roomId, tenantId, occupantIds, startDate, endDate, monthlyRent: Number(rent), depositAmount: Number(deposit), receivedDeposit: Number(received), note, contractTemplateId: contractTemplateId || null,
       handover: { expectedRoomAssetIds: assets.filter(a => a.locationKind === 'room' && a.locationId === roomId).map(a => a.id), expectedAddedLocations: changes.addAssetIds.map(id => { const a = assets.find(x => x.id === id)!; return { assetId: id, kind: a.locationKind, id: a.locationId } }), ...changes },
       feeModel: 'snapshot' as const,
       fees: fees.map(f => ({ feeTypeId: f.feeTypeId, name: f.name, unit: f.unit, quantitySource: f.quantitySource, unitPrice: Number(f.price), quantity: Number(f.quantity), initialReading: f.initialReading.trim() === '' ? undefined : Number(f.initialReading), existingMeterId: f.existingMeterId })),
@@ -105,6 +107,9 @@ export function LeaseWizard({ assets, canManageAssets, feeDefaults, roomMeters, 
 
   return (
     <div className="max-w-2xl space-y-5">
+      <div className="space-y-1"><Label htmlFor="contract-template">Mẫu hợp đồng</Label>
+        {templates.length ? <select id="contract-template" value={contractTemplateId} onChange={e => setContractTemplateId(e.target.value)} className="h-8 w-full rounded-lg border px-2 text-sm">{templates.map(t => <option key={t.id} value={t.id}>{t.name}{t.isDefault ? ' (mặc định)' : ''}</option>)}</select> : <p className="text-sm text-muted-foreground">Chưa có mẫu hợp đồng. Có thể thêm mẫu trong Cài đặt → Mẫu giấy tờ.</p>}{fieldError('contractTemplateId')}
+      </div>
       <h2 className="font-semibold">Bên thuê & người ở</h2>
         <div className="space-y-4">
           <div className="space-y-1"><Label htmlFor="room">Phòng</Label>

@@ -3,6 +3,7 @@ import { boolean, check, date, integer, jsonb, pgTable, primaryKey, text, timest
 import { rooms } from './facilities'
 import { feeTypes } from './fees'
 import { tenants } from './tenants'
+import { docTemplates } from './templates'
 
 export const depositContracts = pgTable(
   'deposit_contracts',
@@ -39,6 +40,7 @@ export const leases = pgTable(
     billWaterByMeter: boolean('bill_water_by_meter').notNull().default(true),
     depositAmount: integer('deposit_amount').notNull(),
     note: text('note').notNull().default(''),
+    contractTemplateId: uuid('contract_template_id').references(() => docTemplates.id),
     feeModel: text('fee_model').notNull().default('legacy'),
     dueRule: jsonb('due_rule'),
     proration: text('proration'),

@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, like, lte, ne } from 'drizzle-orm'
 import {
-  assets, depositContracts, depositEntries, facilities, feeTypes, feeUnits, files, invoiceLines, invoices, leaseFees, leaseFeeSnapshots, leaseOccupants, leases, rooms, tenants,
+  assets, depositContracts, depositEntries, docTemplates, facilities, feeTypes, feeUnits, files, invoiceLines, invoices, leaseFees, leaseFeeSnapshots, leaseOccupants, leases, rooms, tenants,
 } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, facilityScope, type AccessContext } from '@/domain/access'
@@ -137,6 +137,7 @@ export type LeaseInput = {
   depositAmount: number
   receivedDeposit?: number
   note?: string
+  contractTemplateId?: string | null
   handover?: {
     expectedRoomAssetIds: string[]
     addAssetIds: string[]
@@ -157,6 +158,10 @@ export type LeaseCreated = { lease: Lease; firstInvoiceLines: InvoiceLineInput[]
 async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDepositId: string | null): Promise<LeaseCreated> {
   const room = await loadRoom(tx, ctx, input.roomId)
   const tenant = await loadTenant(tx, ctx, input.tenantId)
+  if (input.contractTemplateId) {
+    const [template] = await tx.select({ template: docTemplates, file: files }).from(docTemplates).leftJoin(files, eq(files.id, docTemplates.fileId)).where(eq(docTemplates.id, input.contractTemplateId))
+    if (!template || template.template.docType !== 'lease' || !template.file?.confirmedAt || template.file.ownerType !== 'template' || template.file.ownerId !== template.template.id) throw new ValidationError('Mẫu hợp đồng không hợp lệ hoặc chưa sẵn sàng', { contractTemplateId: 'Chọn mẫu hợp đồng hợp lệ' })
+  }
   if (input.endDate < input.startDate) throw new ValidationError('Ngày kết thúc phải sau ngày bắt đầu', { endDate: 'Ngày kết thúc phải sau ngày bắt đầu' })
   if (input.monthlyRent < 0 || input.depositAmount < 0) throw new ValidationError('Số tiền không hợp lệ')
   const occupants = input.feeModel === 'snapshot' ? [...new Set([tenant.id, ...(input.occupantIds ?? [])])] : [...new Set(input.occupantIds?.length ? input.occupantIds : [tenant.id])]
@@ -173,7 +178,7 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
   const code = await nextLeaseCode(tx, fac.code, input.startDate)
   const [lease] = await tx.insert(leases).values({
     code, roomId: room.id, tenantId: tenant.id, startDate: input.startDate, endDate: input.endDate, monthlyRent: input.monthlyRent,
-    depositAmount: input.depositAmount, note: input.note ?? '', feeModel: input.feeModel ?? 'legacy', dueRule: input.dueRule ?? null, proration: input.proration ?? null, billingCycleMonths: input.billingCycleMonths ?? 1, billWaterByMeter: input.billWaterByMeter ?? true, fromDepositContractId: fromDepositId,
+    depositAmount: input.depositAmount, note: input.note ?? '', contractTemplateId: input.contractTemplateId ?? null, feeModel: input.feeModel ?? 'legacy', dueRule: input.dueRule ?? null, proration: input.proration ?? null, billingCycleMonths: input.billingCycleMonths ?? 1, billWaterByMeter: input.billWaterByMeter ?? true, fromDepositContractId: fromDepositId,
   }).returning()
   await tx.insert(leaseOccupants).values(occupants.map((tenantId) => ({ leaseId: lease.id, tenantId })))
   if (input.fees?.length && input.feeModel === 'snapshot') {
@@ -364,7 +369,8 @@ export async function setSignStatus(db: DB, ctx: AccessContext, kind: 'lease' | 
 
 /** Xuất hợp đồng ra Word từ mẫu; hợp đồng đang ở trạng thái nháp tự chuyển sang "đã xuất". */
 export async function exportContract(db: DB, ctx: AccessContext, storage: StorageAdapter, kind: 'lease' | 'deposit', id: string, templateId?: string, format: ExportFormat = 'docx') {
-  const r = await exportDocument(db, ctx, storage, { docType: kind === 'lease' ? 'lease' : 'deposit_contract', entityId: id, templateId, format })
+  const [lease] = kind === 'lease' ? await db.select({ templateId: leases.contractTemplateId }).from(leases).where(eq(leases.id, id)) : []
+  const r = await exportDocument(db, ctx, storage, { docType: kind === 'lease' ? 'lease' : 'deposit_contract', entityId: id, templateId: templateId ?? lease?.templateId ?? undefined, format })
   const table = kind === 'lease' ? leases : depositContracts
   const [row] = await db.select().from(table).where(eq(table.id, id))
   if (row?.signStatus === 'draft') await setSignStatus(db, ctx, kind, id, 'exported')

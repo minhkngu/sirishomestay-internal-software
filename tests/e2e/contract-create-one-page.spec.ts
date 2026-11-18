@@ -34,6 +34,12 @@ test('các mục cùng trang, lỗi cạnh trường và đổi phòng xóa tài
 
 test('tạo hợp đồng với tiền thực nhận, ghi chú và tài sản mới', async ({ page }) => {
   await openForm(page)
+  const templates = page.locator('#contract-template')
+  let selectedTemplate: string | null = null
+  if (await templates.count()) {
+    selectedTemplate = await templates.locator('option').last().getAttribute('value')
+    await templates.selectOption(selectedTemplate!)
+  }
   const room = page.locator('#room option').filter({ hasText: 'Trống' }).first()
   test.skip(await room.count() === 0, 'Cần phòng trống')
   await page.locator('#room').selectOption((await room.getAttribute('value'))!)
@@ -52,6 +58,10 @@ test('tạo hợp đồng với tiền thực nhận, ghi chú và tài sản m�
   await page.getByRole('button', { name: 'Tạo hợp đồng thuê' }).click()
   await expect(page).toHaveURL(/\/contracts\/[a-f0-9-]+$/)
   await expect(page.getByText('Ghi chú kiểm thử')).toBeVisible()
+  if (selectedTemplate) {
+    await page.getByRole('tab', { name: 'Giấy tờ' }).click()
+    await expect(page.getByLabel('Chọn mẫu')).toHaveValue(selectedTemplate)
+  }
   await page.getByRole('tab', { name: 'Bàn giao' }).click()
   await expect(page.getByText('Nháp', { exact: true })).toBeVisible()
   await page.getByRole('tab', { name: 'Sổ cọc' }).click()

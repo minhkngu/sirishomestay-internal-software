@@ -7,9 +7,9 @@ import { exportContractAction } from '@/server/contracts/actions'
 export type TemplateOption = { id: string; name: string; isDefault: boolean }
 
 /** Word chạy ngay; PDF qua Gotenberg (docs/operations/gotenberg.md). */
-export function ExportMenu({ kind, id, templates }: { kind: 'lease' | 'deposit'; id: string; templates: TemplateOption[] }) {
+export function ExportMenu({ kind, id, templates, selectedTemplateId }: { kind: 'lease' | 'deposit'; id: string; templates: TemplateOption[]; selectedTemplateId?: string | null }) {
   const [pending, start] = useTransition()
-  const [templateId, setTemplateId] = useState(templates.find((t) => t.isDefault)?.id ?? templates[0]?.id ?? '')
+  const [templateId, setTemplateId] = useState(templates.find(t => t.id === selectedTemplateId)?.id ?? templates.find((t) => t.isDefault)?.id ?? templates[0]?.id ?? '')
   const [msg, setMsg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 

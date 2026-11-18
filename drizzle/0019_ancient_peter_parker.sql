@@ -1,0 +1,2 @@
+ALTER TABLE "leases" ADD COLUMN "contract_template_id" uuid;--> statement-breakpoint
+ALTER TABLE "leases" ADD CONSTRAINT "leases_contract_template_id_doc_templates_id_fk" FOREIGN KEY ("contract_template_id") REFERENCES "public"."doc_templates"("id") ON DELETE no action ON UPDATE no action;

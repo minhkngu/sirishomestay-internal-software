@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { and, eq } from 'drizzle-orm'
-import { assets, meters, handovers, handoverItems, depositContracts, depositEntries, facilities, feeTypes, feeUnits, leaseOccupants, leases, rooms } from '@/db'
+import { assets, docTemplates, files, meters, handovers, handoverItems, depositContracts, depositEntries, facilities, feeTypes, feeUnits, leaseOccupants, leases, rooms } from '@/db'
 import { assetHistory } from '@/server/assets/service'
 import { listReadingSheet } from '@/server/meters/service'
 import { leaseData } from '@/server/invoices/service'
@@ -8,8 +8,13 @@ import { listFeeTypes, updateFeeType, archiveFeeType } from '@/server/fees/servi
 import { createTenant } from '@/server/tenants/service'
 import { listRoomsWithStatus } from '@/server/rooms/service'
 import {
-  createDepositContract, cancelDepositContract, listDepositContracts, getDepositContract, convertDepositToLease, createLease, getLease, listLeases, setSignStatus,
+  createDepositContract, cancelDepositContract, listDepositContracts, getDepositContract, convertDepositToLease, createLease, getLease, listLeases, setSignStatus, exportContract,
 } from '@/server/contracts/service'
+import { MemoryStorage } from '@/server/storage/memory'
+import { buildSampleTemplate } from '../../scripts/build-sample-templates'
+import { DOCX_MIME } from '@/lib/docx'
+import { vi } from 'vitest'
+import { removeTemplate } from '@/server/templates/service'
 import { depositBalance } from '@/domain/deposit'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import type { AccessContext, Permission } from '@/domain/access'
@@ -52,6 +57,43 @@ describe('contracts', () => {
   const leaseInput = (over: Record<string, unknown> = {}) => ({
     roomId: r301, tenantId: tenant1, occupantIds: [tenant1], startDate: '2026-10-15', endDate: '2027-10-14', monthlyRent: 9_000_000, depositAmount: 9_000_000,
     fees: [{ feeTypeId: feePerson, quantity: 1, unitPrice: 200_000 }], ...over,
+  })
+
+  it('lưu mẫu hợp đồng đã chọn và dùng mẫu đó khi xuất dù mẫu mặc định đã đổi', async () => {
+    const storage = new MemoryStorage()
+    const [selected] = await db.insert(docTemplates).values({ docType: 'lease', name: 'Mẫu chọn' }).returning()
+    const [other] = await db.insert(docTemplates).values({ docType: 'lease', name: 'Mẫu mặc định', isDefault: true }).returning()
+    for (const t of [selected, other]) {
+      const key = `template/${t.id}.docx`
+      await storage.write(key, await buildSampleTemplate('lease'), DOCX_MIME)
+      const [file] = await db.insert(files).values({ storageKey: key, ownerType: 'template', ownerId: t.id, contentType: DOCX_MIME, confirmedAt: new Date() }).returning()
+      await db.update(docTemplates).set({ fileId: file.id }).where(eq(docTemplates.id, t.id))
+    }
+    const { lease } = await createLease(db, lan(), leaseInput({ contractTemplateId: selected.id }))
+    expect((await getLease(db, lan(), lease.id)).contractTemplateId).toBe(selected.id)
+    const read = vi.spyOn(storage, 'read')
+    await exportContract(db, lan(), storage, 'lease', lease.id)
+    expect(read).toHaveBeenCalledWith(`template/${selected.id}.docx`)
+    await exportContract(db, lan(), storage, 'lease', lease.id, other.id)
+    expect(read).toHaveBeenCalledWith(`template/${other.id}.docx`)
+    await expect(removeTemplate(db, admin, storage, selected.id)).rejects.toThrow('đang được hợp đồng sử dụng')
+  })
+
+  it('từ chối mẫu sai loại hoặc chưa có tệp khi lập hợp đồng', async () => {
+    const [other] = await db.insert(docTemplates).values({ docType: 'deposit_contract', name: 'Sai loại' }).returning()
+    const [unfinished] = await db.insert(docTemplates).values({ docType: 'lease', name: 'Chưa có tệp' }).returning()
+    for (const contractTemplateId of [other.id, unfinished.id, crypto.randomUUID()]) {
+      await expect(createLease(db, lan(), leaseInput({ contractTemplateId }))).rejects.toThrow(ValidationError)
+    }
+  })
+
+  it('chuyển hợp đồng cọc giữ mẫu hợp đồng đã chọn', async () => {
+    const [template] = await db.insert(docTemplates).values({ docType: 'lease', name: 'Mẫu thuê' }).returning()
+    const [file] = await db.insert(files).values({ storageKey: 'template/test.docx', ownerType: 'template', ownerId: template.id, contentType: DOCX_MIME, confirmedAt: new Date() }).returning()
+    await db.update(docTemplates).set({ fileId: file.id }).where(eq(docTemplates.id, template.id))
+    const { contract } = await createDepositContract(db, lan(), { roomId: r301, tenantId: tenant1, depositAmount: 1_000_000, agreedRent: 9_000_000, expectedMoveIn: '2026-10-15' })
+    const { lease } = await convertDepositToLease(db, lan(), contract.id, leaseInput({ contractTemplateId: template.id }))
+    expect((await getLease(db, lan(), lease.id)).contractTemplateId).toBe(template.id)
   })
 
   it('ghi nhận cọc thực nhận và ghi chú khi tạo hợp đồng', async () => {

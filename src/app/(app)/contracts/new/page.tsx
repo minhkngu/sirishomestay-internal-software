@@ -16,6 +16,7 @@ import type { DepositEntry } from '@/domain/types'
 import { getDepositContract } from '@/server/contracts/service'
 import { DepositForm } from '@/features/contracts/components/deposit-form'
 import { LeaseWizard } from '@/features/contracts/components/lease-wizard'
+import { listTemplates } from '@/server/templates/service'
 
 type SP = { kind?: string; room?: string; tenant?: string; deposit?: string }
 
@@ -24,8 +25,8 @@ export default async function NewContractPage({ searchParams }: { searchParams: 
   const ctx = await getAccessContext()
   try { assertCan(ctx, 'tenants_contracts') } catch { notFound() }
   const kind = sp.kind === 'deposit' ? 'deposit' : 'lease'
-  const [facs, tenants, feeTypes, units, settings, prices, feeDefaults] = await Promise.all([
-    listFacilities(db, ctx), searchTenants(db, ctx, { limit: 500 }), listFeeTypes(db, ctx), listFeeUnits(db, ctx), getSettings(db), listFeeTypePrices(db, ctx), listFeeDefaults(db, ctx),
+  const [facs, tenants, feeTypes, units, settings, prices, feeDefaults, templates] = await Promise.all([
+    listFacilities(db, ctx), searchTenants(db, ctx, { limit: 500 }), listFeeTypes(db, ctx), listFeeUnits(db, ctx), getSettings(db), listFeeTypePrices(db, ctx), listFeeDefaults(db, ctx), listTemplates(db, ctx, 'lease'),
   ])
   const allRooms = await listRoomsWithStatus(db, ctx, {})
   const rooms = facs.flatMap((f) => allRooms.filter((r) => r.facilityId === f.id).map((r) => ({ f, r })))
@@ -49,7 +50,7 @@ export default async function NewContractPage({ searchParams }: { searchParams: 
       <h1 className="text-xl font-semibold">{kind === 'deposit' ? 'Tạo hợp đồng cọc' : 'Tạo hợp đồng thuê'}</h1>
       {kind === 'deposit'
         ? <DepositForm rooms={roomOptions((s) => s === 'vacant' || s === 'occupied' || s === 'ending_soon')} tenants={tenantOptions} initialRoomId={sp.room} initialTenantId={sp.tenant} />
-        : <LeaseWizard feeDefaults={feeDefaults} roomMeters={roomMeters} assets={assetOptions.map((a) => ({ id: a.id, name: a.name, model: a.model, facilityId: a.facilityId, locationKind: a.locationKind, locationId: a.locationId }))} canManageAssets={can(ctx, 'assets')} rooms={roomOptions((s) => s === 'vacant' || s === 'deposited')} tenants={tenantOptions} initial={initial}
+        : <LeaseWizard templates={templates.filter(t => t.fileId).map(t => ({ id: t.id, name: t.name, isDefault: t.isDefault }))} feeDefaults={feeDefaults} roomMeters={roomMeters} assets={assetOptions.map((a) => ({ id: a.id, name: a.name, model: a.model, facilityId: a.facilityId, locationKind: a.locationKind, locationId: a.locationId }))} canManageAssets={can(ctx, 'assets')} rooms={roomOptions((s) => s === 'vacant' || s === 'deposited')} tenants={tenantOptions} initial={initial}
             feeTypes={feeTypes.map((f) => ({ id: f.id, name: f.name, unit: unitName.get(f.unitId) ?? '', defaultPrice: f.defaultPrice, prices: prices[f.id] ?? {}, billing: f.billing, quantityFrom: f.quantityFrom }))}
             defaults={{ proration: settings.proration, dueRuleLabel: settings.dueRule.kind === 'day_of_next_month' ? `ngày ${settings.dueRule.day} của tháng sau` : `${settings.dueRule.days} ngày sau khi duyệt` }} />}
     </div>

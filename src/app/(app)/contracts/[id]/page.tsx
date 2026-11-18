@@ -499,6 +499,7 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
             <ExportMenu
               kind="lease"
               id={lease.id}
+              selectedTemplateId={lease.contractTemplateId}
               templates={templates.map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault }))}
             />
             {exports.length > 0 && (
