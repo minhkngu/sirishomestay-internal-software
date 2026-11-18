@@ -38,6 +38,11 @@ export default async function NewContractPage({ searchParams }: { searchParams: 
   const unitName = new Map(units.map((u) => [u.id, u.name]))
 
   const assetOptions = can(ctx, 'assets') ? await listAssets(db, ctx, {}) : facs.length ? await db.select().from(assets).where(and(inArray(assets.facilityId, facs.map(f => f.id)), ne(assets.status, 'disposed'))) : []
+  const assetFacs = facs.filter(f => can(ctx, 'assets', f.id))
+  const moveTargets = {
+    warehouses: assetFacs.map(f => ({ facilityId: f.id, label: `Kho ${f.name}` })),
+    rooms: rooms.filter(({ f }) => assetFacs.some(a => a.id === f.id)).map(({ f, r }) => ({ id: r.id, facilityId: f.id, label: `${f.name} · ${r.code}` })),
+  }
   let initial = { roomId: sp.room, tenantId: sp.tenant, depositId: undefined as string | undefined, rent: undefined as number | undefined, deposit: undefined as number | undefined, startDate: undefined as string | undefined, receivedDeposit: 0 }
   if (sp.deposit) {
     const d = await getDepositContract(db, ctx, sp.deposit)
@@ -51,7 +56,7 @@ export default async function NewContractPage({ searchParams }: { searchParams: 
       <h1 className="text-xl font-semibold">{kind === 'deposit' ? 'Tạo hợp đồng cọc' : 'Tạo hợp đồng thuê'}</h1>
       {kind === 'deposit'
         ? <DepositForm rooms={roomOptions((s) => s === 'vacant' || s === 'occupied' || s === 'ending_soon')} tenants={tenantOptions} initialRoomId={sp.room} initialTenantId={sp.tenant} />
-        : <LeaseWizard invoiceTemplates={invoiceTemplates.map(t => ({ id: t.id, name: t.name, isDefault: t.isDefault }))} templates={templates.filter(t => t.fileId).map(t => ({ id: t.id, name: t.name, isDefault: t.isDefault }))} feeDefaults={feeDefaults} roomMeters={roomMeters} assets={assetOptions.map((a) => ({ id: a.id, code: a.code, name: a.name, model: a.model, condition: a.condition, facilityId: a.facilityId, locationKind: a.locationKind, locationId: a.locationId }))} canManageAssets={can(ctx, 'assets')} rooms={roomOptions((s) => s === 'vacant' || s === 'deposited')} tenants={tenantOptions} initial={initial}
+        : <LeaseWizard invoiceTemplates={invoiceTemplates.map(t => ({ id: t.id, name: t.name, isDefault: t.isDefault }))} templates={templates.filter(t => t.fileId).map(t => ({ id: t.id, name: t.name, isDefault: t.isDefault }))} feeDefaults={feeDefaults} roomMeters={roomMeters} assets={assetOptions.map((a) => ({ id: a.id, code: a.code, name: a.name, model: a.model, condition: a.condition, facilityId: a.facilityId, locationKind: a.locationKind, locationId: a.locationId }))} canManageAssets={can(ctx, 'assets')} moveTargets={moveTargets} rooms={roomOptions((s) => s === 'vacant' || s === 'deposited')} tenants={tenantOptions} initial={initial}
             feeTypes={feeTypes.map((f) => ({ id: f.id, name: f.name, unit: unitName.get(f.unitId) ?? '', defaultPrice: f.defaultPrice, prices: prices[f.id] ?? {}, billing: f.billing, quantityFrom: f.quantityFrom }))}
             defaults={{ proration: settings.proration, dueRuleLabel: settings.dueRule.kind === 'day_of_next_month' ? `ngày ${settings.dueRule.day} của tháng sau` : `${settings.dueRule.days} ngày sau khi duyệt` }} />}
     </div>

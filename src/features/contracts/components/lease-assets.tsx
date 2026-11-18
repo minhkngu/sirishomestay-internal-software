@@ -7,7 +7,9 @@ import { assetEntry } from '../lease-photo-retry'
 
 export type AssetOption = { id: string; code: string; name: string; model: string; condition: string; facilityId: string; locationKind: string; locationId: string }
 export type NewAsset = { code: string; name: string; model: string; category: string; value: number; condition: string }
-export type AssetChanges = { addAssetIds: string[]; newAssets: NewAsset[]; remove: { assetId: string; action: 'warehouse' | 'dispose' | 'unassigned' }[] }
+export type MoveTargets = { warehouses: { facilityId: string; label: string }[]; rooms: { id: string; facilityId: string; label: string }[] }
+export type AssetRemoval = { assetId: string; action: 'dispose' } | { assetId: string; action: 'move'; to: { kind: 'warehouse' | 'room'; id: string } }
+export type AssetChanges = { addAssetIds: string[]; newAssets: NewAsset[]; remove: AssetRemoval[] }
 export const emptyChanges = (): AssetChanges => ({ addAssetIds: [], newAssets: [], remove: [] })
 const noPhotos: File[] = []
 
@@ -28,13 +30,20 @@ function AssetPhotos({ name, files, onChange }: { name: string; files: File[]; o
   </div>
 }
 
-type Props = { assets: AssetOption[]; roomId: string; facilityId?: string; canManageAssets: boolean; changes: AssetChanges; onChange: (v: AssetChanges) => void; conditions: Record<string, string>; onCondition: (code: string, value: string) => void; photos: Record<string, File[]>; onPhotos: (code: string, files: File[]) => void; onForget: (code: string) => void }
+type Props = { assets: AssetOption[]; roomId: string; facilityId?: string; canManageAssets: boolean; moveTargets: MoveTargets; changes: AssetChanges; onChange: (v: AssetChanges) => void; conditions: Record<string, string>; onCondition: (code: string, value: string) => void; photos: Record<string, File[]>; onPhotos: (code: string, files: File[]) => void; onForget: (code: string) => void }
 
-export function LeaseAssets({ assets, roomId, facilityId, canManageAssets, changes, onChange, conditions, onCondition, photos, onPhotos, onForget }: Props) {
+export function LeaseAssets({ assets, roomId, facilityId, canManageAssets, moveTargets, changes, onChange, conditions, onCondition, photos, onPhotos, onForget }: Props) {
   const [open, setOpen] = useState(true)
   const [menu, setMenu] = useState<string | null>(null)
+  const [moving, setMoving] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [code, setCode] = useState(''); const [name, setName] = useState(''); const [model, setModel] = useState(''); const [category, setCategory] = useState(''); const [value, setValue] = useState('0'); const [condition, setCondition] = useState('Tốt')
+  const targets = moveTargets.warehouses.flatMap(w => [
+    { value: `warehouse:${w.facilityId}`, label: w.label },
+    ...moveTargets.rooms.filter(r => r.facilityId === w.facilityId && r.id !== roomId).map(r => ({ value: `room:${r.id}`, label: r.label })),
+  ])
+  const removalLabel = (removal: AssetRemoval) => removal.action === 'dispose' ? 'Thanh lý' : `Di chuyển → ${targets.find(t => t.value === `${removal.to.kind}:${removal.to.id}`)?.label ?? ''}`
+  const setRemoval = (removal: AssetRemoval) => { onChange({ ...changes, remove: [...changes.remove.filter(r => r.assetId !== removal.assetId), removal] }); setMenu(null); setMoving(null) }
   const roomAssets = assets.filter(a => a.locationKind === 'room' && a.locationId === roomId)
   const candidates = assets.filter(a => a.facilityId === facilityId && !roomAssets.some(r => r.id === a.id))
   const fields = (asset: { code: string; name: string; model: string; condition: string }) => <div className="space-y-2">
@@ -48,8 +57,12 @@ export function LeaseAssets({ assets, roomId, facilityId, canManageAssets, chang
       {!roomId && <p className="text-sm">Chọn phòng để xem tài sản.</p>}
       {roomId && roomAssets.length === 0 && changes.addAssetIds.length === 0 && changes.newAssets.length === 0 && <p className="text-sm text-muted-foreground">Phòng chưa có tài sản bàn giao.</p>}
       {roomAssets.map(asset => { const removal = changes.remove.find(r => r.assetId === asset.id); return <div key={asset.id} className="space-y-2 rounded-lg border bg-card p-3">
-        {removal ? <p className="text-sm">{asset.name} · {removal.action === 'warehouse' ? 'Chuyển kho' : removal.action === 'dispose' ? 'Thanh lý' : 'Bỏ khỏi phòng'}</p> : fields(asset)}
-        {canManageAssets && <div className="relative"><button type="button" className="text-sm underline" onClick={() => setMenu(menu === asset.id ? null : asset.id)}>{removal ? 'Đổi cách xử lý' : 'Xử lý tài sản'}</button>{menu === asset.id && <div className="absolute left-0 top-full z-10 grid min-w-40 rounded border bg-card p-1 shadow">{([['warehouse', 'Chuyển vào kho'], ['dispose', 'Thanh lý'], ['unassigned', 'Bỏ khỏi phòng']] as const).map(([action, label]) => <button type="button" className="p-2 text-left text-sm hover:bg-muted" key={action} onClick={() => { onChange({ ...changes, remove: [...changes.remove.filter(r => r.assetId !== asset.id), { assetId: asset.id, action }] }); setMenu(null) }}>{label}</button>)}{removal && <button type="button" className="p-2 text-left text-sm" onClick={() => { onChange({ ...changes, remove: changes.remove.filter(r => r.assetId !== asset.id) }); setMenu(null) }}>Giữ lại</button>}</div>}</div>}
+        {removal ? <p className="text-sm">{asset.name} · {removalLabel(removal)}</p> : fields(asset)}
+        {canManageAssets && <div className="relative"><button type="button" className="text-sm underline" onClick={() => { setMenu(menu === asset.id ? null : asset.id); setMoving(null) }}>{removal ? 'Đổi cách xử lý' : 'Xử lý tài sản'}</button>{menu === asset.id && <div className="absolute left-0 top-full z-10 grid min-w-40 rounded border bg-card p-1 shadow">
+          <button type="button" className="p-2 text-left text-sm hover:bg-muted" onClick={() => setMoving(moving === asset.id ? null : asset.id)}>Di chuyển</button>
+          {moving === asset.id && <select aria-label={`Đích di chuyển ${asset.name}`} className="m-1 rounded border p-2 text-sm" value="" onChange={e => { const [kind, id] = e.target.value.split(':'); if (kind === 'warehouse' || kind === 'room') setRemoval({ assetId: asset.id, action: 'move', to: { kind, id } }) }}><option value="">— chọn kho hoặc phòng —</option>{targets.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}</select>}
+          <button type="button" className="p-2 text-left text-sm hover:bg-muted" onClick={() => setRemoval({ assetId: asset.id, action: 'dispose' })}>Thanh lý</button>
+          {removal && <button type="button" className="p-2 text-left text-sm" onClick={() => { onChange({ ...changes, remove: changes.remove.filter(r => r.assetId !== asset.id) }); setMenu(null); setMoving(null) }}>Giữ lại</button>}</div>}</div>}
       </div> })}
       {changes.addAssetIds.map(id => { const asset = assets.find(a => a.id === id); return asset && <div key={id} className="space-y-2 rounded-lg border bg-card p-3">{fields(asset)}<button type="button" className="text-sm underline" onClick={() => { onForget(asset.code); onChange({ ...changes, addAssetIds: changes.addAssetIds.filter(x => x !== id) }) }}>Gỡ {asset.name}</button></div> })}
       {changes.newAssets.map(asset => <div key={asset.code} className="space-y-2 rounded-lg border bg-card p-3">{fields(asset)}<button type="button" className="text-sm underline" onClick={() => { onForget(asset.code); onChange({ ...changes, newAssets: changes.newAssets.filter(a => a.code !== asset.code) }) }}>Gỡ {asset.name}</button></div>)}

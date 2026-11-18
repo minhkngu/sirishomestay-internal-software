@@ -34,6 +34,37 @@ test('các mục cùng trang, lỗi cạnh trường và đổi phòng xóa tài
   await expect(page.getByRole('button', { name: 'Gỡ Tài sản thử' })).toHaveCount(0)
 })
 
+test('xử lý tài sản chỉ có di chuyển và thanh lý, đổi phòng xóa lựa chọn', async ({ page }) => {
+  await openForm(page)
+  const rooms = page.locator('#room option[value]:not([value=""])')
+  let found = false
+  for (let i = 0; i < await rooms.count() && !found; i++) {
+    await page.locator('#room').selectOption((await rooms.nth(i).getAttribute('value'))!)
+    await page.waitForTimeout(300)
+    found = await page.getByRole('button', { name: 'Xử lý tài sản' }).count() > 0
+  }
+  test.skip(!found, 'Cần phòng trống có tài sản')
+  const first = page.getByRole('button', { name: 'Xử lý tài sản' }).first()
+  await first.click()
+  await expect(page.getByRole('button', { name: 'Di chuyển', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Thanh lý', exact: true })).toBeVisible()
+  await expect(page.getByText('Bỏ khỏi phòng')).toHaveCount(0)
+  await expect(page.getByText('Chuyển vào kho')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Di chuyển', exact: true }).click()
+  const target = page.getByRole('combobox', { name: /^Đích di chuyển/ })
+  await target.selectOption({ index: 1 })
+  await expect(page.getByText(/Di chuyển → /)).toBeVisible()
+  await page.getByRole('button', { name: 'Đổi cách xử lý' }).click()
+  await page.getByRole('button', { name: 'Thanh lý', exact: true }).click()
+  await expect(page.getByText(/· Thanh lý$/)).toBeVisible()
+  const current = await page.locator('#room').inputValue()
+  for (let i = 0; i < await rooms.count(); i++) {
+    const value = await rooms.nth(i).getAttribute('value')
+    if (value && value !== current) { await page.locator('#room').selectOption(value); break }
+  }
+  await expect(page.getByText(/· Thanh lý$/)).toHaveCount(0)
+})
+
 test('tạo hợp đồng với tiền thực nhận, ghi chú và tài sản mới', async ({ page }) => {
   await openForm(page)
   const templates = page.locator('#contract-template')

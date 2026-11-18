@@ -13,12 +13,12 @@ import { replaceSigner } from '../contract-occupants'
 import { assetEntry, buildHandoverPhotoTasks, uploadLeasePhotos, type PendingPhoto } from '../lease-photo-retry'
 import { uploadOne } from '@/components/file-upload'
 import { LeaseFees, type FeeOption, type FeeDraft, type RoomFeeMeter } from './lease-fees'
-import { LeaseAssets, emptyChanges, type AssetOption } from './lease-assets'
+import { LeaseAssets, emptyChanges, type AssetOption, type MoveTargets } from './lease-assets'
 import type { RoomOption, TenantOption } from './deposit-form'
 
 type Initial = { roomId?: string; tenantId?: string; depositId?: string; rent?: number; deposit?: number; startDate?: string; receivedDeposit?: number }
 type Props = {
-  assets: AssetOption[]; canManageAssets: boolean; feeDefaults: Record<string, string[]>; roomMeters: RoomFeeMeter[]
+  assets: AssetOption[]; canManageAssets: boolean; moveTargets: MoveTargets; feeDefaults: Record<string, string[]>; roomMeters: RoomFeeMeter[]
   templates: { id: string; name: string; isDefault: boolean }[]
   invoiceTemplates: { id: string; name: string; isDefault: boolean }[]
   rooms: RoomOption[]; tenants: TenantOption[]; feeTypes: FeeOption[]; initial?: Initial
@@ -26,7 +26,7 @@ type Props = {
 }
 
 
-export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAssets, feeDefaults, roomMeters, rooms, tenants, feeTypes, initial = {}, defaults }: Props) {
+export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAssets, moveTargets, feeDefaults, roomMeters, rooms, tenants, feeTypes, initial = {}, defaults }: Props) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [received, setReceived] = useState(String(initial.receivedDeposit ?? 0))
@@ -165,7 +165,7 @@ export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAsse
               {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n} tháng</option>)}</select></div>
         </div>
       <div><Label htmlFor="note">Ghi chú</Label><textarea id="note" className="w-full rounded border p-2" value={note} onChange={e => setNote(e.target.value)} /></div>
-      <LeaseAssets key={roomId} assets={assets} roomId={roomId} facilityId={rooms.find(r => r.id === roomId)?.facilityId} canManageAssets={canManageAssets} changes={changes} onChange={setChanges} conditions={assetConditions} onCondition={(code, value) => setAssetConditions(previous => ({ ...previous, [code]: value }))} photos={assetPhotos} onPhotos={(code, files) => setAssetPhotos(previous => ({ ...previous, [code]: files }))} onForget={code => { setAssetConditions(previous => { const next = { ...previous }; delete next[code]; return next }); setAssetPhotos(previous => { const next = { ...previous }; delete next[code]; return next }) }} />
+      <LeaseAssets key={roomId} assets={assets} roomId={roomId} facilityId={rooms.find(r => r.id === roomId)?.facilityId} canManageAssets={canManageAssets} moveTargets={moveTargets} changes={changes} onChange={setChanges} conditions={assetConditions} onCondition={(code, value) => setAssetConditions(previous => ({ ...previous, [code]: value }))} photos={assetPhotos} onPhotos={(code, files) => setAssetPhotos(previous => ({ ...previous, [code]: files }))} onForget={code => { setAssetConditions(previous => { const next = { ...previous }; delete next[code]; return next }); setAssetPhotos(previous => { const next = { ...previous }; delete next[code]; return next }) }} />
       {fieldError('handover')}
       <div><Label htmlFor="photos">Ảnh hợp đồng</Label><Input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e => setPhotos(Array.from(e.target.files ?? []))} /></div>
       <h2 className="font-semibold">Tóm tắt</h2>
