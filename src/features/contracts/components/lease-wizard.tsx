@@ -12,6 +12,7 @@ import { convertDepositToLeaseAction, createLeaseAction } from '@/server/contrac
 import { replaceSigner } from '../contract-occupants'
 import { assetEntry, buildHandoverPhotoTasks, uploadLeasePhotos, type PendingPhoto } from '../lease-photo-retry'
 import { uploadOne } from '@/components/file-upload'
+import { meterFeeError } from '../lease-fee-meters'
 import { LeaseFees, type FeeOption, type FeeDraft, type RoomFeeMeter } from './lease-fees'
 import { LeaseAssets, emptyChanges, type AssetOption, type MoveTargets } from './lease-assets'
 import type { RoomOption, TenantOption } from './deposit-form'
@@ -93,9 +94,9 @@ export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAsse
     if (!Number.isSafeInteger(Number(received)) || Number(received) < (initial.receivedDeposit ?? 0) || Number(received) > Number(deposit)) errors.receivedDeposit = 'Tiền thực nhận phải từ cọc kế thừa đến tiền cọc'
     if (handoverAssets.some(asset => !(assetEntry(assetConditions, asset.code) ?? asset.condition).trim())) errors.handover = 'Nhập tình trạng cho từng tài sản bàn giao'
     for (const fee of fees) {
-      const hasMeter = fee.feeTypeId ? roomMeters.some(m => m.roomId === roomId && m.feeTypeId === fee.feeTypeId) : !!fee.existingMeterId
       if (!Number.isSafeInteger(Number(fee.price)) || fee.price.trim() === '' || Number(fee.price) < 0 || (fee.legacyFixed && (!Number.isSafeInteger(Number(fee.quantity)) || Number(fee.quantity) < 0))) errors.fees = `Kiểm tra đơn giá hoặc số lượng phí ${fee.name}`
-      if (fee.quantitySource === 'meter' && !hasMeter && (fee.initialReading.trim() === '' || !Number.isSafeInteger(Number(fee.initialReading)) || Number(fee.initialReading) < 0)) errors.fees = `Nhập chỉ số ban đầu hợp lệ cho ${fee.name}`
+      const meterError = meterFeeError(fee)
+      if (meterError) errors.fees = meterError
     }
     setFieldErrors(errors)
     if (Object.keys(errors).length) return

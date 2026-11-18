@@ -131,6 +131,29 @@ test('tạo hợp đồng với tiền thực nhận, ghi chú và tài sản m�
   await expect(asset.getByRole('img', { name: 'Ảnh' })).toBeVisible()
 })
 
+test('hai dòng phí đồng hồ có chọn đồng hồ riêng và chỉ số ban đầu bắt buộc', async ({ page }) => {
+  await openForm(page)
+  const room = page.locator('#room option').filter({ hasText: 'Trống' }).first()
+  test.skip(await room.count() === 0, 'Cần phòng trống')
+  await page.locator('#room').selectOption((await room.getAttribute('value'))!)
+  await page.locator('#tenant').selectOption({ label: 'Nguyễn Văn An' })
+  await page.getByLabel('Ngày bắt đầu').fill('2026-12-01')
+  await page.getByRole('button', { name: '+12 tháng' }).click()
+  await page.getByLabel('Giá thuê tháng (VND)').fill('9000000')
+  await page.getByLabel('Tiền cọc (VND)').fill('0')
+  await page.getByRole('button', { name: 'Thêm phí dịch vụ' }).click()
+  for (const name of ['Đồng hồ thử A', 'Đồng hồ thử B']) {
+    await page.getByLabel('Tên phí riêng').fill(name)
+    await page.getByLabel('Đơn vị phí riêng').fill('kWh')
+    await page.getByLabel('Đơn giá phí riêng').fill('3500')
+    await page.getByLabel('Cách tính phí riêng').selectOption('meter')
+    await page.getByRole('button', { name: 'Thêm phí riêng' }).click()
+    await expect(page.getByLabel(`Đồng hồ ${name}`)).toBeVisible()
+  }
+  await page.getByRole('button', { name: 'Tạo hợp đồng thuê' }).click()
+  await expect(page.getByText(/Nhập chỉ số ban đầu hợp lệ cho Đồng hồ thử/)).toBeVisible()
+})
+
 test('bố cục di động hiển thị mục bàn giao', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 })
   await openForm(page)
