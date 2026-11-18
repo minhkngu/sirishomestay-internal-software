@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { AmenitySettings, type AmenityRow } from '@/features/settings/components/amenity-settings'
 import { FeeSettings } from '@/features/settings/components/fee-settings'
 import { Msg, useRun } from '@/features/settings/components/use-run'
 import { createFacilityAction, updateFacilityAction } from '@/server/facilities/actions'
@@ -16,7 +17,7 @@ type Fac = { id: string; code: string; name: string; address: string; expectedIn
 type Unit = { id: string; name: string }
 type FeeT = { id: string; name: string; unitId: string; defaultPrice: number; billing: string; quantityFrom: string; isActive: boolean }
 
-type Props = { defaults: Record<string, string[]>; prices: Record<string, Record<string, number>>; settings: Settings; facilities: Fac[]; units: Unit[]; feeTypes: FeeT[] }
+type Props = { defaults: Record<string, string[]>; prices: Record<string, Record<string, number>>; settings: Settings; facilities: Fac[]; units: Unit[]; feeTypes: FeeT[]; amenities: AmenityRow[] }
 
 function GeneralTab({ s }: { s: Settings }) {
   const { pending, error, ok, run } = useRun()
@@ -95,16 +96,18 @@ function FacilitiesTab({ facilities }: { facilities: Fac[] }) {
   )
 }
 
-export function SettingsTabs({ settings, facilities, units, feeTypes, prices, defaults }: Props) {
+export function SettingsTabs({ settings, facilities, units, feeTypes, prices, defaults, amenities }: Props) {
   return (
     <Tabs defaultValue="general">
       <TabsList>
         <TabsTrigger value="general">Chung</TabsTrigger>
         <TabsTrigger value="facilities">Cơ sở</TabsTrigger>
         <TabsTrigger value="fees">Phí dịch vụ</TabsTrigger>
+        <TabsTrigger value="amenities">Tiện ích</TabsTrigger>
         <TabsTrigger value="bank">Tài khoản nhận tiền</TabsTrigger>
       </TabsList>
       <TabsContent value="general"><GeneralTab s={settings} /></TabsContent>
+      <TabsContent value="amenities"><AmenitySettings amenities={amenities} /></TabsContent>
       <TabsContent value="bank"><BankAccountTab settings={settings} /></TabsContent>
       <TabsContent value="facilities"><FacilitiesTab facilities={facilities} /></TabsContent>
       <TabsContent value="fees"><FeeSettings defaults={defaults} units={units} feeTypes={feeTypes} facilities={facilities} prices={prices} /></TabsContent>

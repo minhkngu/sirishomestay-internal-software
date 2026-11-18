@@ -1,0 +1,30 @@
+import { PageHeader } from '@/components/list/page-header'
+import { db } from '@/db/client'
+import { getAccessContext } from '@/server/session'
+import { listAmenities } from '@/server/amenities/service'
+import { listFacilities } from '@/server/facilities/service'
+import { listRoomsWithStatus } from '@/server/rooms/service'
+import { RoomGrid } from '@/features/rooms/components/room-grid'
+import { RoomPanels } from '@/features/rooms/components/room-panels'
+
+export default async function RoomsPage() {
+  const ctx = await getAccessContext()
+  // Nạp mọi phòng trong quyền một lần; lọc theo toà làm ở trình duyệt
+  const [facs, rooms, amenities] = await Promise.all([
+    listFacilities(db, ctx), listRoomsWithStatus(db, ctx, {}), ctx.isAdmin ? listAmenities(db, ctx) : Promise.resolve([]),
+  ])
+  const facilities = facs.map((f) => ({ id: f.id, name: f.name }))
+  return (
+    <div className="space-y-5">
+      <PageHeader title="Phòng" />
+      {ctx.isAdmin && <RoomPanels facilities={facilities} amenities={amenities.map((a) => ({ id: a.id, name: a.name }))} />}
+      <RoomGrid
+        facilities={facilities}
+        rooms={rooms.map((r) => ({
+          id: r.id, code: r.code, status: r.status, facilityId: r.facilityId, floor: r.floor,
+          tenantName: r.tenantName, monthlyRent: r.monthlyRent, depositBalance: r.depositBalance, leaseEndDate: r.leaseEndDate,
+        }))}
+      />
+    </div>
+  )
+}

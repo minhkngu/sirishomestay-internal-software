@@ -28,6 +28,7 @@ export const rooms = pgTable(
     areaM2: numeric('area_m2'),
     listPrice: integer('list_price'),
     capacity: integer('capacity'),
+    beds: integer('beds'),
     note: text('note').notNull().default(''),
     isActive: boolean('is_active').notNull().default(true),
     isDemo: boolean('is_demo').notNull().default(false),

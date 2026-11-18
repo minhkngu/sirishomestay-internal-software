@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { rooms } from '@/db'
+import { rooms, roomAmenities } from '@/db'
 import {
   listFacilities, getFacility, createFacility, updateFacility,
 } from '@/server/facilities/service'
 import {
-  getRoom, listRooms, listRoomsWithStatus, createRoom, updateRoom, setRoomActive, createRoomsBulk,
+  getRoom, getRoomDetail, listRooms, listRoomsWithStatus, createRoom, updateRoom, setRoomActive, createRoomsBulk,
 } from '@/server/rooms/service'
+import { createAmenity, updateAmenity } from '@/server/amenities/service'
+import { ValidationError } from '@/domain/errors'
 import { ForbiddenError, NotFoundError, type AccessContext, type Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'
 import type { DB } from '@/db/client'
@@ -102,4 +104,68 @@ describe('facilities & rooms', () => {
     expect(await listRooms(db, ctxOf(['meters']), {})).toEqual([])
   })
 
+})
+
+describe('phòng có diện tích, giường và tiện ích', () => {
+  let db: DB
+  let admin: AccessContext
+  let fa: string
+  let wifi: string
+  let lanh: string
+  const names = async (roomId: string) => (await getRoomDetail(db, admin, roomId)).amenities.map((a) => a.name).sort()
+  beforeEach(async () => {
+    db = await createTestDb()
+    admin = ctxOf(['settings'])
+    fa = (await createFacility(db, admin, { code: 'A', name: 'Cơ sở A' })).id
+    wifi = (await createAmenity(db, admin, { name: 'Wifi' })).id
+    lanh = (await createAmenity(db, admin, { name: 'Máy lạnh' })).id
+  })
+
+  it('tạo phòng lưu diện tích, giường và tiện ích', async () => {
+    const r = await createRoom(db, admin, { facilityId: fa, code: '101', areaM2: 25.5, beds: 2, amenityIds: [wifi, lanh] })
+    const detail = await getRoomDetail(db, admin, r.id)
+    expect(detail.room.beds).toBe(2)
+    expect(Number(detail.room.areaM2)).toBe(25.5)
+    expect(await names(r.id)).toEqual(['Máy lạnh', 'Wifi'])
+  })
+
+  it('không gắn tiện ích đã ngừng dùng hoặc không tồn tại cho phòng mới', async () => {
+    await updateAmenity(db, admin, wifi, { isActive: false })
+    await expect(createRoom(db, admin, { facilityId: fa, code: '101', amenityIds: [wifi] })).rejects.toBeInstanceOf(ValidationError)
+    await expect(createRoom(db, admin, { facilityId: fa, code: '102', amenityIds: [crypto.randomUUID()] })).rejects.toBeInstanceOf(ValidationError)
+    expect(await listRooms(db, admin, { facilityId: fa })).toHaveLength(0)
+  })
+
+  it('sửa phòng giữ tiện ích đã gắn dù đã ngừng dùng', async () => {
+    const r = await createRoom(db, admin, { facilityId: fa, code: '101', amenityIds: [wifi] })
+    await updateAmenity(db, admin, wifi, { isActive: false })
+    await updateRoom(db, admin, r.id, { beds: 3, amenityIds: [wifi] })
+    expect(await names(r.id)).toEqual(['Wifi'])
+    expect((await getRoomDetail(db, admin, r.id)).room.beds).toBe(3)
+  })
+
+  it('sửa phòng với danh sách rỗng xoá hết tiện ích; không gửi amenityIds thì giữ nguyên', async () => {
+    const r = await createRoom(db, admin, { facilityId: fa, code: '101', amenityIds: [wifi, lanh] })
+    await updateRoom(db, admin, r.id, { beds: 1 })
+    expect(await names(r.id)).toEqual(['Máy lạnh', 'Wifi'])
+    await updateRoom(db, admin, r.id, { amenityIds: [] })
+    expect(await names(r.id)).toEqual([])
+  })
+
+  it('tạo nhanh chỉ gắn thông tin cho phòng mới, không đè phòng đã có mã trùng', async () => {
+    const old = await createRoom(db, admin, { facilityId: fa, code: '102' })
+    const res = await createRoomsBulk(db, admin, fa, { floor: '1', from: 101, to: 103, beds: 1, areaM2: 20, amenityIds: [wifi] })
+    expect(res).toEqual({ created: 2, skipped: ['102'] })
+    const all = await listRooms(db, admin, { facilityId: fa })
+    for (const code of ['101', '103']) {
+      const room = all.find((x) => x.code === code)!
+      expect(room.beds).toBe(1)
+      expect(Number(room.areaM2)).toBe(20)
+      expect(await names(room.id)).toEqual(['Wifi'])
+    }
+    const keep = await getRoomDetail(db, admin, old.id)
+    expect(keep.room.beds).toBeNull()
+    expect(keep.amenities).toEqual([])
+    expect(await db.select().from(roomAmenities)).toHaveLength(2)
+  })
 })

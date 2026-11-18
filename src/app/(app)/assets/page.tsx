@@ -1,5 +1,4 @@
 import { PageHeader } from '@/components/list/page-header'
-import { RefreshButton } from '@/components/list/refresh-button'
 import { db } from '@/db/client'
 import { RequirePermission } from '@/components/require-permission'
 import { getAccessContext } from '@/server/session'
@@ -23,7 +22,7 @@ async function Assets() {
   const [list, stock] = await Promise.all([listAssets(db, ctx, {}), listStock(db, ctx, {})])
   return (
     <div className="space-y-4">
-      <PageHeader title="Tài sản & kho" action={<><RefreshButton /><AssetForm facilities={tree} /></>} />
+      <PageHeader title="Tài sản & kho" action={<AssetForm facilities={tree} />} />
       <AssetsView
         facilities={tree.map((f) => ({ id: f.id, name: f.name }))}
         tree={tree}

@@ -1,7 +1,6 @@
 import Form from 'next/form'
 import Link from 'next/link'
 import { PageHeader } from '@/components/list/page-header'
-import { RefreshButton } from '@/components/list/refresh-button'
 import { RequirePermission } from '@/components/require-permission'
 import { db } from '@/db/client'
 import { daysInMonth, todayVN } from '@/domain/dates'
@@ -29,7 +28,7 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
   const readOn = today.startsWith(period) ? today : end
   return (
     <div className="space-y-5">
-      <PageHeader title="Chỉ số" action={<RefreshButton />} />
+      <PageHeader title="Chỉ số" />
       <nav aria-label="Mục chỉ số" className="flex gap-2 text-sm">
         {([['readings', 'Ghi chỉ số'], ['meters', 'Đồng hồ']] as const).map(([key, label]) => (
           <Link key={key} href={`/meters?tab=${key}${facilityId ? `&facility=${facilityId}` : ''}${key === 'readings' ? `&period=${period}` : ''}`} aria-current={tab === key ? 'page' : undefined}

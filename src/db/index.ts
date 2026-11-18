@@ -1,5 +1,6 @@
 export * from './schema/users'
 export * from './schema/facilities'
+export * from './schema/amenities'
 export * from './schema/tenants'
 export * from './schema/settings'
 export * from './schema/audit'

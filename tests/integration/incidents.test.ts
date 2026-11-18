@@ -30,6 +30,14 @@ describe('sự cố và sửa chữa', () => {
     expect(charges[0]).toMatchObject({ kind: 'penalty', unitPrice: 350000, quantity: 1, invoiceId: null }); expect(done.chargedOneOffId).toBe(charges[0].id)
     await expect(updateIncident(db, ctx, inc.id, { cost: 1 })).rejects.toThrow('Sự cố đã xong')
   })
+  it('lọc sự cố theo phòng', async () => {
+    const ctx = context(['incidents'], facilityId)
+    const [other] = await db.insert(rooms).values({ facilityId, code: '302' }).returning()
+    await createIncident(db, ctx, { roomId, title: 'Hỏng khoá' })
+    await createIncident(db, ctx, { roomId: other.id, title: 'Bóng đèn' })
+    const list = await listIncidents(db, ctx, { roomId })
+    expect(list.map((i) => i.title)).toEqual(['Hỏng khoá'])
+  })
   it('sự cố không do khách thì không sinh phí', async () => {
     const ctx = context(['incidents'], facilityId)
     const inc = await createIncident(db, ctx, { roomId, title: 'Bóng đèn', cost: 50000 })

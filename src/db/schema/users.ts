@@ -31,7 +31,7 @@ export const userPermissions = pgTable(
     primaryKey({ columns: [t.userId, t.permission] }),
     check(
       'user_permissions_permission_check',
-      sql`${t.permission} in ('tenants_contracts','billing','meters','assets','incidents','settings')`,
+      sql`${t.permission} in ('tenants_contracts','delete_contracts','billing','meters','assets','incidents','settings')`,
     ),
   ],
 )

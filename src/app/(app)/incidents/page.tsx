@@ -1,5 +1,4 @@
 import { PageHeader } from '@/components/list/page-header'
-import { RefreshButton } from '@/components/list/refresh-button'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { buttonVariants } from '@/components/ui/button'
@@ -22,7 +21,7 @@ export default async function IncidentsPage() {
   const facilities = await listFacilities(db, ctx)
   return (
     <div className="space-y-4">
-      <PageHeader title="Sự cố & sửa chữa" action={<><RefreshButton /><Link href="/incidents/new" className={buttonVariants()}>Báo sự cố</Link></>} />
+      <PageHeader title="Sự cố & sửa chữa" action={<Link href="/incidents/new" className={buttonVariants()}>Báo sự cố</Link>} />
       <IncidentList
         userId={ctx.userId}
         facilities={facilities.map((f) => ({ id: f.id, name: f.name }))}
