@@ -128,7 +128,7 @@ export type DocEntities = {
   addendum?: { effectiveDate: string; newEndDate?: string | null; newMonthlyRent?: number | null; newDepositAmount?: number | null; newRoomCode?: string | null }
   fees?: { name: string; unit: string; quantity: number; unitPrice: number }[]
   invoice?: { code: string; periodStart: string; periodEnd: string; dueDate?: string | null; lines: { description: string; quantity: number; unitPrice: number; amount: number }[] }
-  handover?: { date: string; items: { code: string; name: string; condition: string; penalty?: number }[]; readings: { kind: 'electric' | 'water'; serial: string; value: number }[] }
+  handover?: { date: string; items: { code: string; name: string; condition: string; penalty?: number }[]; readings: { kind: 'electric' | 'water' | 'fee'; label?: string; serial: string; value: number }[] }
   payment?: { code: string; paidOn: string; amount: number; method: string; receivedBy: string }
 }
 
@@ -187,7 +187,7 @@ export function buildTemplateData(docType: DocType, e: DocEntities): Record<stri
     // bàn giao
     ngay_ban_giao: d(e.handover?.date),
     tai_san: (e.handover?.items ?? []).map((i) => ({ ma: i.code, ten: i.name, tinh_trang: i.condition, phat: formatVND(i.penalty ?? 0) })),
-    chi_so: (e.handover?.readings ?? []).map((r) => ({ loai: r.kind === 'electric' ? 'Điện' : 'Nước', so_dong_ho: r.serial, chi_so: r.value })),
+    chi_so: (e.handover?.readings ?? []).map((r) => ({ loai: r.label ?? (r.kind === 'electric' ? 'Điện' : r.kind === 'water' ? 'Nước' : 'Đồng hồ'), so_dong_ho: r.serial, chi_so: r.value })),
     tong_phat: formatVND(penaltyTotal),
     // phiếu thu
     ma_phieu: e.payment?.code ?? '',

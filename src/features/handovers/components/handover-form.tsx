@@ -13,7 +13,7 @@ type Props = {
   readOnly: boolean
   items: (Omit<ItemState, 'penalty'> & { penalty: number })[]
   checkInConditions?: Record<string, string>
-  meters: { meterId: string; utility: string; serial: string | null; value: number | null }[]
+  meters: { meterId: string; utility: string; label: string; serial: string | null; value: number | null }[]
   hasTemplate: boolean
 }
 
@@ -38,10 +38,10 @@ export function HandoverForm({ id, kind, readOnly, items: initial, checkInCondit
     <div className="space-y-4">
       {meters.length > 0 && (
         <section className="space-y-2 rounded-lg border bg-card p-3">
-          <h2 className="font-medium">Chỉ số điện nước</h2>
+          <h2 className="font-medium">Chỉ số đồng hồ</h2>
           {meters.map((m) => (
-            <label key={m.meterId} className="flex items-center justify-between gap-2 text-sm">{m.utility === 'electric' ? 'Điện' : 'Nước'} {m.serial ?? ''}
-              <input aria-label={`Chỉ số ${m.utility === 'electric' ? 'điện' : 'nước'}`} disabled={readOnly} inputMode="numeric" value={readings[m.meterId]} onChange={(e) => setReadings({ ...readings, [m.meterId]: e.target.value })} className="h-10 w-32 rounded-lg border px-2 text-right" />
+            <label key={m.meterId} className="flex items-center justify-between gap-2 text-sm">{m.label} {m.serial ?? ''}
+              <input aria-label={`Chỉ số ${m.label}`} disabled={readOnly} inputMode="numeric" value={readings[m.meterId]} onChange={(e) => setReadings({ ...readings, [m.meterId]: e.target.value })} className="h-10 w-32 rounded-lg border px-2 text-right" />
             </label>
           ))}
         </section>

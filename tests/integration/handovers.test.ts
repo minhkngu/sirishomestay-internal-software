@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { assets, facilities, meterReadings, meters, rooms } from '@/db'
+import { assets, facilities, leaseFeeMeters, leaseFeeSnapshots, meterReadings, meters, rooms } from '@/db'
 import { createTenant } from '@/server/tenants/service'
 import { createLease } from '@/server/contracts/service'
 import { startHandover, getHandover, saveHandover, completeHandover, listHandovers } from '@/server/handovers/service'
@@ -82,6 +82,14 @@ describe('handovers', () => {
     expect(rows).toHaveLength(1)
     expect(rows[0]).toMatchObject({ value: 1200, readOn: h.date, period: h.date.slice(0, 7) })
     expect((await getHandover(db, lan(), h.id)).readings[0]).toMatchObject({ meterId: eMeter, value: 1200, serial: 'E-301' })
+  })
+
+  it('biên bản gọi đồng hồ theo tên phí gắn với hợp đồng', async () => {
+    const [fee] = await db.insert(leaseFeeSnapshots).values({ leaseId, name: 'Giặt', unit: 'lượt', quantitySource: 'meter', unitPrice: 5000 }).returning()
+    const [meter] = await db.insert(meters).values({ roomId: r301, utility: 'fee', installedOn: '2026-10-15', startReading: 0 }).returning()
+    await db.insert(leaseFeeMeters).values({ leaseFeeId: fee.id, meterId: meter.id })
+    const h = await startHandover(db, lan(), leaseId, 'check_in')
+    expect((await getHandover(db, lan(), h.id)).meters.find(m => m.meterId === meter.id)).toMatchObject({ label: 'Giặt' })
   })
 
   it('chỉ số thấp hơn chỉ số trước của đồng hồ → lỗi', async () => {

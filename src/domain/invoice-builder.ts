@@ -29,7 +29,7 @@ function rentAndFixedLines(terms: LeaseTerms, from: ISODate, to: ISODate, sum: n
     type: 'rent', description: `Tiền phòng ${label}`, quantity: round4(sum), unitPrice: terms.monthlyRent, amount: Math.round(terms.monthlyRent * sum),
     meta: { from, to },
   }]
-  for (const f of terms.fees.filter((x) => x.billing === 'monthly_fixed' && x.quantitySource !== 'meter' && x.quantitySource !== 'period_input')) {
+  for (const f of terms.fees.filter((x) => (x.billing === 'monthly_fixed' || x.quantitySource === 'occupants' || x.quantitySource === 'room') && x.quantitySource !== 'meter' && x.quantitySource !== 'period_input')) {
     const qty = f.quantitySource === 'room' ? 1 : f.quantitySource === 'occupants' || (!f.quantitySource && f.quantityFrom === 'occupants') ? occupantsCount : f.quantity
     lines.push({
       type: 'fee', description: `${f.name} (${qty} ${f.unit}) ${label}`, quantity: qty, unitPrice: f.unitPrice,
@@ -148,7 +148,13 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): { lines: Invoic
         const meter = input.meters.find(m => m.id === link?.meterId)
         if (!meter) { warnings.push(`Chưa có đồng hồ ${f.name}`); continue }
         try {
-          const usage = meterUsage([meter], input.readings, prevStart, prevEnd)
+          const beginsInPeriod = terms.startDate >= prevStart && terms.startDate <= prevEnd
+          if (beginsInPeriod && meter.installedOn < terms.startDate && !input.readings.some(r => r.meterId === meter.id && r.readOn === terms.startDate)) {
+            warnings.push(`Chưa ghi chỉ số ${f.name} ngày bắt đầu hợp đồng ${formatDateVN(terms.startDate)}`)
+            continue
+          }
+          const usageStart = beginsInPeriod && meter.installedOn < terms.startDate ? addDays(terms.startDate, 1) : prevStart
+          const usage = meterUsage([meter], input.readings, usageStart, prevEnd)
           if (usage.missing.length) { warnings.push(`Chưa ghi chỉ số ${f.name} tháng ${mmYYYY(prev)}`); continue }
           lines.push({ type: 'fee', description: `${f.name} tháng ${mmYYYY(prev)}`, quantity: usage.usage, unitPrice: f.unitPrice, amount: usage.usage * f.unitPrice, meta: { leaseFeeId: f.leaseFeeId, unit: f.unit, segments: usage.segments } })
         } catch (e) {

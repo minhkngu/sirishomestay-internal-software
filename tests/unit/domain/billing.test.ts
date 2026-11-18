@@ -400,4 +400,19 @@ describe('phí snapshot trong hóa đơn', () => {
     expect(result.warnings.join(' ')).toContain('C')
     expect(result.warnings.join(' ')).toContain('D')
   })
+  it('tính phí theo người và phòng dù danh mục đánh dấu trả sau', () => {
+    const fees = input.lease.fees.slice(0, 2).map(f => ({ ...f, billing: 'per_occurrence' as const }))
+    const result = buildMonthlyInvoice({ ...input, lease: { ...input.lease, fees } })
+    expect(result.lines.find(l => l.meta?.leaseFeeId === 'a')?.amount).toBe(20_000)
+    expect(result.lines.find(l => l.meta?.leaseFeeId === 'b')?.amount).toBe(30_000)
+  })
+  it('đồng hồ dùng lại chỉ tính từ chỉ số ngày bắt đầu hợp đồng', () => {
+    const newLease = { ...input.lease, startDate: '2026-10-15', fees: input.lease.fees.filter(f => f.leaseFeeId === 'c') }
+    const readings = [{ meterId: 'mc', period: '2026-09', readOn: '2026-09-30', value: 110 }, { meterId: 'mc', period: '2026-10', readOn: '2026-10-31', value: 140 }]
+    const missing = buildMonthlyInvoice({ ...input, lease: newLease, readings })
+    expect(missing.lines.some(l => l.meta?.leaseFeeId === 'c')).toBe(false)
+    expect(missing.warnings.join(' ')).toContain('C')
+    const withBoundary = buildMonthlyInvoice({ ...input, lease: newLease, readings: [...readings, { meterId: 'mc', period: '2026-10', readOn: '2026-10-15', value: 120 }] })
+    expect(withBoundary.lines.find(l => l.meta?.leaseFeeId === 'c')?.amount).toBe(100_000)
+  })
 })

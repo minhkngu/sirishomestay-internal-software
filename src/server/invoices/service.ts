@@ -149,6 +149,7 @@ export async function setPeriod(db: DB, ctx: AccessContext, id: string, input: {
   const data = parse(periodSchema, input)
   return db.transaction(async tx0 => {
     const tx = tx0 as unknown as DB; const before = await getInvoice(tx, ctx, id); const lease = await leaseData(tx, before.leaseId)
+    if (before.periodStart !== data.start || before.periodEnd !== data.end) await tx.delete(invoiceFeeQuantities).where(eq(invoiceFeeQuantities.invoiceId, id))
     const draft = await calculate(tx, lease, before.facilityId, data.start.slice(0, 7), { start: data.start, end: data.end, coefficient: data.coefficient }, data.fullMonth, data.proration, id)
     const oldLines = await tx.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, id))
     await tx.delete(invoiceLines).where(and(eq(invoiceLines.invoiceId, id), inArray(invoiceLines.type, ['rent', 'fee'])))
@@ -241,12 +242,15 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
     const old = await tx.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, id))
     const [leaseRow] = await tx.select({ feeModel: leases.feeModel }).from(leases).where(eq(leases.id, inv.leaseId))
     if (leaseRow?.feeModel === 'snapshot') {
-      const protectedLine = (l: { type: string; quantity: number; unitPrice: number; meta?: unknown }) => { const meta = l.meta as { leaseFeeId?: unknown } | null; return typeof meta?.leaseFeeId === 'string' ? JSON.stringify([meta.leaseFeeId, l.type, l.quantity, l.unitPrice]) : null }
+      const protectedLine = (l: { id?: string; type: string; quantity: number; unitPrice: number; meta?: unknown }) => { const meta = l.meta as { leaseFeeId?: unknown } | null; return typeof meta?.leaseFeeId === 'string' ? JSON.stringify([l.id, meta.leaseFeeId, l.type, l.quantity, l.unitPrice]) : null }
       const beforeFees = old.map(protectedLine).filter(Boolean).sort()
       const afterFees = data.map(protectedLine).filter(Boolean).sort()
       if (JSON.stringify(beforeFees) !== JSON.stringify(afterFees)) throw new ValidationError('Không sửa hoặc xóa dòng phí hợp đồng tại đây; hãy cập nhật số lượng theo kỳ')
     }
-    const next = data.map(l => ({ invoiceId: id, type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, amount: Math.round(l.quantity * l.unitPrice), meta: l.meta ?? null }))
+    const next = data.map(l => {
+      const protectedFee = leaseRow?.feeModel === 'snapshot' && typeof (l.meta as { leaseFeeId?: unknown } | null)?.leaseFeeId === 'string' ? old.find(previous => previous.id === l.id) : undefined
+      return { invoiceId: id, type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, amount: protectedFee?.amount ?? Math.round(l.quantity * l.unitPrice), meta: protectedFee ? protectedFee.meta : l.meta ?? null }
+    })
     // Phí phát sinh / điều chỉnh bị bỏ khỏi hoá đơn thì trả về trạng thái chưa tính
     const keep = new Set(next.map(l => JSON.stringify(l.meta ?? {})))
     for (const l of old) {

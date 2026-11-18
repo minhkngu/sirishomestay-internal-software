@@ -65,6 +65,33 @@ describe('hoá đơn và thu tiền', () => {
     await expect(updateLines(db, ctx, inv.id, lines.filter(l => l.meta?.leaseFeeId !== fee.id))).rejects.toThrow(ValidationError)
   })
 
+  it('giữ thành tiền phí theo kỳ lẻ khi sửa mô tả hóa đơn', async () => {
+    const ctx = context(['billing'], facilityId)
+    await db.update(leases).set({ feeModel: 'snapshot', startDate: '2026-12-16' }).where(eq(leases.id, leaseId))
+    const [fee] = await db.insert(leaseFeeSnapshots).values({ leaseId, name: 'Phòng', unit: 'phòng', quantitySource: 'room', unitPrice: 300000 }).returning()
+    const [inv] = await createDrafts(db, ctx, { facilityId, period: '2026-12' })
+    await setPeriod(db, ctx, inv.id, { start: '2026-12-16', end: '2026-12-31', coefficient: 0.5 })
+    const old = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, inv.id))
+    const feeLine = old.find(l => (l.meta as Record<string, unknown> | null)?.leaseFeeId === fee.id)!
+    expect(feeLine.amount).not.toBe(feeLine.quantity * feeLine.unitPrice)
+    const updated = await updateLines(db, ctx, inv.id, old.map(l => ({ ...l, description: l.description + ' sửa', meta: l.id === feeLine.id ? { ...l.meta as Record<string, unknown>, from: '2020-01-01' } : l.meta as Record<string, unknown> | null })))
+    const updatedFee = updated.find(l => (l.meta as Record<string, unknown> | null)?.leaseFeeId === fee.id)
+    expect(updatedFee?.amount).toBe(feeLine.amount)
+    expect(updatedFee?.meta).toEqual(feeLine.meta)
+  })
+
+  it('đổi tháng hóa đơn yêu cầu nhập lại số lượng theo kỳ', async () => {
+    const ctx = context(['billing'], facilityId)
+    await db.update(leases).set({ feeModel: 'snapshot' }).where(eq(leases.id, leaseId))
+    const [fee] = await db.insert(leaseFeeSnapshots).values({ leaseId, name: 'Dọn', unit: 'lần', quantitySource: 'period_input', unitPrice: 7000 }).returning()
+    const [inv] = await createDrafts(db, ctx, { facilityId, period: '2026-12' })
+    await saveInvoiceFeeQuantities(db, ctx, inv.id, [{ leaseFeeId: fee.id, quantity: 3 }])
+    await setPeriod(db, ctx, inv.id, { start: '2027-01-01', end: '2027-01-31' })
+    await expect(approveInvoice(db, ctx, inv.id, { dueDate: '2027-02-05' })).rejects.toThrow('Dọn')
+    await saveInvoiceFeeQuantities(db, ctx, inv.id, [{ leaseFeeId: fee.id, quantity: 2 }])
+    expect((await approveInvoice(db, ctx, inv.id, { dueDate: '2027-02-05' })).status).toBe('approved')
+  })
+
   it('hóa đơn phí đồng hồ dùng đúng đơn giá hợp đồng, không cộng điện nước ngầm', async () => {
     const ctx = context(['billing'], facilityId)
     await db.update(leases).set({ feeModel: 'snapshot' }).where(eq(leases.id, leaseId))
