@@ -189,7 +189,8 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
   await tx.insert(leaseOccupants).values(occupants.map((tenantId) => ({ leaseId: lease.id, tenantId })))
   if (input.fees?.length && input.feeModel === 'snapshot') {
     const fees = input.fees as LeaseFeeInput[]
-    const commonIds = fees.flatMap(f => f.feeTypeId ? [f.feeTypeId] : [])
+    // Phí tính theo đồng hồ được thêm nhiều dòng cùng loại (mỗi dòng một đồng hồ); các phí khác chỉ một dòng mỗi loại
+    const commonIds = fees.flatMap(f => f.feeTypeId && f.quantitySource !== 'meter' ? [f.feeTypeId] : [])
     const meterIds = fees.flatMap(f => f.existingMeterId ? [f.existingMeterId] : [])
     if (new Set(commonIds).size !== commonIds.length || new Set(meterIds).size !== meterIds.length) throw new ValidationError('Phí hoặc đồng hồ bị chọn trùng')
     for (const fee of input.fees as LeaseFeeInput[]) {

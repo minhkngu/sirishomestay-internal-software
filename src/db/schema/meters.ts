@@ -17,7 +17,7 @@ export const meters = pgTable('meters', {
   isDemo: boolean('is_demo').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [uniqueIndex('meters_active_room_fee_unique').on(t.roomId, t.feeTypeId).where(sql`${t.removedOn} is null and ${t.feeTypeId} is not null`)])
+})
 
 export const meterReadings = pgTable(
   'meter_readings',

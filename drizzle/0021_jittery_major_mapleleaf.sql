@@ -1,0 +1,1 @@
+DROP INDEX "meters_active_room_fee_unique";
