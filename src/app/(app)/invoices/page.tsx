@@ -1,5 +1,4 @@
 import { PageHeader } from '@/components/list/page-header'
-import { RefreshButton } from '@/components/list/refresh-button'
 import { listFacilities } from '@/server/facilities/service'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -21,7 +20,6 @@ export default async function InvoicesPage() {
         title="Hoá đơn"
         action={
           <>
-            <RefreshButton />
             <Link href="/invoices/generate" className={buttonVariants({ variant: 'default' })}>
               Tạo hoá đơn hàng loạt
             </Link>

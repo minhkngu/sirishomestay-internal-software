@@ -42,6 +42,10 @@ import { TerminationWizard } from '@/features/contracts/components/termination-w
 import { TransferWizard } from '@/features/contracts/components/transfer-wizard'
 import { addendumFormData, listAddenda } from '@/server/addenda/service'
 import { cn } from '@/lib/utils'
+import { listRooms } from '@/server/rooms/service'
+import { listFacilities } from '@/server/facilities/service'
+import { searchTenants, displayName } from '@/server/tenants/service'
+import { ContractEditActions } from '@/features/contracts/components/contract-edit-actions'
 
 const ENTRY: Record<string, string> = {
   collect: 'Thu cọc',
@@ -143,6 +147,10 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
     if (!(e instanceof NotFoundError)) throw e
   }
 
+  const [allRooms, facilities, allTenants] = await Promise.all([listRooms(db, ctx, { includeInactive: true }), listFacilities(db, ctx), searchTenants(db, ctx, { limit: null })])
+  const roomOptions = allRooms.map(r => ({ id: r.id, label: `${facilities.find(f => f.id === r.facilityId)?.name ?? ''} · ${r.code}` }))
+  const tenantOptions = allTenants.map(t => ({ id: t.id, label: displayName(t) }))
+
   if (!lease) {
     let deposit
     try {
@@ -203,6 +211,8 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
             )}
           </div>
         </div>
+
+        <ContractEditActions contract={{ kind: 'deposit', id: deposit.id, roomId: deposit.roomId, tenantId: deposit.tenantId, depositAmount: deposit.depositAmount, signStatus: deposit.signStatus, expectedMoveIn: deposit.expectedMoveIn, agreedRent: deposit.agreedRent }} canDelete={ctx.permissions.has('delete_contracts') && can(ctx, 'delete_contracts', deposit.facilityId)} rooms={roomOptions} tenants={tenantOptions} />
 
         {/* Deposit Summary Details */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -317,6 +327,8 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
       </div>
+
+      <ContractEditActions contract={{ kind: 'lease', id: lease.id, roomId: lease.roomId, tenantId: lease.tenantId, depositAmount: lease.depositAmount, signStatus: lease.signStatus, startDate: lease.startDate, endDate: lease.endDate, monthlyRent: lease.monthlyRent, note: lease.note }} canDelete={ctx.permissions.has('delete_contracts') && can(ctx, 'delete_contracts', lease.facilityId)} rooms={roomOptions} tenants={tenantOptions} />
 
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList className="h-10 rounded-xl bg-muted/60 p-1">

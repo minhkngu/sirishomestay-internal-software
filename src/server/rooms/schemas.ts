@@ -9,6 +9,9 @@ export const roomInput = z.object({
   areaM2: z.number().nonnegative().nullish(),
   listPrice: optInt,
   capacity: optInt,
+  beds: optInt,
+  // Không dùng default: cập nhật phòng không gửi trường này thì giữ nguyên tiện ích
+  amenityIds: z.array(z.string().uuid()).optional(),
   note: z.string().trim().default(''),
 })
 export const roomUpdateInput = roomInput.omit({ facilityId: true }).partial()
@@ -19,8 +22,11 @@ export const bulkInput = z.object({
   from: z.number().int().nonnegative(),
   to: z.number().int().nonnegative(),
   roomType: z.string().trim().nullish(),
+  areaM2: z.number().nonnegative().nullish(),
   listPrice: optInt,
   capacity: optInt,
+  beds: optInt,
+  amenityIds: z.array(z.string().uuid()).optional(),
 })
 export type RoomInput = z.input<typeof roomInput>
 export type BulkInput = z.input<typeof bulkInput>

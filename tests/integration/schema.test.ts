@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest'
-import { facilities, rooms, tenants, userProfiles, userPermissions } from '@/db'
+import { amenities, facilities, roomAmenities, rooms, tenants, userProfiles, userPermissions } from '@/db'
 import { createTestDb } from '../helpers/db'
 import type { DB } from '@/db/client'
 
@@ -29,6 +29,15 @@ describe('schema', () => {
     await db.insert(rooms).values({ facilityId: fA, code: '101' })
     expect(await dbError(db.insert(rooms).values({ facilityId: fA, code: '101' }))).toMatch(/unique|duplicate/i)
     await expect(db.insert(rooms).values({ facilityId: fB, code: '101' })).resolves.toBeDefined()
+  })
+
+  it('lưu giường của phòng và chặn gắn trùng một tiện ích hai lần', async () => {
+    const [room] = await db.insert(rooms).values({ facilityId: fA, code: 'G1', beds: 2 }).returning()
+    expect(room.beds).toBe(2)
+    const [wifi] = await db.insert(amenities).values({ name: 'Wifi' }).returning()
+    expect(wifi.isActive).toBe(true)
+    await db.insert(roomAmenities).values({ roomId: room.id, amenityId: wifi.id })
+    expect(await dbError(db.insert(roomAmenities).values({ roomId: room.id, amenityId: wifi.id }))).toMatch(/unique|duplicate/i)
   })
 
   it('rejects a foreign tenant without passport number', async () => {

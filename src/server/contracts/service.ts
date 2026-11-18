@@ -1,11 +1,11 @@
 import { and, asc, eq, inArray, like, lte, ne } from 'drizzle-orm'
 import {
-  assets, depositContracts, depositEntries, docTemplates, facilities, feeTypes, feeUnits, files, handoverItems, invoiceLines, invoiceTemplates, invoices, leaseFees, leaseFeeSnapshots, leaseOccupants, leases, rooms, tenants,
+  addenda, assets, depositContracts, depositEntries, docTemplates, facilities, feeTypes, feeUnits, files, handoverItems, handovers, incidents, invoices, payments, oneOffCharges, pendingAdjustments, invoiceTemplates, leaseFees, leaseFeeSnapshots, leaseOccupants, leases, rooms, tenants,
 } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, facilityScope, type AccessContext } from '@/domain/access'
-import { NotFoundError, ValidationError } from '@/domain/errors'
-import { addDays, daysInMonth, todayVN } from '@/domain/dates'
+import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
+import { addDays, todayVN } from '@/domain/dates'
 import { depositBalance } from '@/domain/deposit'
 import { buildFirstInvoice } from '@/domain/invoice-builder'
 import { contractTermsAt } from '@/domain/contract-terms'
@@ -16,7 +16,7 @@ import { createAssetInTransaction, moveAssetsInTransaction, setAssetStatusInTran
 import { startHandoverInTransaction } from '@/server/handovers/service'
 import { registerExportOwnerResolver, registerOwnerResolver } from '@/server/files/owners'
 import type { ExportFormat } from '@/server/convert'
-import { leaseData, loadAddenda, nextInvoiceCode } from '@/server/invoices/service'
+import { leaseData, loadAddenda } from '@/server/invoices/service'
 import { getSettings } from '@/server/settings/service'
 import { exportDocument, registerDocLoader } from '@/server/templates/service'
 import type { StorageAdapter } from '@/server/storage/types'
@@ -288,15 +288,6 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
     depositAmount: lease.depositAmount, fees, occupantIds: occupants,
   }
   const firstInvoiceLines = buildFirstInvoice(terms, lease.startDate, proration, received)
-  // Hoá đơn đầu tiên (nháp thật): từ ngày vào ở tới hết tháng (hoặc hết hợp đồng); nhân viên duyệt vào lúc họ chọn
-  const monthEnd = `${lease.startDate.slice(0, 7)}-${String(daysInMonth(lease.startDate.slice(0, 7))).padStart(2, '0')}`
-  const [firstInvoice] = await tx.insert(invoices).values({
-    code: await nextInvoiceCode(tx, fac.code, lease.startDate.slice(0, 7)), leaseId: lease.id, facilityId: room.facilityId, kind: 'first',
-    periodStart: lease.startDate, periodEnd: lease.endDate < monthEnd ? lease.endDate : monthEnd, issueDate: todayVN(),
-  }).returning()
-  if (firstInvoiceLines.length) await tx.insert(invoiceLines).values(firstInvoiceLines.map((l) => ({ ...l, invoiceId: firstInvoice.id })))
-  await recordAudit(tx, ctx, { action: 'create', entity: 'invoice', entityId: firstInvoice.id, facilityId: room.facilityId, summary: `Tạo hoá đơn đầu tiên ${firstInvoice.code}`, after: firstInvoice })
-
   await recordAudit(tx, ctx, { action: 'create', entity: 'lease', entityId: lease.id, facilityId: room.facilityId, summary: `Tạo hợp đồng thuê ${lease.code}`, after: lease })
   return { lease, firstInvoiceLines, warnings: [], handoverItems: createdHandoverItems }
 }
@@ -376,6 +367,112 @@ export async function getPendingDepositContract(db: DB, ctx: AccessContext, room
   await loadRoom(db, ctx, roomId)
   const [c] = await db.select().from(depositContracts).where(and(eq(depositContracts.roomId, roomId), eq(depositContracts.status, 'pending')))
   return c ?? null
+}
+
+// ------------------------------------------------------------------ sửa và xoá hợp đồng
+
+export type LeaseEditInput = Pick<LeaseInput, 'roomId' | 'tenantId' | 'startDate' | 'endDate' | 'monthlyRent' | 'depositAmount' | 'note'>
+
+function checkMoney(value: number) {
+  if (!Number.isSafeInteger(value) || value < 0 || value > 2_147_483_647) throw new ValidationError('Số tiền không hợp lệ')
+}
+function checkDate(value: string) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(Date.parse(value)) || new Date(value).toISOString().slice(0, 10) !== value) throw new ValidationError('Ngày không hợp lệ')
+}
+
+export async function updateLease(db: DB, ctx: AccessContext, id: string, input: LeaseEditInput, confirmedSigned: boolean): Promise<void> {
+  await db.transaction(async raw => {
+    const tx = raw as unknown as DB
+    const [before] = await tx.select().from(leases).where(eq(leases.id, id)).for('update')
+    if (!before) throw new NotFoundError()
+    await loadRoom(tx, ctx, before.roomId)
+    const target = await loadRoom(tx, ctx, input.roomId)
+    await loadTenant(tx, ctx, input.tenantId)
+    if (before.signStatus === 'signed' && confirmedSigned !== true) throw new ValidationError('Cần xác nhận sửa hợp đồng đã ký')
+    checkDate(input.startDate); checkDate(input.endDate); checkMoney(input.monthlyRent); checkMoney(input.depositAmount)
+    if (input.endDate < input.startDate) throw new ValidationError('Ngày kết thúc phải sau ngày bắt đầu')
+    if (!target.isActive && target.id !== before.roomId) throw new ValidationError('Phòng đã ngừng sử dụng')
+    if (before.status === 'active') {
+      const [other] = await tx.select().from(leases).where(and(eq(leases.roomId, input.roomId), eq(leases.status, 'active'), ne(leases.id, id)))
+      if (other) throw new ValidationError('Phòng đã có hợp đồng đang hiệu lực')
+    }
+    const [after] = await tx.update(leases).set({ roomId: input.roomId, tenantId: input.tenantId, startDate: input.startDate, endDate: input.endDate, monthlyRent: input.monthlyRent, depositAmount: input.depositAmount, note: input.note ?? '', updatedAt: new Date() }).where(eq(leases.id, id)).returning()
+    if (before.tenantId !== input.tenantId) {
+      await tx.delete(leaseOccupants).where(and(eq(leaseOccupants.leaseId, id), eq(leaseOccupants.tenantId, before.tenantId)))
+      await tx.insert(leaseOccupants).values({ leaseId: id, tenantId: input.tenantId }).onConflictDoNothing()
+    }
+    await recordAudit(tx, ctx, { action: 'update', entity: 'lease', entityId: id, facilityId: target.facilityId, summary: `Sửa hợp đồng thuê ${before.code}`, before, after })
+  })
+}
+
+export async function updateDepositContract(db: DB, ctx: AccessContext, id: string, input: DepositInput, confirmedSigned: boolean): Promise<void> {
+  await db.transaction(async raw => {
+    const tx = raw as unknown as DB
+    const [before] = await tx.select().from(depositContracts).where(eq(depositContracts.id, id)).for('update')
+    if (!before) throw new NotFoundError()
+    await loadRoom(tx, ctx, before.roomId)
+    const room = await loadRoom(tx, ctx, input.roomId)
+    await loadTenant(tx, ctx, input.tenantId)
+    if (before.signStatus === 'signed' && confirmedSigned !== true) throw new ValidationError('Cần xác nhận sửa hợp đồng đã ký')
+    checkMoney(input.depositAmount); checkMoney(input.agreedRent); checkDate(input.expectedMoveIn)
+    if (!room.isActive && room.id !== before.roomId) throw new ValidationError('Phòng đã ngừng sử dụng')
+    if (before.status === 'pending') {
+      const [other] = await tx.select().from(depositContracts).where(and(eq(depositContracts.roomId, input.roomId), eq(depositContracts.status, 'pending'), ne(depositContracts.id, id)))
+      if (other) throw new ValidationError('Phòng đã có hợp đồng cọc đang chờ')
+    }
+    const [after] = await tx.update(depositContracts).set({ roomId: input.roomId, tenantId: input.tenantId, depositAmount: input.depositAmount, agreedRent: input.agreedRent, expectedMoveIn: input.expectedMoveIn, updatedAt: new Date() }).where(eq(depositContracts.id, id)).returning()
+    await recordAudit(tx, ctx, { action: 'update', entity: 'deposit_contract', entityId: id, facilityId: room.facilityId, summary: 'Sửa hợp đồng cọc', before, after })
+  })
+}
+
+export async function deleteContract(db: DB, ctx: AccessContext, kind: 'lease' | 'deposit', id: string, confirmed: boolean): Promise<void> {
+  if (kind !== 'lease' && kind !== 'deposit') throw new ValidationError('Loại hợp đồng không hợp lệ')
+  if (confirmed !== true) throw new ValidationError('Cần xác nhận xoá hợp đồng')
+  await db.transaction(async raw => {
+    const tx = raw as unknown as DB
+    const table = kind === 'lease' ? leases : depositContracts
+    const [before] = await tx.select().from(table).where(eq(table.id, id)).for('update')
+    if (!before) throw new NotFoundError()
+    const [room] = await tx.select().from(rooms).where(eq(rooms.id, before.roomId))
+    if (!room) throw new NotFoundError()
+    assertCan(ctx, 'delete_contracts', room.facilityId)
+    if (!ctx.permissions.has('delete_contracts')) throw new ForbiddenError()
+    if (kind === 'deposit') {
+      const linked = await tx.select({ facilityId: rooms.facilityId }).from(leases).innerJoin(rooms, eq(rooms.id, leases.roomId)).where(eq(leases.fromDepositContractId, id))
+      for (const l of linked) assertCan(ctx, 'delete_contracts', l.facilityId)
+      await tx.delete(files).where(and(eq(files.ownerId, id), inArray(files.ownerType, ['signed_contract', 'export'])))
+      await tx.update(leases).set({ fromDepositContractId: null, updatedAt: new Date() }).where(eq(leases.fromDepositContractId, id))
+      await tx.delete(depositEntries).where(eq(depositEntries.depositContractId, id))
+      await tx.delete(depositContracts).where(eq(depositContracts.id, id))
+    } else {
+      const invoiceRows = await tx.select({ id: invoices.id, facilityId: invoices.facilityId }).from(invoices).where(eq(invoices.leaseId, id))
+      const handoverRows = await tx.select({ id: handovers.id, facilityId: rooms.facilityId }).from(handovers).innerJoin(rooms, eq(rooms.id, handovers.roomId)).where(eq(handovers.leaseId, id))
+      for (const item of [...invoiceRows, ...handoverRows]) assertCan(ctx, 'delete_contracts', item.facilityId)
+      const handoverIds = handoverRows.map(x => x.id)
+      const items = handoverIds.length ? await tx.select({ id: handoverItems.id }).from(handoverItems).where(inArray(handoverItems.handoverId, handoverIds)) : []
+      const addonRows = await tx.select({ id: addenda.id }).from(addenda).where(eq(addenda.leaseId, id))
+      const relatedIds = [id, ...invoiceRows.map(x => x.id), ...handoverIds, ...addonRows.map(x => x.id)]
+      await tx.delete(files).where(and(eq(files.ownerType, 'export'), inArray(files.ownerId, relatedIds)))
+      await tx.delete(files).where(and(inArray(files.ownerType, ['signed_contract', 'lease_photo']), eq(files.ownerId, id)))
+      if (items.length) await tx.delete(files).where(and(eq(files.ownerType, 'handover_photo'), inArray(files.ownerId, items.map(x => x.id))))
+      const invoiceIds = invoiceRows.map(x => x.id)
+      const charges = await tx.select({ id: oneOffCharges.id }).from(oneOffCharges).where(eq(oneOffCharges.leaseId, id))
+      if (charges.length) await tx.update(incidents).set({ chargedOneOffId: null, updatedAt: new Date() }).where(inArray(incidents.chargedOneOffId, charges.map(x => x.id)))
+      await tx.delete(oneOffCharges).where(eq(oneOffCharges.leaseId, id))
+      await tx.delete(pendingAdjustments).where(eq(pendingAdjustments.leaseId, id))
+      if (invoiceIds.length) {
+        await tx.update(oneOffCharges).set({ invoiceId: null }).where(inArray(oneOffCharges.invoiceId, invoiceIds))
+        await tx.update(pendingAdjustments).set({ invoiceId: null }).where(inArray(pendingAdjustments.invoiceId, invoiceIds))
+        await tx.delete(payments).where(inArray(payments.invoiceId, invoiceIds))
+        await tx.delete(invoices).where(inArray(invoices.id, invoiceIds))
+      }
+      await tx.delete(depositEntries).where(eq(depositEntries.leaseId, id))
+      await tx.delete(addenda).where(eq(addenda.leaseId, id))
+      await tx.delete(handovers).where(eq(handovers.leaseId, id))
+      await tx.delete(leases).where(eq(leases.id, id))
+    }
+    await recordAudit(tx, ctx, { action: 'delete', entity: kind === 'lease' ? 'lease' : 'deposit_contract', entityId: id, facilityId: room.facilityId, summary: kind === 'lease' ? 'Xoá hợp đồng thuê và dữ liệu liên quan' : 'Xoá hợp đồng cọc và dữ liệu liên quan', before })
+  })
 }
 
 // ------------------------------------------------------------------ trạng thái ký + xuất

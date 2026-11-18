@@ -1,5 +1,4 @@
 import { PageHeader } from '@/components/list/page-header'
-import { RefreshButton } from '@/components/list/refresh-button'
 import { listFacilities } from '@/server/facilities/service'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -28,7 +27,6 @@ export default async function ContractsPage() {
         title="Hợp đồng"
         action={
           <div className="flex flex-wrap items-center gap-2.5">
-            <RefreshButton />
             <Link href="/contracts/new?kind=deposit" className={buttonVariants({ variant: 'outline' })}>
               Tạo hợp đồng cọc
             </Link>

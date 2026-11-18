@@ -1,5 +1,5 @@
 import {
-  AlertTriangle, BellRing, Boxes, Building2, ClipboardList, FileText, FileUp, Gauge, History, Receipt, Settings, Users, UserCog,
+  AlertTriangle, BellRing, Boxes, Building2, ClipboardList, DoorOpen, FileText, FileUp, Gauge, History, Receipt, Settings, Users, UserCog,
   type LucideIcon,
 } from 'lucide-react'
 import type { Permission } from '@/domain/access'
@@ -8,7 +8,8 @@ export type NavItem = { href: string; label: string; icon: LucideIcon; requires?
 
 export const NAV_ITEMS: NavItem[] = [
   { href: '/', label: 'Nhắc việc', icon: BellRing },
-  { href: '/facilities', label: 'Cơ sở & phòng', icon: Building2 },
+  { href: '/facilities', label: 'Cơ sở', icon: Building2 },
+  { href: '/rooms', label: 'Phòng', icon: DoorOpen },
   { href: '/tenants', label: 'Khách thuê', icon: Users, requires: 'tenants_contracts' },
   { href: '/contracts', label: 'Hợp đồng', icon: FileText, requires: 'tenants_contracts' },
   { href: '/meters', label: 'Chỉ số', icon: Gauge, requires: 'meters' },
