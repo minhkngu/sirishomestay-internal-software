@@ -4,8 +4,11 @@ import { test, expect, type Page } from '@playwright/test'
 function trackServerRequests(page: Page) {
   const requests: string[] = []
   page.on('request', (req) => {
-    const isRsc = req.headers()['rsc'] === '1' || req.url().includes('_rsc=')
-    if (isRsc || req.resourceType() === 'document') requests.push(`${req.method()} ${req.url()}`)
+    const h = req.headers()
+    const isRsc = h['rsc'] === '1' || req.url().includes('_rsc=')
+    // Tải nền (prefetch) khi link hiện ra không phải là lần tải trang do người dùng bấm
+    const prefetch = h['next-router-prefetch'] === '1'
+    if ((isRsc || req.resourceType() === 'document') && !prefetch) requests.push(`${req.method()} ${req.url()}`)
   })
   return {
     requests,
@@ -33,6 +36,8 @@ test.describe('không tải lại trang', () => {
     await expect(page.getByRole('table')).toBeVisible()
     await nav.getByRole('link', { name: 'Hợp đồng' }).click()
     await expect(page.getByRole('table')).toBeVisible()
+    // Chờ các request tải nền của hai lần vào trang xong rồi mới đếm
+    await page.waitForLoadState('networkidle')
     track.reset()
     await nav.getByRole('link', { name: 'Khách thuê' }).click()
     await expect(page).toHaveURL(/\/tenants/)
@@ -82,8 +87,11 @@ test.describe('không tải lại trang', () => {
     const before = Number((await summary.textContent())!.match(/trên (\d+)/)![1])
     const name = `Khach E2E ${Date.now()}`
     await page.goto('/tenants/new')
-    await page.getByLabel(/Họ tên/).first().fill(name)
-    await page.getByRole('button', { name: /^Lưu/ }).click()
+    await page.getByLabel('Họ tên').fill(name)
+    await page.getByLabel('Số passport').fill(`E2E${Date.now()}`)
+    await page.getByLabel('Số điện thoại').fill(`+1415${String(Date.now()).slice(-7)}`)
+    await page.getByRole('button', { name: 'Tạo khách' }).click()
+    await expect(page).toHaveURL(/\/tenants\/[0-9a-f-]{36}/)
     await page.getByRole('navigation').getByRole('link', { name: 'Khách thuê' }).click()
     await expect(page.getByText(new RegExp(`trên ${before + 1}$`))).toBeVisible()
     await page.getByPlaceholder('Tìm tên, SĐT, passport, CCCD…').fill(name.toLowerCase())
