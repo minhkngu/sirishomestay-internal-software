@@ -12,8 +12,8 @@ export async function fillMeterReadings(page: Page) {
   for (let i = 0; i < await inputs.count(); i++) if (!(await inputs.nth(i).inputValue())) await inputs.nth(i).fill(String(meterValue()))
 }
 
-/** Đăng nhập Admin, tạo một phòng tạm ở Thảo Điền rồi tạo hợp đồng thuê mới (từ 01/12/2026, 12 tháng); trả về địa chỉ trang hợp đồng. */
-export async function createTempLease(page: Page): Promise<string> {
+/** Đăng nhập Admin, tạo một phòng tạm ở Thảo Điền rồi tạo hợp đồng thuê mới (từ 01/12/2026, 12 tháng); trả về địa chỉ trang hợp đồng và mã phòng. */
+export async function createTempLease(page: Page): Promise<{ url: string; roomCode: string }> {
   await page.goto('/login')
   await page.getByRole('button', { name: /^Admin/ }).click()
   await expect(page.getByRole('heading', { name: 'Nhắc việc' })).toBeVisible()
@@ -40,5 +40,5 @@ export async function createTempLease(page: Page): Promise<string> {
   await fillMeterReadings(page)
   await page.getByRole('button', { name: 'Tạo hợp đồng thuê' }).click()
   await expect(page).toHaveURL(/\/contracts\/[a-f0-9-]+$/, { timeout: 60_000 })
-  return page.url()
+  return { url: page.url(), roomCode: `${prefix}901` }
 }

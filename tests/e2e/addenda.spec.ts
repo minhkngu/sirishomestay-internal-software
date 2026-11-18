@@ -4,7 +4,7 @@ import { createTempLease } from './helpers'
 test.skip(!process.env.E2E_BASE_URL, 'Cần E2E_BASE_URL trỏ tới môi trường thử có dữ liệu mẫu')
 test('gia hạn tăng cọc: xem trước tiền, lưu, sổ cọc có khoản thu bổ sung', async ({ page }) => {
   test.setTimeout(300_000)
-  await page.goto(await createTempLease(page))
+  await page.goto((await createTempLease(page)).url)
   await page.getByRole('tab', { name: 'Tổng quan' }).click()
   const term = await page.getByText('Thời hạn hợp đồng', { exact: true }).locator('xpath=following-sibling::div[1]').innerText()
   const [dd, mm, yyyy] = term.split('–')[1].trim().split('/')
@@ -26,7 +26,7 @@ test('gia hạn tăng cọc: xem trước tiền, lưu, sổ cọc có khoản t
 
 test('chuyển phòng và thanh lý: bước xem trước tiền không lưu gì', async ({ page }) => {
   test.setTimeout(300_000)
-  await page.goto(await createTempLease(page))
+  await page.goto((await createTempLease(page)).url)
   await page.getByRole('tab', { name: 'Phụ lục' }).click()
   await page.getByRole('button', { name: 'Thanh lý hợp đồng' }).click()
   await page.getByLabel('Ngày trả phòng').fill('2026-12-10')

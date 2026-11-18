@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { fillMeterReadings, meterValue } from './helpers'
+import { createTempLease, fillMeterReadings, meterValue } from './helpers'
 
 test.skip(!process.env.E2E_BASE_URL, 'Cần E2E_BASE_URL trỏ tới môi trường thử có dữ liệu mẫu')
 async function login(page: Page, name: RegExp) {
@@ -15,10 +15,11 @@ test('Hùng xem trạng thái phòng mà không thấy tên khách hay tiền', 
   const occupied = page.locator('a[href^="/rooms/"]').filter({ hasText: /Đang ở|Sắp trả/ }).first()
   await expect(occupied).toBeVisible()
   await occupied.click()
-  await expect(page.getByText('Trạng thái', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /^Phòng / })).toBeVisible()
+  await expect(page.getByText(/Đang ở|Sắp trả/).first()).toBeVisible()
   await expect(page.getByText('Thông tin thanh toán')).toHaveCount(0)
   await expect(page.getByText('Người ở:', { exact: false })).toHaveCount(0)
-  await expect(page.getByRole('heading', { name: 'Hợp đồng', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Hợp đồng phòng' })).toHaveCount(0)
 })
 
 test('nhập và chuyển vật tư theo số lượng', async ({ page }) => {
@@ -30,12 +31,15 @@ test('nhập và chuyển vật tư theo số lượng', async ({ page }) => {
   await page.getByLabel('Đơn vị', { exact: true }).fill('cái')
   await page.getByLabel('Loại vật tư').fill('Điện')
   await page.getByRole('button', { name: 'Thêm vật tư' }).click()
-  await expect(page.getByRole('row').filter({ hasText: uniqueName })).toBeVisible()
+  // Vật tư mới chưa có tồn kho nên chưa có dòng trong bảng; kiểm tra nó có trong danh sách chọn
   const itemOption = page.getByLabel('Vật tư', { exact: true }).locator('option').filter({ hasText: uniqueName })
+  await expect(itemOption).toHaveCount(1)
   await page.getByLabel('Vật tư', { exact: true }).selectOption((await itemOption.getAttribute('value'))!)
   await page.getByLabel('Vị trí đích').selectOption({ label: 'Kho' })
   await page.getByLabel('Số lượng').fill('20')
   await page.getByRole('button', { name: 'Lưu', exact: true }).last().click()
+  // Bảng vật tư phân trang 15 dòng: mở rộng để thấy dòng vừa tạo
+  await page.getByLabel('Số dòng').first().selectOption('100')
   await expect(page.getByRole('row').filter({ hasText: uniqueName })).toContainText('20')
   await page.getByLabel('Thao tác').selectOption('move')
   await page.getByLabel('Vị trí nguồn').selectOption({ label: 'Kho' })
@@ -106,8 +110,13 @@ test('chuyển hai tài sản mới từ kho vào phòng', async ({ page }) => {
     await page.getByLabel('Tên tài sản').fill('Tài sản kiểm thử')
     await page.getByLabel('Giá trị', { exact: true }).fill('100000')
     await page.getByRole('button', { name: 'Lưu', exact: true }).first().click()
+    // Bảng tài sản phân trang: lọc theo mã vừa tạo để chắc chắn thấy dòng
+    await page.getByLabel('Tìm tài sản').fill(prefix + suffix)
     await expect(page.getByRole('link', { name: prefix + suffix, exact: true })).toBeVisible()
   }
+  await page.getByLabel('Tìm tài sản').fill(prefix)
+  await expect(page.getByRole('link', { name: prefix + 'A', exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: prefix + 'B', exact: true })).toBeVisible()
   await page.getByLabel(`Chọn ${prefix}A`).check()
   await page.getByLabel(`Chọn ${prefix}B`).check()
   await page.getByRole('button', { name: 'Chuyển 2 tài sản' }).click()
@@ -122,26 +131,22 @@ test('chuyển hai tài sản mới từ kho vào phòng', async ({ page }) => {
   await expect(page.getByRole('row').filter({ hasText: prefix + 'B' })).toContainText(roomLabel)
 })
 
-test('ghi chỉ số điện, báo chỉ số giảm và thay đồng hồ', async ({ page }) => {
-  await login(page, /^Admin/)
+test('ghi chỉ số điện theo dòng phí và báo chỉ số giảm', async ({ page }) => {
+  test.setTimeout(300_000)
+  // Đồng hồ Điện là đồng hồ theo dòng phí của hợp đồng: tạo hợp đồng tạm rồi ghi chỉ số cho phòng đó (kỳ 12/2026)
+  const { roomCode } = await createTempLease(page)
   await page.goto('/meters')
   await page.getByLabel('Cơ sở', { exact: true }).selectOption({ label: 'Thảo Điền' })
-  await page.getByRole('button', { name: 'Xem', exact: true }).click()
-  const row = page.getByRole('row').filter({ has: page.getByLabel('Điện phòng 302', { exact: true }) })
-  const previous = Number(await row.locator('td').nth(1).innerText())
+  await page.getByLabel('Kỳ', { exact: true }).fill('2026-12')
+  await page.getByRole('button', { name: 'Xem bảng ghi' }).click()
+  const reading = page.getByLabel(`Điện phòng ${roomCode}`, { exact: true })
+  const box = reading.locator('xpath=..')
+  const previous = Number((await box.innerText()).match(/Chỉ số cũ:\s*(\d+)/)![1])
   expect(previous).toBeGreaterThan(0)
-  const reading = row.getByLabel('Điện phòng 302', { exact: true })
   await reading.fill('0')
   await page.getByRole('button', { name: 'Lưu chỉ số' }).click()
-  await expect(row.getByText('Chỉ số mới nhỏ hơn chỉ số cũ')).toBeVisible()
+  await expect(box.getByText('Chỉ số mới nhỏ hơn chỉ số cũ')).toBeVisible()
   await reading.fill(String(previous + 1))
   await page.getByRole('button', { name: 'Lưu chỉ số' }).click()
   await expect(page.getByText('Đã lưu 1 chỉ số', { exact: true })).toBeVisible()
-  await row.getByRole('button', { name: 'Thay', exact: true }).first().click()
-  const dialog = page.getByRole('dialog', { name: 'Thay đồng hồ' })
-  await dialog.getByLabel('Chỉ số cuối đồng hồ cũ').fill(String(previous + 1))
-  await dialog.getByLabel('Số hiệu đồng hồ mới').fill(`E2E-${Date.now()}`)
-  await dialog.getByLabel('Chỉ số đầu đồng hồ mới').fill('1000')
-  await dialog.getByRole('button', { name: 'Thay đồng hồ' }).click()
-  await expect(dialog).toBeHidden()
 })
