@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { createCanvas } from '@napi-rs/canvas'
+import { fillMeterReadings } from './helpers'
 
 test.skip(!process.env.E2E_BASE_URL, 'Cần E2E_BASE_URL trỏ tới môi trường thử có dữ liệu mẫu')
 
@@ -27,11 +28,6 @@ async function openFormWithRooms(page: Page, count = 1): Promise<string[]> {
   await expect(page.getByText(`Đã tạo ${count} phòng`, { exact: true })).toBeVisible()
   await page.goto('/contracts/new')
   return Array.from({ length: count }, (_, i) => `${prefix}${901 + i}`)
-}
-/** Phí mặc định theo đồng hồ (vd. Điện) được tự thêm vào form và đòi chỉ số ban đầu: điền cho mọi ô còn trống. */
-async function fillMeterReadings(page: Page) {
-  const inputs = page.getByLabel(/^Chỉ số ban đầu /)
-  for (let i = 0; i < await inputs.count(); i++) if (!(await inputs.nth(i).inputValue())) await inputs.nth(i).fill('100')
 }
 const roomOption = (page: Page, code: string) => page.locator('#room option').filter({ hasText: code })
 
@@ -231,7 +227,15 @@ test('công ty ký và tạo đồng hồ cho phí riêng', async ({ page }) => 
   await expect(page).toHaveURL(/\/contracts\/[a-f0-9-]+$/, { timeout: 60_000 })
   await expect(page.getByText('Phí thử theo đồng hồ')).toBeVisible()
   await expect(page.getByText('Số người ở').locator('..')).toContainText('2')
-  await page.goto('/invoices?view=draft')
+  // Hợp đồng không tự sinh hoá đơn: tạo hàng loạt cho Thảo Điền, kỳ 12/2026 (tháng bắt đầu hợp đồng)
+  await page.goto('/invoices/generate')
+  await page.getByLabel('Cơ sở').selectOption({ label: 'Thảo Điền' })
+  await page.getByLabel('Kỳ (tháng)').fill('2026-12')
+  await page.getByRole('button', { name: 'Xem trước' }).click()
+  const createDrafts = page.getByRole('button', { name: /^Tạo \d+ hoá đơn nháp$/ })
+  await expect(createDrafts).toBeEnabled()
+  await createDrafts.click()
+  await expect(page).toHaveURL(/view=draft/)
   // Danh sách phân trang 15 dòng; hoá đơn nháp từ các lần chạy trước nhiều nên mở rộng tối đa
   await page.getByLabel('Số dòng').selectOption('100')
   const invoiceRow = page.getByRole('row').filter({ hasText: companyName }).filter({ hasText: roomCode }).first()

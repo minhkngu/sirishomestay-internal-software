@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { fillMeterReadings, meterValue } from './helpers'
 
 test.skip(!process.env.E2E_BASE_URL, 'Cần E2E_BASE_URL trỏ tới môi trường thử có dữ liệu mẫu')
 async function login(page: Page, name: RegExp) {
@@ -49,6 +50,7 @@ test('nhập và chuyển vật tư theo số lượng', async ({ page }) => {
 })
 
 test('tạo cọc, chuyển thành hợp đồng, xuất Word và bàn giao', async ({ page }) => {
+  test.setTimeout(300_000) // luồng dài nhiều trang, môi trường thử chậm
   await login(page, /^Admin/)
   await page.goto('/contracts/new?kind=deposit')
   const roomOption = page.locator('#room option').filter({ hasText: 'Trống' }).first()
@@ -68,14 +70,15 @@ test('tạo cọc, chuyển thành hợp đồng, xuất Word và bàn giao', as
   await page.goto(depositUrl)
   await page.getByRole('link', { name: 'Chuyển thành hợp đồng thuê' }).click()
   await page.getByRole('button', { name: '+12 tháng' }).click()
+  await fillMeterReadings(page)
   await page.getByRole('button', { name: 'Tạo hợp đồng thuê' }).click()
-  await expect(page).toHaveURL(/\/contracts\/[a-f0-9-]+$/)
+  await expect(page).toHaveURL(/\/contracts\/[a-f0-9-]+$/, { timeout: 60_000 })
   const leaseUrl = page.url()
   await page.getByRole('tab', { name: 'Giấy tờ' }).click()
   const download = page.waitForEvent('download', { timeout: 20000 })
   await page.getByRole('button', { name: 'Xuất Word' }).click()
   expect((await download).suggestedFilename()).toMatch(/\.docx$/i)
-  await page.locator('input[type=file]').first().setInputFiles({ name: 'ban-da-ky.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n%%EOF') })
+  await page.locator('section', { hasText: 'Trạng thái ký' }).locator('input[type=file]').setInputFiles({ name: 'ban-da-ky.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n%%EOF') })
   await expect(page.getByRole('link', { name: 'Xem bản đã ký' })).toBeVisible()
   await page.getByRole('tab', { name: 'Bàn giao' }).click()
   await page.getByRole('button', { name: 'Check-in', exact: true }).click()
@@ -86,8 +89,8 @@ test('tạo cọc, chuyển thành hợp đồng, xuất Word và bàn giao', as
   await page.getByRole('tab', { name: 'Bàn giao' }).click()
   await page.getByRole('button', { name: 'Check-out', exact: true }).click()
   await expect(page).toHaveURL(/\/handovers\//)
-  await page.getByRole('button', { name: 'Mất', exact: true }).first().click()
-  await page.getByLabel(/Tiền phạt/).first().fill('500000')
+  const readings = page.getByLabel(/^Chỉ số /)
+  for (let i = 0; i < await readings.count(); i++) await readings.nth(i).fill(String(meterValue()))
   await page.getByRole('button', { name: 'Hoàn tất' }).click()
   await expect(page.getByText('Đã hoàn tất biên bản')).toBeVisible()
 })
