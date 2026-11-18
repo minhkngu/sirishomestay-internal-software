@@ -74,7 +74,6 @@ test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → 
   await expect(page).toHaveURL(/\/contracts\/[a-f0-9-]+$/, { timeout: 60_000 })
   const leaseUrl = page.url()
 
-  await page.getByRole('tab', { name: 'Bàn giao' }).click()
   await page.getByRole('button', { name: 'Check-in', exact: true }).click()
   await expect(page).toHaveURL(/\/handovers\//)
   await page.getByRole('button', { name: 'Hoàn tất' }).click()
@@ -93,9 +92,8 @@ test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → 
   await expect(page.getByRole('row').filter({ hasText: name })).toBeVisible()
 
   // thanh lý hợp đồng vừa tạo: hoá đơn thanh lý nháp, duyệt xong hợp đồng kết thúc
-  await page.goto(leaseUrl); await page.waitForLoadState('networkidle')
-  await page.getByRole('tab', { name: 'Phụ lục' }).click()
-  await page.getByRole('button', { name: 'Thanh lý hợp đồng' }).click()
+  await page.goto('/contracts'); await page.waitForLoadState('networkidle')
+  await page.getByRole('row').filter({ hasText: name }).getByRole('button', { name: 'Thanh lý hợp đồng' }).click()
   await page.getByLabel('Ngày trả phòng').fill('2026-12-10')
   for (const input of await page.getByText('Chỉ số tại ngày trả phòng').locator('xpath=..').locator('input[type=number]').all()) await input.fill(String(meterValue()))
   await page.getByRole('button', { name: 'Xem trước tiền' }).click()

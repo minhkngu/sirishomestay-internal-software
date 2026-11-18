@@ -3,7 +3,7 @@ import { TEMPLATE_FIELDS, DOC_TYPES, DOC_TYPE_LABELS, buildTemplateData, sampleD
 
 describe('TEMPLATE_FIELDS', () => {
   it('có đủ 10 loại giấy tờ, mỗi trường có mã, ý nghĩa và ví dụ', () => {
-    expect(DOC_TYPES).toHaveLength(10)
+    expect(DOC_TYPES).toHaveLength(11)
     for (const t of DOC_TYPES) {
       expect(DOC_TYPE_LABELS[t]).toBeTruthy()
       expect(TEMPLATE_FIELDS[t].length).toBeGreaterThan(0)
@@ -13,6 +13,10 @@ describe('TEMPLATE_FIELDS', () => {
         expect(f.example).not.toBe('')
       }
     }
+  })
+  it('phụ lục chuyển nhượng có thông tin cả hai bên', () => {
+    const data = buildTemplateData('addendum_assignment', { oldTenant: { name: 'Khách cũ', idDocument: '111' }, newTenant: { name: 'Khách mới', idDocument: '222' } })
+    expect(data).toMatchObject({ ten_ben_chuyen: 'Khách cũ', giay_to_ben_chuyen: '111', ten_ben_nhan: 'Khách mới', giay_to_ben_nhan: '222' })
   })
   it('hợp đồng thuê có các chỗ điền và vòng lặp theo spec', () => {
     const keys = TEMPLATE_FIELDS.lease.map((f) => f.key)

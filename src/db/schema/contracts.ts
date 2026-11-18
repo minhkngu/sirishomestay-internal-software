@@ -99,3 +99,14 @@ export const depositEntries = pgTable('deposit_entries', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
+
+export const contractVersions = pgTable('contract_versions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  contractId: uuid('contract_id').notNull(),
+  kind: text('kind').notNull(),
+  operation: text('operation').notNull(),
+  sequence: integer('sequence').notNull(),
+  actorId: uuid('actor_id').notNull(),
+  snapshot: jsonb('snapshot').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [uniqueIndex('contract_versions_kind_contract_sequence_idx').on(t.kind, t.contractId, t.sequence)]).enableRLS()

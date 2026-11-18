@@ -1,5 +1,5 @@
 {
-  "id": "138876ea-2c1f-40de-986b-dd12434517ae",
+  "id": "2214fdd6-423e-43da-b413-eaaa951b83f4",
   "prevId": "c4e261cc-ff33-4a34-9301-69710cffa4e5",
   "version": "7",
   "dialect": "postgresql",
@@ -4045,7 +4045,7 @@
           "name": "home_facility_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "phone": {
           "name": "phone",

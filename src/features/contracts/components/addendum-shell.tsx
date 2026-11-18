@@ -11,15 +11,15 @@ type Result = { ok: true; data: unknown } | { ok: false; error: string }
 export type MeterOption = { meterId: string; roomId: string; utility: 'electric' | 'water'; serial: string | null }
 
 /** Khung dùng chung của các wizard phụ lục: nhập → "Xem trước tiền" → lưu. Đổi dữ liệu nhập thì phải xem trước lại. */
-export function AddendumShell({ label, kind, leaseId, input, create, children }: { label: string; kind: 'occupants' | 'extension' | 'transfer' | 'termination'; leaseId: string; input: unknown; create: (leaseId: string, input: unknown) => Promise<Result>; children: ReactNode }) {
+export function AddendumShell({ label, kind, leaseId, input, create, children, defaultOpen = false, onCompleted }: { label: string; kind: 'occupants' | 'extension' | 'transfer' | 'termination'; leaseId: string; input: unknown; create: (leaseId: string, input: unknown) => Promise<Result>; children: ReactNode; defaultOpen?: boolean; onCompleted?: () => void }) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   const [pending, start] = useTransition()
   const [preview, setPreview] = useState<{ key: string; data: Preview } | null>(null)
   const key = JSON.stringify(input)
   const fresh = preview?.key === key ? preview.data : null
   const doPreview = () => start(async () => { const r = await previewAddendumAction(kind, leaseId, input); if (!r.ok) toast.error(r.error); else setPreview({ key, data: r.data as Preview }) })
-  const save = () => start(async () => { const r = await create(leaseId, input); if (!r.ok) toast.error(r.error); else { toast.success('Đã lưu phụ lục'); setOpen(false); setPreview(null); router.refresh() } })
+  const save = () => start(async () => { const r = await create(leaseId, input); if (!r.ok) toast.error(r.error); else { toast.success('Đã lưu phụ lục'); setOpen(false); setPreview(null); router.refresh(); onCompleted?.() } })
   if (!open) return <Button variant="outline" size="sm" onClick={() => setOpen(true)}>{label}</Button>
   return (
     <section className="max-w-xl space-y-3 rounded-lg border bg-card p-4">
@@ -28,7 +28,7 @@ export function AddendumShell({ label, kind, leaseId, input, create, children }:
       <div className="flex gap-2">
         <Button size="sm" variant="outline" disabled={pending} onClick={doPreview}>Xem trước tiền</Button>
         <Button size="sm" disabled={pending || !fresh} onClick={save}>Lưu phụ lục</Button>
-        <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Đóng</Button>
+        {!defaultOpen && <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Đóng</Button>}
       </div>
       {fresh && (
         <div className="space-y-1 rounded-md bg-muted/50 p-3 text-sm">

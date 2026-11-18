@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { addenda, assets, depositContracts, depositEntries, facilities, feeTypes, feeUnits, handoverItems, handovers, invoiceLines, invoices, leaseOccupants, leases, meterReadings, meters, oneOffCharges, payments, pendingAdjustments, rooms, tenants, utilityRates } from '@/db'
+import { addenda, assets, depositContracts, depositEntries, facilities, feeTypes, feeUnits, files, handoverItems, handovers, invoiceLines, invoices, leaseOccupants, leases, meterReadings, meters, oneOffCharges, payments, pendingAdjustments, rooms, tenants, utilityRates } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { resolveFeePrice } from '@/domain/fee-price'
@@ -16,7 +16,8 @@ import { meterUsage } from '@/domain/meters'
 import { rateFor } from '@/domain/rates'
 import type { ContractFee, DepositEntry, ForfeitInput, Invoice, InvoiceLineInput, Meter, MeterReading, OneOffCharge, PendingAdjustment, Proration, UtilityRate } from '@/domain/types'
 import { recordAudit } from '@/server/audit'
-import { registerExportOwnerResolver } from '@/server/files/owners'
+import { captureContractVersion, recordTerminationHandover, recordTerminationReadings } from '@/server/contracts/history'
+import { registerExportOwnerResolver, registerOwnerResolver } from '@/server/files/owners'
 import { leaseData, loadAddenda, nextInvoiceCode } from '@/server/invoices/service'
 import { getSettings } from '@/server/settings/service'
 import type { StorageAdapter } from '@/server/storage/types'
@@ -33,6 +34,7 @@ const feesSchema = z.array(z.object({ feeTypeId: z.uuid(), quantity: z.number().
 const occupantSchema = z.object({ effectiveDate: date, occupantIds: z.array(z.uuid()).min(1, 'Chọn ít nhất một người ở'), adjustmentTarget: target })
 const extensionSchema = z.object({ effectiveDate: date, newEndDate: date, newMonthlyRent: z.number().int().positive().optional(), newDepositAmount: z.number().int().nonnegative().optional(), newFees: feesSchema, adjustmentTarget: target })
 const transferSchema = z.object({ effectiveDate: date, newRoomId: z.uuid(), newMonthlyRent: z.number().int().positive().optional(), newFees: feesSchema, readings: readingsSchema, adjustmentTarget: target })
+const assignmentSchema = z.object({ effectiveDate: date, newTenantId: z.uuid() })
 const terminationSchema = z.object({ endDate: date, forfeit: z.object({ mode: z.enum(['all', 'partial', 'none']), amount: z.number().int().nonnegative().optional() }).default({ mode: 'none' }), readings: readingsSchema })
 function parse<T>(schema: z.ZodType<T>, input: unknown): T {
   const r = schema.safeParse(input)
@@ -135,6 +137,7 @@ export async function createExtension(db: DB, ctx: AccessContext, leaseId: strin
     const [base, existing] = await Promise.all([leaseData(tx, leaseId), loadAddenda(tx, leaseId)])
     const current = contractTermsAt(base, existing, data.effectiveDate)
     const newFees = data.newFees ? await resolveFees(tx, data.newFees) : null
+    await captureContractVersion(tx, ctx, 'lease', leaseId, 'extension')
     const [row] = await tx.insert(addenda).values({ leaseId, type: 'extension', effectiveDate: data.effectiveDate, newEndDate: data.newEndDate, newMonthlyRent: data.newMonthlyRent ?? null, newDepositAmount: data.newDepositAmount ?? null, newFees, adjustmentTarget: data.adjustmentTarget }).returning()
     await tx.update(leases).set({ endDate: data.newEndDate, updatedAt: new Date() }).where(eq(leases.id, leaseId))
     const diff = data.newDepositAmount != null ? depositDiffEntry(current.depositAmount, data.newDepositAmount, data.effectiveDate) : null
@@ -169,6 +172,28 @@ export async function createTransfer(db: DB, ctx: AccessContext, leaseId: string
   })
 }
 
+export async function createAssignment(db: DB, ctx: AccessContext, leaseId: string, input: unknown): Promise<AddendumResult> {
+  const data = parse(assignmentSchema, input)
+  return db.transaction(async tx0 => {
+    const tx = tx0 as unknown as DB
+    const { l, facilityId } = await lockLease(tx, ctx, leaseId)
+    checkDate(l, data.effectiveDate)
+    if (data.newTenantId === l.tenantId) throw new ValidationError('Người nhận trùng bên thuê hiện tại')
+    const [tenant] = await tx.select().from(tenants).where(eq(tenants.id, data.newTenantId))
+    if (!tenant) throw new NotFoundError()
+    if (tenant.homeFacilityId !== facilityId) throw new ValidationError('Người nhận phải thuộc cùng cơ sở')
+    const oldOccupantIds = (await tx.select().from(leaseOccupants).where(eq(leaseOccupants.leaseId, leaseId))).map(o => o.tenantId)
+    const newOccupantIds = [...new Set([...oldOccupantIds.filter(id => id !== l.tenantId), ...(tenant.kind === 'company' ? [] : [tenant.id])])]
+    await captureContractVersion(tx, ctx, 'lease', leaseId, 'assignment')
+    const [row] = await tx.insert(addenda).values({ leaseId, type: 'assignment', effectiveDate: data.effectiveDate, oldTenantId: l.tenantId, newTenantId: tenant.id, oldOccupantIds, newOccupantIds }).returning()
+    await tx.update(leases).set({ tenantId: tenant.id, updatedAt: new Date() }).where(eq(leases.id, leaseId))
+    await tx.delete(leaseOccupants).where(and(eq(leaseOccupants.leaseId, leaseId), eq(leaseOccupants.tenantId, l.tenantId)))
+    if (tenant.kind !== 'company') await tx.insert(leaseOccupants).values({ leaseId, tenantId: tenant.id }).onConflictDoNothing()
+    await recordAudit(tx, ctx, { action: 'create', entity: 'addendum', entityId: row.id, facilityId, summary: `Chuyển nhượng hợp đồng ${l.code}`, before: { tenantId: l.tenantId }, after: { tenantId: tenant.id } })
+    return { addendum: row, adjustments: [], ...EMPTY_RESULT }
+  })
+}
+
 export async function createTermination(db: DB, ctx: AccessContext, leaseId: string, input: unknown): Promise<AddendumResult> {
   const data = parse(terminationSchema, input)
   return db.transaction(async tx0 => {
@@ -176,10 +201,13 @@ export async function createTermination(db: DB, ctx: AccessContext, leaseId: str
     if (data.endDate < l.startDate) throw new ValidationError('Ngày thanh lý phải sau ngày bắt đầu hợp đồng', { endDate: 'Ngày thanh lý phải sau ngày bắt đầu hợp đồng' })
     const [dup] = await tx.select({ id: addenda.id }).from(addenda).where(and(eq(addenda.leaseId, leaseId), eq(addenda.type, 'termination'))).limit(1)
     if (dup) throw new ValidationError('Hợp đồng đã có phụ lục thanh lý')
+    const versionId = await captureContractVersion(tx, ctx, 'lease', leaseId, 'termination')
     await recordReadings(tx, [l.roomId], data.endDate, data.readings)
+    await recordTerminationReadings(tx, versionId, data.endDate, data.readings.map(r => r.meterId))
     // Dùng biên bản check-out đã lập (phạt tài sản nằm ở đó); chưa có thì tạo mới
     const [existingCheckout] = await tx.select().from(handovers).where(and(eq(handovers.leaseId, leaseId), eq(handovers.roomId, l.roomId), eq(handovers.kind, 'check_out'))).orderBy(desc(handovers.createdAt)).limit(1)
     const checkout = existingCheckout ?? await newHandover(tx, leaseId, l.roomId, 'check_out', data.endDate)
+    await recordTerminationHandover(tx, versionId, existingCheckout ? null : checkout.id)
     const [row] = await tx.insert(addenda).values({ leaseId, type: 'termination', effectiveDate: data.endDate, depositForfeit: data.forfeit, adjustmentTarget: 'next' }).returning()
 
     const [base, all, settings, entries, allInvoices, ms, rates, oneOffs, pending, items] = await Promise.all([
@@ -252,15 +280,20 @@ async function loadAddendum(db: DB, ctx: AccessContext, id: string) {
   if (!row) throw new NotFoundError(); assertCan(ctx, 'tenants_contracts', row.facilityId)
   return row
 }
-export async function setAddendumSignStatus(db: DB, ctx: AccessContext, id: string, status: Sign): Promise<void> {
+export async function setAddendumSignStatus(db: DB, ctx: AccessContext, id: string, status: Sign, signedFileId?: string): Promise<void> {
   await db.transaction(async tx0 => {
     const tx = tx0 as unknown as DB; const { a, facilityId } = await loadAddendum(tx, ctx, id)
     if (RANK[status] < RANK[a.signStatus as Sign]) throw new ValidationError('Không thể lùi trạng thái ký')
-    await tx.update(addenda).set({ signStatus: status, updatedAt: new Date() }).where(eq(addenda.id, id))
+    if (a.type === 'assignment' && status === 'signed' && !signedFileId && !a.signedFileId) throw new ValidationError('Cần tải tệp phụ lục đã ký')
+    if (signedFileId) {
+      const [file] = await tx.select().from(files).where(eq(files.id, signedFileId))
+      if (!file || file.ownerType !== 'signed_addendum' || file.ownerId !== id || !file.confirmedAt) throw new ValidationError('Tệp phụ lục đã ký chưa được tải lên')
+    }
+    await tx.update(addenda).set({ signStatus: status, signedFileId: signedFileId ?? a.signedFileId, updatedAt: new Date() }).where(eq(addenda.id, id))
     await recordAudit(tx, ctx, { action: 'update', entity: 'addendum', entityId: id, facilityId, summary: `Đổi trạng thái ký phụ lục → ${status}`, before: { signStatus: a.signStatus }, after: { signStatus: status } })
   })
 }
-const DOC = { extension: 'addendum_extension', transfer: 'addendum_transfer', termination: 'addendum_termination' } as const
+const DOC = { extension: 'addendum_extension', transfer: 'addendum_transfer', assignment: 'addendum_assignment', termination: 'addendum_termination' } as const
 export async function exportAddendum(db: DB, ctx: AccessContext, storage: StorageAdapter, id: string, templateId?: string) {
   const { a } = await loadAddendum(db, ctx, id)
   const docType = DOC[a.type as keyof typeof DOC]; if (!docType) throw new ValidationError('Loại phụ lục này chưa có mẫu giấy tờ')
@@ -273,9 +306,12 @@ for (const docType of Object.values(DOC)) {
     const { a, facilityId } = await loadAddendum(db, ctx, id)
     const [row] = await db.select({ l: leases, room: rooms, tenant: tenants, facility: facilities }).from(leases).innerJoin(rooms, eq(rooms.id, leases.roomId)).innerJoin(tenants, eq(tenants.id, leases.tenantId)).innerJoin(facilities, eq(facilities.id, rooms.facilityId)).where(eq(leases.id, a.leaseId))
     const [oldRoom] = a.oldRoomId ? await db.select().from(rooms).where(eq(rooms.id, a.oldRoomId)) : [null]
+    const [oldTenant] = a.oldTenantId ? await db.select().from(tenants).where(eq(tenants.id, a.oldTenantId)) : [null]
+    const [newTenant] = a.newTenantId ? await db.select().from(tenants).where(eq(tenants.id, a.newTenantId)) : [null]
+    const person = (p: typeof tenants.$inferSelect | null) => p ? { name: p.kind === 'company' ? p.companyName ?? '' : p.fullName ?? '', idDocument: p.kind === 'company' ? p.taxCode : p.kind === 'foreign' ? p.passportNumber : p.idNumber } : undefined
     const t = row.tenant
     const entities: DocEntities = {
-      now: todayVN(), tenant: { kind: t.kind as 'foreign', fullName: t.fullName, companyName: t.companyName, taxCode: t.taxCode, idDocument: t.kind === 'foreign' ? t.passportNumber : t.idNumber, phone: t.phone, email: t.email },
+      now: todayVN(), oldTenant: person(oldTenant), newTenant: person(newTenant), tenant: { kind: t.kind as 'foreign', fullName: t.fullName, companyName: t.companyName, taxCode: t.taxCode, idDocument: t.kind === 'foreign' ? t.passportNumber : t.idNumber, phone: t.phone, email: t.email },
       facility: { name: row.facility.name, address: row.facility.address }, room: { code: oldRoom?.code ?? row.room.code, oldCode: oldRoom?.code },
       lease: { code: row.l.code, startDate: row.l.startDate, endDate: row.l.endDate, monthlyRent: row.l.monthlyRent, depositAmount: row.l.depositAmount },
       addendum: { effectiveDate: a.effectiveDate, newEndDate: a.newEndDate, newMonthlyRent: a.newMonthlyRent, newDepositAmount: a.newDepositAmount, newRoomCode: a.newRoomId ? row.room.code : null },
@@ -286,6 +322,11 @@ for (const docType of Object.values(DOC)) {
 registerExportOwnerResolver(async (db, id) => {
   const [row] = await db.select({ f: rooms.facilityId }).from(addenda).innerJoin(leases, eq(leases.id, addenda.leaseId)).innerJoin(rooms, eq(rooms.id, leases.roomId)).where(eq(addenda.id, id))
   if (!row) throw new NotFoundError(); return { facilityId: row.f }
+})
+registerOwnerResolver('signed_addendum', async (db, id) => {
+  const [row] = await db.select({ facilityId: rooms.facilityId }).from(addenda).innerJoin(leases, eq(leases.id, addenda.leaseId)).innerJoin(rooms, eq(rooms.id, leases.roomId)).where(eq(addenda.id, id))
+  if (!row) throw new NotFoundError()
+  return { facilityId: row.facilityId }
 })
 
 /** Dữ liệu cho các wizard phụ lục: phòng trống cùng cơ sở, đồng hồ đang chạy, khách cá nhân có thể làm người ở, loại phí. */
@@ -298,7 +339,7 @@ export async function addendumFormData(db: DB, ctx: AccessContext, leaseId: stri
   const free = roomRows.filter(r => !busy.has(r.id) && !held.has(r.id))
   const ids = [row.l.roomId, ...free.map(r => r.id)]
   const ms = (await db.select().from(meters).where(and(inArray(meters.roomId, ids), isNull(meters.removedOn)))).map(m => ({ meterId: m.id, roomId: m.roomId, utility: m.utility as 'electric' | 'water', serial: m.serial }))
-  const people = await db.select({ id: tenants.id, name: tenants.fullName }).from(tenants).where(ne(tenants.kind, 'company')).orderBy(asc(tenants.fullName))
+  const people = await db.select({ id: tenants.id, name: tenants.fullName }).from(tenants).where(and(ne(tenants.kind, 'company'), eq(tenants.homeFacilityId, row.facilityId))).orderBy(asc(tenants.fullName))
   const fees = await db.select({ id: feeTypes.id, name: feeTypes.name, defaultPrice: feeTypes.defaultPrice }).from(feeTypes)
   const prices = await listFeeTypePrices(db, ctx)
   const resolvedFees = fees.map((fee) => ({ ...fee, defaultPrice: resolveFeePrice(fee.defaultPrice, prices[fee.id], row.facilityId) }))

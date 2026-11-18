@@ -147,15 +147,11 @@ test('tạo hợp đồng với tiền thực nhận, ghi chú và tài sản m�
   await expect(page).toHaveURL(/\/contracts\/[a-f0-9-]+$/, { timeout: 60_000 })
   await expect(page.getByText('Ghi chú kiểm thử')).toBeVisible()
   if (selectedTemplate) {
-    await page.getByRole('tab', { name: 'Giấy tờ' }).click()
     await expect(page.getByLabel('Chọn mẫu')).toHaveValue(selectedTemplate)
   }
-  await page.getByRole('tab', { name: 'Bàn giao' }).click()
-  await expect(page.getByText('Nháp', { exact: true })).toBeVisible()
-  await page.getByRole('tab', { name: 'Sổ cọc' }).click()
+  await expect(page.getByText('Nháp', { exact: true }).first()).toBeVisible()
   await expect(page.getByText(/3\.000\.000/).first()).toBeVisible()
   await expect(page.getByText(/6\.000\.000/).first()).toBeVisible()
-  await page.getByRole('tab', { name: 'Bàn giao' }).click()
   await page.getByRole('link', { name: 'Xem biên bản' }).first().click()
   const asset = page.getByRole('listitem').filter({ hasText: assetName })
   await expect(asset.getByText('Tình trạng đang ghi: Trầy nhẹ')).toBeVisible()
