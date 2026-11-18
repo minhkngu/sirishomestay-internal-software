@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { and, eq } from 'drizzle-orm'
 import { leaseFeeMeters, leaseFeeSnapshots, meterReadings, assets, docTemplates, files, invoiceTemplates, meters, handovers, handoverItems, depositContracts, depositEntries, facilities, feeTypes, feeUnits, leaseOccupants, leases, rooms } from '@/db'
 import { assetHistory } from '@/server/assets/service'
-import { listReadingSheet } from '@/server/meters/service'
+import { listMeterOverview, listReadingSheet } from '@/server/meters/service'
 import { leaseData } from '@/server/invoices/service'
 import { listFeeTypes, updateFeeType, archiveFeeType } from '@/server/fees/service'
 import { createTenant } from '@/server/tenants/service'
@@ -310,6 +310,15 @@ describe('contracts', () => {
     await createLease(db, lan(), snapshot([meterFee({ existingMeterId: meter.id, initialReading: 130 })], { tenantId: tenant2, occupantIds: [tenant2] }))
     expect(await db.select().from(meters).where(eq(meters.roomId, r301))).toHaveLength(1)
     expect(await db.select().from(meterReadings).where(eq(meterReadings.meterId, meter.id))).toEqual([expect.objectContaining({ kind: 'handover', readOn: '2026-10-15', value: 130 })])
+  })
+
+  it('liệt kê đồng hồ theo dòng phí và hợp đồng đang hiệu lực', async () => {
+    await updateFeeType(db, admin, feePerson, { name: 'ABC', quantityFrom: 'meter' })
+    const { lease } = await createLease(db, lan(), snapshot([meterFee({ initialReading: 10 }), meterFee({ initialReading: 20, name: 'ABC' })]))
+    const rows = (await listMeterOverview(db, admin, fa)).filter(r => r.roomId === r301)
+    expect(rows).toHaveLength(2)
+    expect(rows.every(r => r.feeName === 'ABC' && r.unit === 'người' && r.leaseCode === lease.code)).toBe(true)
+    expect(rows.map(r => r.startReading).sort()).toEqual([10, 20])
   })
 
   it('hai dòng cùng loại phí có hai đồng hồ riêng', async () => {

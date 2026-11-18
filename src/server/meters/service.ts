@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { leaseFeeMeters, leaseFeeSnapshots, leases, meterReadings, meters, rooms } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
@@ -204,4 +204,39 @@ export async function ensureFeeMeter(tx: DB, ctx: AccessContext, input: { roomId
   }
   await tx.insert(leaseFeeMeters).values({ leaseFeeId: input.leaseFeeId, meterId: found.id })
   return { id: found.id }
+}
+
+export type MeterOverviewRow = {
+  meterId: string; roomId: string; roomCode: string; floor: string | null
+  feeName: string | null; unit: string | null; leaseCode: string | null
+  serial: string | null; startReading: number; installedOn: string; removedOn: string | null
+  readings: { period: string; kind: 'monthly' | 'handover'; readOn: string; value: number }[]
+}
+
+/** Danh sách đồng hồ của một cơ sở kèm dòng phí, hợp đồng đang hiệu lực và lịch sử chỉ số (mới nhất trước). */
+export async function listMeterOverview(db: DB, ctx: AccessContext, facilityId: string): Promise<MeterOverviewRow[]> {
+  assertCan(ctx, 'meters', facilityId)
+  const base = await db.select({ meter: meters, room: rooms }).from(meters).innerJoin(rooms, eq(rooms.id, meters.roomId)).where(eq(rooms.facilityId, facilityId))
+  if (base.length === 0) return []
+  const ids = base.map(b => b.meter.id)
+  const [links, readings] = await Promise.all([
+    db.select({ meterId: leaseFeeMeters.meterId, name: leaseFeeSnapshots.name, unit: leaseFeeSnapshots.unit, leaseCode: leases.code, status: leases.status, startDate: leases.startDate })
+      .from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).innerJoin(leases, eq(leases.id, leaseFeeSnapshots.leaseId))
+      .where(inArray(leaseFeeMeters.meterId, ids)),
+    db.select().from(meterReadings).where(inArray(meterReadings.meterId, ids)).orderBy(desc(meterReadings.readOn), desc(meterReadings.createdAt)),
+  ])
+  const LEGACY: Record<string, { name: string; unit: string }> = { electric: { name: 'Điện', unit: 'kWh' }, water: { name: 'Nước', unit: 'm³' } }
+  const rows = base.map(({ meter, room }) => {
+    const mine = links.filter(l => l.meterId === meter.id).sort((a, b) => (a.status === 'active' ? 0 : 1) - (b.status === 'active' ? 0 : 1) || b.startDate.localeCompare(a.startDate))
+    const link = mine[0]
+    const legacy = LEGACY[meter.utility]
+    return {
+      meterId: meter.id, roomId: room.id, roomCode: room.code, floor: room.floor,
+      feeName: link?.name ?? legacy?.name ?? null, unit: link?.unit ?? legacy?.unit ?? null,
+      leaseCode: link?.status === 'active' ? link.leaseCode : null,
+      serial: meter.serial, startReading: meter.startReading, installedOn: meter.installedOn, removedOn: meter.removedOn,
+      readings: readings.filter(r => r.meterId === meter.id).map(r => ({ period: r.period, kind: r.kind as 'monthly' | 'handover', readOn: r.readOn, value: r.value })),
+    }
+  })
+  return rows.sort((a, b) => (a.floor ?? '').localeCompare(b.floor ?? '') || a.roomCode.localeCompare(b.roomCode) || Number(a.removedOn !== null) - Number(b.removedOn !== null) || (a.feeName ?? '').localeCompare(b.feeName ?? ''))
 }
