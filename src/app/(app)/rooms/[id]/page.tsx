@@ -11,7 +11,7 @@ import { listAmenities } from '@/server/amenities/service'
 import { RoomEditForm } from '@/features/rooms/components/room-edit-form'
 import { getRoomDetail } from '@/server/rooms/service'
 import { listAssets } from '@/server/assets/service'
-import { IncidentBoard } from '@/features/incidents/components/incident-board'
+import { RoomIncidentList } from '@/features/rooms/components/room-incident-list'
 import { listIncidents } from '@/server/incidents/service'
 import { userProfiles } from '@/db'
 import { inArray } from 'drizzle-orm'
@@ -194,9 +194,9 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
       {roomIncidents && (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold tracking-tight text-foreground">Sự cố của phòng ({roomIncidents.filter((i) => i.status !== 'cancelled').length})</h2>
-          <IncidentBoard items={roomIncidents.filter((i) => i.status !== 'cancelled').map((i) => ({
-            id: i.id, title: i.title, priority: i.priority, status: i.status, place: `Phòng ${r.code}`,
-            assigneeName: people.find((p) => p.id === i.assigneeId)?.name ?? null,
+          <RoomIncidentList items={roomIncidents.filter((i) => i.status !== 'cancelled').map((i) => ({
+            id: i.id, title: i.title, status: i.status, priority: i.priority, cost: i.cost,
+            createdAt: i.createdAt.toISOString(), assigneeName: people.find((p) => p.id === i.assigneeId)?.name ?? null,
           }))} />
         </section>
       )}
