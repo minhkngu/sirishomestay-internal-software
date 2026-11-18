@@ -14,10 +14,19 @@ function fakeAuth(): AuthAdmin {
   }
 }
 
+// Các test chỉ đọc dùng chung một DB đã seed; test nào ghi dữ liệu thì tự tạo DB riêng.
+let seeded: ReturnType<typeof createTestDb> | undefined
+function seededDb() {
+  seeded ??= createTestDb().then(async (db) => {
+    await runSeed(db, fakeAuth(), { today: '2026-11-16', password: 'x' })
+    return db
+  })
+  return seeded
+}
+
 describe('runSeed', () => {
   it('nạp 2 cơ sở, 40 phòng, 5 tài khoản mẫu với đúng quyền', async () => {
-    const db = await createTestDb()
-    await runSeed(db, fakeAuth(), { today: '2026-11-16', password: 'x' })
+    const db = await seededDb()
     const facs = await db.select().from(facilities)
     expect(facs.map((f) => f.code).sort()).toEqual(['BT', 'TD'])
     expect(facs.every((f) => f.isDemo)).toBe(true)
@@ -33,8 +42,7 @@ describe('runSeed', () => {
   })
 
   it('nạp 6 loại phí, đơn vị và đơn giá điện nước (điện đổi giá từ đầu tháng hiện tại)', async () => {
-    const db = await createTestDb()
-    await runSeed(db, fakeAuth(), { today: '2026-11-16', password: 'x' })
+    const db = await seededDb()
     const types = await db.select().from(feeTypes)
     expect(types.map((t) => t.name).sort()).toEqual(['Dọn phòng thêm', 'Giặt ủi', 'Gửi xe máy', 'Internet', 'Nước theo người', 'Phí dịch vụ'])
     expect(types.find((t) => t.name === 'Phí dịch vụ')).toMatchObject({ billing: 'monthly_fixed', quantityFrom: 'occupants' })
@@ -48,8 +56,7 @@ describe('runSeed', () => {
   })
 
   it('nạp 30 khách (14 nước ngoài / 12 Việt Nam / 4 công ty) với visa hết hạn tương đối so với ngày seed', async () => {
-    const db = await createTestDb()
-    await runSeed(db, fakeAuth(), { today: '2026-11-16', password: 'x' })
+    const db = await seededDb()
     const all = await db.select().from(tenants)
     expect(all).toHaveLength(30)
     const foreign = all.filter((t) => t.kind === 'foreign')
@@ -62,8 +69,7 @@ describe('runSeed', () => {
   })
 
   it('nạp mẫu Word cho mỗi loại giấy tờ, mỗi loại một mẫu mặc định có file', async () => {
-    const db = await createTestDb()
-    await runSeed(db, fakeAuth(), { today: '2026-11-16', password: 'x' })
+    const db = await seededDb()
     const t = await db.select().from(docTemplates)
     expect(t).toHaveLength(DOC_TYPES.length)
     expect(t.every((x) => x.isDefault && x.fileId && x.isDemo)).toBe(true)
@@ -72,8 +78,7 @@ describe('runSeed', () => {
   })
 
   it('nạp ~26 hợp đồng thuê (vài cái sắp hết hạn, 2 cái chưa ký) và 3 hợp đồng cọc chờ', async () => {
-    const db = await createTestDb()
-    await runSeed(db, fakeAuth(), { today: '2026-11-16', password: 'x' })
+    const db = await seededDb()
     const ls = await db.select().from(leases)
     expect(ls).toHaveLength(26)
     expect(ls.every((l) => l.status === 'active' && l.isDemo)).toBe(true)
@@ -91,8 +96,7 @@ describe('runSeed', () => {
   })
 
   it('nạp ~120 tài sản ở phòng, khu chung và kho, nhất quán với cơ sở', async () => {
-    const db = await createTestDb()
-    await runSeed(db, fakeAuth(), { today: '2026-11-16', password: 'x' })
+    const db = await seededDb()
     const all = await db.select().from(assets)
     expect(all.length).toBeGreaterThanOrEqual(110)
     expect(all.length).toBeLessThanOrEqual(170)
@@ -106,8 +110,7 @@ describe('runSeed', () => {
   })
 
   it('nạp đồng hồ điện + nước mỗi phòng và chỉ số 3 tháng gần nhất (có một đồng hồ đã thay)', async () => {
-    const db = await createTestDb()
-    await runSeed(db, fakeAuth(), { today: '2026-11-16', password: 'x' })
+    const db = await seededDb()
     const ms = await db.select().from(meters)
     expect(ms.filter((m) => !m.removedOn)).toHaveLength(80)
     expect(ms.filter((m) => m.removedOn)).toHaveLength(1)
@@ -125,8 +128,7 @@ describe('runSeed', () => {
   })
 
   it('nạp biên bản check-in đã hoàn tất cho mọi hợp đồng thuê, mỗi món tài sản trong phòng một dòng', async () => {
-    const db = await createTestDb()
-    await runSeed(db, fakeAuth(), { today: '2026-11-16', password: 'x' })
+    const db = await seededDb()
     const hs = await db.select().from(handovers)
     expect(hs).toHaveLength(26)
     expect(hs.every((h) => h.kind === 'check_in' && h.status === 'done' && h.isDemo)).toBe(true)
