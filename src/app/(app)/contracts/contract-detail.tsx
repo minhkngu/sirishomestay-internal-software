@@ -32,6 +32,7 @@ import { OccupantDialog } from '@/features/contracts/components/occupant-dialog'
 import { ContractRowActions } from '@/features/contracts/components/contract-row-actions'
 import { addendumFormData, listAddenda } from '@/server/addenda/service'
 import { cn } from '@/lib/utils'
+import { signStatusLabel } from '@/domain/sign-status'
 
 const ENTRY: Record<string, string> = {
   collect: 'Thu cọc',
@@ -176,6 +177,14 @@ export default async function ContractDetail({ id }: { id: string }) {
                 >
                   {statusLabels[deposit.status] || deposit.status}
                 </span>
+                <span
+                className={cn(
+                  'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
+                  deposit.signStatus === 'signed' ? 'border-emerald-200/80 bg-emerald-50 text-emerald-700' : 'border-border/80 bg-muted/60 text-muted-foreground'
+                )}
+              >
+                {signStatusLabel(deposit.signStatus)}
+              </span>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
                 Khách thuê: <strong className="font-medium text-foreground">{deposit.tenantName}</strong>
@@ -223,16 +232,16 @@ export default async function ContractDetail({ id }: { id: string }) {
         </div>
 
         <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-2xs space-y-4">
+          <ExportMenu
+            kind="deposit"
+            id={deposit.id}
+            templates={templates.map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault }))}
+          />
           <SignStatus
             kind="deposit"
             id={deposit.id}
             status={deposit.signStatus as 'draft'}
             signedFileId={deposit.signedFileId}
-          />
-          <ExportMenu
-            kind="deposit"
-            id={deposit.id}
-            templates={templates.map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault }))}
           />
         </div>
 
@@ -284,6 +293,14 @@ export default async function ContractDetail({ id }: { id: string }) {
                 )}
               >
                 {isActive ? 'Đang hiệu lực' : 'Đã kết thúc'}
+              </span>
+              <span
+                className={cn(
+                  'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
+                  lease.signStatus === 'signed' ? 'border-emerald-200/80 bg-emerald-50 text-emerald-700' : 'border-border/80 bg-muted/60 text-muted-foreground'
+                )}
+              >
+                {signStatusLabel(lease.signStatus)}
               </span>
               <span className="rounded-full border border-border/80 bg-muted/60 px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
                 Phòng {lease.roomCode}
@@ -466,17 +483,17 @@ export default async function ContractDetail({ id }: { id: string }) {
             <FileUpload ownerType="lease_photo" ownerId={lease.id} multiple label="Thêm ảnh hợp đồng" />
           </section>
           <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-2xs space-y-4">
-            <SignStatus
-              kind="lease"
-              id={lease.id}
-              status={lease.signStatus as 'draft'}
-              signedFileId={lease.signedFileId}
-            />
             <ExportMenu
               kind="lease"
               id={lease.id}
               selectedTemplateId={lease.contractTemplateId}
               templates={templates.map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault }))}
+            />
+            <SignStatus
+              kind="lease"
+              id={lease.id}
+              status={lease.signStatus as 'draft'}
+              signedFileId={lease.signedFileId}
             />
             {exports.length > 0 && (
               <div className="space-y-2 pt-3 border-t border-border/60">
