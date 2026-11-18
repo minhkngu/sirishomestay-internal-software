@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { FeeTypeForm } from '@/features/settings/components/fee-type-form'
 import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { createFacilityAction, updateFacilityAction } from '@/server/facilities/actions'
@@ -147,7 +148,7 @@ function FeeDefaults({ fee, facilities, defaults }: { fee: FeeT; facilities: Fac
 function FeesTab({ units, feeTypes, facilities, prices, defaults }: { units: Unit[]; feeTypes: FeeT[]; facilities: Fac[]; prices: Record<string, Record<string, number>>; defaults: Record<string, string[]> }) {
   const { pending, error, ok, run } = useRun()
   const [unit, setUnit] = useState('')
-  const [t, setT] = useState({ name: '', unitId: units[0]?.id ?? '', defaultPrice: '', billing: 'monthly_fixed', quantityFrom: 'manual' })
+  const [adding, setAdding] = useState(false)
   const unitName = new Map(units.map((u) => [u.id, u.name]))
   return (
     <div className="space-y-4">
@@ -155,6 +156,12 @@ function FeesTab({ units, feeTypes, facilities, prices, defaults }: { units: Uni
         <div className="space-y-1"><Label htmlFor="unit">Thêm đơn vị</Label><Input id="unit" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="người, xe, kg…" /></div>
         <Button disabled={pending} onClick={() => run(async () => { const r = await createFeeUnitAction({ name: unit }); if (r.ok) setUnit(''); return r })}>Thêm đơn vị</Button>
         <span className="text-sm text-muted-foreground">Đơn vị: {units.map((u) => u.name).join(', ') || '—'}</span>
+      </div>
+      <div className="space-y-3">
+        <Button type="button" variant="outline" onClick={() => setAdding(!adding)} aria-expanded={adding}>+ Thêm loại phí</Button>
+        {adding && <FeeTypeForm units={units} allowNewUnit pending={pending} error={error} submitLabel="Tạo loại phí"
+          onCancel={() => setAdding(false)}
+          onSubmit={(values) => run(async () => { const r = await createFeeTypeAction(values); if (r.ok) setAdding(false); return r }, 'Đã thêm loại phí')} />}
       </div>
       <div className="overflow-x-auto rounded-md border bg-card">
         <table className="w-full text-sm">
@@ -172,19 +179,6 @@ function FeesTab({ units, feeTypes, facilities, prices, defaults }: { units: Uni
       </div>
       {feeTypes.map((fee) => <FeeDefaults key={fee.id} fee={fee} facilities={facilities} defaults={defaults} />)}
       {feeTypes.map((fee) => <FeePrices key={fee.id} fee={fee} facilities={facilities} prices={prices[fee.id] ?? {}} />)}
-      <div className="grid max-w-xl gap-2 rounded-md border bg-card p-3 sm:grid-cols-2">
-        <h3 className="text-sm font-medium sm:col-span-2">Thêm loại phí</h3>
-        <Input placeholder="Tên loại phí" value={t.name} onChange={(e) => setT({ ...t, name: e.target.value })} />
-        <select aria-label="Đơn vị" value={t.unitId} onChange={(e) => setT({ ...t, unitId: e.target.value })} className="h-8 rounded-lg border px-2 text-sm">{units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select>
-        <Input placeholder="Đơn giá mặc định" inputMode="numeric" value={t.defaultPrice} onChange={(e) => setT({ ...t, defaultPrice: e.target.value })} />
-        <select aria-label="Kiểu phí" value={t.billing} onChange={(e) => setT({ ...t, billing: e.target.value })} className="h-8 rounded-lg border px-2 text-sm">
-          <option value="monthly_fixed">Cố định hằng tháng (trả trước)</option><option value="per_occurrence">Theo lần / tiêu thụ (trả sau)</option>
-        </select>
-        <select aria-label="Số lượng lấy từ" value={t.quantityFrom} onChange={(e) => setT({ ...t, quantityFrom: e.target.value })} className="h-8 rounded-lg border px-2 text-sm">
-          <option value="manual">Nhập tay (kiểu cũ)</option><option value="occupants">Theo số người ở</option><option value="room">Theo phòng</option><option value="meter">Theo đồng hồ</option><option value="period_input">Nhập lượng mỗi kỳ</option>
-        </select>
-        <Button disabled={pending} onClick={() => run(async () => { const r = await createFeeTypeAction({ ...t, defaultPrice: Number(t.defaultPrice) }); if (r.ok) setT({ ...t, name: '', defaultPrice: '' }); return r })}>Thêm loại phí</Button>
-      </div>
       <Msg error={error} ok={ok} />
     </div>
   )
