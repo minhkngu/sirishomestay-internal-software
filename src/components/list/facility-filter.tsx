@@ -8,8 +8,6 @@ export function FacilityFilter({
   facilities,
 }: {
   facilities: { id: string; name: string }[]
-  /** Tạm giữ cho các trang chưa chuyển; xoá ở Task 7 */
-  selected?: string[]
 }) {
   const allowed = useMemo(() => facilities.map((f) => f.id), [facilities])
   const checked = useFacilitySelection(allowed)
