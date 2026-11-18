@@ -1,16 +1,17 @@
-import { and, asc, eq, inArray, like, lte, ne } from 'drizzle-orm'
+import { and, asc, eq, inArray, like, lte, ne, sql } from 'drizzle-orm'
 import {
-  addenda, assets, depositContracts, depositEntries, docTemplates, facilities, feeTypes, feeUnits, files, handoverItems, handovers, incidents, invoices, payments, oneOffCharges, pendingAdjustments, invoiceTemplates, leaseFees, leaseFeeSnapshots, leaseOccupants, leases, rooms, tenants,
+  addenda, assets, contractVersions, depositContracts, depositEntries, docTemplates, facilities, feeTypes, feeUnits, files, handoverItems, handovers, incidents, invoices, payments, oneOffCharges, pendingAdjustments, invoiceTemplates, leaseFees, leaseFeeSnapshots, leaseOccupants, leases, rooms, tenants,
 } from '@/db'
 import type { DB } from '@/db/client'
-import { assertCan, facilityScope, type AccessContext } from '@/domain/access'
-import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
+import { assertCan, can, facilityScope, type AccessContext } from '@/domain/access'
+import { NotFoundError, ValidationError } from '@/domain/errors'
 import { addDays, todayVN } from '@/domain/dates'
 import { depositBalance } from '@/domain/deposit'
 import { buildFirstInvoice } from '@/domain/invoice-builder'
 import { contractTermsAt } from '@/domain/contract-terms'
 import type { ContractFee, DepositEntry, InvoiceLineInput, LeaseTerms, Proration } from '@/domain/types'
 import { recordAudit } from '@/server/audit'
+import { captureContractVersion } from './history'
 import { ensureFeeMeter } from '@/server/meters/service'
 import { createAssetInTransaction, moveAssetsInTransaction, setAssetStatusInTransaction } from '@/server/assets/service'
 import { startHandoverInTransaction } from '@/server/handovers/service'
@@ -396,6 +397,7 @@ export async function updateLease(db: DB, ctx: AccessContext, id: string, input:
       const [other] = await tx.select().from(leases).where(and(eq(leases.roomId, input.roomId), eq(leases.status, 'active'), ne(leases.id, id)))
       if (other) throw new ValidationError('Phòng đã có hợp đồng đang hiệu lực')
     }
+    await captureContractVersion(tx, ctx, 'lease', id, 'edit')
     const [after] = await tx.update(leases).set({ roomId: input.roomId, tenantId: input.tenantId, startDate: input.startDate, endDate: input.endDate, monthlyRent: input.monthlyRent, depositAmount: input.depositAmount, note: input.note ?? '', updatedAt: new Date() }).where(eq(leases.id, id)).returning()
     if (before.tenantId !== input.tenantId) {
       await tx.delete(leaseOccupants).where(and(eq(leaseOccupants.leaseId, id), eq(leaseOccupants.tenantId, before.tenantId)))
@@ -420,12 +422,13 @@ export async function updateDepositContract(db: DB, ctx: AccessContext, id: stri
       const [other] = await tx.select().from(depositContracts).where(and(eq(depositContracts.roomId, input.roomId), eq(depositContracts.status, 'pending'), ne(depositContracts.id, id)))
       if (other) throw new ValidationError('Phòng đã có hợp đồng cọc đang chờ')
     }
+    await captureContractVersion(tx, ctx, 'deposit', id, 'edit')
     const [after] = await tx.update(depositContracts).set({ roomId: input.roomId, tenantId: input.tenantId, depositAmount: input.depositAmount, agreedRent: input.agreedRent, expectedMoveIn: input.expectedMoveIn, updatedAt: new Date() }).where(eq(depositContracts.id, id)).returning()
     await recordAudit(tx, ctx, { action: 'update', entity: 'deposit_contract', entityId: id, facilityId: room.facilityId, summary: 'Sửa hợp đồng cọc', before, after })
   })
 }
 
-export async function deleteContract(db: DB, ctx: AccessContext, kind: 'lease' | 'deposit', id: string, confirmed: boolean): Promise<void> {
+export async function deleteContract(db: DB, ctx: AccessContext, kind: 'lease' | 'deposit', id: string, confirmed: boolean, storage: StorageAdapter): Promise<{ pendingFiles: number }> {
   if (kind !== 'lease' && kind !== 'deposit') throw new ValidationError('Loại hợp đồng không hợp lệ')
   if (confirmed !== true) throw new ValidationError('Cần xác nhận xoá hợp đồng')
   await db.transaction(async raw => {
@@ -436,11 +439,13 @@ export async function deleteContract(db: DB, ctx: AccessContext, kind: 'lease' |
     const [room] = await tx.select().from(rooms).where(eq(rooms.id, before.roomId))
     if (!room) throw new NotFoundError()
     assertCan(ctx, 'delete_contracts', room.facilityId)
-    if (!ctx.permissions.has('delete_contracts')) throw new ForbiddenError()
+    await tx.delete(contractVersions).where(and(eq(contractVersions.contractId, id), eq(contractVersions.kind, kind)))
     if (kind === 'deposit') {
       const linked = await tx.select({ facilityId: rooms.facilityId }).from(leases).innerJoin(rooms, eq(rooms.id, leases.roomId)).where(eq(leases.fromDepositContractId, id))
       for (const l of linked) assertCan(ctx, 'delete_contracts', l.facilityId)
-      await tx.delete(files).where(and(eq(files.ownerId, id), inArray(files.ownerType, ['signed_contract', 'export'])))
+      await tx.update(files).set({ ownerType: 'pending_contract_delete', confirmedAt: null, deleteAfter: todayVN(), facilityId: sql`coalesce(${files.facilityId}, ${room.facilityId})`, updatedAt: new Date() }).where(and(eq(files.ownerId, id), inArray(files.ownerType, ['signed_contract', 'export'])))
+      const markedFiles = await tx.select({ facilityId: files.facilityId }).from(files).where(and(eq(files.ownerType, 'pending_contract_delete'), eq(files.ownerId, id)))
+      for (const file of markedFiles) if (file.facilityId) assertCan(ctx, 'delete_contracts', file.facilityId)
       await tx.update(leases).set({ fromDepositContractId: null, updatedAt: new Date() }).where(eq(leases.fromDepositContractId, id))
       await tx.delete(depositEntries).where(eq(depositEntries.depositContractId, id))
       await tx.delete(depositContracts).where(eq(depositContracts.id, id))
@@ -451,11 +456,15 @@ export async function deleteContract(db: DB, ctx: AccessContext, kind: 'lease' |
       const handoverIds = handoverRows.map(x => x.id)
       const items = handoverIds.length ? await tx.select({ id: handoverItems.id }).from(handoverItems).where(inArray(handoverItems.handoverId, handoverIds)) : []
       const addonRows = await tx.select({ id: addenda.id }).from(addenda).where(eq(addenda.leaseId, id))
-      const relatedIds = [id, ...invoiceRows.map(x => x.id), ...handoverIds, ...addonRows.map(x => x.id)]
-      await tx.delete(files).where(and(eq(files.ownerType, 'export'), inArray(files.ownerId, relatedIds)))
-      await tx.delete(files).where(and(inArray(files.ownerType, ['signed_contract', 'lease_photo']), eq(files.ownerId, id)))
-      if (items.length) await tx.delete(files).where(and(eq(files.ownerType, 'handover_photo'), inArray(files.ownerId, items.map(x => x.id))))
       const invoiceIds = invoiceRows.map(x => x.id)
+      const paymentRows = invoiceIds.length ? await tx.select({ id: payments.id }).from(payments).where(inArray(payments.invoiceId, invoiceIds)) : []
+      const relatedIds = [id, ...invoiceIds, ...paymentRows.map(x => x.id), ...handoverIds, ...addonRows.map(x => x.id)]
+      await tx.update(files).set({ ownerType: 'pending_contract_delete', confirmedAt: null, deleteAfter: todayVN(), facilityId: sql`coalesce(${files.facilityId}, ${room.facilityId})`, updatedAt: new Date() }).where(and(eq(files.ownerType, 'export'), inArray(files.ownerId, relatedIds)))
+      await tx.update(files).set({ ownerType: 'pending_contract_delete', confirmedAt: null, deleteAfter: todayVN(), facilityId: sql`coalesce(${files.facilityId}, ${room.facilityId})`, updatedAt: new Date() }).where(and(inArray(files.ownerType, ['signed_contract', 'lease_photo']), eq(files.ownerId, id)))
+      if (addonRows.length) await tx.update(files).set({ ownerType: 'pending_contract_delete', confirmedAt: null, deleteAfter: todayVN(), facilityId: sql`coalesce(${files.facilityId}, ${room.facilityId})`, updatedAt: new Date() }).where(and(eq(files.ownerType, 'signed_addendum'), inArray(files.ownerId, addonRows.map(a => a.id))))
+      if (items.length) await tx.update(files).set({ ownerType: 'pending_contract_delete', confirmedAt: null, deleteAfter: todayVN(), facilityId: sql`coalesce(${files.facilityId}, ${room.facilityId})`, updatedAt: new Date() }).where(and(eq(files.ownerType, 'handover_photo'), inArray(files.ownerId, items.map(x => x.id))))
+      const markedFiles = await tx.select({ facilityId: files.facilityId }).from(files).where(and(eq(files.ownerType, 'pending_contract_delete'), inArray(files.ownerId, [...relatedIds, ...items.map(x => x.id)])))
+      for (const file of markedFiles) if (file.facilityId) assertCan(ctx, 'delete_contracts', file.facilityId)
       const charges = await tx.select({ id: oneOffCharges.id }).from(oneOffCharges).where(eq(oneOffCharges.leaseId, id))
       if (charges.length) await tx.update(incidents).set({ chargedOneOffId: null, updatedAt: new Date() }).where(inArray(incidents.chargedOneOffId, charges.map(x => x.id)))
       await tx.delete(oneOffCharges).where(eq(oneOffCharges.leaseId, id))
@@ -473,6 +482,22 @@ export async function deleteContract(db: DB, ctx: AccessContext, kind: 'lease' |
     }
     await recordAudit(tx, ctx, { action: 'delete', entity: kind === 'lease' ? 'lease' : 'deposit_contract', entityId: id, facilityId: room.facilityId, summary: kind === 'lease' ? 'Xoá hợp đồng thuê và dữ liệu liên quan' : 'Xoá hợp đồng cọc và dữ liệu liên quan', before })
   })
+  return { pendingFiles: await cleanupPendingContractFiles(db, storage, ctx) }
+}
+
+/** Tệp chưa dọn được vẫn bị ẩn và có thể thử lại mà không cần hợp đồng gốc. */
+export async function cleanupPendingContractFiles(db: DB, storage: StorageAdapter, ctx?: AccessContext): Promise<number> {
+  const rows = await db.select().from(files).where(eq(files.ownerType, 'pending_contract_delete'))
+  let pending = 0
+  for (const file of rows) {
+    if (ctx && (file.facilityId ? !can(ctx, 'delete_contracts', file.facilityId) : !ctx.isAdmin)) continue
+    try {
+      await storage.delete(file.storageKey)
+      if (file.thumbKey) await storage.delete(file.thumbKey)
+      await db.delete(files).where(and(eq(files.id, file.id), eq(files.ownerType, 'pending_contract_delete')))
+    } catch { pending++ }
+  }
+  return pending
 }
 
 // ------------------------------------------------------------------ trạng thái ký + xuất

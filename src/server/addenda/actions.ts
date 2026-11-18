@@ -5,7 +5,7 @@ import { db } from '@/db/client'
 import { toActionResult } from '@/lib/action-result'
 import { getAccessContext } from '@/server/session'
 import { getStorage } from '@/server/storage'
-import { createExtension, createOccupantChange, createTermination, createTransfer, exportAddendum, previewAddendum, setAddendumSignStatus, type AddendumKind } from './service'
+import { createAssignment, createExtension, createOccupantChange, createTermination, createTransfer, exportAddendum, previewAddendum, setAddendumSignStatus, type AddendumKind } from './service'
 
 const refresh = () => { revalidatePath('/contracts', 'layout'); revalidatePath('/invoices', 'layout'); revalidatePath('/rooms', 'layout') }
 const summary = (r: Awaited<ReturnType<typeof createExtension>>) => ({ id: r.addendum.id, adjustments: r.adjustments, depositEntry: r.depositEntry, invoice: r.invoice })
@@ -25,13 +25,17 @@ export async function createTransferAction(leaseId: string, input: unknown) {
   const ctx = await getAccessContext()
   return toActionResult(async () => { const r = summary(await createTransfer(db, ctx, leaseId, input)); refresh(); return r })
 }
+export async function createAssignmentAction(leaseId: string, input: unknown) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => { const r = summary(await createAssignment(db, ctx, leaseId, input)); refresh(); return r })
+}
 export async function createTerminationAction(leaseId: string, input: unknown) {
   const ctx = await getAccessContext()
   return toActionResult(async () => { const r = summary(await createTermination(db, ctx, leaseId, input)); refresh(); return r })
 }
-export async function setAddendumSignStatusAction(id: string, status: 'draft' | 'exported' | 'signed') {
+export async function setAddendumSignStatusAction(id: string, status: 'draft' | 'exported' | 'signed', signedFileId?: string) {
   const ctx = await getAccessContext()
-  return toActionResult(async () => { await setAddendumSignStatus(db, ctx, id, status); refresh(); return {} })
+  return toActionResult(async () => { await setAddendumSignStatus(db, ctx, id, status, signedFileId); refresh(); return {} })
 }
 export async function exportAddendumAction(id: string, templateId?: string) {
   const ctx = await getAccessContext()

@@ -5,7 +5,7 @@ import { formatDateVN } from './dates'
 import { formatVND, numberToVietnameseWords } from './money'
 
 export const DOC_TYPES = [
-  'deposit_contract', 'lease', 'addendum_extension', 'addendum_transfer', 'addendum_termination',
+  'deposit_contract', 'lease', 'addendum_extension', 'addendum_transfer', 'addendum_assignment', 'addendum_termination',
   'handover_check_in', 'handover_check_out', 'invoice_monthly', 'invoice_termination', 'receipt',
 ] as const
 export type DocType = (typeof DOC_TYPES)[number]
@@ -15,6 +15,7 @@ export const DOC_TYPE_LABELS: Record<DocType, string> = {
   lease: 'Hợp đồng thuê',
   addendum_extension: 'Phụ lục gia hạn',
   addendum_transfer: 'Phụ lục chuyển phòng',
+  addendum_assignment: 'Phụ lục chuyển nhượng hợp đồng',
   addendum_termination: 'Phụ lục thanh lý',
   handover_check_in: 'Biên bản bàn giao check-in',
   handover_check_out: 'Biên bản bàn giao check-out',
@@ -92,6 +93,11 @@ export const TEMPLATE_FIELDS: Record<DocType, Field[]> = {
     ...PERSON, ...SITE, f('ma_hop_dong', 'Mã hợp đồng', 'TD-HĐ-2026-0001'), f('ngay_hieu_luc', 'Ngày hiệu lực', '15/11/2026'),
     f('phong_cu', 'Phòng cũ', '301'), f('phong_moi', 'Phòng mới', '402'), ...MONEY('gia_thue_moi', 'Giá thuê mới', 11_000_000),
   ],
+  addendum_assignment: [
+    ...SITE, f('ma_hop_dong', 'Mã hợp đồng', 'TD-HĐ-2026-0001'), f('ngay_hieu_luc', 'Ngày hiệu lực', '15/11/2026'),
+    f('ten_ben_chuyen', 'Tên bên chuyển nhượng', 'Nguyễn Văn An'), f('giay_to_ben_chuyen', 'Giấy tờ bên chuyển nhượng', '012345678901'),
+    f('ten_ben_nhan', 'Tên bên nhận chuyển nhượng', 'Trần Thị Bình'), f('giay_to_ben_nhan', 'Giấy tờ bên nhận chuyển nhượng', '012345678902'),
+  ],
   addendum_termination: [
     ...PERSON, ...SITE, f('ma_hop_dong', 'Mã hợp đồng', 'TD-HĐ-2026-0001'), f('ngay_tra_phong', 'Ngày trả phòng', '20/11/2026'),
     f('tien_hoan_khach', 'Số tiền hoàn cho khách', '11.080.000'), f('tien_khach_tra_them', 'Số tiền khách trả thêm', '0'),
@@ -119,6 +125,8 @@ export function sampleDataFor(docType: DocType): Record<string, unknown> {
 
 export type DocEntities = {
   now?: string
+  oldTenant?: { name: string; idDocument?: string | null }
+  newTenant?: { name: string; idDocument?: string | null }
   tenant?: { kind: 'foreign' | 'vietnamese' | 'company'; fullName?: string | null; companyName?: string | null; idDocument?: string | null; taxCode?: string | null; phone?: string | null; email?: string | null }
   occupants?: { fullName: string; idDocument?: string | null }[]
   facility?: { name: string; address?: string | null }
@@ -166,6 +174,10 @@ export function buildTemplateData(docType: DocType, e: DocEntities): Record<stri
     phi_dich_vu: (e.fees ?? []).map((x) => ({ ten: x.name, don_vi: x.unit, so_luong: x.quantity, don_gia: formatVND(x.unitPrice) })),
     nguoi_o: (e.occupants ?? []).map((x) => ({ ho_ten: x.fullName, giay_to: x.idDocument ?? '' })),
     // phụ lục
+    ten_ben_chuyen: e.oldTenant?.name ?? '',
+    giay_to_ben_chuyen: e.oldTenant?.idDocument ?? '',
+    ten_ben_nhan: e.newTenant?.name ?? '',
+    giay_to_ben_nhan: e.newTenant?.idDocument ?? '',
     ngay_hieu_luc: d(e.addendum?.effectiveDate),
     ngay_ket_thuc_moi: d(e.addendum?.newEndDate),
     gia_thue_moi: m(e.addendum?.newMonthlyRent),

@@ -4,7 +4,7 @@ import type { DB } from '@/db/client'
 import type { Permission } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 
-export const OWNER_TYPES = ['tenant_document', 'lease_photo', 'handover_photo', 'incident_photo', 'signed_contract', 'template', 'export'] as const
+export const OWNER_TYPES = ['tenant_document', 'lease_photo', 'handover_photo', 'incident_photo', 'signed_contract', 'signed_addendum', 'template', 'export'] as const
 export type OwnerType = (typeof OWNER_TYPES)[number]
 
 /** Nhóm quyền cần để thao tác với tệp của từng loại chủ sở hữu. `export` phụ thuộc loại giấy tờ gốc. */
@@ -14,6 +14,7 @@ export function fileAccessPermission(ownerType: OwnerType, meta?: { docType?: st
     case 'lease_photo':
     case 'handover_photo':
     case 'signed_contract':
+    case 'signed_addendum':
       return 'tenants_contracts'
     case 'incident_photo':
       return 'incidents'
@@ -72,6 +73,7 @@ export const ALLOWED_TYPES: Record<OwnerType, { types: string[]; message: string
   handover_photo: { types: IMAGE, message: 'Chỉ nhận ảnh (WebP, JPEG hoặc PNG)', maxBytes: 2 * 1024 * 1024 },
   incident_photo: { types: IMAGE, message: 'Chỉ nhận ảnh (WebP, JPEG hoặc PNG)', maxBytes: 2 * 1024 * 1024 },
   signed_contract: { types: [...PDF, ...IMAGE], message: 'Chỉ nhận PDF hoặc ảnh', maxBytes: 10 * 1024 * 1024 },
+  signed_addendum: { types: [...PDF, ...IMAGE], message: 'Chỉ nhận PDF hoặc ảnh', maxBytes: 10 * 1024 * 1024 },
   template: { types: DOCX, message: 'Chỉ nhận file Word (.docx)', maxBytes: 10 * 1024 * 1024 },
   export: { types: [...DOCX, ...PDF, 'image/png'], message: 'Định dạng xuất không hợp lệ', maxBytes: 20 * 1024 * 1024 },
 }

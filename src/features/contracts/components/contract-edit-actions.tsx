@@ -5,17 +5,19 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { deleteContractAction, updateDepositContractAction, updateLeaseAction } from '@/server/contracts/actions'
+import { deleteContractAction, retryContractFileCleanupAction, updateDepositContractAction, updateLeaseAction } from '@/server/contracts/actions'
 
 type Common = { id: string; roomId: string; tenantId: string; depositAmount: number; signStatus: string }
 type Contract = (Common & { kind: 'lease'; startDate: string; endDate: string; monthlyRent: number; note: string }) | (Common & { kind: 'deposit'; expectedMoveIn: string; agreedRent: number })
 type Option = { id: string; label: string }
 
-export function ContractEditActions({ contract, canDelete, rooms, tenants }: { contract: Contract; canDelete: boolean; rooms: Option[]; tenants: Option[] }) {
+export function ContractEditActions({ contract, canDelete, rooms, tenants, mode, onCompleted }: { contract: Contract; canDelete: boolean; rooms: Option[]; tenants: Option[]; mode?: 'edit' | 'delete'; onCompleted?: () => void }) {
   const router = useRouter()
-  const [editing, setEditing] = useState(false)
+  const [editing, setEditing] = useState(mode === 'edit')
   const [pending, start] = useTransition()
   const [error, setError] = useState('')
+  const [pendingFiles, setPendingFiles] = useState(0)
+  const [deleted, setDeleted] = useState(false)
   const [roomId, setRoomId] = useState(contract.roomId)
   const [tenantId, setTenantId] = useState(contract.tenantId)
   const [deposit, setDeposit] = useState(String(contract.depositAmount))
@@ -35,23 +37,34 @@ export function ContractEditActions({ contract, canDelete, rooms, tenants }: { c
         ? await updateLeaseAction(contract.id, { ...common, startDate, endDate, monthlyRent: Number(rent), note }, signed)
         : await updateDepositContractAction(contract.id, { ...common, expectedMoveIn: startDate, agreedRent: Number(rent) }, signed)
       if (!result.ok) { setError(result.error); return }
-      setEditing(false); router.refresh()
+      setEditing(false); router.refresh(); onCompleted?.()
     })
   }
   function remove() {
-    const warning = `${signed ? 'Hợp đồng đã ký. ' : ''}Xoá vĩnh viễn hợp đồng này cùng các hoá đơn, khoản tiền cọc, thanh toán, phụ lục và biên bản bàn giao liên quan. Thao tác không thể hoàn tác. Bạn có chắc chắn muốn xoá?`
+    const warning = `${signed ? 'Hợp đồng đã ký. ' : ''}Xoá vĩnh viễn hợp đồng này cùng các hoá đơn, khoản tiền cọc, thanh toán, phụ lục, biên bản bàn giao và tệp đính kèm liên quan. Thao tác không thể hoàn tác. Bạn có chắc chắn muốn xoá?`
     if (!window.confirm(warning)) return
     setError('')
     start(async () => {
       const result = await deleteContractAction(contract.kind, contract.id, true)
       if (!result.ok) { setError(result.error); return }
-      router.push('/contracts'); router.refresh()
+      if (result.data.pendingFiles) { setDeleted(true); setPendingFiles(result.data.pendingFiles); return }
+      if (onCompleted) { onCompleted(); router.refresh() } else { router.push('/contracts'); router.refresh() }
     })
   }
+  if (deleted) return <div className="space-y-3 rounded-xl border p-4" role="alert">
+    <p>Hợp đồng đã được xoá. Còn {pendingFiles} tệp chưa xoá được khỏi kho lưu trữ; hãy thử lại.</p>
+    <Button disabled={pending} onClick={() => start(async () => {
+      const result = await retryContractFileCleanupAction()
+      if (!result.ok) { setError(result.error); return }
+      if (result.data.pendingFiles) { setPendingFiles(result.data.pendingFiles); return }
+      router.push('/contracts'); router.refresh()
+    })}>Thử xoá tệp lại</Button>
+    {error && <p className="text-sm text-destructive">{error}</p>}
+  </div>
   return <div className="space-y-3">
     <div className="flex flex-wrap gap-2">
-      <Button type="button" size="sm" variant="outline" onClick={() => { setError(''); setEditing(!editing) }}>{editing ? 'Đóng chỉnh sửa' : 'Chỉnh sửa hợp đồng'}</Button>
-      {canDelete && <Button type="button" size="sm" variant="destructive" disabled={pending} onClick={remove}>Xoá hợp đồng</Button>}
+      {!mode && <Button type="button" size="sm" variant="outline" onClick={() => { setError(''); setEditing(!editing) }}>{editing ? 'Đóng chỉnh sửa' : 'Chỉnh sửa hợp đồng'}</Button>}
+      {canDelete && mode !== 'edit' && <Button type="button" size="sm" variant="destructive" disabled={pending} onClick={remove}>Xoá hợp đồng</Button>}
     </div>
     {editing && <form onSubmit={save} className="space-y-3 rounded-xl border p-4">
       <p className="text-sm text-muted-foreground">Hoá đơn và các khoản tiền cọc hiện có sẽ được giữ nguyên. Vui lòng tự kiểm tra và điều chỉnh nếu cần.</p>

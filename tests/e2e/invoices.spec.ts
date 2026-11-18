@@ -39,7 +39,7 @@ test('tạo hoá đơn hàng loạt → sửa kỳ → duyệt → thu một ph�
   await expect(page.getByText('Thu một phần').first()).toBeVisible()
 })
 
-test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → check-in → hoá đơn đầu tiên nháp', async ({ page }) => {
+test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → check-in không tự tạo hoá đơn', async ({ page }) => {
   await login(page, /^Admin/)
   const name = `Khách luồng ${Date.now()}`
   await page.goto('/tenants/new'); await page.waitForLoadState('networkidle')
@@ -69,19 +69,17 @@ test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → 
   await expect(page).toHaveURL(/\/contracts\/[a-f0-9-]+$/)
   const leaseUrl = page.url()
 
-  await page.getByRole('tab', { name: 'Bàn giao' }).click()
   await page.getByRole('button', { name: 'Check-in', exact: true }).click()
   await expect(page).toHaveURL(/\/handovers\//)
   await page.getByRole('button', { name: 'Hoàn tất' }).click()
   await expect(page.getByText('Đã hoàn tất biên bản')).toBeVisible()
 
   await page.goto('/invoices?view=draft')
-  await expect(page.getByRole('row').filter({ hasText: name })).toBeVisible()
+  await expect(page.getByRole('row').filter({ hasText: name })).toHaveCount(0)
 
   // thanh lý hợp đồng vừa tạo: hoá đơn thanh lý nháp, duyệt xong hợp đồng kết thúc
-  await page.goto(leaseUrl); await page.waitForLoadState('networkidle')
-  await page.getByRole('tab', { name: 'Phụ lục' }).click()
-  await page.getByRole('button', { name: 'Thanh lý hợp đồng' }).click()
+  await page.goto('/contracts'); await page.waitForLoadState('networkidle')
+  await page.getByRole('row').filter({ hasText: name }).getByRole('button', { name: 'Thanh lý hợp đồng' }).click()
   await page.getByLabel('Ngày trả phòng').fill('2026-12-10')
   for (const input of await page.getByText('Chỉ số tại ngày trả phòng').locator('xpath=..').locator('input[type=number]').all()) await input.fill('999999')
   await page.getByRole('button', { name: 'Xem trước tiền' }).click()
