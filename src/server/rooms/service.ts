@@ -5,6 +5,8 @@ import { assertCan, can, facilityScope, NotFoundError, type AccessContext } from
 import { ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/server/audit'
 import { roomStatus, type RoomStatus } from '@/domain/room-status'
+import { depositBalance } from '@/domain/deposit'
+import type { DepositEntry } from '@/domain/types'
 import { todayVN } from '@/domain/dates'
 import { getSettings } from '@/server/settings/service'
 import { getFacility } from '../facilities/service'
@@ -150,7 +152,7 @@ export async function createRoomsBulk(db: DB, ctx: AccessContext, facilityId: st
   })
 }
 
-export type RoomWithStatus = Room & { status: RoomStatus; tenantName?: string | null; leaseEndDate?: string | null }
+export type RoomWithStatus = Room & { status: RoomStatus; tenantName?: string | null; leaseEndDate?: string | null; monthlyRent?: number | null; depositBalance?: number | null }
 
 /** Phòng của một cơ sở kèm trạng thái suy ra từ hợp đồng thuê đang hiệu lực và hợp đồng cọc đang chờ. */
 export async function listRoomsWithStatus(
@@ -160,16 +162,27 @@ export async function listRoomsWithStatus(
   if (list.length === 0) return []
   const ids = list.map((r) => r.id)
   const [active, pending, settings] = await Promise.all([
-    db.select({ roomId: leases.roomId, endDate: leases.endDate, fullName: tenants.fullName, companyName: tenants.companyName })
+    db.select({ id: leases.id, roomId: leases.roomId, endDate: leases.endDate, monthlyRent: leases.monthlyRent, fullName: tenants.fullName, companyName: tenants.companyName })
       .from(leases).innerJoin(tenants, eq(tenants.id, leases.tenantId)).where(and(inArray(leases.roomId, ids), eq(leases.status, 'active'))),
     db.select({ roomId: depositContracts.roomId, expectedMoveIn: depositContracts.expectedMoveIn }).from(depositContracts).where(and(inArray(depositContracts.roomId, ids), eq(depositContracts.status, 'pending'))),
     getSettings(db),
   ])
   const today = opts.today ?? todayVN()
+  // Tiền cọc của mọi hợp đồng đang thuê lấy một lần, chỉ khi có phòng người gọi được xem tiền
+  const moneyLeaseIds = active.filter((a) => {
+    const facilityId = list.find((r) => r.id === a.roomId)!.facilityId
+    return can(ctx, 'tenants_contracts', facilityId) || can(ctx, 'billing', facilityId)
+  }).map((a) => a.id)
+  const deposits = moneyLeaseIds.length
+    ? await db.select({ leaseId: depositEntries.leaseId, type: depositEntries.type, amount: depositEntries.amount, status: depositEntries.status })
+      .from(depositEntries).where(inArray(depositEntries.leaseId, moneyLeaseIds))
+    : []
   return list.map((r) => {
     const lease = active.find((a) => a.roomId === r.id)
+    const showMoney = !!lease && (can(ctx, 'tenants_contracts', r.facilityId) || can(ctx, 'billing', r.facilityId))
     return {
       ...r,
+      ...(showMoney ? { monthlyRent: lease.monthlyRent, depositBalance: depositBalance(deposits.filter((d) => d.leaseId === lease.id) as unknown as DepositEntry[]) } : {}),
       status: roomStatus(r, lease ?? null, pending.find((p) => p.roomId === r.id) ?? null, today, settings.contractWarningDays),
       ...(can(ctx, 'tenants_contracts', r.facilityId) ? { tenantName: lease ? lease.fullName ?? lease.companyName : null, leaseEndDate: lease?.endDate ?? null } : {}),
     }
