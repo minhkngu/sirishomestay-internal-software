@@ -19,7 +19,8 @@ export class SupabaseStorage implements StorageAdapter {
     return data.signedUrl
   }
   async delete(key: string) {
-    await this.bucket().remove([key])
+    const { error } = await this.bucket().remove([key])
+    if (error) throw new Error(`Không xoá được tệp: ${error.message}`)
   }
   async read(key: string): Promise<ArrayBuffer> {
     const { data, error } = await this.bucket().download(key)

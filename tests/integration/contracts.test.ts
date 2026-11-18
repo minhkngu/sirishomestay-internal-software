@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { and, eq } from 'drizzle-orm'
-import { auditLogs, leaseFeeMeters, leaseFeeSnapshots, meterReadings, assets, docTemplates, files, invoiceTemplates, meters, handovers, handoverItems, depositContracts, depositEntries, facilities, feeTypes, feeUnits, leaseOccupants, leases, rooms } from '@/db'
+import { invoices, auditLogs, leaseFeeMeters, leaseFeeSnapshots, meterReadings, assets, docTemplates, files, invoiceTemplates, meters, handovers, handoverItems, depositContracts, depositEntries, facilities, feeTypes, feeUnits, leaseOccupants, leases, rooms } from '@/db'
 import { assetHistory } from '@/server/assets/service'
 import { listMeterOverview, listReadingSheet } from '@/server/meters/service'
 import { leaseData } from '@/server/invoices/service'
@@ -57,6 +57,25 @@ describe('contracts', () => {
   const leaseInput = (over: Record<string, unknown> = {}) => ({
     roomId: r301, tenantId: tenant1, occupantIds: [tenant1], startDate: '2026-10-15', endDate: '2027-10-14', monthlyRent: 9_000_000, depositAmount: 9_000_000,
     fees: [{ feeTypeId: feePerson, quantity: 1, unitPrice: 200_000 }], ...over,
+  })
+
+  it('không tự tạo hoá đơn khi tạo hợp đồng thuê', async () => {
+    const { lease } = await createLease(db, lan(), leaseInput())
+    expect(await db.select().from(invoices).where(eq(invoices.leaseId, lease.id))).toHaveLength(0)
+  })
+
+  it('không tự tạo hoá đơn khi đánh dấu hợp đồng đã ký', async () => {
+    const { lease } = await createLease(db, lan(), leaseInput())
+    const [file] = await db.insert(files).values({ ownerType: 'signed_contract', ownerId: lease.id, storageKey: 'signed-test', contentType: 'application/pdf', confirmedAt: new Date() }).returning()
+    const { setSignStatus } = await import('@/server/contracts/service')
+    await setSignStatus(db, lan(), 'lease', lease.id, 'signed', file.id)
+    expect(await db.select().from(invoices).where(eq(invoices.leaseId, lease.id))).toHaveLength(0)
+  })
+
+  it('không tự tạo hoá đơn khi chuyển hợp đồng cọc thành hợp đồng thuê', async () => {
+    const { contract } = await createDepositContract(db, lan(), { roomId: r301, tenantId: tenant1, depositAmount: 1_000_000, agreedRent: 9_000_000, expectedMoveIn: '2026-10-15' })
+    const { lease } = await convertDepositToLease(db, lan(), contract.id, leaseInput())
+    expect(await db.select().from(invoices).where(eq(invoices.leaseId, lease.id))).toHaveLength(0)
   })
 
   it('lưu mẫu hợp đồng đã chọn và dùng mẫu đó khi xuất dù mẫu mặc định đã đổi', async () => {

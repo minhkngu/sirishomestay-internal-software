@@ -38,7 +38,7 @@ export async function requestUpload(db: DB, ctx: AccessContext, storage: Storage
 
 async function loadFile(db: Pick<DB, 'select'>, ctx: AccessContext, fileId: string): Promise<FileRow> {
   const [f] = await db.select().from(files).where(eq(files.id, fileId))
-  if (!f) throw new NotFoundError()
+  if (!f || f.ownerType === 'pending_contract_delete' || f.ownerType === 'pending_contract_restore') throw new NotFoundError()
   assertCan(ctx, fileAccessPermission(f.ownerType as OwnerType, f.meta as { docType?: string } | null), f.facilityId ?? undefined)
   return f
 }

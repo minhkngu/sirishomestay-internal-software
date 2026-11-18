@@ -1,0 +1,2 @@
+ALTER TABLE "user_permissions" DROP CONSTRAINT "user_permissions_permission_check";--> statement-breakpoint
+ALTER TABLE "user_permissions" ADD CONSTRAINT "user_permissions_permission_check" CHECK ("user_permissions"."permission" in ('tenants_contracts','delete_contracts','billing','meters','assets','incidents','settings'));

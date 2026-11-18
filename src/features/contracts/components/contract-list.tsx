@@ -10,6 +10,7 @@ import { formatDateVN } from '@/domain/dates'
 import { matchesContractView, type ContractView } from '@/domain/list-filters'
 import { formatVND } from '@/domain/money'
 import type { DepositListItem, LeaseListItem } from '@/server/contracts/service'
+import { ContractRowActions } from './contract-row-actions'
 
 const VIEWS = [['active', 'Đang hiệu lực'], ['expiring', 'Sắp hết hạn'], ['unsigned', 'Chưa ký'], ['ended', 'Đã kết thúc'], ['deposits', 'Cọc chờ']] as const
 const SIGN = { draft: 'Nháp', exported: 'Đã xuất', signed: 'Đã ký' } as const
@@ -20,12 +21,14 @@ export function ContractList({
   facilities,
   today,
   warningDays,
+  deleteFacilityIds,
 }: {
   leases: LeaseListItem[]
   deposits: DepositListItem[]
   facilities: { id: string; name: string }[]
   today: string
   warningDays: number
+  deleteFacilityIds: string[]
 }) {
   const rawView = useListParam('view') ?? 'active'
   const view = VIEWS.some(([k]) => k === rawView) ? rawView : 'active'
@@ -74,6 +77,7 @@ export function ContractList({
               <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground">Thời hạn</th>
               <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground">Giá thuê</th>
               <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground">Ký</th>
+              <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50">
@@ -107,6 +111,7 @@ export function ContractList({
                     {SIGN[l.signStatus as keyof typeof SIGN]}
                   </span>
                 </td>
+                <td className="p-3"><ContractRowActions id={l.id} kind="lease" active={l.status === 'active'} canDelete={deleteFacilityIds.includes(l.facilityId)} /></td>
               </tr>
             ))}
             {shown.deposits.map((c) => (
@@ -129,12 +134,13 @@ export function ContractList({
                     {SIGN[c.signStatus as keyof typeof SIGN]}
                   </span>
                 </td>
+                <td className="p-3"><ContractRowActions id={c.id} kind="deposit" active={false} canDelete={deleteFacilityIds.includes(c.facilityId)} /></td>
               </tr>
             ))}
             {shown.leases.length + shown.deposits.length === 0 && (
               <tr>
                 <td
-                  colSpan={facilities.length > 1 ? 7 : 6}
+                  colSpan={facilities.length > 1 ? 8 : 7}
                   className="p-8 text-center text-xs text-muted-foreground"
                 >
                   Không có hợp đồng nào
