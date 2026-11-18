@@ -21,7 +21,7 @@ async function Settings({ ctx }: { ctx: Awaited<ReturnType<typeof getAccessConte
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Cài đặt</h1>
       <SettingsTabs defaults={defaults} settings={settings} units={units} feeTypes={feeTypes} prices={prices}
-        facilities={facilities.map((f) => ({ id: f.id, code: f.code, name: f.name, address: f.address, expectedInvoiceDay: f.expectedInvoiceDay }))} />
+        facilities={facilities.map((f) => ({ id: f.id, name: f.name }))} />
     </div>
   )
 }
