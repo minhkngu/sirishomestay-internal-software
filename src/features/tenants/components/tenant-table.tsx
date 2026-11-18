@@ -2,7 +2,8 @@ import Link from 'next/link'
 import { StatusDot } from '@/components/list/status-dot'
 import { diffDays, formatDateVN, todayVN } from '@/domain/dates'
 import { formatPhoneDisplay } from '@/domain/phone'
-import { displayName, type Tenant } from '@/server/tenants/service'
+import { displayName } from '@/domain/tenant-name'
+import type { Tenant } from '@/server/tenants/service'
 
 const KIND: Record<Tenant['kind'], string> = { foreign: 'Nước ngoài', vietnamese: 'Việt Nam', company: 'Công ty' }
 
