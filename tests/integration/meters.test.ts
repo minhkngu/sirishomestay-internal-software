@@ -130,6 +130,11 @@ describe('meters', () => {
     expect(rows.map(r => r.meterId)).toEqual([m.W101, m.E101])
   })
 
+  it('không liệt kê đồng hồ của phòng đã ẩn', async () => {
+    await db.update(rooms).set({ isActive: false }).where(eq(rooms.id, r201))
+    expect((await listMeterOverview(db, hung(), fa)).map(r => r.roomCode)).toEqual(['101', '101', '102', '102'])
+  })
+
   it('người ngoài phạm vi cơ sở bị từ chối, người thiếu quyền meters bị từ chối', async () => {
     await expect(listMeterOverview(db, ctxOf(['meters'], [fb]), fa)).rejects.toThrow(NotFoundError)
     await expect(listMeterOverview(db, ctxOf(['billing'], [fa]), fa)).rejects.toThrow(ForbiddenError)

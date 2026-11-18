@@ -1,8 +1,9 @@
-import { and, asc, desc, eq } from 'drizzle-orm'
+import { and, asc, desc, eq, lte } from 'drizzle-orm'
 import { z } from 'zod'
 import { feeTypes, feeTypePrices, feeUnits, utilityRates, feeDefaults, facilities } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
+import { todayVN } from '@/domain/dates'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/server/audit'
 import { getFacility } from '@/server/facilities/service'
@@ -204,18 +205,22 @@ export async function setFeeDefault(db: DB, ctx: AccessContext, input: { facilit
  */
 export async function ensureUtilityFeeTypes(db: DB, ctx: AccessContext): Promise<{ electric: FeeType; water: FeeType }> {
   assertCan(ctx, 'settings')
-  const facs = await db.select().from(facilities).orderBy(asc(facilities.code))
-  const rates = await db.select().from(utilityRates).orderBy(desc(utilityRates.effectiveFrom))
+  return db.transaction(async (t) => {
+  const tx = t as unknown as DB
+  const facs = await tx.select().from(facilities).orderBy(asc(facilities.code))
+  // Bỏ đơn giá có ngày hiệu lực ở tương lai: giá mặc định là giá đang áp dụng
+  const rates = await tx.select().from(utilityRates).where(lte(utilityRates.effectiveFrom, todayVN())).orderBy(desc(utilityRates.effectiveFrom))
   const ensure = async (utility: 'electric' | 'water', name: string, unit: string): Promise<FeeType> => {
-    const [existing] = await db.select().from(feeTypes).where(eq(feeTypes.name, name))
+    const [existing] = await tx.select().from(feeTypes).where(eq(feeTypes.name, name))
     if (existing) return existing
     const latest = new Map<string, number>()
     for (const r of rates) if (r.utility === utility && !latest.has(r.facilityId)) latest.set(r.facilityId, r.pricePerUnit)
     const priced = facs.filter((f) => latest.has(f.id))
     const defaultPrice = priced.length ? latest.get(priced[0].id)! : 0
-    const created = await createFeeType(db, ctx, { name, newUnitName: unit, defaultPrice, billing: 'per_occurrence', quantityFrom: 'meter' })
-    for (const f of priced) if (latest.get(f.id) !== defaultPrice) await setFeeTypePrice(db, ctx, { feeTypeId: created.id, facilityId: f.id, price: latest.get(f.id)! })
+    const created = await createFeeType(tx, ctx, { name, newUnitName: unit, defaultPrice, billing: 'per_occurrence', quantityFrom: 'meter' })
+    for (const f of priced) if (latest.get(f.id) !== defaultPrice) await setFeeTypePrice(tx, ctx, { feeTypeId: created.id, facilityId: f.id, price: latest.get(f.id)! })
     return created
   }
   return { electric: await ensure('electric', 'Điện', 'kWh'), water: await ensure('water', 'Nước', 'm³') }
+  })
 }

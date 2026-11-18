@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { and, eq } from 'drizzle-orm'
-import { leaseFeeMeters, leaseFeeSnapshots, meterReadings, assets, docTemplates, files, invoiceTemplates, meters, handovers, handoverItems, depositContracts, depositEntries, facilities, feeTypes, feeUnits, leaseOccupants, leases, rooms } from '@/db'
+import { auditLogs, leaseFeeMeters, leaseFeeSnapshots, meterReadings, assets, docTemplates, files, invoiceTemplates, meters, handovers, handoverItems, depositContracts, depositEntries, facilities, feeTypes, feeUnits, leaseOccupants, leases, rooms } from '@/db'
 import { assetHistory } from '@/server/assets/service'
 import { listMeterOverview, listReadingSheet } from '@/server/meters/service'
 import { leaseData } from '@/server/invoices/service'
@@ -330,7 +330,7 @@ describe('contracts', () => {
     expect(new Set(links.map(l => l.meterId)).size).toBe(2)
   })
 
-  it('từ chối đồng hồ đã gắn dòng phí của hợp đồng đang hiệu lực', async () => {
+  it('từ chối dùng đồng hồ của phòng khác cho hợp đồng mới dù đồng hồ đang gắn hợp đồng hiệu lực', async () => {
     await updateFeeType(db, admin, feePerson, { name: 'ABC', quantityFrom: 'meter' })
     await createLease(db, lan(), snapshot([meterFee()]))
     const [meter] = await db.select().from(meters).where(eq(meters.roomId, r301))
@@ -348,6 +348,16 @@ describe('contracts', () => {
     }
     expect(await db.select().from(leases)).toHaveLength(1)
     expect(await db.select().from(meterReadings)).toHaveLength(0)
+  })
+
+  it('ghi nhật ký khi dùng lại đồng hồ có sẵn', async () => {
+    await updateFeeType(db, admin, feePerson, { name: 'ABC', quantityFrom: 'meter' })
+    const first = await createLease(db, lan(), snapshot([meterFee()]))
+    const [meter] = await db.select().from(meters).where(eq(meters.roomId, r301))
+    await db.update(leases).set({ status: 'ended' }).where(eq(leases.id, first.lease.id))
+    await createLease(db, lan(), snapshot([meterFee({ existingMeterId: meter.id, initialReading: 130 })], { tenantId: tenant2, occupantIds: [tenant2] }))
+    const logs = (await db.select().from(auditLogs)).filter(l => l.entity === 'meter' && l.entityId === meter.id)
+    expect(logs.map(l => l.summary)).toContain('Dùng lại đồng hồ cho phí hợp đồng')
   })
 
   it('nhận lại chỉ số bàn giao cùng ngày khi trùng giá trị, từ chối khi khác giá trị', async () => {

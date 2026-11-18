@@ -198,6 +198,7 @@ export async function ensureFeeMeter(tx: DB, ctx: AccessContext, input: { roomId
     // Chỉ số bàn giao cùng ngày (vd. chốt khi thanh lý hợp đồng trước) được nhận lại nếu trùng giá trị
     const sameDay = readings.find(r => r.kind === 'handover' && r.readOn === input.installedOn)
     if (sameDay && sameDay.value !== input.initialReading) throw new ValidationError(`Đồng hồ đã có chỉ số bàn giao ${sameDay.value} trong ngày này`, { initialReading: `Nhập đúng chỉ số đã chốt: ${sameDay.value}` })
+    await recordAudit(tx, ctx, { action: 'update', entity: 'meter', entityId: meter.id, facilityId: room.facilityId, summary: 'Dùng lại đồng hồ cho phí hợp đồng', after: { leaseFeeId: input.leaseFeeId, initialReading: input.initialReading, readOn: input.installedOn } })
     if (!sameDay) await tx.insert(meterReadings).values({ meterId: meter.id, period: input.installedOn.slice(0, 7), kind: 'handover', readOn: input.installedOn, value: input.initialReading! })
     found = meter
   } else {
@@ -218,7 +219,7 @@ export type MeterOverviewRow = {
 /** Danh sách đồng hồ của một cơ sở kèm dòng phí, hợp đồng đang hiệu lực và lịch sử chỉ số (mới nhất trước). */
 export async function listMeterOverview(db: DB, ctx: AccessContext, facilityId: string): Promise<MeterOverviewRow[]> {
   assertCan(ctx, 'meters', facilityId)
-  const base = await db.select({ meter: meters, room: rooms }).from(meters).innerJoin(rooms, eq(rooms.id, meters.roomId)).where(eq(rooms.facilityId, facilityId))
+  const base = await db.select({ meter: meters, room: rooms }).from(meters).innerJoin(rooms, eq(rooms.id, meters.roomId)).where(and(eq(rooms.facilityId, facilityId), eq(rooms.isActive, true)))
   if (base.length === 0) return []
   const ids = base.map(b => b.meter.id)
   const [links, readings] = await Promise.all([
@@ -228,8 +229,12 @@ export async function listMeterOverview(db: DB, ctx: AccessContext, facilityId: 
     db.select().from(meterReadings).where(inArray(meterReadings.meterId, ids)).orderBy(desc(meterReadings.readOn), desc(meterReadings.createdAt)),
   ])
   const LEGACY: Record<string, { name: string; unit: string }> = { electric: { name: 'Điện', unit: 'kWh' }, water: { name: 'Nước', unit: 'm³' } }
+  const readingsByMeter = new Map<string, typeof readings>()
+  for (const r of readings) { const list = readingsByMeter.get(r.meterId); if (list) list.push(r); else readingsByMeter.set(r.meterId, [r]) }
+  const linksByMeter = new Map<string, typeof links>()
+  for (const l of links) { const list = linksByMeter.get(l.meterId); if (list) list.push(l); else linksByMeter.set(l.meterId, [l]) }
   const rows = base.map(({ meter, room }) => {
-    const mine = links.filter(l => l.meterId === meter.id).sort((a, b) => (a.status === 'active' ? 0 : 1) - (b.status === 'active' ? 0 : 1) || b.startDate.localeCompare(a.startDate))
+    const mine = (linksByMeter.get(meter.id) ?? []).sort((a, b) => (a.status === 'active' ? 0 : 1) - (b.status === 'active' ? 0 : 1) || b.startDate.localeCompare(a.startDate))
     const link = mine[0]
     const legacy = LEGACY[meter.utility]
     return {
@@ -237,7 +242,7 @@ export async function listMeterOverview(db: DB, ctx: AccessContext, facilityId: 
       feeName: link?.name ?? legacy?.name ?? null, unit: link?.unit ?? legacy?.unit ?? null,
       leaseCode: link?.status === 'active' ? link.leaseCode : null,
       serial: meter.serial, startReading: meter.startReading, installedOn: meter.installedOn, removedOn: meter.removedOn,
-      readings: readings.filter(r => r.meterId === meter.id).map(r => ({ period: r.period, kind: r.kind as 'monthly' | 'handover', readOn: r.readOn, value: r.value })),
+      readings: (readingsByMeter.get(meter.id) ?? []).map(r => ({ period: r.period, kind: r.kind as 'monthly' | 'handover', readOn: r.readOn, value: r.value })),
     }
   })
   return rows.sort((a, b) => (a.floor ?? '').localeCompare(b.floor ?? '') || a.roomCode.localeCompare(b.roomCode) || Number(a.removedOn !== null) - Number(b.removedOn !== null) || (a.feeName ?? '').localeCompare(b.feeName ?? ''))

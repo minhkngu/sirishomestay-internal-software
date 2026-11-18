@@ -147,6 +147,12 @@ describe('fees & rates', () => {
     expect((await listFeeTypePrices(db, admin))[electric.id]).toEqual({ [fb]: 4000 })
   })
 
+  it('bỏ qua đơn giá có ngày hiệu lực ở tương lai khi lấy giá mặc định', async () => {
+    await createRate(db, admin, { facilityId: fa, utility: 'electric', pricePerUnit: 3500, effectiveFrom: '2026-01-01' })
+    await createRate(db, admin, { facilityId: fa, utility: 'electric', pricePerUnit: 9999, effectiveFrom: '2999-01-01' })
+    expect((await ensureUtilityFeeTypes(db, admin)).electric.defaultPrice).toBe(3500)
+  })
+
   it('chạy lần hai không tạo trùng và không ghi đè giá đã sửa', async () => {
     const first = await ensureUtilityFeeTypes(db, admin)
     await updateFeeType(db, admin, first.electric.id, { defaultPrice: 5000 })
