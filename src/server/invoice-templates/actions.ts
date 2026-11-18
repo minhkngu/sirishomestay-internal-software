@@ -4,9 +4,13 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/db/client'
 import { toActionResult } from '@/lib/action-result'
 import { getAccessContext } from '@/server/session'
-import { createInvoiceTemplate, deleteInvoiceTemplate, selectInvoiceTemplate, selectLeaseInvoiceTemplate, setDefaultInvoiceTemplate, updateInvoiceTemplate } from './service'
+import { createInvoiceTemplate, deleteInvoiceTemplate, previewInvoiceTemplate, selectInvoiceTemplate, selectLeaseInvoiceTemplate, setDefaultInvoiceTemplate, updateInvoiceTemplate } from './service'
 
 const refresh = () => { revalidatePath('/templates'); revalidatePath('/contracts', 'layout'); revalidatePath('/invoices', 'layout') }
+export async function previewInvoiceTemplateAction(config: unknown) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => ({ base64: Buffer.from(await previewInvoiceTemplate(ctx, config)).toString('base64') }))
+}
 export async function saveInvoiceTemplateAction(id: string | null, input: { name: string; config: unknown }) {
   const ctx = await getAccessContext()
   return toActionResult(async () => { const row = id ? await updateInvoiceTemplate(db, ctx, id, input) : await createInvoiceTemplate(db, ctx, input); refresh(); return { id: row.id } })

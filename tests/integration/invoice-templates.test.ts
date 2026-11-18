@@ -1,10 +1,12 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import QRCode from 'qrcode'
 import { facilities, rooms, tenants, leases, invoices } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
 import { defaultInvoiceTemplate } from '@/domain/invoice-template'
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { createTestDb } from '../helpers/db'
-import { createInvoiceTemplate, updateInvoiceTemplate, deleteInvoiceTemplate, listInvoiceTemplates, setDefaultInvoiceTemplate, selectInvoiceTemplate, selectLeaseInvoiceTemplate, resolveInvoiceTemplate } from '@/server/invoice-templates/service'
+import { createInvoiceTemplate, updateInvoiceTemplate, deleteInvoiceTemplate, listInvoiceTemplates, setDefaultInvoiceTemplate, selectInvoiceTemplate, selectLeaseInvoiceTemplate, resolveInvoiceTemplate, previewInvoiceTemplate } from '@/server/invoice-templates/service'
 
 describe('quản lý và chọn mẫu hóa đơn', () => {
   let db: DB, facilityId: string, leaseId: string, invoiceId: string
@@ -39,5 +41,24 @@ describe('quản lý và chọn mẫu hóa đơn', () => {
     await expect(selectInvoiceTemplate(db, staff(), invoiceId, crypto.randomUUID())).rejects.toThrow()
     await expect(selectInvoiceTemplate(db, { ...staff(), facilityIds: new Set([crypto.randomUUID()]) }, invoiceId, null)).rejects.toThrow()
     await expect(createInvoiceTemplate(db, admin, { name: 'X', config: { ...defaultInvoiceTemplate, logo: 'data:image/png;base64,AAAA' } })).rejects.toThrow()
+  })
+  it('xem PDF với dữ liệu mẫu và cấu hình chưa lưu mà không thay đổi dữ liệu', async () => {
+    const before = await listInvoiceTemplates(db, admin)
+    const qr = vi.spyOn(QRCode, 'toDataURL')
+    const pdf = await previewInvoiceTemplate(admin, { ...defaultInvoiceTemplate, brand: 'THUONG HIEU CHUA LUU', title: 'HOA DON THU NGHIEM' })
+    expect(qr.mock.calls[0][0]).toBe('DU LIEU MAU - KHONG THANH TOAN')
+    qr.mockRestore()
+    const doc = await getDocument({ data: new Uint8Array(pdf), useSystemFonts: true }).promise
+    const content = await (await doc.getPage(1)).getTextContent()
+    const text = content.items.map(item => 'str' in item ? item.str : '').join(' ')
+    expect(text).toContain('THUONG HIEU CHUA LUU')
+    expect(text).toContain('HOA DON THU NGHIEM')
+    expect(text).toContain('Nguyễn Văn An')
+    expect(text).toContain('Tiền phòng')
+    expect(text).toContain('DỮ LIỆU MẪU')
+    expect(text).toContain('Mã QR minh họa')
+    expect(await listInvoiceTemplates(db, admin)).toEqual(before)
+    await expect(previewInvoiceTemplate(staff(), defaultInvoiceTemplate)).rejects.toThrow()
+    await expect(previewInvoiceTemplate(admin, { ...defaultInvoiceTemplate, color: 'red' })).rejects.toThrow()
   })
 })

@@ -18,6 +18,23 @@ function checked(input: { name: string; config: unknown }) {
   }
   return { name, config: config.data }
 }
+/** Xem mẫu chưa lưu bằng cùng bộ dựng PDF, không tạo hóa đơn hoặc tệp xuất. */
+export async function previewInvoiceTemplate(ctx: AccessContext, config: unknown): Promise<Uint8Array> {
+  assertCan(ctx, 'settings')
+  const validated = checked({ name: 'Xem trước', config }).config
+  const { renderInvoicePdf } = await import('@/server/pdf')
+  return renderInvoicePdf({
+    kind: 'monthly', code: 'MAU-KHONG-THANH-TOAN', issueDate: '2026-11-01', periodStart: '2026-11-01', periodEnd: '2026-11-30', dueDate: '2026-11-05',
+    facility: { name: 'Siris Residences (dữ liệu mẫu)', address: 'Địa chỉ cơ sở mẫu' }, room: '301', tenant: { name: 'Nguyễn Văn An', phone: '0900000000' },
+    lines: [
+      { description: 'Tiền phòng', quantity: 1, unitLabel: 'tháng', unitPrice: 9000000, amount: 9000000 },
+      { description: 'Phí dịch vụ', quantity: 2, unitLabel: 'người', unitPrice: 200000, amount: 400000 },
+      { description: 'Điện', quantity: 100, unitLabel: 'kWh', unitPrice: 3500, amount: 350000 },
+    ],
+    total: 9750000, paid: 0,
+    bank: { bankBin: '970436', bankName: 'Ngân hàng mẫu', accountNumber: '123456789', accountName: 'TAI KHOAN MAU' },
+  }, validated, { sample: true })
+}
 export async function listInvoiceTemplates(db: Pick<DB, 'select'>, ctx: AccessContext) {
   void ctx
   return db.select().from(invoiceTemplates).orderBy(asc(invoiceTemplates.createdAt))

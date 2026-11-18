@@ -17,7 +17,7 @@ const styles = StyleSheet.create({
   qr: { width: 96, height: 96 }, paymentDetails: { flexGrow: 1, lineHeight: 1.7 }, footer: { position: 'absolute', bottom: 25, left: 40, right: 40, color: '#7A8B85', fontSize: 8 },
 })
 const date = (value: string) => value.split('-').reverse().join('/')
-export function InvoiceDocument({ data, qr, template }: { data: InvoicePdfData; qr: string | null; template: InvoiceTemplateConfig }) {
+export function InvoiceDocument({ data, qr, template, sample = false }: { data: InvoicePdfData; qr: string | null; template: InvoiceTemplateConfig; sample?: boolean }) {
   const [year, month] = data.periodStart.split('-')
   const title = data.kind === 'termination' ? 'Hoá đơn thanh lý' : `Hoá đơn tháng ${month}/${year}`
   const blocks: Record<InvoiceSection, React.ReactNode> = {
@@ -26,10 +26,10 @@ export function InvoiceDocument({ data, qr, template }: { data: InvoicePdfData; 
     charges: <View><View style={styles.row}><Text style={styles.description}>Khoản</Text><Text style={styles.quantity}>Số lượng</Text><Text style={styles.price}>Đơn giá</Text><Text style={styles.price}>Thành tiền</Text></View>{data.lines.map((line, index) => <View style={styles.row} key={index}><Text style={styles.description}>{line.description}</Text><Text style={styles.quantity}>{line.quantity} {line.unitLabel}</Text><Text style={styles.price}>{formatVND(line.unitPrice)}</Text><Text style={styles.price}>{formatVND(line.amount)}</Text></View>)}</View>,
     total: <View style={styles.total}><Text>Tổng cộng: {formatVND(data.total)} ₫</Text><Text style={styles.words}>{numberToVietnameseWords(data.total)}</Text></View>,
     payment: data.bank && <View style={styles.payment}>{qr && <Image style={styles.qr} src={qr} />}<View style={styles.paymentDetails}>
-      <Text>{data.total < 0 ? `Số tiền hoàn cho khách: ${formatVND(-data.total)} ₫` : data.total - data.paid <= 0 ? 'Đã thanh toán' : 'Quét mã để chuyển khoản'}</Text>
+      <Text>{sample ? 'Mã QR minh họa' : data.total < 0 ? `Số tiền hoàn cho khách: ${formatVND(-data.total)} ₫` : data.total - data.paid <= 0 ? 'Đã thanh toán' : 'Quét mã để chuyển khoản'}</Text>
       <Text>Ngân hàng: {data.bank.bankName}</Text><Text>Số tài khoản: {data.bank.accountNumber}</Text><Text>Chủ tài khoản: {data.bank.accountName}</Text><Text>Nội dung: {data.code}</Text>{data.dueDate && <Text>Hạn thanh toán: {date(data.dueDate)}</Text>}
     </View></View>,
     footer: template.footer ? <Text style={{ marginTop: 20, color: '#7A8B85', fontSize: 8 }}>{template.footer}</Text> : null,
   }
-  return <Document><Page size="A4" style={styles.page}>{template.sections.filter(section => !template.hidden.includes(section)).map(section => <View key={section}>{blocks[section]}</View>)}<Text style={styles.footer} render={({ pageNumber, totalPages }) => `${data.facility.name} · ${pageNumber}/${totalPages}`} fixed /></Page></Document>
+  return <Document><Page size="A4" style={styles.page}>{template.sections.filter(section => !template.hidden.includes(section)).map(section => <View key={section}>{blocks[section]}</View>)}<Text style={styles.footer} render={({ pageNumber, totalPages }) => `${data.facility.name}${sample ? ' · DỮ LIỆU MẪU — KHÔNG THANH TOÁN' : ''} · ${pageNumber}/${totalPages}`} fixed /></Page></Document>
 }
