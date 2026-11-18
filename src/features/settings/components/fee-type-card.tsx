@@ -27,7 +27,6 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
     Object.fromEntries(facilities.map((f) => [f.id, defaultFacilityIds.includes(f.id)])),
   )
   const appliedFacilities = facilities.filter((f) => selected[f.id])
-  const defaultNames = appliedFacilities.map((f) => f.name)
   const priceEntries = appliedFacilities
     .filter((f) => prices[f.id] != null)
     .map((f) => [f.name, prices[f.id]] as const)
@@ -75,12 +74,7 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-        <div className="space-y-0.5">
-          <p>{feeApplicationSummary(appliedFacilities.length, priceEntries.length)}</p>
-          {appliedFacilities.length > 0 && appliedFacilities.length <= 3 && (
-            <p>{defaultNames.join(', ')}{priceEntries.length > 0 ? ` · Giá riêng: ${priceEntries.map(([name, amount]) => `${name} ${formatVND(amount)} đ`).join(' · ')}` : ''}</p>
-          )}
-        </div>
+        <p>{feeApplicationSummary(appliedFacilities.length, priceEntries.length)}</p>
         <FeeFacilitiesDialog fee={fee} facilities={facilities} selected={selected} prices={prices} onSelectedChange={setSelected} />
       </div>
 
