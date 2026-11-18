@@ -33,6 +33,13 @@ describe('sửa và xoá hợp đồng', () => {
     expect(await db.select().from(invoices).where(eq(invoices.id, invoice.id))).toHaveLength(1)
     expect(await db.select().from(depositEntries).where(eq(depositEntries.leaseId, lease.id))).toEqual(before)
   })
+  it('sửa hợp đồng lưu ghi chú nhiều dòng, để trống thì xoá ghi chú', async () => {
+    const { lease } = await contracts.createLease(db, admin, input())
+    await contracts.updateLease(db, admin, lease.id, { ...input(), note: 'Khách hút thuốc\nXe 2 bánh' }, false)
+    expect((await contracts.getLease(db, admin, lease.id)).note).toBe('Khách hút thuốc\nXe 2 bánh')
+    await contracts.updateLease(db, admin, lease.id, { ...input(), note: '' }, false)
+    expect((await contracts.getLease(db, admin, lease.id)).note).toBe('')
+  })
   it('sửa hợp đồng cọc giữ nguyên sổ cọc', async () => {
     const input = { roomId, tenantId, depositAmount: 500, agreedRent: 1000, expectedMoveIn: '2026-01-01' }
     const { contract } = await contracts.createDepositContract(db, admin, input)

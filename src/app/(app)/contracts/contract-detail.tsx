@@ -29,7 +29,7 @@ import { listInvoices } from '@/server/invoices/service'
 import { SignStatus } from '@/features/contracts/components/sign-status'
 import { AddendaList } from '@/features/contracts/components/addenda-list'
 import { OccupantDialog } from '@/features/contracts/components/occupant-dialog'
-import { TransferWizard } from '@/features/contracts/components/transfer-wizard'
+import { ContractRowActions } from '@/features/contracts/components/contract-row-actions'
 import { addendumFormData, listAddenda } from '@/server/addenda/service'
 import { cn } from '@/lib/utils'
 
@@ -182,14 +182,17 @@ export default async function ContractDetail({ id }: { id: string }) {
               </p>
             </div>
 
-            {deposit.status === 'pending' && (
-              <Link
-                href={`/contracts/new?deposit=${deposit.id}`}
-                className={cn(buttonVariants({ size: 'sm' }), 'rounded-xl shadow-2xs')}
-              >
-                Chuyển thành hợp đồng thuê
-              </Link>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              <ContractRowActions id={deposit.id} kind="deposit" active={false} canDelete={can(ctx, 'delete_contracts', deposit.facilityId)} redirectAfterDelete="/contracts" />
+              {deposit.status === 'pending' && (
+                <Link
+                  href={`/contracts/new?deposit=${deposit.id}`}
+                  className={cn(buttonVariants({ size: 'sm' }), 'rounded-xl shadow-2xs')}
+                >
+                  Chuyển thành hợp đồng thuê
+                </Link>
+              )}
+            </div>
           </div>
         </div>
 
@@ -305,6 +308,7 @@ export default async function ContractDetail({ id }: { id: string }) {
               )}
             </div>
           </div>
+          <ContractRowActions id={lease.id} kind="lease" active={isActive} canDelete={can(ctx, 'delete_contracts', lease.facilityId)} redirectAfterDelete="/contracts" />
         </div>
       </div>
 
@@ -386,17 +390,6 @@ export default async function ContractDetail({ id }: { id: string }) {
                 signedFileId: a.signedFileId,
               }))}
             />
-            {form && (
-              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/60">
-                <TransferWizard
-                  leaseId={lease.id}
-                  currentRoomId={form.currentRoomId}
-                  freeRooms={form.freeRooms}
-                  meters={form.meters}
-                  today={form.today}
-                />
-              </div>
-            )}
           </div>
         </section>
 
