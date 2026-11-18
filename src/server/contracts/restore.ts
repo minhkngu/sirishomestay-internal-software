@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm'
 import { addenda, contractVersions, depositContracts, depositEntries, files, handoverItems, handovers, invoiceLines, invoices, leaseOccupants, leases, meterReadings, oneOffCharges, payments, pendingAdjustments, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
-import { assertCan, can, type AccessContext } from '@/domain/access'
+import { assertCan, can, facilityKey, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { todayVN } from '@/domain/dates'
 import { recordAudit } from '@/server/audit'
@@ -30,7 +30,7 @@ export async function previewContractRestore(db: DB, ctx: AccessContext, kind: K
   const restoredPeople = [...new Set([snapshot.contract.tenantId, ...snapshot.occupants.map(person => person.tenantId)])]
   const people = await db.select({ id: tenants.id, facilityId: tenants.homeFacilityId }).from(tenants).where(inArray(tenants.id, restoredPeople))
   if (people.length !== restoredPeople.length) throw new NotFoundError()
-  for (const person of people) assertCan(ctx, 'tenants_contracts', person.facilityId)
+  for (const person of people) assertCan(ctx, 'tenants_contracts', facilityKey(person.facilityId))
   const entries = await db.select().from(depositEntries).where(kind === 'lease' ? eq(depositEntries.leaseId, id) : eq(depositEntries.depositContractId, id))
   const invoiceRows = kind === 'lease' ? await db.select().from(invoices).where(eq(invoices.leaseId, id)) : []
   for (const invoice of invoiceRows) assertCan(ctx, 'tenants_contracts', invoice.facilityId)

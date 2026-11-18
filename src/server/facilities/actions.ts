@@ -7,7 +7,7 @@ import { getAccessContext } from '@/server/session'
 import { toActionResult, type ActionResult } from '@/lib/action-result'
 import { ValidationError } from '@/domain/errors'
 import { fieldErrorsOf } from '@/lib/zod-errors'
-import { createFacility, updateFacility } from './service'
+import { createFacility, deleteFacility, setFacilityActive, updateFacility } from './service'
 
 async function guard<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
   return toActionResult(async () => {
@@ -32,6 +32,26 @@ export async function updateFacilityAction(id: string, input: unknown) {
   return guard(async () => {
     await updateFacility(db, ctx, id, input as never)
     revalidatePath('/facilities')
+    return {}
+  })
+}
+
+export async function setFacilityActiveAction(id: string, active: boolean) {
+  const ctx = await getAccessContext()
+  return guard(async () => {
+    await setFacilityActive(db, ctx, id, active)
+    revalidatePath('/facilities')
+    revalidatePath('/rooms')
+    return {}
+  })
+}
+
+export async function deleteFacilityAction(id: string) {
+  const ctx = await getAccessContext()
+  return guard(async () => {
+    await deleteFacility(db, ctx, id)
+    revalidatePath('/facilities')
+    revalidatePath('/rooms')
     return {}
   })
 }

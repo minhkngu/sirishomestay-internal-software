@@ -23,6 +23,7 @@ export default async function RoomsPage() {
         rooms={rooms.map((r) => ({
           id: r.id, code: r.code, status: r.status, facilityId: r.facilityId, floor: r.floor,
           tenantName: r.tenantName, monthlyRent: r.monthlyRent, depositBalance: r.depositBalance, leaseEndDate: r.leaseEndDate,
+          ...(ctx.isAdmin && { isActive: r.isActive, manage: { floor: r.floor, roomType: r.roomType, areaM2: r.areaM2, beds: r.beds, listPrice: r.listPrice, capacity: r.capacity } }),
         }))}
       />
     </div>

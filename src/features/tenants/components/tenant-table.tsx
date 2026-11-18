@@ -41,7 +41,7 @@ export function TenantTable({ tenants, facilityNames = {}, visaWarningDays = 30 
               </td>
               <td className="p-3 font-medium text-foreground whitespace-nowrap">{formatPhoneDisplay(t.phone)}</td>
               <td className="p-3 text-muted-foreground whitespace-nowrap">{t.passportNumber ?? t.idNumber ?? t.taxCode ?? '—'}</td>
-              <td className="p-3 text-foreground font-medium whitespace-nowrap">{facilityNames[t.homeFacilityId] ?? '—'}</td>
+              <td className="p-3 text-foreground font-medium whitespace-nowrap">{(t.homeFacilityId && facilityNames[t.homeFacilityId]) || '—'}</td>
               <td className="p-3 text-muted-foreground whitespace-nowrap">—</td>
               <td className="p-3 whitespace-nowrap">
                 {t.visaExpiry ? (

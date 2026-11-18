@@ -64,7 +64,7 @@ export async function getDashboard(db: DB, ctx: AccessContext, today = todayVN()
     invoiceRows = rows.map(r => ({ id: r.inv.id, code: r.inv.code, facilityId: r.inv.facilityId, dueDate: r.inv.dueDate, tenantName: r.tenantName, total: sums.find(x => x.id === r.inv.id)?.n ?? 0, paid: paid.find(x => x.id === r.inv.id)?.n ?? 0 }))
     overdueDebt = invoiceRows.filter(i => i.dueDate && i.dueDate < today && i.total > i.paid).reduce((n, i) => n + i.total - i.paid, 0)
   }
-  const visas = wantTenants ? (await db.select({ id: tenants.id, name: tenants.fullName, f: tenants.homeFacilityId, v: tenants.visaExpiry }).from(tenants).where(and(eq(tenants.kind, 'foreign'), isNotNull(tenants.visaExpiry), lte(tenants.visaExpiry, addDays(today, settings.visaWarningDays)), inScope(tenants.homeFacilityId)))).map(r => ({ tenantId: r.id, name: r.name ?? '', facilityId: r.f, visaExpiry: r.v! })) : []
+  const visas = wantTenants ? (await db.select({ id: tenants.id, name: tenants.fullName, f: tenants.homeFacilityId, v: tenants.visaExpiry }).from(tenants).where(and(eq(tenants.kind, 'foreign'), isNotNull(tenants.visaExpiry), lte(tenants.visaExpiry, addDays(today, settings.visaWarningDays)), inScope(tenants.homeFacilityId)))).map(r => ({ tenantId: r.id, name: r.name ?? '', facilityId: r.f ?? '', visaExpiry: r.v! })) : []
 
   let metersMissing: Snapshot['metersMissing'] = []
   if (can(ctx, 'meters')) {

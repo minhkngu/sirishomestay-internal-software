@@ -1,0 +1,1 @@
+ALTER TABLE "tenants" ALTER COLUMN "home_facility_id" DROP NOT NULL;

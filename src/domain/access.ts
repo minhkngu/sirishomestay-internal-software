@@ -48,6 +48,10 @@ function inScope(ctx: AccessContext, facilityId: string): boolean {
   return ctx.isAdmin || ctx.facilityIds.has(facilityId)
 }
 
+/** Khách thuê mất cơ sở (cơ sở bị xoá) không thuộc phạm vi cơ sở nào: chỉ admin thấy. Dùng làm id cơ sở khi kiểm quyền. */
+export const NO_FACILITY = '00000000-0000-0000-0000-000000000000'
+export const facilityKey = (facilityId: string | null): string => facilityId ?? NO_FACILITY
+
 export function can(ctx: AccessContext, perm: Permission, facilityId?: string): boolean {
   if (ctx.isAdmin) return true
   if (!ctx.permissions.has(perm)) return false

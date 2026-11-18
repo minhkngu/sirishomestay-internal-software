@@ -9,6 +9,7 @@ import { orNotFound } from '@/lib/or-not-found'
 import { getAccessContext } from '@/server/session'
 import { listAmenities } from '@/server/amenities/service'
 import { RoomEditForm } from '@/features/rooms/components/room-edit-form'
+import { RoomLifecycle } from '@/features/rooms/components/room-lifecycle'
 import { getRoomDetail } from '@/server/rooms/service'
 import { listAssets } from '@/server/assets/service'
 import { RoomIncidentList } from '@/features/rooms/components/room-incident-list'
@@ -50,6 +51,7 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
             <span className="rounded-full border border-border/80 bg-muted/60 px-3 py-0.5 text-xs font-semibold text-foreground">
               {ROOM_STATUS_LABELS[detail.status]}
             </span>
+            {!r.isActive && <span className="rounded-full border border-dashed border-border bg-muted px-3 py-0.5 text-xs font-semibold text-muted-foreground">Ngừng sử dụng</span>}
           </div>
           {can(ctx, 'incidents', r.facilityId) && (
             <Link
@@ -83,6 +85,7 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
           <div className="mt-3">
             <RoomEditForm room={{ id: r.id, code: r.code, floor: r.floor, roomType: r.roomType, areaM2: r.areaM2, beds: r.beds, listPrice: r.listPrice, capacity: r.capacity }}
               amenities={allAmenities.map((a) => ({ id: a.id, name: a.name, isActive: a.isActive }))} selectedIds={detail.amenities.map((a) => a.id)} />
+            <div className="mt-3 border-t border-border/60 pt-3"><RoomLifecycle id={r.id} code={r.code} isActive={r.isActive} /></div>
           </div>
         )}
       </section>

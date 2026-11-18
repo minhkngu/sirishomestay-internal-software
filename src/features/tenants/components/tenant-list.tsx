@@ -30,7 +30,7 @@ export function TenantList({
       tenants.filter(
         (t) =>
           (!kind || t.kind === kind) &&
-          (selected.length === 0 || selected.includes(t.homeFacilityId)) &&
+          (selected.length === 0 || selected.includes(t.homeFacilityId ?? '')) &&
           matchesTenantQuery(t.searchText, q),
       ),
     [tenants, q, kind, selected],

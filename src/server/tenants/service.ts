@@ -1,7 +1,7 @@
 import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm'
 import { tenants } from '@/db'
 import type { DB } from '@/db/client'
-import { assertCan, facilityScope, NotFoundError, type AccessContext } from '@/domain/access'
+import { assertCan, facilityKey, facilityScope, NotFoundError, type AccessContext } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/server/audit'
 import { normalizePhone } from '@/domain/phone'
@@ -99,7 +99,7 @@ export async function createTenant(db: DB, ctx: AccessContext, input: unknown): 
     const dup = await findDuplicateField(tx, row)
     if (dup) throw dupError(dup)
     const [t] = await tx.insert(tenants).values(row).returning()
-    await recordAudit(tx, ctx, { action: 'create', entity: 'tenant', summary: 'Tạo khách thuê', entityId: t.id, facilityId: t.homeFacilityId, after: t })
+    await recordAudit(tx, ctx, { action: 'create', entity: 'tenant', summary: 'Tạo khách thuê', entityId: t.id, facilityId: t.homeFacilityId ?? undefined, after: t })
     return t
   })
 }
@@ -109,13 +109,13 @@ export async function updateTenant(db: DB, ctx: AccessContext, id: string, input
   return db.transaction(async (tx) => {
     const [before] = await tx.select().from(tenants).where(eq(tenants.id, id))
     if (!before) throw new NotFoundError()
-    assertCan(ctx, 'tenants_contracts', before.homeFacilityId)
+    assertCan(ctx, 'tenants_contracts', facilityKey(before.homeFacilityId))
     assertCan(ctx, 'tenants_contracts', data.homeFacilityId)
     const row = toTenantRow(data)
     const dup = await findDuplicateField(tx, row, id)
     if (dup) throw dupError(dup)
     const [after] = await tx.update(tenants).set({ ...row, updatedAt: new Date() }).where(eq(tenants.id, id)).returning()
-    await recordAudit(tx, ctx, { action: 'update', entity: 'tenant', summary: 'Sửa khách thuê', entityId: id, facilityId: after.homeFacilityId, before, after })
+    await recordAudit(tx, ctx, { action: 'update', entity: 'tenant', summary: 'Sửa khách thuê', entityId: id, facilityId: after.homeFacilityId ?? undefined, before, after })
     return after
   })
 }
@@ -123,7 +123,7 @@ export async function updateTenant(db: DB, ctx: AccessContext, id: string, input
 export async function getTenant(db: DB, ctx: AccessContext, id: string): Promise<Tenant> {
   const [t] = await db.select().from(tenants).where(eq(tenants.id, id))
   if (!t) throw new NotFoundError()
-  assertCan(ctx, 'tenants_contracts', t.homeFacilityId)
+  assertCan(ctx, 'tenants_contracts', facilityKey(t.homeFacilityId))
   return t
 }
 
