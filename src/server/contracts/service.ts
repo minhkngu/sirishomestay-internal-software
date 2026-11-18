@@ -232,7 +232,14 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
   if (input.handover) {
     const h = input.handover
     if (h.addAssetIds.length || h.newAssets.length || h.remove.length) assertCan(ctx, 'assets', room.facilityId)
-    await tx.select({ id: facilities.id }).from(facilities).where(eq(facilities.id, room.facilityId)).for('update')
+    // Khóa cơ sở của phòng và mọi cơ sở đích của việc di chuyển theo một thứ tự cố định, tránh deadlock khi hai hợp đồng chuyển chéo cơ sở
+    const targetFacilities: string[] = []
+    for (const item of h.remove) {
+      if (item.action !== 'move' || !item.to) continue
+      if (item.to.kind === 'warehouse') targetFacilities.push(item.to.id)
+      else if (item.to.kind === 'room') { const [r] = await tx.select({ f: rooms.facilityId }).from(rooms).where(eq(rooms.id, item.to.id)); if (r) targetFacilities.push(r.f) }
+    }
+    for (const id of [...new Set([room.facilityId, ...targetFacilities])].sort()) await tx.select({ id: facilities.id }).from(facilities).where(eq(facilities.id, id)).for('update')
     const current = await tx.select().from(assets).where(and(eq(assets.locationKind, 'room'), eq(assets.locationId, room.id), ne(assets.status, 'disposed'))).for('update')
     const expected = new Set(h.expectedRoomAssetIds)
     const added = new Set(h.addAssetIds)
