@@ -190,9 +190,9 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
   if (input.fees?.length && input.feeModel === 'snapshot') {
     const fees = input.fees as LeaseFeeInput[]
     // Phí tính theo đồng hồ được thêm nhiều dòng cùng loại (mỗi dòng một đồng hồ); các phí khác chỉ một dòng mỗi loại
-    const commonIds = fees.flatMap(f => f.feeTypeId && f.quantitySource !== 'meter' ? [f.feeTypeId] : [])
     const meterIds = fees.flatMap(f => f.existingMeterId ? [f.existingMeterId] : [])
-    if (new Set(commonIds).size !== commonIds.length || new Set(meterIds).size !== meterIds.length) throw new ValidationError('Phí hoặc đồng hồ bị chọn trùng')
+    if (new Set(meterIds).size !== meterIds.length) throw new ValidationError('Đồng hồ bị chọn trùng')
+    const seenCommon = new Set<string>()
     for (const fee of input.fees as LeaseFeeInput[]) {
       if (!Number.isSafeInteger(fee.unitPrice) || fee.unitPrice < 0 || fee.unitPrice > 2_147_483_647 || !['occupants', 'room', 'meter', 'period_input'].includes(fee.quantitySource)) throw new ValidationError('Phí dịch vụ không hợp lệ')
       let name = fee.name?.trim(), unit = fee.unit?.trim(), source: NonNullable<ContractFee['quantitySource']> = fee.quantitySource
@@ -202,6 +202,11 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
         if (!row || !row.type.isActive) throw new ValidationError('Loại phí không tồn tại hoặc đã lưu trữ')
         name = row.type.name; unit = row.unit.name; billing = row.type.billing as ContractFee['billing']
         source = row.type.quantityFrom === 'manual' ? 'legacy_fixed' : row.type.quantityFrom as LeaseFeeInput['quantitySource']
+      }
+      // Chỉ phí theo đồng hồ được nhiều dòng cùng loại; dùng nguồn số lượng thật của loại phí, không tin dữ liệu client
+      if (fee.feeTypeId && source !== 'meter') {
+        if (seenCommon.has(fee.feeTypeId)) throw new ValidationError('Phí hoặc đồng hồ bị chọn trùng')
+        seenCommon.add(fee.feeTypeId)
       }
       if (!name || !unit) throw new ValidationError('Nhập tên và đơn vị phí')
       const quantity = source === 'legacy_fixed' ? (fee.quantity ?? 1) : 1

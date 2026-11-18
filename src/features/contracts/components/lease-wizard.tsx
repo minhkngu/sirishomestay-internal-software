@@ -12,7 +12,7 @@ import { convertDepositToLeaseAction, createLeaseAction } from '@/server/contrac
 import { replaceSigner } from '../contract-occupants'
 import { assetEntry, buildHandoverPhotoTasks, uploadLeasePhotos, type PendingPhoto } from '../lease-photo-retry'
 import { uploadOne } from '@/components/file-upload'
-import { meterFeeError } from '../lease-fee-meters'
+import { meterFeeError, resolveMeterIds } from '../lease-fee-meters'
 import { LeaseFees, type FeeOption, type FeeDraft, type RoomFeeMeter } from './lease-fees'
 import { LeaseAssets, emptyChanges, type AssetOption, type MoveTargets } from './lease-assets'
 import type { RoomOption, TenantOption } from './deposit-form'
@@ -101,11 +101,12 @@ export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAsse
     setFieldErrors(errors)
     if (Object.keys(errors).length) return
     submitting.current = true
+    const meterIds = resolveMeterIds({ roomMeters, roomId, fees })
     const input = {
       roomId, tenantId, occupantIds, startDate, endDate, monthlyRent: Number(rent), depositAmount: Number(deposit), receivedDeposit: Number(received), note, contractTemplateId: contractTemplateId || null, invoiceTemplateId: invoiceTemplateId || null,
       handover: { expectedRoomAssetIds: assets.filter(a => a.locationKind === 'room' && a.locationId === roomId).map(a => a.id), expectedAddedLocations: changes.addAssetIds.map(id => { const a = assets.find(x => x.id === id)!; return { assetId: id, kind: a.locationKind, id: a.locationId } }), ...changes, conditions: handoverAssets.map(asset => ({ assetCode: asset.code, condition: assetEntry(assetConditions, asset.code) ?? asset.condition })) },
       feeModel: 'snapshot' as const,
-      fees: fees.map(f => ({ feeTypeId: f.feeTypeId, name: f.name, unit: f.unit, quantitySource: f.quantitySource, unitPrice: Number(f.price), quantity: Number(f.quantity), initialReading: f.initialReading.trim() === '' ? undefined : Number(f.initialReading), existingMeterId: f.existingMeterId })),
+      fees: fees.map(f => ({ feeTypeId: f.feeTypeId, name: f.name, unit: f.unit, quantitySource: f.quantitySource, unitPrice: Number(f.price), quantity: Number(f.quantity), initialReading: f.initialReading.trim() === '' ? undefined : Number(f.initialReading), existingMeterId: meterIds[f.key] })),
       proration: overrideProration || null, billingCycleMonths: Number(cycle) || 1,
       dueRule: dayOfMonth ? { kind: 'day_of_next_month', day: Number(dayOfMonth) } : null,
     }

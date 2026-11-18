@@ -350,6 +350,25 @@ describe('contracts', () => {
     expect(await db.select().from(meterReadings)).toHaveLength(0)
   })
 
+  it('nhận lại chỉ số bàn giao cùng ngày khi trùng giá trị, từ chối khi khác giá trị', async () => {
+    await updateFeeType(db, admin, feePerson, { name: 'ABC', quantityFrom: 'meter' })
+    const first = await createLease(db, lan(), snapshot([meterFee()]))
+    const [meter] = await db.select().from(meters).where(eq(meters.roomId, r301))
+    await db.update(leases).set({ status: 'ended' }).where(eq(leases.id, first.lease.id))
+    await db.insert(meterReadings).values({ meterId: meter.id, period: '2026-10', kind: 'handover', readOn: '2026-10-15', value: 500 })
+    const next = (initialReading: number) => createLease(db, lan(), snapshot([meterFee({ existingMeterId: meter.id, initialReading })], { tenantId: tenant2, occupantIds: [tenant2] }))
+    await expect(next(520)).rejects.toThrow(ValidationError)
+    expect(await db.select().from(leases)).toHaveLength(1)
+    await next(500)
+    expect(await db.select().from(meterReadings).where(eq(meterReadings.meterId, meter.id))).toHaveLength(1)
+  })
+
+  it('từ chối trùng loại phí không theo đồng hồ dù input khai quantitySource là meter', async () => {
+    const fee = { feeTypeId: feePerson, name: 'x', unit: 'x', quantitySource: 'meter' as const, unitPrice: 100, initialReading: 1 }
+    await expect(createLease(db, lan(), snapshot([fee, { ...fee, initialReading: 2 }]))).rejects.toThrow(ValidationError)
+    expect(await db.select().from(leases)).toHaveLength(0)
+  })
+
   it('từ chối đồng hồ của phòng khác hoặc đã gỡ', async () => {
     await updateFeeType(db, admin, feePerson, { name: 'ABC', quantityFrom: 'meter' })
     const first = await createLease(db, lan(), snapshot([meterFee()]))

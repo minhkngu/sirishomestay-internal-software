@@ -195,8 +195,10 @@ export async function ensureFeeMeter(tx: DB, ctx: AccessContext, input: { roomId
     const readings = await tx.select().from(meterReadings).where(eq(meterReadings.meterId, meter.id))
     const latest = readings.reduce((max, r) => Math.max(max, r.value), meter.startReading)
     if (input.initialReading! < latest) throw new ValidationError(`Chỉ số ban đầu không được nhỏ hơn chỉ số gần nhất (${latest})`, { initialReading: `Không nhỏ hơn ${latest}` })
-    if (readings.some(r => r.kind === 'handover' && r.readOn === input.installedOn)) throw new ValidationError('Đồng hồ đã có chỉ số bàn giao trong ngày này')
-    await tx.insert(meterReadings).values({ meterId: meter.id, period: input.installedOn.slice(0, 7), kind: 'handover', readOn: input.installedOn, value: input.initialReading! })
+    // Chỉ số bàn giao cùng ngày (vd. chốt khi thanh lý hợp đồng trước) được nhận lại nếu trùng giá trị
+    const sameDay = readings.find(r => r.kind === 'handover' && r.readOn === input.installedOn)
+    if (sameDay && sameDay.value !== input.initialReading) throw new ValidationError(`Đồng hồ đã có chỉ số bàn giao ${sameDay.value} trong ngày này`, { initialReading: `Nhập đúng chỉ số đã chốt: ${sameDay.value}` })
+    if (!sameDay) await tx.insert(meterReadings).values({ meterId: meter.id, period: input.installedOn.slice(0, 7), kind: 'handover', readOn: input.installedOn, value: input.initialReading! })
     found = meter
   } else {
     ;[found] = await tx.insert(meters).values({ roomId: room.id, utility: 'fee', feeTypeId: input.feeTypeId, startReading: input.initialReading!, installedOn: input.installedOn }).returning()
