@@ -36,6 +36,7 @@ export function LeaseAssets({ assets, roomId, facilityId, canManageAssets, moveT
   const [open, setOpen] = useState(true)
   const [menu, setMenu] = useState<string | null>(null)
   const [moving, setMoving] = useState<string | null>(null)
+  const [moveTo, setMoveTo] = useState('')
   const [adding, setAdding] = useState(false)
   const [code, setCode] = useState(''); const [name, setName] = useState(''); const [model, setModel] = useState(''); const [category, setCategory] = useState(''); const [value, setValue] = useState('0'); const [condition, setCondition] = useState('Tốt')
   const targets = moveTargets.warehouses.flatMap(w => [
@@ -43,7 +44,7 @@ export function LeaseAssets({ assets, roomId, facilityId, canManageAssets, moveT
     ...moveTargets.rooms.filter(r => r.facilityId === w.facilityId && r.id !== roomId).map(r => ({ value: `room:${r.id}`, label: r.label })),
   ])
   const removalLabel = (removal: AssetRemoval) => removal.action === 'dispose' ? 'Thanh lý' : `Di chuyển → ${targets.find(t => t.value === `${removal.to.kind}:${removal.to.id}`)?.label ?? ''}`
-  const setRemoval = (removal: AssetRemoval) => { onChange({ ...changes, remove: [...changes.remove.filter(r => r.assetId !== removal.assetId), removal] }); setMenu(null); setMoving(null) }
+  const setRemoval = (removal: AssetRemoval) => { onChange({ ...changes, remove: [...changes.remove.filter(r => r.assetId !== removal.assetId), removal] }); setMenu(null); setMoving(null); setMoveTo('') }
   const roomAssets = assets.filter(a => a.locationKind === 'room' && a.locationId === roomId)
   const candidates = assets.filter(a => a.facilityId === facilityId && !roomAssets.some(r => r.id === a.id))
   const fields = (asset: { code: string; name: string; model: string; condition: string }) => <div className="space-y-2">
@@ -60,9 +61,9 @@ export function LeaseAssets({ assets, roomId, facilityId, canManageAssets, moveT
         {removal ? <p className="text-sm">{asset.name} · {removalLabel(removal)}</p> : fields(asset)}
         {canManageAssets && <div className="relative"><button type="button" className="text-sm underline" onClick={() => { setMenu(menu === asset.id ? null : asset.id); setMoving(null) }}>{removal ? 'Đổi cách xử lý' : 'Xử lý tài sản'}</button>{menu === asset.id && <div className="absolute left-0 top-full z-10 grid min-w-40 rounded border bg-card p-1 shadow">
           <button type="button" className="p-2 text-left text-sm hover:bg-muted" onClick={() => setMoving(moving === asset.id ? null : asset.id)}>Di chuyển</button>
-          {moving === asset.id && <select aria-label={`Đích di chuyển ${asset.name}`} className="m-1 rounded border p-2 text-sm" value="" onChange={e => { const [kind, id] = e.target.value.split(':'); if (kind === 'warehouse' || kind === 'room') setRemoval({ assetId: asset.id, action: 'move', to: { kind, id } }) }}><option value="">— chọn kho hoặc phòng —</option>{targets.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}</select>}
+          {moving === asset.id && <div className="m-1 grid gap-1"><select aria-label={`Đích di chuyển ${asset.name}`} className="rounded border p-2 text-sm" value={moveTo} onChange={e => setMoveTo(e.target.value)}><option value="">— chọn kho hoặc phòng —</option>{targets.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}</select><button type="button" className="rounded border p-2 text-sm disabled:opacity-50" disabled={!moveTo} onClick={() => { const [kind, id] = moveTo.split(':'); if (kind === 'warehouse' || kind === 'room') setRemoval({ assetId: asset.id, action: 'move', to: { kind, id } }) }}>Áp dụng</button></div>}
           <button type="button" className="p-2 text-left text-sm hover:bg-muted" onClick={() => setRemoval({ assetId: asset.id, action: 'dispose' })}>Thanh lý</button>
-          {removal && <button type="button" className="p-2 text-left text-sm" onClick={() => { onChange({ ...changes, remove: changes.remove.filter(r => r.assetId !== asset.id) }); setMenu(null); setMoving(null) }}>Giữ lại</button>}</div>}</div>}
+          {removal && <button type="button" className="p-2 text-left text-sm" onClick={() => { onChange({ ...changes, remove: changes.remove.filter(r => r.assetId !== asset.id) }); setMenu(null); setMoving(null); setMoveTo('') }}>Giữ lại</button>}</div>}</div>}
       </div> })}
       {changes.addAssetIds.map(id => { const asset = assets.find(a => a.id === id); return asset && <div key={id} className="space-y-2 rounded-lg border bg-card p-3">{fields(asset)}<button type="button" className="text-sm underline" onClick={() => { onForget(asset.code); onChange({ ...changes, addAssetIds: changes.addAssetIds.filter(x => x !== id) }) }}>Gỡ {asset.name}</button></div> })}
       {changes.newAssets.map(asset => <div key={asset.code} className="space-y-2 rounded-lg border bg-card p-3">{fields(asset)}<button type="button" className="text-sm underline" onClick={() => { onForget(asset.code); onChange({ ...changes, newAssets: changes.newAssets.filter(a => a.code !== asset.code) }) }}>Gỡ {asset.name}</button></div>)}

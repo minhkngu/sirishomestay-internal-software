@@ -122,6 +122,8 @@ export async function moveAssetsInTransaction(tx: DB, ctx: AccessContext, assetI
     for (const id of facilityIds) await tx.select({ id: facilities.id }).from(facilities).where(eq(facilities.id, id)).for('update')
     const found = await tx.select().from(assets).where(inArray(assets.id, assetIds))
     if (found.length !== new Set(assetIds).size) throw new NotFoundError()
+    // Tài sản vừa bị chuyển sang cơ sở chưa được khóa giữa lúc đọc và khóa
+    if (found.some(a => !facilityIds.includes(a.facilityId))) throw new ValidationError('Tài sản vừa thay đổi, vui lòng thử lại')
     for (const a of found) assertCan(ctx, 'assets', a.facilityId)
     assertCan(ctx, 'assets', destFacility)
     for (const a of found) {
@@ -133,6 +135,11 @@ export async function moveAssetsInTransaction(tx: DB, ctx: AccessContext, assetI
       await recordAudit(tx, ctx, {
         action: 'update', entity: 'asset_move', entityId: a.id, facilityId: a.facilityId, summary: `Chuyển tài sản ${a.code}`,
         before: { kind: a.locationKind, id: a.locationId }, after: { kind: to.kind, id: to.id, facilityId: destFacility, reason },
+      })
+      // Chuyển liên cơ sở: ghi thêm một dòng cho cơ sở đến để người chỉ có quyền ở đó cũng thấy
+      if (a.facilityId !== destFacility) await recordAudit(tx, ctx, {
+        action: 'update', entity: 'asset_move', entityId: a.id, facilityId: destFacility, summary: `Nhận tài sản ${a.code} từ cơ sở khác`,
+        before: { kind: a.locationKind, id: a.locationId, facilityId: a.facilityId }, after: { kind: to.kind, id: to.id, facilityId: destFacility, reason },
       })
     }
 }

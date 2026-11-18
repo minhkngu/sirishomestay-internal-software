@@ -236,6 +236,7 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
     const targetFacilities: string[] = []
     for (const item of h.remove) {
       if (item.action !== 'move' || !item.to) continue
+      if (typeof item.to.id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.to.id)) throw new ValidationError('Đích di chuyển không hợp lệ')
       if (item.to.kind === 'warehouse') targetFacilities.push(item.to.id)
       else if (item.to.kind === 'room') { const [r] = await tx.select({ f: rooms.facilityId }).from(rooms).where(eq(rooms.id, item.to.id)); if (r) targetFacilities.push(r.f) }
     }

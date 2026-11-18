@@ -59,6 +59,13 @@ describe('assets', () => {
     expect((await assetHistory(db, admin, a.id)).moves[0]).toMatchObject({ toKind: 'room', toId: r302 })
   })
 
+  it('chuyển liên cơ sở ghi nhật ký cho cả cơ sở đi và cơ sở đến', async () => {
+    const a = await mk('AC-01')
+    await moveAssets(db, admin, [a.id], { kind: 'room', id: r302 }, 'x')
+    const logs = (await db.select().from(auditLogs)).filter((l) => l.entity === 'asset_move' && l.entityId === a.id)
+    expect(logs.map((l) => l.facilityId).sort()).toEqual([fa, fb].sort())
+  })
+
   it('thiếu quyền ở cơ sở đích → từ chối, không đổi gì', async () => {
     const a = await mk('AC-01')
     await expect(moveAssets(db, hung(), [a.id], { kind: 'room', id: r302 }, 'x')).rejects.toThrow(NotFoundError)

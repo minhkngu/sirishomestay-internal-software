@@ -214,6 +214,13 @@ describe('contracts', () => {
     expect(await db.select().from(handovers)).toHaveLength(0)
   })
 
+  it('từ chối id đích không phải UUID bằng ValidationError', async () => {
+    const [a] = await db.insert(assets).values({ code: 'BADID', name: 'Bàn', facilityId: fa, locationKind: 'room', locationId: r301 }).returning()
+    const handover = { expectedRoomAssetIds: [a.id], addAssetIds: [], newAssets: [], remove: [{ assetId: a.id, action: 'move', to: { kind: 'room', id: 'khong-phai-uuid' } }] }
+    await expect(createLease(db, admin, leaseInput({ handover: handover as never }))).rejects.toThrow(ValidationError)
+    expect(await db.select().from(leases)).toHaveLength(0)
+  })
+
   it('từ chối hành động cũ warehouse/unassigned', async () => {
     const [a] = await db.insert(assets).values({ code: 'OLDACT', name: 'Bàn', facilityId: fa, locationKind: 'room', locationId: r301 }).returning()
     for (const action of ['warehouse', 'unassigned']) {

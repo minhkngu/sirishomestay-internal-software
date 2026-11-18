@@ -53,6 +53,8 @@ test('xử lý tài sản chỉ có di chuyển và thanh lý, đổi phòng xó
   await page.getByRole('button', { name: 'Di chuyển', exact: true }).click()
   const target = page.getByRole('combobox', { name: /^Đích di chuyển/ })
   await target.selectOption({ index: 1 })
+  await expect(page.getByText(/Di chuyển → /)).toHaveCount(0)
+  await page.getByRole('button', { name: 'Áp dụng', exact: true }).click()
   await expect(page.getByText(/Di chuyển → /)).toBeVisible()
   await page.getByRole('button', { name: 'Đổi cách xử lý' }).click()
   await page.getByRole('button', { name: 'Thanh lý', exact: true }).click()
