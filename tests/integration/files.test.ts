@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { facilities, files } from '@/db'
+import { facilities, files, rooms, leases } from '@/db'
+import '@/server/contracts/service'
 import { createTenant } from '@/server/tenants/service'
 import { requestUpload, confirmUpload, deleteFile, listFiles, getDownloadUrl, fileAccessPermission } from '@/server/files/service'
 import { MemoryStorage } from '@/server/storage/memory'
@@ -29,6 +30,25 @@ describe('files', () => {
     tenantA = (await createTenant(db, ctxOf(['settings']), { kind: 'vietnamese', homeFacilityId: fa, fullName: 'A', phone: '0901234567', idNumber: '012345678901' })).id
   })
   const doc = { ownerType: 'tenant_document' as const, ownerId: '' }
+
+  it('ảnh hợp đồng chỉ hiện sau xác nhận và tuân theo quyền cơ sở', async () => {
+    const [room] = await db.insert(rooms).values({ facilityId: fa, code: '301' }).returning()
+    const [lease] = await db.insert(leases).values({ code: 'L1', roomId: room.id, tenantId: tenantA, startDate: '2026-01-01', endDate: '2026-12-31', monthlyRent: 1, depositAmount: 0 }).returning()
+    const req = { ownerType: 'lease_photo' as const, ownerId: lease.id, contentType: 'image/jpeg' }
+    await expect(requestUpload(db, ctxOf(['billing'], [fa]), storage, req)).rejects.toThrow(ForbiddenError)
+    await expect(requestUpload(db, ctxOf(['tenants_contracts'], [fb]), storage, req)).rejects.toThrow(NotFoundError)
+    await expect(requestUpload(db, staffA, storage, { ...req, contentType: 'application/pdf' })).rejects.toThrow(ValidationError)
+    const up = await requestUpload(db, staffA, storage, req)
+    expect(up.thumbUploadUrl).toBeTruthy()
+    expect(await listFiles(db, staffA, 'lease_photo', lease.id)).toHaveLength(0)
+    const [stored] = await db.select().from(files).where(eq(files.id, up.fileId))
+    await storage.write(stored.storageKey, new Uint8Array(2 * 1024 * 1024 + 1), 'image/jpeg')
+    await expect(confirmUpload(db, staffA, up.fileId, storage)).rejects.toThrow(ValidationError)
+    await storage.write(stored.storageKey, new Uint8Array(10), 'image/jpeg')
+    await storage.write(stored.thumbKey!, new Uint8Array(10), 'image/jpeg')
+    await confirmUpload(db, staffA, up.fileId, storage)
+    expect(await listFiles(db, staffA, 'lease_photo', lease.id)).toHaveLength(1)
+  })
 
   it('xin URL tải lên, xác nhận → có bản ghi gắn đúng chủ sở hữu và cơ sở', async () => {
     const up = await requestUpload(db, staffA, storage, { ...doc, ownerId: tenantA, contentType: 'image/webp', name: 'passport.webp' })

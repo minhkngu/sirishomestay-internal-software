@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, like, lte, ne } from 'drizzle-orm'
 import {
-  depositContracts, depositEntries, facilities, feeTypes, feeUnits, files, invoiceLines, invoices, leaseFees, leaseOccupants, leases, rooms, tenants,
+  assets, depositContracts, depositEntries, docTemplates, facilities, feeTypes, feeUnits, files, handoverItems, invoiceLines, invoiceTemplates, invoices, leaseFees, leaseFeeSnapshots, leaseOccupants, leases, rooms, tenants,
 } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, facilityScope, type AccessContext } from '@/domain/access'
@@ -11,6 +11,9 @@ import { buildFirstInvoice } from '@/domain/invoice-builder'
 import { contractTermsAt } from '@/domain/contract-terms'
 import type { ContractFee, DepositEntry, InvoiceLineInput, LeaseTerms, Proration } from '@/domain/types'
 import { recordAudit } from '@/server/audit'
+import { ensureFeeMeter } from '@/server/meters/service'
+import { createAssetInTransaction, moveAssetsInTransaction, setAssetStatusInTransaction } from '@/server/assets/service'
+import { startHandoverInTransaction } from '@/server/handovers/service'
 import { registerExportOwnerResolver, registerOwnerResolver } from '@/server/files/owners'
 import type { ExportFormat } from '@/server/convert'
 import { leaseData, loadAddenda, nextInvoiceCode } from '@/server/invoices/service'
@@ -48,6 +51,11 @@ export async function nextLeaseCode(tx: Pick<DB, 'select'>, facilityCode: string
 }
 
 async function contractFees(tx: Pick<DB, 'select'>, leaseId: string): Promise<ContractFee[]> {
+  const [lease] = await tx.select({ feeModel: leases.feeModel }).from(leases).where(eq(leases.id, leaseId))
+  if (lease?.feeModel === 'snapshot') {
+    const rows = await tx.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, leaseId))
+    return rows.map(f => ({ leaseFeeId: f.id, feeTypeId: f.feeTypeId, name: f.name, unit: f.unit, billing: f.billing as ContractFee['billing'], quantityFrom: f.quantitySource === 'occupants' ? 'occupants' as const : 'manual' as const, quantitySource: f.quantitySource as NonNullable<ContractFee['quantitySource']>, quantity: f.quantity, unitPrice: f.unitPrice }))
+  }
   const rows = await tx
     .select({ f: leaseFees, t: feeTypes, u: feeUnits })
     .from(leaseFees)
@@ -117,6 +125,8 @@ export async function cancelDepositContract(db: DB, ctx: AccessContext, id: stri
 
 // ------------------------------------------------------------------ hợp đồng thuê
 
+export type LeaseFeeInput = { feeTypeId: string | null; name: string; unit: string; quantitySource: 'occupants' | 'room' | 'meter' | 'period_input'; unitPrice: number; quantity?: number; initialReading?: number; existingMeterId?: string }
+type LegacyFeeInput = { feeTypeId: string; quantity: number; unitPrice: number }
 export type LeaseInput = {
   roomId: string
   tenantId: string
@@ -125,25 +135,46 @@ export type LeaseInput = {
   endDate: string
   monthlyRent: number
   depositAmount: number
-  fees?: { feeTypeId: string; quantity: number; unitPrice: number }[]
+  receivedDeposit?: number
+  note?: string
+  contractTemplateId?: string | null
+  invoiceTemplateId?: string | null
+  handover?: {
+    expectedRoomAssetIds: string[]
+    addAssetIds: string[]
+    expectedAddedLocations?: Array<{ assetId: string; kind: string; id: string }>
+    newAssets: Array<{ code: string; name: string; model: string; category: string; value: number; condition: string }>
+    remove: Array<{ assetId: string; action: 'dispose' } | { assetId: string; action: 'move'; to: { kind: 'warehouse' | 'room'; id: string } }>
+    conditions?: Array<{ assetCode: string; condition: string }>
+  }
+  feeModel?: 'legacy' | 'snapshot'
+  fees?: LegacyFeeInput[] | LeaseFeeInput[]
   dueRule?: unknown
   proration?: Proration | null
   billingCycleMonths?: number
   billWaterByMeter?: boolean
 }
 
-export type LeaseCreated = { lease: Lease; firstInvoiceLines: InvoiceLineInput[]; warnings: string[] }
+export type LeaseCreated = { lease: Lease; firstInvoiceLines: InvoiceLineInput[]; warnings: string[]; handoverItems: Array<{ assetCode: string; itemId: string }> }
 
 async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDepositId: string | null): Promise<LeaseCreated> {
   const room = await loadRoom(tx, ctx, input.roomId)
   const tenant = await loadTenant(tx, ctx, input.tenantId)
+  if (input.invoiceTemplateId) {
+    const [template] = await tx.select({ id: invoiceTemplates.id }).from(invoiceTemplates).where(eq(invoiceTemplates.id, input.invoiceTemplateId))
+    if (!template) throw new ValidationError('Mẫu hóa đơn không hợp lệ', { invoiceTemplateId: 'Chọn mẫu hóa đơn hợp lệ' })
+  }
+  if (input.contractTemplateId) {
+    const [template] = await tx.select({ template: docTemplates, file: files }).from(docTemplates).leftJoin(files, eq(files.id, docTemplates.fileId)).where(eq(docTemplates.id, input.contractTemplateId))
+    if (!template || template.template.docType !== 'lease' || !template.file?.confirmedAt || template.file.ownerType !== 'template' || template.file.ownerId !== template.template.id) throw new ValidationError('Mẫu hợp đồng không hợp lệ hoặc chưa sẵn sàng', { contractTemplateId: 'Chọn mẫu hợp đồng hợp lệ' })
+  }
   if (input.endDate < input.startDate) throw new ValidationError('Ngày kết thúc phải sau ngày bắt đầu', { endDate: 'Ngày kết thúc phải sau ngày bắt đầu' })
   if (input.monthlyRent < 0 || input.depositAmount < 0) throw new ValidationError('Số tiền không hợp lệ')
-  const occupants = [...new Set(input.occupantIds?.length ? input.occupantIds : tenant.kind === 'company' ? [] : [tenant.id])]
+  const occupants = input.feeModel === 'snapshot' ? [...new Set([tenant.id, ...(input.occupantIds ?? [])])] : [...new Set(input.occupantIds?.length ? input.occupantIds : [tenant.id])]
   if (occupants.length === 0) throw new ValidationError('Chọn ít nhất một người ở', { occupantIds: 'Chọn ít nhất một người ở' })
   for (const o of occupants) {
     const occupant = await loadTenant(tx, ctx, o)
-    if (occupant.kind === 'company') throw new ValidationError('Người ở phải là khách cá nhân', { occupantIds: 'Người ở phải là khách cá nhân' })
+    if (input.feeModel !== 'snapshot' && occupant.kind === 'company' && occupant.id !== tenant.id) throw new ValidationError('Người ở phải là khách cá nhân', { occupantIds: 'Người ở phải là khách cá nhân' })
   }
 
   const [active] = await tx.select().from(leases).where(and(eq(leases.roomId, room.id), eq(leases.status, 'active')))
@@ -153,20 +184,98 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
   const code = await nextLeaseCode(tx, fac.code, input.startDate)
   const [lease] = await tx.insert(leases).values({
     code, roomId: room.id, tenantId: tenant.id, startDate: input.startDate, endDate: input.endDate, monthlyRent: input.monthlyRent,
-    depositAmount: input.depositAmount, dueRule: input.dueRule ?? null, proration: input.proration ?? null, billingCycleMonths: input.billingCycleMonths ?? 1, billWaterByMeter: input.billWaterByMeter ?? true, fromDepositContractId: fromDepositId,
+    depositAmount: input.depositAmount, note: input.note ?? '', contractTemplateId: input.contractTemplateId ?? null, invoiceTemplateId: input.invoiceTemplateId ?? null, feeModel: input.feeModel ?? 'legacy', dueRule: input.dueRule ?? null, proration: input.proration ?? null, billingCycleMonths: input.billingCycleMonths ?? 1, billWaterByMeter: input.billWaterByMeter ?? true, fromDepositContractId: fromDepositId,
   }).returning()
   await tx.insert(leaseOccupants).values(occupants.map((tenantId) => ({ leaseId: lease.id, tenantId })))
-  if (input.fees?.length) await tx.insert(leaseFees).values(input.fees.map((f) => ({ leaseId: lease.id, ...f })))
+  if (input.fees?.length && input.feeModel === 'snapshot') {
+    const fees = input.fees as LeaseFeeInput[]
+    // Phí tính theo đồng hồ được thêm nhiều dòng cùng loại (mỗi dòng một đồng hồ); các phí khác chỉ một dòng mỗi loại
+    const meterIds = fees.flatMap(f => f.existingMeterId ? [f.existingMeterId] : [])
+    if (new Set(meterIds).size !== meterIds.length) throw new ValidationError('Đồng hồ bị chọn trùng')
+    const seenCommon = new Set<string>()
+    for (const fee of input.fees as LeaseFeeInput[]) {
+      if (!Number.isSafeInteger(fee.unitPrice) || fee.unitPrice < 0 || fee.unitPrice > 2_147_483_647 || !['occupants', 'room', 'meter', 'period_input'].includes(fee.quantitySource)) throw new ValidationError('Phí dịch vụ không hợp lệ')
+      let name = fee.name?.trim(), unit = fee.unit?.trim(), source: NonNullable<ContractFee['quantitySource']> = fee.quantitySource
+      let billing: ContractFee['billing'] = source === 'meter' || source === 'period_input' ? 'per_occurrence' : 'monthly_fixed'
+      if (fee.feeTypeId) {
+        const [row] = await tx.select({ type: feeTypes, unit: feeUnits }).from(feeTypes).innerJoin(feeUnits, eq(feeTypes.unitId, feeUnits.id)).where(eq(feeTypes.id, fee.feeTypeId))
+        if (!row || !row.type.isActive) throw new ValidationError('Loại phí không tồn tại hoặc đã lưu trữ')
+        name = row.type.name; unit = row.unit.name; billing = row.type.billing as ContractFee['billing']
+        source = row.type.quantityFrom === 'manual' ? 'legacy_fixed' : row.type.quantityFrom as LeaseFeeInput['quantitySource']
+      }
+      // Chỉ phí theo đồng hồ được nhiều dòng cùng loại; dùng nguồn số lượng thật của loại phí, không tin dữ liệu client
+      if (fee.feeTypeId && source !== 'meter') {
+        if (seenCommon.has(fee.feeTypeId)) throw new ValidationError('Phí hoặc đồng hồ bị chọn trùng')
+        seenCommon.add(fee.feeTypeId)
+      }
+      if (!name || !unit) throw new ValidationError('Nhập tên và đơn vị phí')
+      const quantity = source === 'legacy_fixed' ? (fee.quantity ?? 1) : 1
+      if (!Number.isSafeInteger(quantity) || quantity < 0 || quantity > 2_147_483_647) throw new ValidationError('Số lượng phí không hợp lệ')
+      const [savedFee] = await tx.insert(leaseFeeSnapshots).values({ leaseId: lease.id, feeTypeId: fee.feeTypeId, name, unit, quantitySource: source, quantity, billing, unitPrice: fee.unitPrice }).returning()
+      if (source === 'meter') await ensureFeeMeter(tx, ctx, { roomId: room.id, feeTypeId: fee.feeTypeId, leaseFeeId: savedFee.id, initialReading: fee.initialReading, existingMeterId: fee.existingMeterId, installedOn: input.startDate })
+    }
+  } else if (input.fees?.length) await tx.insert(leaseFees).values((input.fees as LegacyFeeInput[]).map((f) => ({ leaseId: lease.id, ...f })))
 
   // sổ cọc: cọc giữ chỗ chuyển sang hợp đồng thuê; phần còn thiếu ghi dòng thu chờ
   let held = 0
   if (fromDepositId) {
-    const moved = await tx.update(depositEntries).set({ leaseId: lease.id, updatedAt: new Date() }).where(eq(depositEntries.depositContractId, fromDepositId)).returning()
+    const moved = await tx.update(depositEntries).set({ leaseId: lease.id, updatedAt: new Date() }).where(and(eq(depositEntries.depositContractId, fromDepositId), eq(depositEntries.status, 'done'))).returning()
     held = depositBalance(moved.map(toDomainEntry))
   }
-  const missing = input.depositAmount - held
+  const received = input.receivedDeposit ?? held
+  if (!Number.isSafeInteger(input.depositAmount) || !Number.isSafeInteger(received) || received < held || received < 0 || received > input.depositAmount) {
+    throw new ValidationError('Tiền cọc thực nhận không hợp lệ', { receivedDeposit: 'Tiền thực nhận phải từ số cọc kế thừa đến số cọc hợp đồng' })
+  }
+  if (received > held) {
+    await tx.insert(depositEntries).values({ leaseId: lease.id, date: todayVN(), type: 'collect', amount: received - held, status: 'done', note: 'Cọc thực nhận khi tạo hợp đồng' })
+  }
+  const missing = input.depositAmount - received
   if (missing > 0) {
     await tx.insert(depositEntries).values({ leaseId: lease.id, date: input.startDate, type: 'collect', amount: missing, status: 'pending', note: 'Cọc còn thiếu theo hợp đồng thuê' })
+  }
+
+  let createdHandoverItems: Array<{ assetCode: string; itemId: string }> = []
+  if (input.handover) {
+    const h = input.handover
+    if (h.addAssetIds.length || h.newAssets.length || h.remove.length) assertCan(ctx, 'assets', room.facilityId)
+    // Khóa cơ sở của phòng và mọi cơ sở đích của việc di chuyển theo một thứ tự cố định, tránh deadlock khi hai hợp đồng chuyển chéo cơ sở
+    const targetFacilities: string[] = []
+    for (const item of h.remove) {
+      if (item.action !== 'move' || !item.to) continue
+      if (typeof item.to.id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.to.id)) throw new ValidationError('Đích di chuyển không hợp lệ')
+      if (item.to.kind === 'warehouse') targetFacilities.push(item.to.id)
+      else if (item.to.kind === 'room') { const [r] = await tx.select({ f: rooms.facilityId }).from(rooms).where(eq(rooms.id, item.to.id)); if (r) targetFacilities.push(r.f) }
+    }
+    for (const id of [...new Set([room.facilityId, ...targetFacilities])].sort()) await tx.select({ id: facilities.id }).from(facilities).where(eq(facilities.id, id)).for('update')
+    const current = await tx.select().from(assets).where(and(eq(assets.locationKind, 'room'), eq(assets.locationId, room.id), ne(assets.status, 'disposed'))).for('update')
+    const expected = new Set(h.expectedRoomAssetIds)
+    const added = new Set(h.addAssetIds)
+    const removed = new Set(h.remove.map((x) => x.assetId))
+    if (expected.size !== h.expectedRoomAssetIds.length || added.size !== h.addAssetIds.length || removed.size !== h.remove.length || current.length !== expected.size || current.some((a) => !expected.has(a.id)) || h.remove.some((x) => !expected.has(x.assetId)) || h.addAssetIds.some((id) => expected.has(id))) {
+      throw new ValidationError('Danh sách tài sản đã thay đổi hoặc không hợp lệ, vui lòng tải lại')
+    }
+    if (h.addAssetIds.length) {
+      const additions = await tx.select().from(assets).where(inArray(assets.id, h.addAssetIds)).for('update')
+      if (additions.length !== h.addAssetIds.length || additions.some((a) => a.facilityId !== room.facilityId || a.status === 'disposed' || (!h.expectedAddedLocations?.some((loc) => loc.assetId === a.id && loc.kind === a.locationKind && loc.id === a.locationId)))) throw new ValidationError('Tài sản không hợp lệ hoặc không thuộc cơ sở')
+      await moveAssetsInTransaction(tx, ctx, h.addAssetIds, { kind: 'room', id: room.id }, 'Bàn giao nhận phòng')
+    }
+    for (const item of h.remove) {
+      if (item.action === 'dispose') await setAssetStatusInTransaction(tx, ctx, item.assetId, 'disposed')
+      else if (item.action === 'move' && item.to && (item.to.kind === 'warehouse' || item.to.kind === 'room') && typeof item.to.id === 'string') {
+        if (item.to.kind === 'room' && item.to.id === room.id) throw new ValidationError('Không thể chuyển tài sản vào chính phòng đang lập hợp đồng')
+        await moveAssetsInTransaction(tx, ctx, [item.assetId], item.to, 'Bàn giao nhận phòng')
+      } else throw new ValidationError('Cách xử lý tài sản không hợp lệ')
+    }
+    for (const asset of h.newAssets) await createAssetInTransaction(tx, ctx, { ...asset, facilityId: room.facilityId, location: { kind: 'room', id: room.id } })
+    const handover = await startHandoverInTransaction(tx, ctx, lease.id, 'check_in')
+    createdHandoverItems = await tx.select({ assetCode: assets.code, itemId: handoverItems.id }).from(handoverItems).innerJoin(assets, eq(assets.id, handoverItems.assetId)).where(eq(handoverItems.handoverId, handover.id))
+    const conditions = h.conditions ?? []
+    if (!Array.isArray(conditions) || conditions.some(c => !c || typeof c.assetCode !== 'string') || new Set(conditions.map(c => c.assetCode)).size !== conditions.length) throw new ValidationError('Tình trạng tài sản không hợp lệ')
+    for (const entry of conditions) {
+      const item = createdHandoverItems.find(x => x.assetCode === entry.assetCode)
+      if (!item || typeof entry.condition !== 'string' || !entry.condition.trim() || entry.condition.trim().length > 300) throw new ValidationError('Tình trạng tài sản không hợp lệ hoặc không thuộc biên bản')
+      await tx.update(handoverItems).set({ condition: entry.condition.trim() }).where(eq(handoverItems.id, item.itemId))
+    }
   }
 
   // hoá đơn đầu tiên (nháp) — bảng hoá đơn nối ở Task 14, trước đó trả về dòng nháp
@@ -178,7 +287,7 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
     roomId: lease.roomId, startDate: lease.startDate, endDate: lease.endDate, monthlyRent: lease.monthlyRent,
     depositAmount: lease.depositAmount, fees, occupantIds: occupants,
   }
-  const firstInvoiceLines = buildFirstInvoice(terms, lease.startDate, proration, held)
+  const firstInvoiceLines = buildFirstInvoice(terms, lease.startDate, proration, received)
   // Hoá đơn đầu tiên (nháp thật): từ ngày vào ở tới hết tháng (hoặc hết hợp đồng); nhân viên duyệt vào lúc họ chọn
   const monthEnd = `${lease.startDate.slice(0, 7)}-${String(daysInMonth(lease.startDate.slice(0, 7))).padStart(2, '0')}`
   const [firstInvoice] = await tx.insert(invoices).values({
@@ -189,7 +298,7 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
   await recordAudit(tx, ctx, { action: 'create', entity: 'invoice', entityId: firstInvoice.id, facilityId: room.facilityId, summary: `Tạo hoá đơn đầu tiên ${firstInvoice.code}`, after: firstInvoice })
 
   await recordAudit(tx, ctx, { action: 'create', entity: 'lease', entityId: lease.id, facilityId: room.facilityId, summary: `Tạo hợp đồng thuê ${lease.code}`, after: lease })
-  return { lease, firstInvoiceLines, warnings: [] }
+  return { lease, firstInvoiceLines, warnings: [], handoverItems: createdHandoverItems }
 }
 
 export async function createLease(db: DB, ctx: AccessContext, input: LeaseInput): Promise<LeaseCreated> {
@@ -291,7 +400,8 @@ export async function setSignStatus(db: DB, ctx: AccessContext, kind: 'lease' | 
 
 /** Xuất hợp đồng ra Word từ mẫu; hợp đồng đang ở trạng thái nháp tự chuyển sang "đã xuất". */
 export async function exportContract(db: DB, ctx: AccessContext, storage: StorageAdapter, kind: 'lease' | 'deposit', id: string, templateId?: string, format: ExportFormat = 'docx') {
-  const r = await exportDocument(db, ctx, storage, { docType: kind === 'lease' ? 'lease' : 'deposit_contract', entityId: id, templateId, format })
+  const [lease] = kind === 'lease' ? await db.select({ templateId: leases.contractTemplateId }).from(leases).where(eq(leases.id, id)) : []
+  const r = await exportDocument(db, ctx, storage, { docType: kind === 'lease' ? 'lease' : 'deposit_contract', entityId: id, templateId: templateId ?? lease?.templateId ?? undefined, format })
   const table = kind === 'lease' ? leases : depositContracts
   const [row] = await db.select().from(table).where(eq(table.id, id))
   if (row?.signStatus === 'draft') await setSignStatus(db, ctx, kind, id, 'exported')
@@ -299,6 +409,12 @@ export async function exportContract(db: DB, ctx: AccessContext, storage: Storag
 }
 
 // ------------------------------------------------------------------ nối với tệp và giấy tờ
+
+registerOwnerResolver('lease_photo', async (db, ownerId) => {
+  const [row] = await db.select({ facilityId: rooms.facilityId }).from(leases).innerJoin(rooms, eq(rooms.id, leases.roomId)).where(eq(leases.id, ownerId))
+  if (!row) throw new NotFoundError()
+  return row
+})
 
 registerOwnerResolver('signed_contract', async (db, ownerId) => {
   for (const t of [leases, depositContracts] as const) {

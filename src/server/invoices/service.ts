@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, like, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { addenda, facilities, feeTypes, feeUnits, invoiceLines, invoices, leaseFees, leaseOccupants, leases, meterReadings, meters, oneOffCharges, payments, pendingAdjustments, rooms, tenants, utilityRates } from '@/db'
+import { addenda, facilities, feeTypes, feeUnits, invoiceLines, invoices, invoiceFeeQuantities, leaseFeeMeters, leaseFees, leaseFeeSnapshots, leaseOccupants, leases, meterReadings, meters, oneOffCharges, payments, pendingAdjustments, rooms, tenants, utilityRates } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { computeDueDate } from '@/domain/due-date'
@@ -16,6 +16,7 @@ import { getSettings } from '@/server/settings/service'
 import { registerPdfLoader } from '@/server/templates/service'
 import { resolveBankAccount } from '@/domain/vietqr'
 import { renderInvoicePdf, renderReceiptPdf } from '@/server/pdf'
+import { resolveInvoiceTemplate } from '@/server/invoice-templates/service'
 
 const batchSchema = z.object({ facilityId: z.uuid(), period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) })
 const periodSchema = z.object({ start: z.iso.date(), end: z.iso.date(), coefficient: z.number().positive().finite().optional(), fullMonth: z.boolean().optional(), proration: z.enum(['days_30', 'actual_days']).optional() }).refine(x => x.end >= x.start, { message: 'Ngày kết thúc phải sau ngày bắt đầu' })
@@ -32,11 +33,12 @@ async function getInvoice(db: Pick<DB, 'select'>, ctx: AccessContext, id: string
 async function leasesData(db: Pick<DB, 'select'>, ids: string[]): Promise<Map<string, { lease: Lease; addenda: Addendum[] }>> {
   const out = new Map<string, { lease: Lease; addenda: Addendum[] }>()
   if (!ids.length) return out
-  const [rows, occupants, feeRows, addendaRows] = await Promise.all([
+  const [rows, occupants, feeRows, addendaRows, snapshots] = await Promise.all([
     db.select().from(leases).where(inArray(leases.id, ids)),
     db.select().from(leaseOccupants).where(inArray(leaseOccupants.leaseId, ids)),
     db.select({ fee: leaseFees, type: feeTypes, unit: feeUnits }).from(leaseFees).innerJoin(feeTypes, eq(leaseFees.feeTypeId, feeTypes.id)).innerJoin(feeUnits, eq(feeTypes.unitId, feeUnits.id)).where(inArray(leaseFees.leaseId, ids)),
     db.select().from(addenda).where(inArray(addenda.leaseId, ids)).orderBy(asc(addenda.effectiveDate), asc(addenda.createdAt)),
+    db.select().from(leaseFeeSnapshots).where(inArray(leaseFeeSnapshots.leaseId, ids)),
   ])
   for (const row of rows) {
     const mine = addendaRows.filter(a => a.leaseId === row.id)
@@ -44,9 +46,9 @@ async function leasesData(db: Pick<DB, 'select'>, ids: string[]): Promise<Map<st
     const firstTransfer = mine.find(a => a.type === 'transfer'), firstOccupants = mine.find(a => a.type === 'occupants')
     const lease: Lease = {
       id: row.id, code: row.code, roomId: firstTransfer?.oldRoomId ?? row.roomId, startDate: row.startDate, endDate: row.endDate, monthlyRent: row.monthlyRent, depositAmount: row.depositAmount,
-      billingCycleMonths: row.billingCycleMonths, billWaterByMeter: row.billWaterByMeter, dueRule: row.dueRule as DueRule | null, proration: row.proration as Proration | null,
+      billingCycleMonths: row.billingCycleMonths, billWaterByMeter: row.billWaterByMeter, feeModel: row.feeModel as 'legacy' | 'snapshot', dueRule: row.dueRule as DueRule | null, proration: row.proration as Proration | null,
       occupantIds: (firstOccupants?.oldOccupantIds as string[] | undefined) ?? occupants.filter(x => x.leaseId === row.id).map(x => x.tenantId),
-      fees: feeRows.filter(f => f.fee.leaseId === row.id).map(({ fee, type, unit }) => ({ feeTypeId: type.id, name: type.name, unit: unit.name, billing: type.billing as ContractFee['billing'], quantityFrom: type.quantityFrom as ContractFee['quantityFrom'], quantity: fee.quantity, unitPrice: fee.unitPrice })),
+      fees: row.feeModel === 'snapshot' ? snapshots.filter(f => f.leaseId === row.id).map(f => ({ leaseFeeId: f.id, feeTypeId: f.feeTypeId, name: f.name, unit: f.unit, billing: f.billing as ContractFee['billing'], quantityFrom: f.quantitySource === 'occupants' ? 'occupants' as const : 'manual' as const, quantitySource: f.quantitySource as NonNullable<ContractFee['quantitySource']>, quantity: f.quantity, unitPrice: f.unitPrice })) : feeRows.filter(f => f.fee.leaseId === row.id).map(({ fee, type, unit }) => ({ feeTypeId: type.id, name: type.name, unit: unit.name, billing: type.billing as ContractFee['billing'], quantityFrom: type.quantityFrom as ContractFee['quantityFrom'], quantity: fee.quantity, unitPrice: fee.unitPrice })),
     }
     out.set(row.id, { lease, addenda: mine.map(toAddendum) })
   }
@@ -70,20 +72,22 @@ async function loadCalcInputs(db: Pick<DB, 'select'>, facilityId: string, data: 
     getSettings(db), roomIds.length ? db.select().from(meters).where(inArray(meters.roomId, roomIds)) : [], db.select().from(utilityRates).where(eq(utilityRates.facilityId, facilityId)),
     leaseIds.length ? db.select().from(oneOffCharges).where(inArray(oneOffCharges.leaseId, leaseIds)) : [], leaseIds.length ? db.select().from(pendingAdjustments).where(inArray(pendingAdjustments.leaseId, leaseIds)) : [],
   ])
+  const feeMeterLinks = leaseIds.length ? await db.select({ leaseFeeId: leaseFeeMeters.leaseFeeId, meterId: leaseFeeMeters.meterId }).from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).where(inArray(leaseFeeSnapshots.leaseId, leaseIds)) : []
   const readings = ms.length ? await db.select().from(meterReadings).where(inArray(meterReadings.meterId, ms.map(m => m.id))) : []
-  return { settings, meters: ms, rates, oneOffs, pending, readings }
+  return { settings, meters: ms, rates, oneOffs, pending, readings, feeMeterLinks }
 }
 type CalcInputs = Awaited<ReturnType<typeof loadCalcInputs>>
-function calculateWith(inputs: CalcInputs, lease: Lease, addendaRows: Addendum[], facilityId: string, period: string, override?: { start: string; end: string; coefficient?: number }, fullMonth = false, proration?: Proration) {
+function calculateWith(inputs: CalcInputs, lease: Lease, addendaRows: Addendum[], facilityId: string, period: string, override?: { start: string; end: string; coefficient?: number }, fullMonth = false, proration?: Proration, periodQuantities: Array<{ leaseFeeId: string; period: string; quantity: number }> = []) {
   return buildMonthlyInvoice({
-    lease, addenda: addendaRows, facilityId, period, proration: proration ?? lease.proration ?? inputs.settings.proration, meters: inputs.meters as Meter[], readings: inputs.readings as MeterReading[], rates: inputs.rates as UtilityRate[],
+    lease, addenda: addendaRows, facilityId, period, proration: proration ?? lease.proration ?? inputs.settings.proration, meters: inputs.meters as Meter[], readings: inputs.readings as MeterReading[], feeMeterLinks: inputs.feeMeterLinks, periodQuantities, rates: inputs.rates as UtilityRate[],
     oneOffs: inputs.oneOffs.filter(x => x.leaseId === lease.id).map(x => ({ ...x, kind: x.kind as OneOffCharge['kind'], invoicedInId: x.invoiceId })),
     pending: inputs.pending.filter(x => x.leaseId === lease.id).map(x => ({ ...x, invoicedInId: x.invoiceId })) as PendingAdjustment[], overridePeriod: override, fullMonth,
   })
 }
-async function calculate(db: DB, lease: Lease, facilityId: string, period: string, override?: { start: string; end: string; coefficient?: number }, fullMonth = false, proration?: Proration) {
+async function calculate(db: DB, lease: Lease, facilityId: string, period: string, override?: { start: string; end: string; coefficient?: number }, fullMonth = false, proration?: Proration, invoiceId?: string) {
   const found = (await leasesData(db, [lease.id])).get(lease.id)!
-  return calculateWith(await loadCalcInputs(db, facilityId, new Map([[lease.id, { lease, addenda: found.addenda }]])), lease, found.addenda, facilityId, period, override, fullMonth, proration)
+  const quantities = invoiceId ? await db.select().from(invoiceFeeQuantities).where(eq(invoiceFeeQuantities.invoiceId, invoiceId)) : []
+  return calculateWith(await loadCalcInputs(db, facilityId, new Map([[lease.id, { lease, addenda: found.addenda }]])), lease, found.addenda, facilityId, period, override, fullMonth, proration, quantities.map(q => ({ ...q, period })))
 }
 export async function previewBatch(db: DB, ctx: AccessContext, input: { facilityId: string; period: string }) {
   const { facilityId, period } = parse(batchSchema, input); assertCan(ctx, 'billing', facilityId)
@@ -146,7 +150,8 @@ export async function setPeriod(db: DB, ctx: AccessContext, id: string, input: {
   const data = parse(periodSchema, input)
   return db.transaction(async tx0 => {
     const tx = tx0 as unknown as DB; const before = await getInvoice(tx, ctx, id); const lease = await leaseData(tx, before.leaseId)
-    const draft = await calculate(tx, lease, before.facilityId, data.start.slice(0, 7), { start: data.start, end: data.end, coefficient: data.coefficient }, data.fullMonth, data.proration)
+    if (before.periodStart !== data.start || before.periodEnd !== data.end) await tx.delete(invoiceFeeQuantities).where(eq(invoiceFeeQuantities.invoiceId, id))
+    const draft = await calculate(tx, lease, before.facilityId, data.start.slice(0, 7), { start: data.start, end: data.end, coefficient: data.coefficient }, data.fullMonth, data.proration, id)
     const oldLines = await tx.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, id))
     await tx.delete(invoiceLines).where(and(eq(invoiceLines.invoiceId, id), inArray(invoiceLines.type, ['rent', 'fee'])))
     const lines = draft.lines.filter(x => x.type === 'rent' || x.type === 'fee')
@@ -156,11 +161,41 @@ export async function setPeriod(db: DB, ctx: AccessContext, id: string, input: {
     return after
   })
 }
+export async function saveInvoiceFeeQuantities(db: DB, ctx: AccessContext, invoiceId: string, quantities: Array<{ leaseFeeId: string; quantity: number }>): Promise<void> {
+  const data = parse(z.array(z.object({ leaseFeeId: z.uuid(), quantity: z.number().int().safe().nonnegative().max(2_147_483_647) })).refine(items => new Set(items.map(i => i.leaseFeeId)).size === items.length, 'Phí bị trùng'), quantities)
+  await db.transaction(async tx0 => {
+    const tx = tx0 as unknown as DB
+    await tx.select({ id: invoices.id }).from(invoices).where(eq(invoices.id, invoiceId)).for('update')
+    const inv = await getInvoice(tx, ctx, invoiceId)
+    if (inv.status !== 'draft') throw new ValidationError('Hoá đơn đã được duyệt')
+    for (const item of data) {
+      const [fee] = await tx.select().from(leaseFeeSnapshots).where(and(eq(leaseFeeSnapshots.id, item.leaseFeeId), eq(leaseFeeSnapshots.leaseId, inv.leaseId)))
+      if (!fee || fee.quantitySource !== 'period_input') throw new ValidationError('Phí không thuộc hợp đồng hoặc không nhập theo kỳ')
+      if (!Number.isSafeInteger(item.quantity * fee.unitPrice)) throw new ValidationError('Thành tiền vượt giới hạn cho phép')
+      await tx.insert(invoiceFeeQuantities).values({ invoiceId, ...item }).onConflictDoUpdate({ target: [invoiceFeeQuantities.invoiceId, invoiceFeeQuantities.leaseFeeId], set: { quantity: item.quantity } })
+      await tx.delete(invoiceLines).where(and(eq(invoiceLines.invoiceId, invoiceId), sql`${invoiceLines.meta}->>'leaseFeeId' = ${fee.id}`))
+      await tx.insert(invoiceLines).values({ invoiceId, type: 'fee', description: `${fee.name} kỳ ${inv.periodStart.slice(0, 7)}`, quantity: item.quantity, unitPrice: fee.unitPrice, amount: item.quantity * fee.unitPrice, meta: { leaseFeeId: fee.id, unit: fee.unit, period: inv.periodStart.slice(0, 7) } })
+    }
+    await tx.update(invoices).set({ updatedAt: new Date() }).where(eq(invoices.id, invoiceId))
+    await recordAudit(tx, ctx, { action: 'update', entity: 'invoice', entityId: invoiceId, facilityId: inv.facilityId, summary: 'Cập nhật số lượng phí theo kỳ', after: data })
+  })
+}
+
 export async function approveInvoice(db: DB, ctx: AccessContext, id: string, input: { dueRule?: DueRule; dueDate?: string; approvedOn?: string }) {
   const valid = z.object({ dueRule: z.discriminatedUnion('kind', [z.object({ kind: z.literal('day_of_next_month'), day: z.number().int().min(1).max(31) }), z.object({ kind: z.literal('days_after_approval'), days: z.number().int().min(0).max(90) })]).optional(), dueDate: z.iso.date().optional(), approvedOn: z.iso.date().optional() }).parse(input)
   return db.transaction(async tx0 => {
-    const tx = tx0 as unknown as DB; const before = await getInvoice(tx, ctx, id); if (before.status !== 'draft') throw new ValidationError('Hoá đơn đã được duyệt')
+    const tx = tx0 as unknown as DB; await tx.select({ id: invoices.id }).from(invoices).where(eq(invoices.id, id)).for('update'); const before = await getInvoice(tx, ctx, id); if (before.status !== 'draft') throw new ValidationError('Hoá đơn đã được duyệt')
     const [lease, settings] = await Promise.all([leaseData(tx, before.leaseId), getSettings(tx)])
+    if (lease.feeModel === 'snapshot') {
+      const calculated = await calculate(tx, lease, before.facilityId, before.periodStart.slice(0, 7), { start: before.periodStart, end: before.periodEnd, coefficient: before.coefficient ?? undefined }, before.fullMonth, before.proration as Proration | undefined, before.id)
+      const missing = calculated.warnings.filter(w => w.startsWith('Chưa') || lease.fees.some(f => w.startsWith(`${f.name}:`)))
+      if (missing.length) throw new ValidationError(missing.join('; '))
+      for (const fee of lease.fees.filter(f => f.quantitySource === 'meter' && f.leaseFeeId)) {
+        await tx.delete(invoiceLines).where(and(eq(invoiceLines.invoiceId, id), sql`${invoiceLines.meta}->>'leaseFeeId' = ${fee.leaseFeeId}`))
+        const line = calculated.lines.find(l => l.meta?.leaseFeeId === fee.leaseFeeId)
+        if (line) await tx.insert(invoiceLines).values({ ...line, invoiceId: id })
+      }
+    }
     const dueDate = valid.dueDate ?? computeDueDate(valid.dueRule ?? lease.dueRule ?? settings.dueRule, valid.approvedOn ?? todayVN())
     const [after] = await tx.update(invoices).set({ status: 'approved', dueDate, updatedAt: new Date() }).where(eq(invoices.id, id)).returning()
     if (before.kind === 'termination') await finalizeTermination(tx, ctx, before)
@@ -206,7 +241,17 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
   return db.transaction(async tx0 => {
     const tx = tx0 as unknown as DB; const inv = await getInvoice(tx, ctx, id)
     const old = await tx.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, id))
-    const next = data.map(l => ({ invoiceId: id, type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, amount: Math.round(l.quantity * l.unitPrice), meta: l.meta ?? null }))
+    const [leaseRow] = await tx.select({ feeModel: leases.feeModel }).from(leases).where(eq(leases.id, inv.leaseId))
+    if (leaseRow?.feeModel === 'snapshot') {
+      const protectedLine = (l: { id?: string; type: string; quantity: number; unitPrice: number; meta?: unknown }) => { const meta = l.meta as { leaseFeeId?: unknown } | null; return typeof meta?.leaseFeeId === 'string' ? JSON.stringify([l.id, meta.leaseFeeId, l.type, l.quantity, l.unitPrice]) : null }
+      const beforeFees = old.map(protectedLine).filter(Boolean).sort()
+      const afterFees = data.map(protectedLine).filter(Boolean).sort()
+      if (JSON.stringify(beforeFees) !== JSON.stringify(afterFees)) throw new ValidationError('Không sửa hoặc xóa dòng phí hợp đồng tại đây; hãy cập nhật số lượng theo kỳ')
+    }
+    const next = data.map(l => {
+      const protectedFee = leaseRow?.feeModel === 'snapshot' && typeof (l.meta as { leaseFeeId?: unknown } | null)?.leaseFeeId === 'string' ? old.find(previous => previous.id === l.id) : undefined
+      return { invoiceId: id, type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, amount: protectedFee?.amount ?? Math.round(l.quantity * l.unitPrice), meta: protectedFee ? protectedFee.meta : l.meta ?? null }
+    })
     // Phí phát sinh / điều chỉnh bị bỏ khỏi hoá đơn thì trả về trạng thái chưa tính
     const keep = new Set(next.map(l => JSON.stringify(l.meta ?? {})))
     for (const l of old) {
@@ -273,20 +318,22 @@ registerPdfLoader('receipt', async (db, ctx, id) => {
 
 export async function getInvoiceDetail(db: DB, ctx: AccessContext, id: string) {
   const inv = await getInvoice(db, ctx, id)
-  const [lines, pays, [row]] = await Promise.all([
+  const [lines, pays, [row], periodFees, quantities] = await Promise.all([
     db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, id)).orderBy(asc(invoiceLines.createdAt)),
     db.select().from(payments).where(eq(payments.invoiceId, id)).orderBy(asc(payments.paidOn), asc(payments.createdAt)),
     db.select({ leaseCode: leases.code, tenantId: leases.tenantId, roomCode: rooms.code, tenantName: sql<string>`coalesce(${tenants.fullName}, ${tenants.companyName}, '')` }).from(leases).innerJoin(rooms, eq(rooms.id, leases.roomId)).innerJoin(tenants, eq(tenants.id, leases.tenantId)).where(eq(leases.id, inv.leaseId)),
+    db.select().from(leaseFeeSnapshots).where(and(eq(leaseFeeSnapshots.leaseId, inv.leaseId), eq(leaseFeeSnapshots.quantitySource, 'period_input'))),
+    db.select().from(invoiceFeeQuantities).where(eq(invoiceFeeQuantities.invoiceId, id)),
   ])
   const total = lines.reduce((n, l) => n + l.amount, 0), paid = pays.reduce((n, p) => n + p.amount, 0)
-  return { invoice: inv, lines, payments: pays, total, paid, state: invoiceStatus(total, paid, inv.status, inv.dueDate, todayVN()), ...row }
+  return { invoice: inv, lines, payments: pays, periodFees: periodFees.map(f => ({ id: f.id, name: f.name, unit: f.unit, unitPrice: f.unitPrice, quantity: quantities.find(q => q.leaseFeeId === f.id)?.quantity ?? null })), total, paid, state: invoiceStatus(total, paid, inv.status, inv.dueDate, todayVN()), ...row }
 }
 function pdfLine(line: typeof invoiceLines.$inferSelect) {
-  const meta = line.meta as { segments?: { start?: unknown; end?: unknown }[] } | null
+  const meta = line.meta as { unit?: unknown; segments?: { start?: unknown; end?: unknown }[] } | null
   const segments = (line.type === 'electric' || line.type === 'water') && Array.isArray(meta?.segments)
     ? meta.segments.filter((segment) => typeof segment.start === 'number' && typeof segment.end === 'number').map((segment) => `${segment.start} đến ${segment.end}`)
     : []
-  return { description: segments.length ? `${line.description} (${segments.join('; ')})` : line.description, quantity: line.quantity, unitLabel: line.type === 'electric' ? 'kWh' : line.type === 'water' ? 'm³' : '', unitPrice: line.unitPrice, amount: line.amount }
+  return { description: segments.length ? `${line.description} (${segments.join('; ')})` : line.description, quantity: line.quantity, unitLabel: line.type === 'electric' ? 'kWh' : line.type === 'water' ? 'm³' : typeof meta?.unit === 'string' ? meta.unit : '', unitPrice: line.unitPrice, amount: line.amount }
 }
 for (const [docType, kind] of [['invoice_monthly', 'monthly'], ['invoice_termination', 'termination']] as const) {
   registerPdfLoader(docType, async (db, ctx, id) => {
@@ -294,7 +341,8 @@ for (const [docType, kind] of [['invoice_monthly', 'monthly'], ['invoice_termina
     if (kind === 'termination' ? d.invoice.kind !== 'termination' : !['monthly', 'first'].includes(d.invoice.kind)) throw new ValidationError('Loại hoá đơn không phù hợp')
     const [row] = await db.select({ tenant: tenants, facility: facilities }).from(leases).innerJoin(tenants, eq(tenants.id, leases.tenantId)).innerJoin(facilities, eq(facilities.id, d.invoice.facilityId)).where(eq(leases.id, d.invoice.leaseId))
     const settings = await getSettings(db)
-    return { facilityId: d.invoice.facilityId, baseName: d.invoice.code, render: () => renderInvoicePdf({ kind, code: d.invoice.code, issueDate: d.invoice.issueDate, periodStart: d.invoice.periodStart, periodEnd: d.invoice.periodEnd, dueDate: d.invoice.dueDate, facility: { name: row.facility.name, address: row.facility.address }, room: d.roomCode, tenant: { name: row.tenant.fullName || row.tenant.companyName || '', phone: row.tenant.phone }, lines: d.lines.map(pdfLine), total: d.total, paid: d.paid, bank: resolveBankAccount(row.facility.bankAccount, settings.bankAccount) }) }
+    const template = await resolveInvoiceTemplate(db, id)
+    return { facilityId: d.invoice.facilityId, baseName: d.invoice.code, render: () => renderInvoicePdf({ kind, code: d.invoice.code, issueDate: d.invoice.issueDate, periodStart: d.invoice.periodStart, periodEnd: d.invoice.periodEnd, dueDate: d.invoice.dueDate, facility: { name: row.facility.name, address: row.facility.address }, room: d.roomCode, tenant: { name: row.tenant.fullName || row.tenant.companyName || '', phone: row.tenant.phone }, lines: d.lines.map(pdfLine), total: d.total, paid: d.paid, bank: resolveBankAccount(row.facility.bankAccount, settings.bankAccount) }, template.config) }
   })
 }
 // Bản xuất hoá đơn / phiếu thu: tìm cơ sở theo hoá đơn hoặc khoản thu gốc

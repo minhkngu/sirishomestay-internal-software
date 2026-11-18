@@ -52,11 +52,30 @@ describe('assets', () => {
     expect((await db.select().from(auditLogs)).filter((l) => l.entity === 'asset_move')).toHaveLength(2)
   })
 
-  it('chuyển sang phòng thuộc cơ sở khác → ValidationError; không có tài sản nào bị đổi', async () => {
+  it('admin chuyển sang phòng cơ sở khác → đổi vị trí và facilityId, ghi lịch sử', async () => {
     const a = await mk('AC-01')
-    const b = await mk('AC-02')
-    await expect(moveAssets(db, admin, [a.id, b.id], { kind: 'room', id: r302 }, 'x')).rejects.toThrow(ValidationError)
-    expect((await getAsset(db, hung(), a.id)).locationKind).toBe('warehouse')
+    await moveAssets(db, admin, [a.id], { kind: 'room', id: r302 }, 'x')
+    expect(await getAsset(db, admin, a.id)).toMatchObject({ locationKind: 'room', locationId: r302, facilityId: fa })
+    expect((await assetHistory(db, admin, a.id)).moves[0]).toMatchObject({ toKind: 'room', toId: r302 })
+  })
+
+  it('chuyển liên cơ sở ghi nhật ký cho cả cơ sở đi và cơ sở đến', async () => {
+    const a = await mk('AC-01')
+    await moveAssets(db, admin, [a.id], { kind: 'room', id: r302 }, 'x')
+    const logs = (await db.select().from(auditLogs)).filter((l) => l.entity === 'asset_move' && l.entityId === a.id)
+    expect(logs.map((l) => l.facilityId).sort()).toEqual([fa, fb].sort())
+  })
+
+  it('thiếu quyền ở cơ sở đích → từ chối, không đổi gì', async () => {
+    const a = await mk('AC-01')
+    await expect(moveAssets(db, hung(), [a.id], { kind: 'room', id: r302 }, 'x')).rejects.toThrow(NotFoundError)
+    expect(await getAsset(db, hung(), a.id)).toMatchObject({ locationKind: 'warehouse', facilityId: fb })
+  })
+
+  it('tài sản đã thanh lý không chuyển được sang cơ sở khác', async () => {
+    const a = await mk('AC-01')
+    await setAssetStatus(db, admin, a.id, 'disposed')
+    await expect(moveAssets(db, admin, [a.id], { kind: 'room', id: r302 }, 'x')).rejects.toThrow(ValidationError)
   })
 
   it('chuyển cùng lúc nhiều món mà một món không tồn tại → NotFoundError, không đổi gì', async () => {

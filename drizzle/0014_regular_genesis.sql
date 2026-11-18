@@ -1,0 +1,1 @@
+ALTER TABLE "lease_fee_snapshots" ADD COLUMN "billing" text DEFAULT 'monthly_fixed' NOT NULL;

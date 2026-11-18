@@ -1,8 +1,9 @@
-import { and, asc, desc, eq } from 'drizzle-orm'
+import { and, asc, desc, eq, lte } from 'drizzle-orm'
 import { z } from 'zod'
-import { feeTypes, feeTypePrices, feeUnits, utilityRates } from '@/db'
+import { feeTypes, feeTypePrices, feeUnits, utilityRates, feeDefaults, facilities } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
+import { todayVN } from '@/domain/dates'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/server/audit'
 import { getFacility } from '@/server/facilities/service'
@@ -12,13 +13,18 @@ export type FeeUnit = typeof feeUnits.$inferSelect
 export type UtilityRateRow = typeof utilityRates.$inferSelect
 
 const unitInput = z.object({ name: z.string().trim().min(1, 'Nhập tên đơn vị') })
-const feeTypeInput = z.object({
+const feeTypeFields = {
   name: z.string().trim().min(1, 'Nhập tên loại phí'),
-  unitId: z.string().uuid('Chọn đơn vị'),
   defaultPrice: z.number().int().min(0, 'Đơn giá không hợp lệ'),
   billing: z.enum(['monthly_fixed', 'per_occurrence']),
-  quantityFrom: z.enum(['manual', 'occupants']),
-})
+  quantityFrom: z.enum(['manual', 'occupants', 'room', 'meter', 'period_input']),
+}
+const feeTypeInput = z.object({
+  ...feeTypeFields,
+  unitId: z.string().uuid('Chọn đơn vị').optional(),
+  newUnitName: z.string().trim().min(1, 'Nhập tên đơn vị').optional(),
+}).refine((v) => Boolean(v.unitId) !== Boolean(v.newUnitName), { message: 'Chọn đơn vị hoặc nhập đơn vị mới', path: ['unitId'] })
+const feeTypeUpdateInput = z.object({ ...feeTypeFields, unitId: z.string().uuid('Chọn đơn vị') }).partial()
 const rateInput = z.object({
   facilityId: z.string().uuid(),
   utility: z.enum(['electric', 'water']),
@@ -62,7 +68,20 @@ export async function createFeeType(db: DB, ctx: AccessContext, input: unknown):
   assertCan(ctx, 'settings')
   const data = parse(feeTypeInput, input)
   return db.transaction(async (tx) => {
-    const [t] = await tx.insert(feeTypes).values(data).returning()
+    let unitId = data.unitId
+    if (!unitId) {
+      const [existing] = await tx.select().from(feeUnits).where(eq(feeUnits.name, data.newUnitName!))
+      if (existing) {
+        unitId = existing.id
+      } else {
+        const [u] = await tx.insert(feeUnits).values({ name: data.newUnitName! }).returning()
+        await recordAudit(tx, ctx, { action: 'create', entity: 'fee_unit', entityId: u.id, summary: `Tạo đơn vị ${u.name}`, after: u })
+        unitId = u.id
+      }
+    }
+    const [t] = await tx.insert(feeTypes).values({
+      name: data.name, unitId, defaultPrice: data.defaultPrice, billing: data.billing, quantityFrom: data.quantityFrom,
+    }).returning()
     await recordAudit(tx, ctx, { action: 'create', entity: 'fee_type', entityId: t.id, summary: `Tạo loại phí ${t.name}`, after: t })
     return t
   })
@@ -70,7 +89,7 @@ export async function createFeeType(db: DB, ctx: AccessContext, input: unknown):
 
 export async function updateFeeType(db: DB, ctx: AccessContext, id: string, input: unknown): Promise<FeeType> {
   assertCan(ctx, 'settings')
-  const data = parse(feeTypeInput.partial(), input)
+  const data = parse(feeTypeUpdateInput, input)
   return db.transaction(async (tx) => {
     const [before] = await tx.select().from(feeTypes).where(eq(feeTypes.id, id))
     if (!before) throw new NotFoundError()
@@ -88,6 +107,17 @@ export async function archiveFeeType(db: DB, ctx: AccessContext, id: string): Pr
     if (!before) throw new NotFoundError()
     await tx.update(feeTypes).set({ isActive: false, updatedAt: new Date() }).where(eq(feeTypes.id, id))
     await recordAudit(tx, ctx, { action: 'update', entity: 'fee_type', entityId: id, summary: `Lưu trữ loại phí ${before.name}`, before: { isActive: true }, after: { isActive: false } })
+  })
+}
+
+/** Mở lại loại phí đã lưu trữ; phí mặc định và giá riêng vẫn còn nguyên trong DB. */
+export async function restoreFeeType(db: DB, ctx: AccessContext, id: string): Promise<void> {
+  assertCan(ctx, 'settings')
+  await db.transaction(async (tx) => {
+    const [before] = await tx.select().from(feeTypes).where(eq(feeTypes.id, id))
+    if (!before) throw new NotFoundError()
+    await tx.update(feeTypes).set({ isActive: true, updatedAt: new Date() }).where(eq(feeTypes.id, id))
+    await recordAudit(tx, ctx, { action: 'update', entity: 'fee_type', entityId: id, summary: `Khôi phục loại phí ${before.name}`, before: { isActive: false }, after: { isActive: true } })
   })
 }
 
@@ -139,5 +169,58 @@ export async function removeFeeTypePrice(db: DB, ctx: AccessContext, input: unkn
   await db.transaction(async (tx) => {
     const [before] = await tx.delete(feeTypePrices).where(and(eq(feeTypePrices.feeTypeId, data.feeTypeId), eq(feeTypePrices.facilityId, data.facilityId))).returning()
     if (before) await recordAudit(tx, ctx, { action: 'delete', entity: 'fee_type_price', entityId: before.id, facilityId: data.facilityId, summary: 'Xoá giá phí theo toà', before })
+  })
+}
+
+export type FeeQuantitySource = 'occupants' | 'room' | 'meter' | 'period_input'
+
+export async function listFeeDefaults(db: Pick<DB, 'select'>, ctx: AccessContext): Promise<Record<string, string[]>> {
+  const rows = await db.select({ facilityId: feeDefaults.facilityId, feeTypeId: feeDefaults.feeTypeId }).from(feeDefaults).innerJoin(feeTypes, eq(feeTypes.id, feeDefaults.feeTypeId)).where(eq(feeTypes.isActive, true))
+  const result: Record<string, string[]> = {}
+  for (const row of rows) {
+    if (!ctx.isAdmin && !ctx.facilityIds.has(row.facilityId)) continue
+    ;(result[row.facilityId] ??= []).push(row.feeTypeId)
+  }
+  return result
+}
+
+export async function setFeeDefault(db: DB, ctx: AccessContext, input: { facilityId: string; feeTypeId: string; enabled: boolean }): Promise<void> {
+  assertCan(ctx, 'settings')
+  const data = parse(z.object({ facilityId: z.uuid(), feeTypeId: z.uuid(), enabled: z.boolean() }), input)
+  await db.transaction(async (tx) => {
+    const [facility] = await tx.select().from(facilities).where(eq(facilities.id, data.facilityId))
+    const [fee] = await tx.select().from(feeTypes).where(eq(feeTypes.id, data.feeTypeId))
+    if (!facility || !fee) throw new NotFoundError()
+    if (data.enabled && !fee.isActive) throw new ValidationError('Loại phí đã lưu trữ')
+    if (data.enabled) await tx.insert(feeDefaults).values({ facilityId: data.facilityId, feeTypeId: data.feeTypeId }).onConflictDoNothing()
+    else await tx.delete(feeDefaults).where(and(eq(feeDefaults.facilityId, data.facilityId), eq(feeDefaults.feeTypeId, data.feeTypeId)))
+    await recordAudit(tx, ctx, { action: 'update', entity: 'fee_default', facilityId: data.facilityId, entityId: data.feeTypeId, summary: 'Cập nhật phí mặc định', after: { enabled: data.enabled } })
+  })
+}
+
+/**
+ * Nạp sẵn hai loại phí Điện (kWh) và Nước (m³) tính theo đồng hồ. Có thể chạy nhiều lần:
+ * loại phí đã có (theo tên) được giữ nguyên, không ghi đè giá. Giá mặc định lấy từ đơn giá mới nhất
+ * của cơ sở đầu tiên (theo mã) có đơn giá; cơ sở khác giá thì lưu giá riêng theo toà.
+ */
+export async function ensureUtilityFeeTypes(db: DB, ctx: AccessContext): Promise<{ electric: FeeType; water: FeeType }> {
+  assertCan(ctx, 'settings')
+  return db.transaction(async (t) => {
+  const tx = t as unknown as DB
+  const facs = await tx.select().from(facilities).orderBy(asc(facilities.code))
+  // Bỏ đơn giá có ngày hiệu lực ở tương lai: giá mặc định là giá đang áp dụng
+  const rates = await tx.select().from(utilityRates).where(lte(utilityRates.effectiveFrom, todayVN())).orderBy(desc(utilityRates.effectiveFrom))
+  const ensure = async (utility: 'electric' | 'water', name: string, unit: string): Promise<FeeType> => {
+    const [existing] = await tx.select().from(feeTypes).where(eq(feeTypes.name, name))
+    if (existing) return existing
+    const latest = new Map<string, number>()
+    for (const r of rates) if (r.utility === utility && !latest.has(r.facilityId)) latest.set(r.facilityId, r.pricePerUnit)
+    const priced = facs.filter((f) => latest.has(f.id))
+    const defaultPrice = priced.length ? latest.get(priced[0].id)! : 0
+    const created = await createFeeType(tx, ctx, { name, newUnitName: unit, defaultPrice, billing: 'per_occurrence', quantityFrom: 'meter' })
+    for (const f of priced) if (latest.get(f.id) !== defaultPrice) await setFeeTypePrice(tx, ctx, { feeTypeId: created.id, facilityId: f.id, price: latest.get(f.id)! })
+    return created
+  }
+  return { electric: await ensure('electric', 'Điện', 'kWh'), water: await ensure('water', 'Nước', 'm³') }
   })
 }

@@ -82,4 +82,12 @@ describe('tenants', () => {
     expect(masked.idNumber).toBe('•••••8901')
     expect(maskTenant(t, ctxOf(['tenants_contracts'], [fa])).idNumber).toBe('012345678901')
   })
+
+  it('danh sách mặc định 50 dòng, limit null lấy hết', async () => {
+    for (let i = 0; i < 60; i++) {
+      await createTenant(db, admin, { kind: 'company', homeFacilityId: fa, companyName: `Cty ${i}`, taxCode: `01000${String(i).padStart(5, '0')}` })
+    }
+    expect(await searchTenants(db, admin, {})).toHaveLength(50)
+    expect(await searchTenants(db, admin, { limit: null })).toHaveLength(60)
+  })
 })

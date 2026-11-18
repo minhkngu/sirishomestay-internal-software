@@ -1,30 +1,19 @@
 'use client'
 
-import { startTransition, useOptimistic } from 'react'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useMemo } from 'react'
 import { Building, ChevronDown } from 'lucide-react'
+import { setListParams, useFacilitySelection } from './use-list-params'
 
 export function FacilityFilter({
   facilities,
-  selected,
 }: {
   facilities: { id: string; name: string }[]
-  selected: string[]
 }) {
-  const router = useRouter(),
-    pathname = usePathname(),
-    search = useSearchParams()
-  const [checked, setChecked] = useOptimistic(selected)
+  const allowed = useMemo(() => facilities.map((f) => f.id), [facilities])
+  const checked = useFacilitySelection(allowed)
 
   function update(ids: string[]) {
-    const params = new URLSearchParams(search.toString())
-    params.delete('toa')
-    if (ids.length) params.set('toa', ids.join(','))
-    const query = params.toString()
-    startTransition(() => {
-      setChecked(ids)
-      router.replace(query ? `${pathname}?${query}` : pathname)
-    })
+    setListParams({ toa: ids.join(',') || null })
   }
 
   return (

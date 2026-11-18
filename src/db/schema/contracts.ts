@@ -3,6 +3,7 @@ import { boolean, check, date, integer, jsonb, pgTable, primaryKey, text, timest
 import { rooms } from './facilities'
 import { feeTypes } from './fees'
 import { tenants } from './tenants'
+import { docTemplates, invoiceTemplates } from './templates'
 
 export const depositContracts = pgTable(
   'deposit_contracts',
@@ -38,6 +39,10 @@ export const leases = pgTable(
     billingCycleMonths: integer('billing_cycle_months').notNull().default(1),
     billWaterByMeter: boolean('bill_water_by_meter').notNull().default(true),
     depositAmount: integer('deposit_amount').notNull(),
+    note: text('note').notNull().default(''),
+    contractTemplateId: uuid('contract_template_id').references(() => docTemplates.id),
+    invoiceTemplateId: uuid('invoice_template_id').references(() => invoiceTemplates.id),
+    feeModel: text('fee_model').notNull().default('legacy'),
     dueRule: jsonb('due_rule'),
     proration: text('proration'),
     fromDepositContractId: uuid('from_deposit_contract_id').references(() => depositContracts.id),
@@ -67,6 +72,18 @@ export const leaseFees = pgTable('lease_fees', {
   quantity: integer('quantity').notNull().default(1),
   unitPrice: integer('unit_price').notNull(),
 })
+
+export const leaseFeeSnapshots = pgTable('lease_fee_snapshots', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  leaseId: uuid('lease_id').notNull().references(() => leases.id, { onDelete: 'cascade' }),
+  feeTypeId: uuid('fee_type_id').references(() => feeTypes.id),
+  name: text('name').notNull(),
+  unit: text('unit').notNull(),
+  quantitySource: text('quantity_source').notNull(),
+  quantity: integer('quantity').notNull().default(1),
+  billing: text('billing').notNull().default('monthly_fixed'),
+  unitPrice: integer('unit_price').notNull(),
+}).enableRLS()
 
 export const depositEntries = pgTable('deposit_entries', {
   id: uuid('id').primaryKey().defaultRandom(),

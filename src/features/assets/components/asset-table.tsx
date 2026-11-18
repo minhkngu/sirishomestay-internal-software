@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
+import { Pager } from '@/components/list/pager'
+import { usePager } from '@/components/list/use-list-params'
 import { Button } from '@/components/ui/button'
 import { formatVND } from '@/domain/money'
 import { removeDiacritics } from '@/domain/text'
@@ -22,14 +24,15 @@ export function AssetTable({ assets, facilities }: { assets: AssetRow[]; facilit
 
   const roomCode = useMemo(() => new Map(facilities.flatMap((f) => f.rooms.map((r) => [r.id, `Phòng ${r.code}`] as const))), [facilities])
   const facName = useMemo(() => new Map(facilities.map((f) => [f.id, f.name])), [facilities])
-  const where = (a: AssetRow) => (a.locationKind === 'room' ? roomCode.get(a.locationId) : `${a.locationKind === 'warehouse' ? 'Kho' : 'Khu chung'} ${facName.get(a.locationId) ?? ''}`)
+  const where = (a: AssetRow) => (a.locationKind === 'room' ? roomCode.get(a.locationId) : `${a.locationKind === 'warehouse' ? 'Kho' : a.locationKind === 'unassigned' ? 'Chưa xếp' : 'Khu chung'} ${facName.get(a.locationId) ?? ''}`)
 
   const shown = assets.filter((a) => {
     if (sel.kind === 'facility' && a.facilityId !== sel.id) return false
-    if ((sel.kind === 'warehouse' || sel.kind === 'common' || sel.kind === 'room') && (a.locationKind !== sel.kind || a.locationId !== sel.id)) return false
+    if ((sel.kind === 'warehouse' || sel.kind === 'common' || sel.kind === 'unassigned' || sel.kind === 'room') && (a.locationKind !== sel.kind || a.locationId !== sel.id)) return false
     if (q.trim()) return removeDiacritics(`${a.code} ${a.name} ${a.category}`).toLowerCase().includes(removeDiacritics(q).toLowerCase().trim())
     return true
   })
+  const { pageRows, pager } = usePager(shown, 'assets', `${sel.kind}:${'id' in sel ? sel.id : ''}|${q}`)
   const chosen = assets.filter((a) => checked.includes(a.id))
   const oneFacility = new Set(chosen.map((a) => a.facilityId)).size === 1
   const toggle = (id: string) => setChecked(checked.includes(id) ? checked.filter((x) => x !== id) : [...checked, id])
@@ -43,7 +46,7 @@ export function AssetTable({ assets, facilities }: { assets: AssetRow[]; facilit
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-left"><tr><th className="p-2 w-8" /><th className="p-2">Mã</th><th className="p-2">Tên</th><th className="p-2">Loại</th><th className="p-2">Vị trí</th>{facilities.length > 1 && <th className="p-2">Toà</th>}<th className="p-2">Tình trạng</th><th className="p-2">Giá trị</th></tr></thead>
             <tbody>
-              {shown.map((a) => (
+              {pageRows.map((a) => (
                 <tr key={a.id} className="border-t">
                   <td className="p-2"><input type="checkbox" aria-label={`Chọn ${a.code}`} checked={checked.includes(a.id)} onChange={() => toggle(a.id)} /></td>
                   <td className="p-2"><Link className="underline" href={`/assets/${a.id}`}>{a.code}</Link></td><td className="p-2">{a.name}</td><td className="p-2">{a.category}</td>
@@ -54,6 +57,7 @@ export function AssetTable({ assets, facilities }: { assets: AssetRow[]; facilit
             </tbody>
           </table>
         </div>
+        <Pager {...pager} />
       </div>
       {checked.length > 0 && !moving && (
         <div className="fixed inset-x-3 bottom-3 z-40 flex items-center justify-between rounded-xl border bg-background p-3 shadow-lg md:left-auto md:right-6 md:w-96">

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { facilities, meterReadings, meters, rooms } from '@/db'
-import { listReadingSheet, saveReadings, replaceMeter } from '@/server/meters/service'
+import { listMeterOverview, listReadingSheet, saveReadings, replaceMeter } from '@/server/meters/service'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import type { AccessContext, Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'
@@ -111,5 +111,32 @@ describe('meters', () => {
 
   it('kỳ không hợp lệ → lỗi dữ liệu', async () => {
     await expect(listReadingSheet(db, hung(), fa, '2026-13')).rejects.toThrow(ValidationError)
+  })
+
+  it('liệt kê đồng hồ của cơ sở: đồng hồ cũ theo utility hiện tên Điện/Nước, lịch sử mới nhất trước', async () => {
+    await read('E101', '2026-10', '2026-10-31', 1100)
+    const rows = await listMeterOverview(db, hung(), fa)
+    expect(rows).toHaveLength(6)
+    expect(rows.map(r => r.roomCode)).toEqual(['101', '101', '102', '102', '201', '201'])
+    const e101 = rows.find(r => r.meterId === m.E101)!
+    expect(e101).toMatchObject({ roomId: r101, floor: '1', feeName: 'Điện', unit: 'kWh', leaseCode: null, serial: 'E101', startReading: 0, installedOn: '2025-01-01', removedOn: null })
+    expect(e101.readings.map(x => x.value)).toEqual([1100, 1000])
+    expect(rows.find(r => r.meterId === m.W101)).toMatchObject({ feeName: 'Nước', unit: 'm³' })
+  })
+
+  it('đồng hồ đã gỡ xếp sau đồng hồ đang dùng của cùng phòng', async () => {
+    await db.update(meters).set({ removedOn: '2026-01-01' }).where(eq(meters.id, m.E101))
+    const rows = (await listMeterOverview(db, hung(), fa)).filter(r => r.roomId === r101)
+    expect(rows.map(r => r.meterId)).toEqual([m.W101, m.E101])
+  })
+
+  it('không liệt kê đồng hồ của phòng đã ẩn', async () => {
+    await db.update(rooms).set({ isActive: false }).where(eq(rooms.id, r201))
+    expect((await listMeterOverview(db, hung(), fa)).map(r => r.roomCode)).toEqual(['101', '101', '102', '102'])
+  })
+
+  it('người ngoài phạm vi cơ sở bị từ chối, người thiếu quyền meters bị từ chối', async () => {
+    await expect(listMeterOverview(db, ctxOf(['meters'], [fb]), fa)).rejects.toThrow(NotFoundError)
+    await expect(listMeterOverview(db, ctxOf(['billing'], [fa]), fa)).rejects.toThrow(ForbiddenError)
   })
 })

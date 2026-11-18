@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import QRCode from 'qrcode'
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
+import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { renderInvoicePdf, renderReceiptPdf } from '@/server/pdf'
 import type { InvoicePdfData } from '@/server/pdf/types'
 import { convertPdfToPng } from '@/server/convert'
+import { defaultInvoiceTemplate } from '@/domain/invoice-template'
+import { createCanvas } from '@napi-rs/canvas'
 
 const invoice: InvoicePdfData = {
   kind: 'monthly', code: 'TD-HD-202612-0001', issueDate: '2026-12-01', periodStart: '2026-12-01', periodEnd: '2026-12-31', dueDate: '2026-12-05',
@@ -17,6 +19,36 @@ async function textOf(pdf: Uint8Array) {
   return content.items.map((item) => 'str' in item ? item.str : '').join(' ')
 }
 describe('PDF hoá đơn và phiếu thu', () => {
+  it('nội dung, thứ tự và các phần ẩn theo mẫu hóa đơn', async () => {
+    const config = { ...defaultInvoiceTemplate, brand: 'THUONG HIEU MOI', title: 'PHIEU THU TIEN', footer: 'CAM ON QUY KHACH', sections: ['header', 'charges', 'total', 'customer', 'payment', 'footer'] as typeof defaultInvoiceTemplate.sections, hidden: ['payment'] as typeof defaultInvoiceTemplate.hidden }
+    const text = await textOf(await renderInvoicePdf(invoice, config))
+    expect(text).toContain('THUONG HIEU MOI')
+    expect(text).toContain('PHIEU THU TIEN')
+    expect(text).toContain('CAM ON QUY KHACH')
+    expect(text).not.toContain('Quét mã để chuyển khoản')
+    expect(text.indexOf('Tiền phòng')).toBeLessThan(text.indexOf('Khách thuê'))
+  })
+  it('đưa logo PNG vào bản PDF', async () => {
+    const canvas = createCanvas(4, 4)
+    canvas.getContext('2d').fillRect(0, 0, 4, 4)
+    const logo = `data:image/png;base64,${canvas.toBuffer('image/png').toString('base64')}`
+    const pdf = await renderInvoicePdf({ ...invoice, bank: null }, { ...defaultInvoiceTemplate, logo })
+    expect(new TextDecoder().decode(pdf.slice(0, 4))).toBe('%PDF')
+    expect(await textOf(pdf)).toContain('SIRIS')
+    const doc = await getDocument({ data: new Uint8Array(pdf), useSystemFonts: true }).promise
+    expect((await (await doc.getPage(1)).getOperatorList()).fnArray).toContain(OPS.paintImageXObject)
+  })
+  it('mẫu mặc định giữ số trang trên mọi trang hóa đơn dài', async () => {
+    const lines = Array.from({ length: 100 }, (_, index) => ({ ...invoice.lines[0], description: `Khoản ${index + 1}` }))
+    const pdf = await getDocument({ data: new Uint8Array(await renderInvoicePdf({ ...invoice, lines })), useSystemFonts: true }).promise
+    expect(pdf.numPages).toBeGreaterThan(1)
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+      const content = await (await pdf.getPage(pageNumber)).getTextContent()
+      const text = content.items.map(item => 'str' in item ? item.str : '').join(' ')
+      expect(text).toContain(`${pageNumber}/${pdf.numPages}`)
+      expect(text).toContain('Siris Thảo Điền')
+    }
+  })
   it('hoá đơn tháng giữ dấu, tiêu đề, tổng, số bằng chữ và thanh toán', async () => {
     const text = await textOf(await renderInvoicePdf(invoice))
     for (const value of ['Hoá đơn tháng 12/2026', '9.380.000', 'Chín triệu ba trăm tám mươi nghìn đồng', 'Quét mã để chuyển khoản', 'TD-HD-202612-0001', 'Nguyễn Thị Thu']) expect(text).toContain(value)

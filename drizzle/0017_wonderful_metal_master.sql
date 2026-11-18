@@ -1,0 +1,1 @@
+ALTER TABLE "lease_fee_snapshots" ADD COLUMN "quantity" integer DEFAULT 1 NOT NULL;

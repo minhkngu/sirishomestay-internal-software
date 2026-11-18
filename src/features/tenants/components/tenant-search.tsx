@@ -1,31 +1,25 @@
 'use client'
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
-
 import { Search } from 'lucide-react'
+import { setListParams, useListParam } from '@/components/list/use-list-params'
 
 export function TenantSearch() {
-  const router = useRouter()
-  const pathname = usePathname()
-  const sp = useSearchParams()
-  const [q, setQ] = useState(sp.get('q') ?? '')
-  const first = useRef(true)
-
-  function push(next: Record<string, string>) {
-    const p = new URLSearchParams(sp.toString())
-    for (const [k, v] of Object.entries(next)) {
-      if (v) p.set(k, v)
-      else p.delete(k)
-    }
-    router.replace(`${pathname}?${p.toString()}`)
+  const urlQ = useListParam('q') ?? ''
+  const [q, setQ] = useState(urlQ)
+  const [prevUrlQ, setPrevUrlQ] = useState(urlQ)
+  // URL đổi từ ngoài (bấm lại menu, mở link khác): ô tìm theo URL
+  if (urlQ !== prevUrlQ) {
+    setPrevUrlQ(urlQ)
+    setQ(urlQ)
   }
+  const kind = useListParam('kind') ?? ''
+  const first = useRef(true)
 
   useEffect(() => {
     if (first.current) { first.current = false; return }
-    const t = setTimeout(() => push({ q }), 300)
+    const t = setTimeout(() => setListParams({ q }), 300)
     return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q])
 
   return (
@@ -40,8 +34,9 @@ export function TenantSearch() {
         />
       </div>
       <select
-        defaultValue={sp.get('kind') ?? ''}
-        onChange={(e) => push({ kind: e.target.value })}
+        value={kind}
+        aria-label="Loại khách"
+        onChange={(e) => setListParams({ kind: e.target.value })}
         className="h-9 rounded-xl border border-border/80 bg-card px-3 text-xs font-medium text-foreground shadow-2xs outline-none focus:border-ring whitespace-nowrap"
       >
         <option value="">Mọi loại khách</option>

@@ -221,6 +221,7 @@ export function InvoiceEditor(p: Props) {
                   <td className="p-2.5">
                     <Select
                       value={l.type}
+                      disabled={typeof l.meta?.leaseFeeId === 'string'}
                       onValueChange={(val) => {
                         if (val) set(i, { type: val })
                       }}
@@ -249,6 +250,7 @@ export function InvoiceEditor(p: Props) {
                       type="number"
                       step="any"
                       value={l.quantity}
+                      disabled={typeof l.meta?.leaseFeeId === 'string'}
                       onChange={(e) => set(i, { quantity: Number(e.target.value) })}
                       className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
                     />
@@ -258,6 +260,7 @@ export function InvoiceEditor(p: Props) {
                       type="number"
                       step="1"
                       value={l.unitPrice}
+                      disabled={typeof l.meta?.leaseFeeId === 'string'}
                       onChange={(e) => set(i, { unitPrice: Number(e.target.value) })}
                       className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
                     />
@@ -268,6 +271,7 @@ export function InvoiceEditor(p: Props) {
                   <td className="p-2.5 text-center">
                     <button
                       type="button"
+                      disabled={typeof l.meta?.leaseFeeId === 'string'}
                       onClick={() => setLines(lines.filter((_, j) => j !== i))}
                       className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-rose-50 hover:text-rose-600"
                       title="Xoá dòng"

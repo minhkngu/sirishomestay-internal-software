@@ -1,5 +1,5 @@
 import { and, asc, eq } from 'drizzle-orm'
-import { docTemplates, files } from '@/db'
+import { docTemplates, files, leases } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
@@ -64,6 +64,8 @@ export async function removeTemplate(db: DB, ctx: AccessContext, storage: Storag
   await db.transaction(async (tx) => {
     const [t] = await tx.select().from(docTemplates).where(eq(docTemplates.id, id))
     if (!t) throw new NotFoundError()
+    const [used] = await tx.select({ id: leases.id }).from(leases).where(eq(leases.contractTemplateId, id)).limit(1)
+    if (used) throw new ValidationError('Mẫu đang được hợp đồng sử dụng, không thể xoá')
     if (t.fileId) {
       const [f] = await tx.select().from(files).where(eq(files.id, t.fileId))
       if (f) keys.push(f.storageKey)

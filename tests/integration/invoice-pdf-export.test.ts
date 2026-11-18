@@ -12,6 +12,8 @@ import { exportDocument } from '@/server/templates/service'
 import '@/server/invoices/service'
 import { MemoryStorage } from '@/server/storage/memory'
 import { createTestDb } from '../helpers/db'
+import { createInvoiceTemplate, selectInvoiceTemplate } from '@/server/invoice-templates/service'
+import { defaultInvoiceTemplate } from '@/domain/invoice-template'
 
 let db: DB, storage: MemoryStorage, ctx: AccessContext, facilityId: string, invoiceId: string, paymentId: string
 beforeEach(async () => {
@@ -30,6 +32,15 @@ async function exported(docType: 'invoice_monthly' | 'invoice_termination' | 're
   return (await db.select().from(files).where(eq(files.id, result.fileId)))[0]
 }
 describe('xuất hoá đơn và phiếu thu', () => {
+  it('xuất PDF theo mẫu đã chọn cho kỳ hóa đơn', async () => {
+    const admin: AccessContext = { ...ctx, isAdmin: true, permissions: new Set(['settings']) }
+    const template = await createInvoiceTemplate(db, admin, { name: 'Thử', config: { ...defaultInvoiceTemplate, brand: 'MAU TUY CHON' } })
+    await selectInvoiceTemplate(db, ctx, invoiceId, template.id)
+    const row = await exported('invoice_monthly', invoiceId)
+    const pdf = await getDocument({ data: new Uint8Array(await storage.read(row.storageKey)), useSystemFonts: true }).promise
+    const text = (await (await pdf.getPage(1)).getTextContent()).items.map(i => 'str' in i ? i.str : '').join(' ')
+    expect(text).toContain('MAU TUY CHON')
+  })
   it('mặc định PDF, dùng tài khoản toà và không gọi dịch vụ ngoài', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch'); const qrSpy = vi.spyOn(QRCode, 'toDataURL')
     try { const row = await exported('invoice_monthly', invoiceId); expect(row).toMatchObject({ contentType: 'application/pdf', name: 'HD-01.pdf' }); expect(fetchSpy.mock.calls.filter(([url]) => /^https?:/.test(String(url)))).toHaveLength(0); expect(qrSpy.mock.calls[0][0]).toContain('123456789') } finally { fetchSpy.mockRestore(); qrSpy.mockRestore() }

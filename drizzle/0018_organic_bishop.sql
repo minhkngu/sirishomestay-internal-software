@@ -1,0 +1,1 @@
+ALTER TABLE "lease_fee_snapshots" ENABLE ROW LEVEL SECURITY;

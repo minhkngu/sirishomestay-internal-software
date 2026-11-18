@@ -11,7 +11,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/facilities', label: 'Cơ sở & phòng', icon: Building2 },
   { href: '/tenants', label: 'Khách thuê', icon: Users, requires: 'tenants_contracts' },
   { href: '/contracts', label: 'Hợp đồng', icon: FileText, requires: 'tenants_contracts' },
-  { href: '/meters', label: 'Điện nước', icon: Gauge, requires: 'meters' },
+  { href: '/meters', label: 'Chỉ số', icon: Gauge, requires: 'meters' },
   { href: '/invoices', label: 'Hoá đơn', icon: Receipt, requires: 'billing' },
   { href: '/assets', label: 'Tài sản', icon: Boxes, requires: 'assets' },
   { href: '/incidents', label: 'Sự cố', icon: AlertTriangle, requires: 'incidents' },

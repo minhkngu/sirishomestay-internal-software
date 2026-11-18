@@ -45,3 +45,8 @@ export const feeTypePrices = pgTable('fee_type_prices', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [unique('fee_type_prices_fee_facility_unique').on(t.feeTypeId, t.facilityId)]).enableRLS()
+
+export const feeDefaults = pgTable('fee_defaults', {
+  facilityId: uuid('facility_id').notNull().references(() => facilities.id, { onDelete: 'cascade' }),
+  feeTypeId: uuid('fee_type_id').notNull().references(() => feeTypes.id, { onDelete: 'cascade' }),
+}, (t) => [unique('fee_defaults_facility_fee_unique').on(t.facilityId, t.feeTypeId)]).enableRLS()

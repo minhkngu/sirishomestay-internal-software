@@ -29,11 +29,11 @@ function rentAndFixedLines(terms: LeaseTerms, from: ISODate, to: ISODate, sum: n
     type: 'rent', description: `Tiền phòng ${label}`, quantity: round4(sum), unitPrice: terms.monthlyRent, amount: Math.round(terms.monthlyRent * sum),
     meta: { from, to },
   }]
-  for (const f of terms.fees.filter((x) => x.billing === 'monthly_fixed')) {
-    const qty = f.quantityFrom === 'occupants' ? occupantsCount : f.quantity
+  for (const f of terms.fees.filter((x) => (x.billing === 'monthly_fixed' || x.quantitySource === 'occupants' || x.quantitySource === 'room') && x.quantitySource !== 'meter' && x.quantitySource !== 'period_input')) {
+    const qty = f.quantitySource === 'room' ? 1 : f.quantitySource === 'occupants' || (!f.quantitySource && f.quantityFrom === 'occupants') ? occupantsCount : f.quantity
     lines.push({
       type: 'fee', description: `${f.name} (${qty} ${f.unit}) ${label}`, quantity: qty, unitPrice: f.unitPrice,
-      amount: Math.round(qty * f.unitPrice * sum), meta: { feeTypeId: f.feeTypeId, from, to },
+      amount: Math.round(qty * f.unitPrice * sum), meta: { feeTypeId: f.feeTypeId, leaseFeeId: f.leaseFeeId, unit: f.unit, from, to },
     })
   }
   return lines
@@ -47,6 +47,8 @@ export type MonthlyInvoiceInput = {
   proration: Proration
   meters: Meter[]
   readings: MeterReading[]
+  feeMeterLinks?: Array<{ leaseFeeId: string; meterId: string }>
+  periodQuantities?: Array<{ leaseFeeId: string; period: string; quantity: number }>
   rates: UtilityRate[]
   oneOffs: OneOffCharge[]
   pending: PendingAdjustment[]
@@ -98,7 +100,7 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): { lines: Invoic
   const prev = prevMonth(period)
   const prevStart = `${prev}-01`
   const prevEnd = lastDayOf(prev)
-  if (terms.startDate <= prevEnd && terms.endDate >= prevStart) {
+  if (input.lease.feeModel !== 'snapshot' && terms.startDate <= prevEnd && terms.endDate >= prevStart) {
     for (const utility of ['electric', 'water'] as const) {
       if (utility === 'water' && !terms.billWaterByMeter) continue
       const ms = input.meters.filter((m) => m.utility === utility && termSegments(input.lease, input.addenda, prevStart, prevEnd).some(segment => segment.terms.roomId === m.roomId))
@@ -129,6 +131,36 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): { lines: Invoic
       } catch (e) {
         if (!(e instanceof ValidationError)) throw e
         warnings.push(e.message === 'Chưa cài đơn giá' ? `Chưa cài đơn giá ${name}` : `${name[0].toUpperCase() + name.slice(1)}: ${e.message}`)
+      }
+    }
+  }
+
+  if (input.lease.feeModel === 'snapshot') {
+    for (const f of terms.fees) {
+      if (!f.leaseFeeId) continue
+      if (f.quantitySource === 'period_input') {
+        const item = input.periodQuantities?.find(x => x.leaseFeeId === f.leaseFeeId && x.period === period)
+        if (!item) { warnings.push(`Chưa nhập số lượng ${f.name} kỳ ${period}`); continue }
+        lines.push({ type: 'fee', description: `${f.name} kỳ ${period}`, quantity: item.quantity, unitPrice: f.unitPrice, amount: item.quantity * f.unitPrice, meta: { leaseFeeId: f.leaseFeeId, period, unit: f.unit } })
+      }
+      if (f.quantitySource === 'meter' && terms.startDate <= prevEnd && terms.endDate >= prevStart) {
+        const link = input.feeMeterLinks?.find(x => x.leaseFeeId === f.leaseFeeId)
+        const meter = input.meters.find(m => m.id === link?.meterId)
+        if (!meter) { warnings.push(`Chưa có đồng hồ ${f.name}`); continue }
+        try {
+          const beginsInPeriod = terms.startDate >= prevStart && terms.startDate <= prevEnd
+          if (beginsInPeriod && meter.installedOn < terms.startDate && !input.readings.some(r => r.meterId === meter.id && r.readOn === terms.startDate)) {
+            warnings.push(`Chưa ghi chỉ số ${f.name} ngày bắt đầu hợp đồng ${formatDateVN(terms.startDate)}`)
+            continue
+          }
+          const usageStart = beginsInPeriod && meter.installedOn < terms.startDate ? addDays(terms.startDate, 1) : prevStart
+          const usage = meterUsage([meter], input.readings, usageStart, prevEnd)
+          if (usage.missing.length) { warnings.push(`Chưa ghi chỉ số ${f.name} tháng ${mmYYYY(prev)}`); continue }
+          lines.push({ type: 'fee', description: `${f.name} tháng ${mmYYYY(prev)}`, quantity: usage.usage, unitPrice: f.unitPrice, amount: usage.usage * f.unitPrice, meta: { leaseFeeId: f.leaseFeeId, unit: f.unit, segments: usage.segments } })
+        } catch (e) {
+          if (!(e instanceof ValidationError)) throw e
+          warnings.push(`${f.name}: ${e.message}`)
+        }
       }
     }
   }

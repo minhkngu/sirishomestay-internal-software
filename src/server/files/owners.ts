@@ -4,13 +4,14 @@ import type { DB } from '@/db/client'
 import type { Permission } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 
-export const OWNER_TYPES = ['tenant_document', 'handover_photo', 'incident_photo', 'signed_contract', 'template', 'export'] as const
+export const OWNER_TYPES = ['tenant_document', 'lease_photo', 'handover_photo', 'incident_photo', 'signed_contract', 'template', 'export'] as const
 export type OwnerType = (typeof OWNER_TYPES)[number]
 
 /** Nhóm quyền cần để thao tác với tệp của từng loại chủ sở hữu. `export` phụ thuộc loại giấy tờ gốc. */
 export function fileAccessPermission(ownerType: OwnerType, meta?: { docType?: string } | null): Permission {
   switch (ownerType) {
     case 'tenant_document':
+    case 'lease_photo':
     case 'handover_photo':
     case 'signed_contract':
       return 'tenants_contracts'
@@ -63,10 +64,11 @@ const IMAGE = ['image/webp', 'image/jpeg', 'image/png']
 const DOCX = ['application/vnd.openxmlformats-officedocument.wordprocessingml.document']
 const PDF = ['application/pdf']
 
-export const IMAGE_OWNERS: OwnerType[] = ['tenant_document', 'handover_photo', 'incident_photo']
+export const IMAGE_OWNERS: OwnerType[] = ['tenant_document', 'lease_photo', 'handover_photo', 'incident_photo']
 
 export const ALLOWED_TYPES: Record<OwnerType, { types: string[]; message: string; maxBytes: number }> = {
   tenant_document: { types: IMAGE, message: 'Chỉ nhận ảnh (WebP, JPEG hoặc PNG)', maxBytes: 2 * 1024 * 1024 },
+  lease_photo: { types: IMAGE, message: 'Chỉ nhận ảnh (WebP, JPEG hoặc PNG)', maxBytes: 2 * 1024 * 1024 },
   handover_photo: { types: IMAGE, message: 'Chỉ nhận ảnh (WebP, JPEG hoặc PNG)', maxBytes: 2 * 1024 * 1024 },
   incident_photo: { types: IMAGE, message: 'Chỉ nhận ảnh (WebP, JPEG hoặc PNG)', maxBytes: 2 * 1024 * 1024 },
   signed_contract: { types: [...PDF, ...IMAGE], message: 'Chỉ nhận PDF hoặc ảnh', maxBytes: 10 * 1024 * 1024 },

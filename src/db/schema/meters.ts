@@ -1,11 +1,14 @@
 import { sql } from 'drizzle-orm'
 import { boolean, date, integer, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 import { rooms } from './facilities'
+import { feeTypes } from './fees'
+import { leaseFeeSnapshots } from './contracts'
 
 export const meters = pgTable('meters', {
   id: uuid('id').primaryKey().defaultRandom(),
   roomId: uuid('room_id').notNull().references(() => rooms.id),
-  utility: text('utility').notNull(), // electric | water
+  utility: text('utility').notNull(),
+  feeTypeId: uuid('fee_type_id').references(() => feeTypes.id), // electric | water
   serial: text('serial'),
   installedOn: date('installed_on', { mode: 'string' }).notNull(),
   startReading: integer('start_reading').notNull().default(0),
@@ -35,3 +38,8 @@ export const meterReadings = pgTable(
     uniqueIndex('meter_readings_handover_unique').on(t.meterId, t.readOn).where(sql`${t.kind} = 'handover'`),
   ],
 )
+
+export const leaseFeeMeters = pgTable('lease_fee_meters', {
+  leaseFeeId: uuid('lease_fee_id').primaryKey().references(() => leaseFeeSnapshots.id, { onDelete: 'cascade' }),
+  meterId: uuid('meter_id').notNull().references(() => meters.id),
+}).enableRLS()

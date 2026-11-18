@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, inArray, isNotNull, ne, sql } from 'drizzle-orm'
-import { assets, facilities, files, handoverItems, handovers, leases, meterReadings, meters, rooms, tenants } from '@/db'
+import { assets, facilities, files, handoverItems, handovers, leaseFeeMeters, leaseFeeSnapshots, leases, meterReadings, meters, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
@@ -28,7 +28,10 @@ async function loadHandover(db: Pick<DB, 'select'>, ctx: AccessContext, id: stri
 
 /** Check-in: tài sản đang ở phòng. Check-out: sao danh sách từ check-in (nếu có). Còn bản nháp cùng loại thì trả về bản đó. */
 export async function startHandover(db: DB, ctx: AccessContext, leaseId: string, kind: HandoverKind): Promise<Handover> {
-  return db.transaction(async (tx) => {
+  return db.transaction((tx) => startHandoverInTransaction(tx as unknown as DB, ctx, leaseId, kind))
+}
+
+export async function startHandoverInTransaction(tx: DB, ctx: AccessContext, leaseId: string, kind: HandoverKind): Promise<Handover> {
     const { l, facilityId, roomCode } = await leaseRoom(tx, ctx, leaseId)
     const [draft] = await tx.select().from(handovers).where(and(eq(handovers.leaseId, leaseId), eq(handovers.kind, kind), eq(handovers.status, 'draft')))
     if (draft) return draft
@@ -48,7 +51,6 @@ export async function startHandover(db: DB, ctx: AccessContext, leaseId: string,
     }
     await recordAudit(tx, ctx, { action: 'create', entity: 'handover', entityId: h.id, facilityId, summary: `Tạo biên bản ${kind === 'check_in' ? 'check-in' : 'check-out'} phòng ${roomCode}`, after: h })
     return h
-  })
 }
 
 export async function getHandover(db: DB, ctx: AccessContext, id: string) {
@@ -59,12 +61,15 @@ export async function getHandover(db: DB, ctx: AccessContext, id: string) {
     ? await db.select({ id: files.id, ownerId: files.ownerId }).from(files).where(and(eq(files.ownerType, 'handover_photo'), inArray(files.ownerId, items.map((x) => x.i.id)), isNotNull(files.confirmedAt)))
     : []
   const roomMeters = await db.select().from(meters).where(eq(meters.roomId, h.roomId))
+  const feeMeters = await db.select({ meterId: leaseFeeMeters.meterId, name: leaseFeeSnapshots.name }).from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).where(eq(leaseFeeSnapshots.leaseId, h.leaseId))
+  const labelFor = (m: typeof meters.$inferSelect) => m.utility === 'electric' ? 'Điện' : m.utility === 'water' ? 'Nước' : feeMeters.find(f => f.meterId === m.id)?.name ?? 'Đồng hồ'
+  const relevantMeters = roomMeters.filter(m => m.utility !== 'fee' || feeMeters.some(f => f.meterId === m.id))
   const reads = roomMeters.length ? await db.select().from(meterReadings).where(and(inArray(meterReadings.meterId, roomMeters.map((m) => m.id)), eq(meterReadings.readOn, h.date))) : []
   const view = items.map(({ i, assetCode, assetName, assetValue }) => ({ ...i, assetCode, assetName, assetValue, photoIds: photos.filter((p) => p.ownerId === i.id).map((p) => p.id) }))
   return {
     ...h, facilityId, roomCode, items: view, penaltyTotal: view.reduce((s, i) => s + i.penalty, 0),
-    meters: roomMeters.filter((m) => !m.removedOn).map((m) => ({ meterId: m.id, utility: m.utility, serial: m.serial })),
-    readings: reads.map((r) => { const m = roomMeters.find((x) => x.id === r.meterId)!; return { meterId: r.meterId, value: r.value, serial: m.serial, utility: m.utility } }),
+    meters: relevantMeters.filter((m) => !m.removedOn).map((m) => ({ meterId: m.id, utility: m.utility, serial: m.serial, label: labelFor(m) })),
+    readings: reads.filter(r => relevantMeters.some(m => m.id === r.meterId)).map((r) => { const m = relevantMeters.find((x) => x.id === r.meterId)!; return { meterId: r.meterId, value: r.value, serial: m.serial, utility: m.utility, label: labelFor(m) } }),
   }
 }
 
@@ -151,7 +156,7 @@ for (const docType of ['handover_check_in', 'handover_check_out'] as const) {
         lease: { code: lease.code, startDate: lease.startDate, endDate: lease.endDate, monthlyRent: lease.monthlyRent, depositAmount: lease.depositAmount },
         handover: {
           date: h.date, items: h.items.map((i) => ({ code: i.assetCode, name: i.assetName, condition: i.missing ? 'Mất' : i.damaged ? `Hư — ${i.condition}` : i.condition, penalty: i.penalty })),
-          readings: h.readings.map((r) => ({ kind: r.utility as 'electric' | 'water', serial: r.serial ?? '', value: r.value })),
+          readings: h.readings.map((r) => ({ kind: r.utility as 'electric' | 'water' | 'fee', label: r.label, serial: r.serial ?? '', value: r.value })),
         },
       },
     }

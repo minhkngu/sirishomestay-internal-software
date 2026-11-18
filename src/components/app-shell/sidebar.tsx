@@ -17,6 +17,7 @@ export function Sidebar({ items, onNavigate, className }: { items: NavItem[]; on
             <Link
               key={i.href}
               href={i.href}
+              prefetch={true}
               onClick={onNavigate}
               aria-current={active ? 'page' : undefined}
               className={cn(

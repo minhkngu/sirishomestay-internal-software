@@ -5,12 +5,14 @@ import { db } from '@/db/client'
 import { NotFoundError } from '@/domain/errors'
 import { formatDateVN, todayVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
+import { InvoiceFeeQuantities } from '@/features/invoices/components/invoice-fee-quantities'
 import { InvoiceEditor } from '@/features/invoices/components/invoice-editor'
 import { InvoiceExport } from '@/features/invoices/components/invoice-export'
 import { InvoiceStatus } from '@/features/invoices/components/invoice-status'
 import { PaymentDialog } from '@/features/invoices/components/payment-dialog'
 import { getInvoiceDetail, tenantBalance } from '@/server/invoices/service'
 import { getAccessContext } from '@/server/session'
+import { listInvoiceTemplates } from '@/server/invoice-templates/service'
 
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -21,6 +23,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   })
   const balance = await tenantBalance(db, ctx, d.tenantId)
   const inv = d.invoice
+  const invoiceTemplates = await listInvoiceTemplates(db, ctx)
   const remaining = d.total - d.paid
 
   return (
@@ -95,6 +98,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
+      {inv.status === 'draft' && <InvoiceFeeQuantities key={inv.updatedAt.toISOString()} invoiceId={id} fees={d.periodFees} />}
       <InvoiceEditor
         key={inv.updatedAt.toISOString()}
         id={id}
@@ -129,7 +133,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
       <section className="space-y-3 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
         <h2 className="text-sm font-semibold tracking-tight text-foreground">Xuất hoá đơn & Phiếu thu</h2>
-        <InvoiceExport invoiceId={id} kind={d.invoice.kind} />
+        <InvoiceExport invoiceId={id} kind={d.invoice.kind} selectedTemplateId={inv.invoiceTemplateId} templates={invoiceTemplates.map(t => ({ id: t.id, name: t.name }))} />
       </section>
     </div>
   )

@@ -78,6 +78,83 @@
       "when": 1794876616759,
       "tag": "0010_known_thanos",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794916889502,
+      "tag": "0011_light_lockheed",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1794930970010,
+      "tag": "0012_exotic_omega_red",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794931093132,
+      "tag": "0013_old_tomas",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794931151174,
+      "tag": "0014_regular_genesis",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1794931430077,
+      "tag": "0015_abnormal_guardian",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1794931781306,
+      "tag": "0016_bright_red_shift",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794932070019,
+      "tag": "0017_wonderful_metal_master",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794932732411,
+      "tag": "0018_organic_bishop",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794977859188,
+      "tag": "0019_ancient_peter_parker",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1794978355883,
+      "tag": "0020_slimy_korath",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794988817176,
+      "tag": "0021_jittery_major_mapleleaf",
+      "breakpoints": true
     }
   ]
 }

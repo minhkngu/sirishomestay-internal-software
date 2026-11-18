@@ -5,6 +5,7 @@ export const assets = pgTable('assets', {
   id: uuid('id').primaryKey().defaultRandom(),
   code: text('code').notNull().unique(),
   name: text('name').notNull(),
+  model: text('model').notNull().default(''),
   category: text('category').notNull().default(''),
   value: integer('value').notNull().default(0),
   condition: text('condition').notNull().default('Tốt'),
