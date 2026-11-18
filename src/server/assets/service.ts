@@ -116,22 +116,23 @@ export async function moveAssets(db: DB, ctx: AccessContext, assetIds: string[],
 export async function moveAssetsInTransaction(tx: DB, ctx: AccessContext, assetIds: string[], to: Location, reason: string): Promise<void> {
     if (assetIds.length === 0) throw new ValidationError('Chọn ít nhất một tài sản')
     const initial = await tx.select().from(assets).where(inArray(assets.id, assetIds))
-    const facilityIds = [...new Set(initial.map(a => a.facilityId))].sort()
+    const destFacility = await locationFacility(tx, to)
+    // Khóa cả cơ sở đi và cơ sở đến theo thứ tự cố định để tránh deadlock
+    const facilityIds = [...new Set([...initial.map(a => a.facilityId), destFacility])].sort()
     for (const id of facilityIds) await tx.select({ id: facilities.id }).from(facilities).where(eq(facilities.id, id)).for('update')
     const found = await tx.select().from(assets).where(inArray(assets.id, assetIds))
     if (found.length !== new Set(assetIds).size) throw new NotFoundError()
     for (const a of found) assertCan(ctx, 'assets', a.facilityId)
-    const destFacility = await locationFacility(tx, to)
+    assertCan(ctx, 'assets', destFacility)
     for (const a of found) {
       if (a.status === 'disposed') throw new ValidationError(`Tài sản ${a.code} đã thanh lý, không chuyển được`)
-      if (a.facilityId !== destFacility) throw new ValidationError('Không thể chuyển tài sản sang cơ sở khác')
     }
     for (const a of found) {
-      await tx.update(assets).set({ locationKind: to.kind, locationId: to.id, updatedAt: new Date() }).where(eq(assets.id, a.id))
+      await tx.update(assets).set({ locationKind: to.kind, locationId: to.id, facilityId: destFacility, updatedAt: new Date() }).where(eq(assets.id, a.id))
       await tx.insert(assetMoves).values({ assetId: a.id, fromKind: a.locationKind, fromId: a.locationId, toKind: to.kind, toId: to.id, movedBy: ctx.userId, reason: reason.trim() })
       await recordAudit(tx, ctx, {
         action: 'update', entity: 'asset_move', entityId: a.id, facilityId: a.facilityId, summary: `Chuyển tài sản ${a.code}`,
-        before: { kind: a.locationKind, id: a.locationId }, after: { kind: to.kind, id: to.id, reason },
+        before: { kind: a.locationKind, id: a.locationId }, after: { kind: to.kind, id: to.id, facilityId: destFacility, reason },
       })
     }
 }
