@@ -25,18 +25,32 @@ describe('phân quyền thông tin phòng', () => {
     expect(list[0].listPrice).toBeNull()
     const billing = await getRoomDetail(db, context(['billing'], facility.id), room.id)
     expect(billing).not.toHaveProperty('lease')
-    expect(billing.money?.monthlyRent).toBe(9000000)
+    expect(billing).not.toHaveProperty('money')
   })
-  it('hiện số dư cọc chờ cho người có quyền tài chính', async () => {
+  it('chi tiết phòng không chứa tiền; trạng thái đã cọc đúng với người chỉ có quyền công tơ', async () => {
     const db = await createTestDb()
     const [facility] = await db.insert(facilities).values({ code: 'TD', name: 'Thảo Điền' }).returning()
     const [room] = await db.insert(rooms).values({ facilityId: facility.id, code: '101' }).returning()
     const [tenant] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: facility.id, fullName: 'Khách', phone: '+84901234567', idNumber: '012345678901' }).returning()
     const [contract] = await db.insert(depositContracts).values({ roomId: room.id, tenantId: tenant.id, depositAmount: 5000000, agreedRent: 9000000, expectedMoveIn: '2027-01-01' }).returning()
     await db.insert(depositEntries).values({ depositContractId: contract.id, date: '2026-11-01', type: 'collect', amount: 5000000, status: 'done' })
-    const detail = await getRoomDetail(db, context(['billing'], facility.id), room.id)
-    expect(detail.status).toBe('deposited')
-    expect(detail.money?.depositBalance).toBe(5000000)
+    for (const perms of [['billing'], ['tenants_contracts'], ['meters']] as Permission[][]) {
+      const detail = await getRoomDetail(db, context(perms, facility.id), room.id)
+      expect(detail.status).toBe('deposited')
+      expect(detail).not.toHaveProperty('money')
+    }
+  })
+
+  it('người có quyền hợp đồng thấy điều khoản hiện hành của hợp đồng đang thuê', async () => {
+    const db = await createTestDb()
+    const [facility] = await db.insert(facilities).values({ code: 'BT', name: 'Bình Thạnh' }).returning()
+    const [room] = await db.insert(rooms).values({ facilityId: facility.id, code: '301' }).returning()
+    const [tenant] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: facility.id, fullName: 'Khách', phone: '+84901234567', idNumber: '012345678901' }).returning()
+    await db.insert(leases).values({ code: 'HD1', roomId: room.id, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-12-31', monthlyRent: 9000000, depositAmount: 18000000 })
+    const detail = await getRoomDetail(db, context(['tenants_contracts'], facility.id), room.id)
+    expect(detail.lease?.terms).toMatchObject({ monthlyRent: 9000000, depositAmount: 18000000, endDate: '2027-12-31' })
+    expect(detail.lease?.terms.fees).toEqual([])
+    expect(await getRoomDetail(db, context(['billing'], facility.id), room.id)).not.toHaveProperty('lease')
   })
 
   describe('dữ liệu hover của danh sách phòng', () => {

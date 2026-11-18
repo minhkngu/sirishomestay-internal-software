@@ -9,6 +9,9 @@ import { depositBalance } from '@/domain/deposit'
 import type { DepositEntry } from '@/domain/types'
 import { todayVN } from '@/domain/dates'
 import { getSettings } from '@/server/settings/service'
+import { leaseData, loadAddenda } from '@/server/invoices/service'
+import { contractTermsAt } from '@/domain/contract-terms'
+import type { LeaseTerms } from '@/domain/types'
 import { getFacility } from '../facilities/service'
 import { bulkInput, roomInput, roomUpdateInput, type BulkInput, type RoomInput } from './schemas'
 
@@ -189,32 +192,31 @@ export async function listRoomsWithStatus(
   })
 }
 
-/** Chi tiết phòng chỉ chứa thông tin phù hợp với quyền của người gọi. */
+/** Chi tiết phòng chỉ chứa thông tin phù hợp với quyền của người gọi. Tiền thuộc về hợp đồng nên không có ở đây. */
 export async function getRoomDetail(db: DB, ctx: AccessContext, id: string): Promise<{
   room: Room; status: RoomStatus; amenities: { id: string; name: string }[]
-  lease?: { id: string; code: string; tenantName: string | null | undefined; occupants: { id: string; name: string | null }[]; endDate: string }
-  money?: { monthlyRent: number | null; depositBalance: number; debt: null }
+  lease?: { id: string; code: string; tenantName: string | null | undefined; occupants: { id: string; name: string | null }[]; endDate: string; startDate: string; terms: LeaseTerms }
 }> {
   const room = await getRoom(db, ctx, id)
-  const amenityList = await roomAmenitiesOf(db, id)
-  const status = (await listRoomsWithStatus(db, ctx, { facilityId: room.facilityId, includeInactive: true })).find((r) => r.id === id)!.status
-  const [active] = await db.select().from(leases).where(and(eq(leases.roomId, id), eq(leases.status, 'active')))
   const showLease = can(ctx, 'tenants_contracts', room.facilityId)
-  const showMoney = showLease || can(ctx, 'billing', room.facilityId)
-  if (!active) {
-    if (!showMoney) return { room, status, amenities: amenityList }
-    const [pending] = await db.select().from(depositContracts).where(and(eq(depositContracts.roomId, id), eq(depositContracts.status, 'pending')))
-    if (!pending) return { room, status, amenities: amenityList }
-    const entries = await db.select().from(depositEntries).where(eq(depositEntries.depositContractId, pending.id))
-    const balance = entries.filter((e) => e.status === 'done').reduce((n, e) => n + (e.type === 'collect' || e.type === 'topup' ? e.amount : -e.amount), 0)
-    return { room, status, amenities: amenityList, money: { monthlyRent: null, depositBalance: balance, debt: null } }
-  }
-  const [tenant] = showLease ? await db.select().from(tenants).where(eq(tenants.id, active.tenantId)) : []
-  const occupants = showLease ? await db.select({ id: tenants.id, name: tenants.fullName }).from(leaseOccupants).innerJoin(tenants, eq(tenants.id, leaseOccupants.tenantId)).where(eq(leaseOccupants.leaseId, active.id)) : []
-  const entries = showMoney ? await db.select().from(depositEntries).where(eq(depositEntries.leaseId, active.id)) : []
-  const balance = entries.filter((e) => e.status === 'done').reduce((n, e) => n + (e.type === 'collect' || e.type === 'topup' ? e.amount : -e.amount), 0)
+  // Các truy vấn không phụ thuộc nhau chạy song song để trang mở nhanh
+  const [amenityList, [active], [pending], settings] = await Promise.all([
+    roomAmenitiesOf(db, id),
+    db.select().from(leases).where(and(eq(leases.roomId, id), eq(leases.status, 'active'))),
+    db.select({ expectedMoveIn: depositContracts.expectedMoveIn }).from(depositContracts).where(and(eq(depositContracts.roomId, id), eq(depositContracts.status, 'pending'))),
+    getSettings(db),
+  ])
+  const status = roomStatus(room, active ?? null, pending ?? null, todayVN(), settings.contractWarningDays)
+  if (!active || !showLease) return { room, status, amenities: amenityList }
+  // Điều khoản hiện hành = hợp đồng gốc + phụ lục có hiệu lực tới hôm nay; lấy cùng lượt với người thuê và người ở
+  const [[tenant], occupants, original, addendaList] = await Promise.all([
+    db.select().from(tenants).where(eq(tenants.id, active.tenantId)),
+    db.select({ id: tenants.id, name: tenants.fullName }).from(leaseOccupants).innerJoin(tenants, eq(tenants.id, leaseOccupants.tenantId)).where(eq(leaseOccupants.leaseId, active.id)),
+    leaseData(db, active.id),
+    loadAddenda(db, active.id),
+  ])
+  const today = todayVN()
+  const terms = contractTermsAt(original, addendaList, today < active.startDate ? active.startDate : today)
   return { room, status, amenities: amenityList,
-    ...(showLease ? { lease: { id: active.id, code: active.code, tenantName: tenant?.fullName ?? tenant?.companyName, occupants, endDate: active.endDate } } : {}),
-    ...(showMoney ? { money: { monthlyRent: active.monthlyRent, depositBalance: balance, debt: null } } : {}),
-  }
+    lease: { id: active.id, code: active.code, tenantName: tenant?.fullName ?? tenant?.companyName, occupants, endDate: terms.endDate, startDate: active.startDate, terms } }
 }
