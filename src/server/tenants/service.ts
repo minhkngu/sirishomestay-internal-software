@@ -12,9 +12,7 @@ import { tenantInput, type TenantInput } from './schemas'
 export type Tenant = typeof tenants.$inferSelect
 export { maskTenant } from './mask'
 
-export function displayName(t: Pick<Tenant, 'kind' | 'fullName' | 'companyName'>): string {
-  return (t.kind === 'company' ? t.companyName : t.fullName) ?? ''
-}
+export { displayName } from '@/domain/tenant-name'
 
 export function parseTenantInput(input: unknown): TenantInput {
   const r = tenantInput.safeParse(input)
@@ -132,7 +130,7 @@ export async function getTenant(db: DB, ctx: AccessContext, id: string): Promise
 export async function searchTenants(
   db: DB,
   ctx: AccessContext,
-  opts: { q?: string; kind?: Tenant['kind']; facilityId?: string; facilityIds?: string[]; limit?: number; offset?: number },
+  opts: { q?: string; kind?: Tenant['kind']; facilityId?: string; facilityIds?: string[]; limit?: number | null; offset?: number },
 ): Promise<Tenant[]> {
   assertCan(ctx, 'tenants_contracts', opts.facilityId)
   const conds = []
@@ -150,11 +148,12 @@ export async function searchTenants(
     const phone = normalizePhone(q)
     conds.push(phone ? or(ilike(tenants.searchText, esc(q)), ilike(tenants.searchText, esc(phone)))! : ilike(tenants.searchText, esc(q)))
   }
-  return db
+  const query = db
     .select()
     .from(tenants)
     .where(and(...conds))
     .orderBy(desc(tenants.createdAt), sql`${tenants.id}`)
-    .limit(opts.limit ?? 50)
-    .offset(opts.offset ?? 0)
+  // limit: null = lấy hết (trang danh sách lọc và phân trang tại chỗ)
+  if (opts.limit === null) return query
+  return query.limit(opts.limit ?? 50).offset(opts.offset ?? 0)
 }

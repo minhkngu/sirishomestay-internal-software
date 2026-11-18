@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   experimental: {
     // Nhập Excel gửi file/dòng dữ liệu qua server action (mặc định chỉ 1MB)
     serverActions: { bodySizeLimit: '12mb' },
+    // Giữ trang đã xem trong trình duyệt tới khi F5, tự lưu (revalidatePath) hoặc bấm "Làm mới",
+    // để chuyển tab không gọi lại server.
+    staleTimes: { dynamic: 3600, static: 3600 },
   },
   webpack(config) {
     config.module.rules.push({ test: /globals\.css$/, use: [{ loader: '@tailwindcss/turbopack' }] })

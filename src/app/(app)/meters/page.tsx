@@ -1,5 +1,7 @@
+import Form from 'next/form'
 import Link from 'next/link'
 import { PageHeader } from '@/components/list/page-header'
+import { RefreshButton } from '@/components/list/refresh-button'
 import { RequirePermission } from '@/components/require-permission'
 import { db } from '@/db/client'
 import { daysInMonth, todayVN } from '@/domain/dates'
@@ -27,7 +29,7 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
   const readOn = today.startsWith(period) ? today : end
   return (
     <div className="space-y-5">
-      <PageHeader title="Chỉ số" />
+      <PageHeader title="Chỉ số" action={<RefreshButton />} />
       <nav aria-label="Mục chỉ số" className="flex gap-2 text-sm">
         {([['readings', 'Ghi chỉ số'], ['meters', 'Đồng hồ']] as const).map(([key, label]) => (
           <Link key={key} href={`/meters?tab=${key}${facilityId ? `&facility=${facilityId}` : ''}${key === 'readings' ? `&period=${period}` : ''}`} aria-current={tab === key ? 'page' : undefined}
@@ -35,7 +37,7 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
         ))}
       </nav>
       <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-2xs">
-        <form method="get" className="flex flex-wrap items-center gap-3">
+        <Form action="/meters" className="flex flex-wrap items-center gap-3">
           <input type="hidden" name="tab" value={tab} />
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-muted-foreground">Chọn cơ sở:</span>
@@ -70,7 +72,7 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
           >
             {tab === 'readings' ? 'Xem bảng ghi' : 'Xem đồng hồ'}
           </button>
-        </form>
+        </Form>
       </div>
       {tab === 'meters' ? (
         facilityId ? <MeterList rows={overview} /> : <div className="rounded-2xl border border-dashed border-border/80 bg-card/60 p-8 text-center text-xs text-muted-foreground">Chưa có cơ sở nào.</div>
