@@ -1,6 +1,6 @@
 # Checklist duyệt chức năng
 
-Dùng **môi trường thử với dữ liệu giả** (có dải "Môi trường thử — dữ liệu giả"). Thao tác tạo ra trong lúc thử được lưu lại trên môi trường thử. Mỗi mục: làm theo các bước, để ý điều ghi sau dấu →, rồi ghi kết quả vào ô ghi chú.
+Dùng **môi trường thử với dữ liệu giả**. Thao tác tạo ra trong lúc thử được lưu lại trên môi trường thử. Mỗi mục: làm theo các bước, để ý điều ghi sau dấu →, rồi ghi kết quả vào ô ghi chú.
 
 Tài khoản mẫu (đăng nhập nhanh ở trang đăng nhập): **Admin** (Cài đặt, thấy mọi cơ sở) · **Lan** (Quản lý Thảo Điền: khách & hợp đồng, hoá đơn) · **Minh** (Kế toán: hoá đơn) · **Hùng** (Kỹ thuật Bình Thạnh: điện nước, tài sản, sự cố) · **Vy** (Lễ tân Thảo Điền: khách & hợp đồng, điện nước).
 
