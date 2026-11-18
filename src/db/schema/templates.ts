@@ -1,4 +1,5 @@
-import { boolean, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+import { boolean, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
 
 export const docTemplates = pgTable('doc_templates', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -10,3 +11,9 @@ export const docTemplates = pgTable('doc_templates', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
+
+export const invoiceTemplates = pgTable('invoice_templates', {
+  id: uuid('id').primaryKey().defaultRandom(), name: text('name').notNull(), config: jsonb('config').notNull(),
+  isDefault: boolean('is_default').notNull().default(false), isSystem: boolean('is_system').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [uniqueIndex('invoice_templates_one_default').on(t.isDefault).where(sql`${t.isDefault}`)]).enableRLS()

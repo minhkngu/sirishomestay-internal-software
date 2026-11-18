@@ -32,6 +32,8 @@ import { listHandovers } from '@/server/handovers/service'
 import { StartHandoverButtons } from '@/features/handovers/components/start-handover-buttons'
 import { getDepositContract, getLease } from '@/server/contracts/service'
 import { ExportMenu } from '@/features/contracts/components/export-menu'
+import { LeaseInvoiceTemplate } from '@/features/contracts/components/lease-invoice-template'
+import { listInvoiceTemplates } from '@/server/invoice-templates/service'
 import { SignStatus } from '@/features/contracts/components/sign-status'
 import { AddendaList } from '@/features/contracts/components/addenda-list'
 import { ExtensionDialog } from '@/features/contracts/components/extension-dialog'
@@ -255,10 +257,11 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
   const handoverList = await listHandovers(db, ctx, lease.id)
   const addendaList = await listAddenda(db, ctx, lease.id)
   const form = lease.status === 'active' ? await addendumFormData(db, ctx, lease.id) : null
-  const [templates, exports, photos] = await Promise.all([
+  const [templates, exports, photos, invoiceTemplates] = await Promise.all([
     listTemplates(db, ctx, 'lease').then((t) => t.filter((x) => x.fileId)),
     listFiles(db, ctx, 'export', lease.id),
     listFiles(db, ctx, 'lease_photo', lease.id),
+    listInvoiceTemplates(db, ctx),
   ])
 
   const isActive = lease.status === 'active'
@@ -326,6 +329,7 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
+          <LeaseInvoiceTemplate leaseId={lease.id} selectedTemplateId={lease.invoiceTemplateId} templates={invoiceTemplates.map(t => ({ id: t.id, name: t.name, isDefault: t.isDefault }))} />
           {lease.note && <p className="rounded-xl border p-4 text-sm whitespace-pre-wrap">{lease.note}</p>}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">

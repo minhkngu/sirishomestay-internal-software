@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, like, lte, ne } from 'drizzle-orm'
 import {
-  assets, depositContracts, depositEntries, docTemplates, facilities, feeTypes, feeUnits, files, invoiceLines, invoices, leaseFees, leaseFeeSnapshots, leaseOccupants, leases, rooms, tenants,
+  assets, depositContracts, depositEntries, docTemplates, facilities, feeTypes, feeUnits, files, invoiceLines, invoiceTemplates, invoices, leaseFees, leaseFeeSnapshots, leaseOccupants, leases, rooms, tenants,
 } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, facilityScope, type AccessContext } from '@/domain/access'
@@ -138,6 +138,7 @@ export type LeaseInput = {
   receivedDeposit?: number
   note?: string
   contractTemplateId?: string | null
+  invoiceTemplateId?: string | null
   handover?: {
     expectedRoomAssetIds: string[]
     addAssetIds: string[]
@@ -158,6 +159,10 @@ export type LeaseCreated = { lease: Lease; firstInvoiceLines: InvoiceLineInput[]
 async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDepositId: string | null): Promise<LeaseCreated> {
   const room = await loadRoom(tx, ctx, input.roomId)
   const tenant = await loadTenant(tx, ctx, input.tenantId)
+  if (input.invoiceTemplateId) {
+    const [template] = await tx.select({ id: invoiceTemplates.id }).from(invoiceTemplates).where(eq(invoiceTemplates.id, input.invoiceTemplateId))
+    if (!template) throw new ValidationError('Mẫu hóa đơn không hợp lệ', { invoiceTemplateId: 'Chọn mẫu hóa đơn hợp lệ' })
+  }
   if (input.contractTemplateId) {
     const [template] = await tx.select({ template: docTemplates, file: files }).from(docTemplates).leftJoin(files, eq(files.id, docTemplates.fileId)).where(eq(docTemplates.id, input.contractTemplateId))
     if (!template || template.template.docType !== 'lease' || !template.file?.confirmedAt || template.file.ownerType !== 'template' || template.file.ownerId !== template.template.id) throw new ValidationError('Mẫu hợp đồng không hợp lệ hoặc chưa sẵn sàng', { contractTemplateId: 'Chọn mẫu hợp đồng hợp lệ' })
@@ -178,7 +183,7 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
   const code = await nextLeaseCode(tx, fac.code, input.startDate)
   const [lease] = await tx.insert(leases).values({
     code, roomId: room.id, tenantId: tenant.id, startDate: input.startDate, endDate: input.endDate, monthlyRent: input.monthlyRent,
-    depositAmount: input.depositAmount, note: input.note ?? '', contractTemplateId: input.contractTemplateId ?? null, feeModel: input.feeModel ?? 'legacy', dueRule: input.dueRule ?? null, proration: input.proration ?? null, billingCycleMonths: input.billingCycleMonths ?? 1, billWaterByMeter: input.billWaterByMeter ?? true, fromDepositContractId: fromDepositId,
+    depositAmount: input.depositAmount, note: input.note ?? '', contractTemplateId: input.contractTemplateId ?? null, invoiceTemplateId: input.invoiceTemplateId ?? null, feeModel: input.feeModel ?? 'legacy', dueRule: input.dueRule ?? null, proration: input.proration ?? null, billingCycleMonths: input.billingCycleMonths ?? 1, billWaterByMeter: input.billWaterByMeter ?? true, fromDepositContractId: fromDepositId,
   }).returning()
   await tx.insert(leaseOccupants).values(occupants.map((tenantId) => ({ leaseId: lease.id, tenantId })))
   if (input.fees?.length && input.feeModel === 'snapshot') {

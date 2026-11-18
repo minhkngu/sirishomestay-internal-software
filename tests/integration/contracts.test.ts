@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { and, eq } from 'drizzle-orm'
-import { assets, docTemplates, files, meters, handovers, handoverItems, depositContracts, depositEntries, facilities, feeTypes, feeUnits, leaseOccupants, leases, rooms } from '@/db'
+import { assets, docTemplates, files, invoiceTemplates, meters, handovers, handoverItems, depositContracts, depositEntries, facilities, feeTypes, feeUnits, leaseOccupants, leases, rooms } from '@/db'
 import { assetHistory } from '@/server/assets/service'
 import { listReadingSheet } from '@/server/meters/service'
 import { leaseData } from '@/server/invoices/service'
@@ -94,6 +94,12 @@ describe('contracts', () => {
     const { contract } = await createDepositContract(db, lan(), { roomId: r301, tenantId: tenant1, depositAmount: 1_000_000, agreedRent: 9_000_000, expectedMoveIn: '2026-10-15' })
     const { lease } = await convertDepositToLease(db, lan(), contract.id, leaseInput({ contractTemplateId: template.id }))
     expect((await getLease(db, lan(), lease.id)).contractTemplateId).toBe(template.id)
+  })
+  it('lưu mẫu hóa đơn khi lập hợp đồng và từ chối mẫu không tồn tại', async () => {
+    await expect(createLease(db, lan(), leaseInput({ invoiceTemplateId: crypto.randomUUID() }))).rejects.toThrow(ValidationError)
+    const [template] = await db.select().from(invoiceTemplates).where(eq(invoiceTemplates.isSystem, true))
+    const { lease } = await createLease(db, lan(), leaseInput({ invoiceTemplateId: template.id }))
+    expect((await getLease(db, lan(), lease.id)).invoiceTemplateId).toBe(template.id)
   })
 
   it('ghi nhận cọc thực nhận và ghi chú khi tạo hợp đồng', async () => {
