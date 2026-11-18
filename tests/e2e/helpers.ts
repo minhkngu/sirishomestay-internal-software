@@ -12,8 +12,8 @@ export async function fillMeterReadings(page: Page) {
   for (let i = 0; i < await inputs.count(); i++) if (!(await inputs.nth(i).inputValue())) await inputs.nth(i).fill(String(meterValue()))
 }
 
-/** Đăng nhập Admin, tạo một phòng tạm ở Thảo Điền rồi tạo hợp đồng thuê mới (từ 01/12/2026, 12 tháng); trả về địa chỉ trang hợp đồng và mã phòng. */
-export async function createTempLease(page: Page): Promise<{ url: string; roomCode: string }> {
+/** Đăng nhập Admin rồi tạo một phòng tạm mã duy nhất ở Thảo Điền; trả về mã phòng. */
+export async function createTempRoom(page: Page): Promise<string> {
   await page.goto('/login')
   await page.getByRole('button', { name: /^Admin/ }).click()
   await expect(page.getByRole('heading', { name: 'Nhắc việc' })).toBeVisible()
@@ -27,8 +27,14 @@ export async function createTempLease(page: Page): Promise<{ url: string; roomCo
   await page.getByLabel('Đến số').fill('901')
   await page.getByRole('button', { name: 'Tạo', exact: true }).click()
   await expect(page.getByText('Đã tạo 1 phòng', { exact: true })).toBeVisible()
+  return `${prefix}901`
+}
+
+/** Đăng nhập Admin, tạo một phòng tạm ở Thảo Điền rồi tạo hợp đồng thuê mới (từ 01/12/2026, 12 tháng); trả về địa chỉ trang hợp đồng và mã phòng. */
+export async function createTempLease(page: Page): Promise<{ url: string; roomCode: string }> {
+  const roomCode = await createTempRoom(page)
   await page.goto('/contracts/new')
-  const room = page.locator('#room option').filter({ hasText: `${prefix}901` })
+  const room = page.locator('#room option').filter({ hasText: roomCode })
   await expect(room).toHaveCount(1)
   await page.locator('#room').selectOption((await room.getAttribute('value'))!)
   const tenant = page.locator('#tenant option').filter({ hasText: 'Nguyễn Văn An' }).first()
@@ -40,5 +46,5 @@ export async function createTempLease(page: Page): Promise<{ url: string; roomCo
   await fillMeterReadings(page)
   await page.getByRole('button', { name: 'Tạo hợp đồng thuê' }).click()
   await expect(page).toHaveURL(/\/contracts\/[a-f0-9-]+$/, { timeout: 60_000 })
-  return { url: page.url(), roomCode: `${prefix}901` }
+  return { url: page.url(), roomCode }
 }

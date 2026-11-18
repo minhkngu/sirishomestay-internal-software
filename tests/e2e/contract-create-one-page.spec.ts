@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { createCanvas } from '@napi-rs/canvas'
-import { fillMeterReadings } from './helpers'
+import { createTempRoom, fillMeterReadings } from './helpers'
 
 test.skip(!process.env.E2E_BASE_URL, 'Cần E2E_BASE_URL trỏ tới môi trường thử có dữ liệu mẫu')
 
@@ -56,15 +56,24 @@ test('các mục cùng trang, lỗi cạnh trường và đổi phòng xóa tài
 })
 
 test('xử lý tài sản chỉ có di chuyển và thanh lý, đổi phòng xóa lựa chọn', async ({ page }) => {
-  await openForm(page)
+  test.setTimeout(240_000)
+  // Tự tạo phòng tạm có một tài sản, không phụ thuộc phòng trống có sẵn trong dữ liệu mẫu
+  const roomCode = await createTempRoom(page)
+  await page.goto('/assets')
+  await page.getByRole('button', { name: 'Thêm tài sản' }).click()
+  await page.getByLabel('Cơ sở', { exact: true }).selectOption({ label: 'Thảo Điền' })
+  await page.locator('select[aria-label="Vị trí"]').selectOption({ label: `Phòng ${roomCode}` })
+  const assetCode = `TS-${Date.now()}`
+  await page.getByLabel('Mã tài sản').fill(assetCode)
+  await page.getByLabel('Tên tài sản').fill('Tài sản kiểm thử')
+  await page.getByLabel('Giá trị', { exact: true }).fill('100000')
+  await page.getByRole('button', { name: 'Lưu', exact: true }).first().click()
+  await page.getByLabel('Tìm tài sản').fill(assetCode)
+  await expect(page.getByRole('link', { name: assetCode, exact: true })).toBeVisible()
+  await page.goto('/contracts/new')
   const rooms = page.locator('#room option[value]:not([value=""])')
-  let found = false
-  for (let i = 0; i < await rooms.count() && !found; i++) {
-    await page.locator('#room').selectOption((await rooms.nth(i).getAttribute('value'))!)
-    await page.waitForTimeout(300)
-    found = await page.getByRole('button', { name: 'Xử lý tài sản' }).count() > 0
-  }
-  test.skip(!found, 'Cần phòng trống có tài sản')
+  await page.locator('#room').selectOption((await page.locator('#room option').filter({ hasText: roomCode }).getAttribute('value'))!)
+  await expect(page.getByRole('button', { name: 'Xử lý tài sản' }).first()).toBeVisible()
   const first = page.getByRole('button', { name: 'Xử lý tài sản' }).first()
   await first.click()
   await expect(page.getByRole('button', { name: 'Di chuyển', exact: true })).toBeVisible()
