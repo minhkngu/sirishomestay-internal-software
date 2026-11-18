@@ -7,7 +7,7 @@ import { getAccessContext } from '@/server/session'
 import { toActionResult, type ActionResult } from '@/lib/action-result'
 import { ValidationError } from '@/domain/errors'
 import { fieldErrorsOf } from '@/lib/zod-errors'
-import { createRoom, createRoomsBulk, setRoomActive, updateRoom } from './service'
+import { createRoom, createRoomsBulk, deleteRoom, setRoomActive, updateRoom } from './service'
 
 async function guard<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
   return toActionResult(async () => {
@@ -41,6 +41,7 @@ export async function setRoomActiveAction(id: string, active: boolean) {
   return guard(async () => {
     await setRoomActive(db, ctx, id, active)
     revalidatePath('/facilities')
+    revalidatePath('/rooms')
     return {}
   })
 }
@@ -51,5 +52,15 @@ export async function createRoomsBulkAction(facilityId: string, input: unknown) 
     const r = await createRoomsBulk(db, ctx, facilityId, input as never)
     revalidatePath('/facilities')
     return r
+  })
+}
+
+export async function deleteRoomAction(id: string) {
+  const ctx = await getAccessContext()
+  return guard(async () => {
+    await deleteRoom(db, ctx, id)
+    revalidatePath('/facilities')
+    revalidatePath('/rooms')
+    return {}
   })
 }

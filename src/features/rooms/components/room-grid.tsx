@@ -27,6 +27,7 @@ export function RoomGrid({ rooms, facilities }: { rooms: GridRoom[]; facilities:
         <span className="rounded-full border bg-card px-3 py-1 text-xs font-medium"><strong className="tabular-nums">{vacant}</strong> phòng trống / <span className="tabular-nums">{total}</span> phòng</span>
         <span className="flex items-center gap-3 text-xs text-muted-foreground">
           <span className="flex items-center gap-1"><span className="size-3 rounded border border-emerald-300 bg-emerald-50" />Có khách</span>
+          <span className="flex items-center gap-1"><span className="size-3 rounded border border-sky-300 bg-sky-50" />Đã cọc</span>
           <span className="flex items-center gap-1"><span className="size-3 rounded border border-border bg-muted/60" />Không có khách</span>
         </span>
       </div>

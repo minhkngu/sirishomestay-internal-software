@@ -3,7 +3,7 @@ import {
   addenda, assets, depositContracts, depositEntries, docTemplates, facilities, feeTypes, feeUnits, files, handoverItems, handovers, incidents, invoices, payments, oneOffCharges, pendingAdjustments, invoiceTemplates, leaseFees, leaseFeeSnapshots, leaseOccupants, leases, rooms, tenants,
 } from '@/db'
 import type { DB } from '@/db/client'
-import { assertCan, facilityScope, type AccessContext } from '@/domain/access'
+import { assertCan, facilityKey, facilityScope, type AccessContext } from '@/domain/access'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import { addDays, todayVN } from '@/domain/dates'
 import { depositBalance } from '@/domain/deposit'
@@ -39,7 +39,7 @@ async function loadRoom(db: Pick<DB, 'select'>, ctx: AccessContext, roomId: stri
 async function loadTenant(db: Pick<DB, 'select'>, ctx: AccessContext, tenantId: string) {
   const [t] = await db.select().from(tenants).where(eq(tenants.id, tenantId))
   if (!t) throw new NotFoundError()
-  assertCan(ctx, 'tenants_contracts', t.homeFacilityId)
+  assertCan(ctx, 'tenants_contracts', facilityKey(t.homeFacilityId))
   return t
 }
 

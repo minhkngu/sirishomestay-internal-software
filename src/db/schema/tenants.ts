@@ -9,7 +9,7 @@ export const tenants = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     kind: tenantKind('kind').notNull(),
-    homeFacilityId: uuid('home_facility_id').notNull().references(() => facilities.id),
+    homeFacilityId: uuid('home_facility_id').references(() => facilities.id),
     phone: text('phone').unique(),
     email: text('email'),
     note: text('note').notNull().default(''),

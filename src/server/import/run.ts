@@ -129,14 +129,14 @@ export async function runImport(db: DB, ctx: AccessContext, target: ImportTarget
 
         if (!existing) {
           const [t] = await tx.insert(tenants).values(row).returning()
-          await recordAudit(tx, ctx, { action: 'create', entity: 'tenant', summary: 'Tạo khách thuê', entityId: t.id, facilityId: t.homeFacilityId, after: t })
+          await recordAudit(tx, ctx, { action: 'create', entity: 'tenant', summary: 'Tạo khách thuê', entityId: t.id, facilityId: t.homeFacilityId ?? undefined, after: t })
           created++
         } else {
           const { searchText, ...cols } = row
           const changed = Object.entries(cols).some(([k, v]) => (existing as Record<string, unknown>)[k] !== v)
           if (changed) {
             const [after] = await tx.update(tenants).set({ ...cols, searchText, updatedAt: new Date() }).where(eq(tenants.id, existing.id)).returning()
-            await recordAudit(tx, ctx, { action: 'update', entity: 'tenant', summary: 'Sửa khách thuê', entityId: existing.id, facilityId: after.homeFacilityId, before: existing, after })
+            await recordAudit(tx, ctx, { action: 'update', entity: 'tenant', summary: 'Sửa khách thuê', entityId: existing.id, facilityId: after.homeFacilityId ?? undefined, before: existing, after })
             updated++
           }
         }

@@ -4,6 +4,7 @@ import type { DB } from '@/db/client'
 import { assertCan, can, facilityScope, NotFoundError, type AccessContext } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/server/audit'
+import { deleteCascade } from '@/server/cascade-delete'
 import { roomStatus, type RoomStatus } from '@/domain/room-status'
 import { depositBalance } from '@/domain/deposit'
 import type { DepositEntry } from '@/domain/types'
@@ -122,9 +123,24 @@ export async function setRoomActive(db: DB, ctx: AccessContext, id: string, isAc
   return db.transaction(async (tx) => {
     const [before] = await tx.select().from(rooms).where(eq(rooms.id, id))
     if (!before) throw new NotFoundError()
+    if (!isActive) {
+      const [busy] = await tx.select({ id: leases.id }).from(leases).where(and(eq(leases.roomId, id), eq(leases.status, 'active'))).limit(1)
+      if (busy) throw new ValidationError('Phòng đang có hợp đồng thuê hiệu lực, không ngừng sử dụng được')
+    }
     const [after] = await tx.update(rooms).set({ isActive, updatedAt: new Date() }).where(eq(rooms.id, id)).returning()
-    await recordAudit(tx, ctx, { action: 'update', entity: 'room', summary: 'Sửa phòng', entityId: id, facilityId: before.facilityId, before: { isActive: before.isActive }, after: { isActive } })
+    await recordAudit(tx, ctx, { action: 'update', entity: 'room', summary: isActive ? 'Dùng lại phòng' : 'Ngừng sử dụng phòng', entityId: id, facilityId: before.facilityId, before: { isActive: before.isActive }, after: { isActive } })
     return after
+  })
+}
+
+/** Xoá hẳn phòng và toàn bộ dữ liệu đi kèm (hợp đồng, công tơ, hoá đơn...). Lỗi giữa chừng thì hoàn tác hết. */
+export async function deleteRoom(db: DB, ctx: AccessContext, id: string): Promise<void> {
+  assertCan(ctx, 'settings')
+  await db.transaction(async (tx) => {
+    const [before] = await tx.select().from(rooms).where(eq(rooms.id, id))
+    if (!before) throw new NotFoundError()
+    await deleteCascade(tx, 'rooms', 'id', [id])
+    await recordAudit(tx, ctx, { action: 'delete', entity: 'room', summary: 'Xoá phòng và dữ liệu đi kèm', entityId: id, facilityId: before.facilityId, before })
   })
 }
 

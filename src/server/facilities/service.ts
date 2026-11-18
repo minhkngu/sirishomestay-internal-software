@@ -1,18 +1,22 @@
-import { asc, eq, inArray } from 'drizzle-orm'
-import { facilities } from '@/db'
+import { and, asc, eq, inArray } from 'drizzle-orm'
+import { facilities, leases, rooms } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, facilityScope, NotFoundError, type AccessContext } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/server/audit'
+import { deleteCascade } from '@/server/cascade-delete'
 import { facilityInput, facilityUpdateInput, type FacilityInput } from './schemas'
 
 export type Facility = typeof facilities.$inferSelect
 
-export async function listFacilities(db: DB, ctx: AccessContext): Promise<Facility[]> {
+/** Mặc định chỉ trả cơ sở đang hoạt động; trang quản lý truyền `includeInactive` để còn dùng lại được cơ sở đã ngừng. */
+export async function listFacilities(db: DB, ctx: AccessContext, opts: { includeInactive?: boolean } = {}): Promise<Facility[]> {
   const scope = facilityScope(ctx)
   if (scope !== 'all' && scope.length === 0) return []
-  const q = db.select().from(facilities)
-  return scope === 'all' ? q.orderBy(asc(facilities.code)) : q.where(inArray(facilities.id, scope)).orderBy(asc(facilities.code))
+  const conds = []
+  if (scope !== 'all') conds.push(inArray(facilities.id, scope))
+  if (!opts.includeInactive) conds.push(eq(facilities.isActive, true))
+  return db.select().from(facilities).where(and(...conds)).orderBy(asc(facilities.code))
 }
 
 export async function getFacility(db: DB, ctx: AccessContext, id: string): Promise<Facility> {
@@ -49,5 +53,34 @@ export async function updateFacility(db: DB, ctx: AccessContext, id: string, inp
     const [after] = await tx.update(facilities).set({ ...data, updatedAt: new Date() }).where(eq(facilities.id, id)).returning()
     await recordAudit(tx, ctx, { action: 'update', entity: 'facility', summary: 'Sửa cơ sở', entityId: id, facilityId: id, before, after })
     return after
+  })
+}
+
+/** Không xoá cứng: ngừng/dùng lại cơ sở. Chỉ ngừng được khi không còn hợp đồng thuê đang hiệu lực. */
+export async function setFacilityActive(db: DB, ctx: AccessContext, id: string, isActive: boolean): Promise<Facility> {
+  assertCan(ctx, 'settings')
+  return db.transaction(async (tx) => {
+    const [before] = await tx.select().from(facilities).where(eq(facilities.id, id))
+    if (!before) throw new NotFoundError()
+    if (!isActive) {
+      const [busy] = await tx.select({ id: leases.id }).from(leases).innerJoin(rooms, eq(rooms.id, leases.roomId))
+        .where(and(eq(rooms.facilityId, id), eq(leases.status, 'active'))).limit(1)
+      if (busy) throw new ValidationError('Còn hợp đồng thuê đang hiệu lực, hãy thanh lý trước khi ngừng sử dụng')
+    }
+    const [after] = await tx.update(facilities).set({ isActive, updatedAt: new Date() }).where(eq(facilities.id, id)).returning()
+    await recordAudit(tx, ctx, { action: 'update', entity: 'facility', summary: isActive ? 'Dùng lại cơ sở' : 'Ngừng sử dụng cơ sở', entityId: id, facilityId: id, before: { isActive: before.isActive }, after: { isActive } })
+    return after
+  })
+}
+
+/** Xoá hẳn cơ sở cùng các phòng và toàn bộ dữ liệu đi kèm (hợp đồng, công tơ, hoá đơn...). Lỗi giữa chừng thì hoàn tác hết. */
+export async function deleteFacility(db: DB, ctx: AccessContext, id: string): Promise<void> {
+  assertCan(ctx, 'settings')
+  await db.transaction(async (tx) => {
+    const [before] = await tx.select().from(facilities).where(eq(facilities.id, id))
+    if (!before) throw new NotFoundError()
+    const roomCount = (await tx.select({ id: rooms.id }).from(rooms).where(eq(rooms.facilityId, id))).length
+    await deleteCascade(tx, 'facilities', 'id', [id])
+    await recordAudit(tx, ctx, { action: 'delete', entity: 'facility', summary: `Xoá cơ sở, ${roomCount} phòng và dữ liệu đi kèm`, entityId: id, facilityId: id, before })
   })
 }
