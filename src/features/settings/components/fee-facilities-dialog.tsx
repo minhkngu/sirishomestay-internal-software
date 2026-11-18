@@ -2,12 +2,14 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { FACILITY_SEARCH_MIN, filterFacilitiesByName, isPriceInput } from '@/features/settings/components/fee-options'
+import {
+  buildFeeFacilityItems, FACILITY_SEARCH_MIN, filterFacilitiesByName, type FeeFacilityDraft,
+} from '@/features/settings/components/fee-options'
 import { Msg } from '@/features/settings/components/use-run'
 import { formatVND } from '@/domain/money'
-import { removeFeeTypePriceAction, setFeeDefaultAction, setFeeTypePriceAction } from '@/server/fees/actions'
+import { saveFeeFacilitiesAction } from '@/server/fees/actions'
 
 type Props = {
   fee: { id: string; name: string; defaultPrice: number }
@@ -17,49 +19,38 @@ type Props = {
   onSelectedChange: (next: Record<string, boolean>) => void
 }
 
-/** Nút + popup chọn toà áp dụng phí và đặt giá riêng theo toà. Mỗi thao tác lưu ngay. */
+function initialDraft(facilities: Props['facilities'], selected: Props['selected'], prices: Props['prices']): Record<string, FeeFacilityDraft> {
+  return Object.fromEntries(facilities.map((f) => [f.id, { on: selected[f.id] ?? false, price: prices[f.id] == null ? '' : String(prices[f.id]) }]))
+}
+
+/** Nút + popup chọn toà áp dụng phí và đặt giá riêng. Tick/nhập giá chỉ là nháp, bấm Áp dụng mới lưu một lần. */
 export function FeeFacilitiesDialog({ fee, facilities, selected, prices, onSelectedChange }: Props) {
-  const [busy, setBusy] = useState<Set<string>>(new Set())
-  const [error, setError] = useState<string | null>(null)
-  const [ok, setOk] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
-  const [values, setValues] = useState<Record<string, string>>(
-    Object.fromEntries(facilities.map((f) => [f.id, prices[f.id] == null ? '' : String(prices[f.id])])),
-  )
+  const [draft, setDraft] = useState(() => initialDraft(facilities, selected, prices))
   const visible = filterFacilitiesByName(facilities, query)
+  const { items, invalid } = buildFeeFacilityItems(facilities.map((f) => f.id), selected, prices, draft)
 
-  /** Server action đã tự revalidate /settings nên không cần router.refresh; chỉ khoá đúng dòng đang lưu. */
-  async function exec(facilityId: string, fn: () => Promise<{ ok: boolean; error?: string }>, okMsg = 'Đã lưu') {
-    setBusy((previous) => new Set(previous).add(facilityId))
-    setError(null); setOk(null)
-    const result = await fn()
-    setBusy((previous) => { const next = new Set(previous); next.delete(facilityId); return next })
-    if (result.ok) setOk(okMsg); else setError(result.error ?? 'Có lỗi')
-    return result
+  function openDialog() {
+    setDraft(initialDraft(facilities, selected, prices))
+    setQuery(''); setError(null); setOpen(true)
   }
 
-  function setDefault(facilityId: string, enabled: boolean) {
-    onSelectedChange({ ...selected, [facilityId]: enabled })
-    void exec(facilityId, async () => {
-      const result = await setFeeDefaultAction({ facilityId, feeTypeId: fee.id, enabled })
-      if (!result.ok) onSelectedChange({ ...selected, [facilityId]: !enabled })
-      return result
-    })
-  }
-
-  function removePrice(facilityId: string) {
-    void exec(facilityId, async () => {
-      const result = await removeFeeTypePriceAction({ feeTypeId: fee.id, facilityId })
-      if (result.ok) setValues((previous) => ({ ...previous, [facilityId]: '' }))
-      return result
-    }, 'Đã xoá giá riêng')
+  async function apply() {
+    setSaving(true); setError(null)
+    const result = await saveFeeFacilitiesAction({ feeTypeId: fee.id, items })
+    setSaving(false)
+    if (!result.ok) { setError(result.error ?? 'Có lỗi'); return }
+    onSelectedChange(Object.fromEntries(facilities.map((f) => [f.id, draft[f.id]?.on ?? false])))
+    setOpen(false)
   }
 
   return (
     <>
-      <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)}>Áp dụng theo toà</Button>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Button type="button" size="sm" variant="outline" onClick={openDialog}>Áp dụng theo toà</Button>
+      <Dialog open={open} onOpenChange={(next) => { if (!saving) setOpen(next) }}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader><DialogTitle>Áp dụng {fee.name} theo toà</DialogTitle></DialogHeader>
           {facilities.length >= FACILITY_SEARCH_MIN && (
@@ -73,18 +64,16 @@ export function FeeFacilitiesDialog({ fee, facilities, selected, prices, onSelec
             <div className="max-h-[60vh] overflow-y-auto rounded-md border">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-muted text-left">
-                  <tr><th className="p-2">Toà</th><th className="p-2">Giá riêng (đ)</th><th className="p-2" /></tr>
+                  <tr><th className="p-2">Toà</th><th className="p-2">Giá riêng (đ)</th></tr>
                 </thead>
                 <tbody>
                   {visible.map((f) => {
-                    const isOn = selected[f.id] ?? false
-                    const pending = busy.has(f.id)
-                    const value = values[f.id] ?? ''
+                    const row = draft[f.id] ?? { on: false, price: '' }
                     return (
                       <tr key={f.id} className="border-t">
                         <td className="p-2">
                           <label className="inline-flex items-center gap-2">
-                            <input type="checkbox" checked={isOn} disabled={pending} onChange={(e) => setDefault(f.id, e.target.checked)} />
+                            <input type="checkbox" checked={row.on} disabled={saving} onChange={(e) => setDraft({ ...draft, [f.id]: { ...row, on: e.target.checked } })} />
                             {f.name}
                           </label>
                         </td>
@@ -93,23 +82,11 @@ export function FeeFacilitiesDialog({ fee, facilities, selected, prices, onSelec
                             aria-label={`Giá riêng ${fee.name} tại ${f.name}`}
                             inputMode="numeric"
                             className="w-full min-w-48"
-                            disabled={!isOn}
+                            disabled={!row.on || saving}
                             placeholder={`Theo giá chung ${formatVND(fee.defaultPrice)}`}
-                            value={value}
-                            onChange={(e) => setValues({ ...values, [f.id]: e.target.value })}
+                            value={row.price}
+                            onChange={(e) => setDraft({ ...draft, [f.id]: { ...row, price: e.target.value } })}
                           />
-                        </td>
-                        <td className="whitespace-nowrap p-2">
-                          <Button
-                            size="sm" variant="outline"
-                            disabled={pending || !isOn || !isPriceInput(value) || Number(value) === prices[f.id]}
-                            onClick={() => void exec(f.id, () => setFeeTypePriceAction({ feeTypeId: fee.id, facilityId: f.id, price: Number(value) }))}
-                          >
-                            Lưu
-                          </Button>
-                          {prices[f.id] != null && (
-                            <Button size="sm" variant="ghost" disabled={pending} onClick={() => removePrice(f.id)}>Xoá</Button>
-                          )}
                         </td>
                       </tr>
                     )
@@ -118,7 +95,12 @@ export function FeeFacilitiesDialog({ fee, facilities, selected, prices, onSelec
               </table>
             </div>
           )}
-          <Msg error={error} ok={ok} />
+          <Msg error={error} ok={null} />
+          {invalid && <p className="text-sm text-destructive">Giá riêng phải là số nguyên không âm</p>}
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={saving} onClick={() => setOpen(false)}>Huỷ</Button>
+            <Button type="button" disabled={saving || invalid || items.length === 0} onClick={apply}>{saving ? 'Đang lưu…' : 'Áp dụng'}</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

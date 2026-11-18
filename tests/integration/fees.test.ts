@@ -2,9 +2,9 @@ import { eq, sql } from 'drizzle-orm'
 import { describe, it, expect, beforeEach } from 'vitest'
 import { facilities, feeTypes, feeTypePrices, feeUnits } from '@/db'
 import {
-  setFeeDefault, listFeeDefaults, setFeeTypePrice, removeFeeTypePrice, listFeeTypePrices, createFeeUnit, listFeeUnits, createFeeType, updateFeeType, archiveFeeType, restoreFeeType, listFeeTypes, ensureUtilityFeeTypes, createRate, listRates,
+  setFeeDefault, listFeeDefaults, setFeeTypePrice, removeFeeTypePrice, listFeeTypePrices, createFeeUnit, listFeeUnits, createFeeType, updateFeeType, archiveFeeType, restoreFeeType, listFeeTypes, ensureUtilityFeeTypes, createRate, listRates, saveFeeFacilities,
 } from '@/server/fees/service'
-import { ForbiddenError, NotFoundError } from '@/domain/errors'
+import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import type { AccessContext, Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'
 import type { DB } from '@/db/client'
@@ -179,5 +179,44 @@ describe('fees & rates', () => {
     await createRate(db, admin, { facilityId: fb, utility: 'electric', pricePerUnit: 3500, effectiveFrom: '2026-01-01' })
     await expect(listRates(db, ctxOf(['billing'], [fa]), fb)).rejects.toThrow(NotFoundError)
     expect(await listRates(db, ctxOf(['billing'], [fb]), fb)).toHaveLength(1)
+  })
+
+  describe('saveFeeFacilities (nút Áp dụng trong popup theo toà)', () => {
+    async function makeFee() {
+      const unit = await createFeeUnit(db, admin, { name: 'phòng' })
+      return createFeeType(db, admin, { name: 'Rác', unitId: unit.id, defaultPrice: 20, billing: 'monthly_fixed', quantityFrom: 'room' })
+    }
+
+    it('lưu nhiều toà và giá riêng trong một lần gọi', async () => {
+      const fee = await makeFee()
+      await saveFeeFacilities(db, admin, { feeTypeId: fee.id, items: [{ facilityId: fa, enabled: true, price: 30 }, { facilityId: fb, enabled: true }] })
+      expect((await listFeeDefaults(db, admin))[fa]).toEqual([fee.id])
+      expect((await listFeeDefaults(db, admin))[fb]).toEqual([fee.id])
+      expect(await listFeeTypePrices(db, admin)).toEqual({ [fee.id]: { [fa]: 30 } })
+    })
+
+    it('bỏ tick một toà và xoá giá riêng (price null) ở lần gọi sau; price bỏ trống thì giữ nguyên', async () => {
+      const fee = await makeFee()
+      await saveFeeFacilities(db, admin, { feeTypeId: fee.id, items: [{ facilityId: fa, enabled: true, price: 30 }, { facilityId: fb, enabled: true, price: 40 }] })
+      await saveFeeFacilities(db, admin, { feeTypeId: fee.id, items: [{ facilityId: fa, enabled: true, price: null }, { facilityId: fb, enabled: false }] })
+      expect((await listFeeDefaults(db, admin))[fa]).toEqual([fee.id])
+      expect((await listFeeDefaults(db, admin))[fb] ?? []).toEqual([])
+      expect(await listFeeTypePrices(db, admin)).toEqual({ [fee.id]: { [fb]: 40 } })
+    })
+
+    it('toà không tồn tại thì không lưu gì (giao dịch nguyên khối)', async () => {
+      const fee = await makeFee()
+      await expect(saveFeeFacilities(db, admin, { feeTypeId: fee.id, items: [{ facilityId: fa, enabled: true, price: 30 }, { facilityId: crypto.randomUUID(), enabled: true }] })).rejects.toThrow(NotFoundError)
+      expect((await listFeeDefaults(db, admin))[fa] ?? []).toEqual([])
+      expect(await listFeeTypePrices(db, admin)).toEqual({})
+    })
+
+    it('từ chối khi thiếu quyền, giá âm hoặc bật phí đã lưu trữ', async () => {
+      const fee = await makeFee()
+      await expect(saveFeeFacilities(db, ctxOf(['billing'], [fa]), { feeTypeId: fee.id, items: [{ facilityId: fa, enabled: true }] })).rejects.toThrow(ForbiddenError)
+      await expect(saveFeeFacilities(db, admin, { feeTypeId: fee.id, items: [{ facilityId: fa, enabled: true, price: -1 }] })).rejects.toThrow(ValidationError)
+      await archiveFeeType(db, admin, fee.id)
+      await expect(saveFeeFacilities(db, admin, { feeTypeId: fee.id, items: [{ facilityId: fa, enabled: true }] })).rejects.toThrow(ValidationError)
+    })
   })
 })
