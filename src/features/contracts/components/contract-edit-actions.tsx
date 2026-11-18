@@ -18,7 +18,7 @@ export function ContractEditActions({ contract, canDelete, rooms, tenants, mode,
   const [error, setError] = useState('')
   const [pendingFiles, setPendingFiles] = useState(0)
   const [deleted, setDeleted] = useState(false)
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(mode === 'delete')
   const [roomId, setRoomId] = useState(contract.roomId)
   const [tenantId, setTenantId] = useState(contract.tenantId)
   const [deposit, setDeposit] = useState(String(contract.depositAmount))

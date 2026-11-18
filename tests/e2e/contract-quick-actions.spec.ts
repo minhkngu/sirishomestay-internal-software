@@ -155,7 +155,6 @@ test('gia hạn, thanh lý, cảnh báo đã ký và xóa trong môi trường c
     await sql`insert into files (owner_type,owner_id,facility_id,storage_key,content_type,confirmed_at,is_demo) values ('export','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','22222222-2222-4222-8222-222222222222','invoice-delete.pdf','application/pdf',now(),true), ('signed_addendum','dddddddd-dddd-4ddd-8ddd-dddddddddddd','22222222-2222-4222-8222-222222222222','addendum-delete.pdf','application/pdf',now(),true)`
     await row.getByRole('button', { name: 'Xóa hợp đồng' }).click()
     modal = page.getByRole('dialog')
-    await modal.getByRole('button', { name: 'Xoá hợp đồng' }).click()
     const confirm = modal.getByRole('alertdialog')
     for (const term of ['đã ký', 'hoá đơn', 'tiền cọc', 'thanh toán', 'phụ lục', 'bàn giao', 'tệp']) await expect(confirm).toContainText(term)
     await confirm.getByRole('button', { name: 'Huỷ' }).click()

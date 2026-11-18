@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeftRight, CalendarPlus, FilePenLine, RotateCcw, Trash2, UserRoundPlus, CircleStop } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { IconTip } from '@/components/ui/tooltip'
+import { IconTip, IconTipGroup } from '@/components/ui/tooltip'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { quickContractDataAction, previewContractRestoreAction, restoreContractAction } from '@/server/contracts/actions'
 import { createAssignmentAction } from '@/server/addenda/actions'
@@ -50,9 +50,9 @@ export function ContractRowActions({ id, kind, active, canDelete, redirectAfterD
   }
   const label = ACTIONS.find(item => item.key === action)?.label ?? ''
   return <>
-    <div className="flex flex-nowrap items-center gap-0.5">
+    <IconTipGroup><div className="flex flex-wrap items-center gap-0.5">
       {ACTIONS.filter(item => (item.key !== 'delete' || canDelete) && (!['termination', 'assignment', 'extension', 'transfer'].includes(item.key) || (kind === 'lease' && active))).map(item => <IconTip key={item.key} label={item.label}><Button type="button" variant="ghost" size="icon-sm" aria-label={item.label} onClick={() => open(item.key)}><item.icon className="size-4" /></Button></IconTip>)}
-    </div>
+    </div></IconTipGroup>
     <Dialog open={action !== null} onOpenChange={open => { if (!open) close() }}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader><DialogTitle>{label}</DialogTitle><DialogDescription>Hợp đồng và dữ liệu liên quan sẽ được kiểm tra trước khi lưu.</DialogDescription></DialogHeader>
