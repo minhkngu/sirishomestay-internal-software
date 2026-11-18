@@ -1,6 +1,9 @@
 import { test, expect } from '@playwright/test'
 import { NAV_ITEMS } from '../../src/components/app-shell/nav'
 
+// Chỉ đo, không kiểm tra gì: không chạy trong bộ e2e mặc định, chạy riêng bằng `npm run test:perf`
+test.skip(!process.env.E2E_PERF, 'Đặt E2E_PERF=1 để đo tốc độ trang')
+
 test('đo thời gian tải các trang', async ({ page }) => {
   test.setTimeout(600_000)
   await page.goto('/login')
