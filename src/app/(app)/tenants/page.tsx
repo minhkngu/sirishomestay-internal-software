@@ -1,5 +1,4 @@
 import { PageHeader } from '@/components/list/page-header'
-import { RefreshButton } from '@/components/list/refresh-button'
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
 import { db } from '@/db/client'
@@ -22,7 +21,6 @@ export default async function TenantsPage() {
         title="Khách thuê"
         action={
           <>
-            <RefreshButton />
             <Link href="/tenants/new" className={buttonVariants()}>Thêm khách</Link>
           </>
         }
