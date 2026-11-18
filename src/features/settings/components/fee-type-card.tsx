@@ -31,8 +31,11 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
   const [values, setValues] = useState<Record<string, string>>(
     Object.fromEntries(facilities.map((f) => [f.id, prices[f.id] == null ? '' : String(prices[f.id])])),
   )
-  const defaultNames = facilities.filter((f) => selected[f.id]).map((f) => f.name)
-  const priceEntries = facilities.filter((f) => prices[f.id] != null).map((f) => [f.name, prices[f.id]] as const)
+  const appliedFacilities = facilities.filter((f) => selected[f.id])
+  const defaultNames = appliedFacilities.map((f) => f.name)
+  const priceEntries = appliedFacilities
+    .filter((f) => prices[f.id] != null)
+    .map((f) => [f.name, prices[f.id]] as const)
 
   function setDefault(facilityId: string, enabled: boolean) {
     setSelected((previous) => ({ ...previous, [facilityId]: enabled }))
@@ -109,7 +112,10 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
 
           <div className="space-y-2">
             <p className="text-sm font-medium">Giá riêng theo toà</p>
-            {facilities.map((f) => (
+            {appliedFacilities.length === 0 && (
+              <p className="text-sm text-muted-foreground">Tick cơ sở áp dụng ở trên để đặt giá riêng.</p>
+            )}
+            {appliedFacilities.map((f) => (
               <div key={f.id} className="flex flex-wrap items-center gap-2">
                 <span className="w-32 text-sm">{f.name}</span>
                 <Input
