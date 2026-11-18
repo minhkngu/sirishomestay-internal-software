@@ -8,19 +8,15 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { FeeSettings } from '@/features/settings/components/fee-settings'
 import { Msg, useRun } from '@/features/settings/components/use-run'
-import { formatDateVN } from '@/domain/dates'
-import { formatVND } from '@/domain/money'
 import { createFacilityAction, updateFacilityAction } from '@/server/facilities/actions'
-import { createRateAction } from '@/server/fees/actions'
 import { updateSettingsAction } from '@/server/settings/actions'
 import type { Settings } from '@/server/settings/service'
 
 type Fac = { id: string; code: string; name: string; address: string; expectedInvoiceDay: number }
 type Unit = { id: string; name: string }
 type FeeT = { id: string; name: string; unitId: string; defaultPrice: number; billing: string; quantityFrom: string; isActive: boolean }
-type Rate = { id: string; facilityId: string; utility: string; pricePerUnit: number; effectiveFrom: string }
 
-type Props = { defaults: Record<string, string[]>; prices: Record<string, Record<string, number>>; settings: Settings; facilities: Fac[]; units: Unit[]; feeTypes: FeeT[]; rates: Rate[] }
+type Props = { defaults: Record<string, string[]>; prices: Record<string, Record<string, number>>; settings: Settings; facilities: Fac[]; units: Unit[]; feeTypes: FeeT[] }
 
 function GeneralTab({ s }: { s: Settings }) {
   const { pending, error, ok, run } = useRun()
@@ -99,50 +95,19 @@ function FacilitiesTab({ facilities }: { facilities: Fac[] }) {
   )
 }
 
-function RatesTab({ facilities, rates }: { facilities: Fac[]; rates: Rate[] }) {
-  const { pending, error, ok, run } = useRun()
-  const [fac, setFac] = useState(facilities[0]?.id ?? '')
-  const [n, setN] = useState({ utility: 'electric', pricePerUnit: '', effectiveFrom: '' })
-  const shown = rates.filter((r) => r.facilityId === fac)
-  return (
-    <div className="space-y-4">
-      <select aria-label="Cơ sở" value={fac} onChange={(e) => setFac(e.target.value)} className="h-8 rounded-lg border px-2 text-sm">{facilities.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select>
-      <div className="overflow-x-auto rounded-md border bg-card">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50 text-left"><tr><th className="p-2">Loại</th><th className="p-2">Đơn giá</th><th className="p-2">Hiệu lực từ</th></tr></thead>
-          <tbody>
-            {shown.map((r) => <tr key={r.id} className="border-t"><td className="p-2">{r.utility === 'electric' ? 'Điện (đ/kWh)' : 'Nước (đ/m³)'}</td><td className="p-2">{formatVND(r.pricePerUnit)}</td><td className="p-2">{formatDateVN(r.effectiveFrom)}</td></tr>)}
-            {shown.length === 0 && <tr><td colSpan={3} className="p-3 text-center text-muted-foreground">Chưa có đơn giá</td></tr>}
-          </tbody>
-        </table>
-      </div>
-      <div className="grid max-w-xl gap-2 rounded-md border bg-card p-3 sm:grid-cols-3">
-        <select aria-label="Loại" value={n.utility} onChange={(e) => setN({ ...n, utility: e.target.value })} className="h-8 rounded-lg border px-2 text-sm"><option value="electric">Điện</option><option value="water">Nước</option></select>
-        <Input placeholder="Đơn giá" inputMode="numeric" value={n.pricePerUnit} onChange={(e) => setN({ ...n, pricePerUnit: e.target.value })} />
-        <Input aria-label="Ngày hiệu lực" type="date" value={n.effectiveFrom} onChange={(e) => setN({ ...n, effectiveFrom: e.target.value })} />
-        <Button className="sm:col-span-3" disabled={pending} onClick={() => run(async () => { const r = await createRateAction({ facilityId: fac, utility: n.utility, pricePerUnit: Number(n.pricePerUnit), effectiveFrom: n.effectiveFrom }); if (r.ok) setN({ ...n, pricePerUnit: '' }); return r })}>Thêm mức giá mới</Button>
-      </div>
-      <p className="text-xs text-muted-foreground">Giá mới áp cho kỳ bắt đầu từ ngày hiệu lực; hoá đơn cũ giữ nguyên.</p>
-      <Msg error={error} ok={ok} />
-    </div>
-  )
-}
-
-export function SettingsTabs({ settings, facilities, units, feeTypes, rates, prices, defaults }: Props) {
+export function SettingsTabs({ settings, facilities, units, feeTypes, prices, defaults }: Props) {
   return (
     <Tabs defaultValue="general">
       <TabsList>
         <TabsTrigger value="general">Chung</TabsTrigger>
-        <TabsTrigger value="bank">Tài khoản nhận tiền</TabsTrigger>
         <TabsTrigger value="facilities">Cơ sở</TabsTrigger>
         <TabsTrigger value="fees">Phí dịch vụ</TabsTrigger>
-        <TabsTrigger value="rates">Đơn giá điện nước</TabsTrigger>
+        <TabsTrigger value="bank">Tài khoản nhận tiền</TabsTrigger>
       </TabsList>
       <TabsContent value="general"><GeneralTab s={settings} /></TabsContent>
       <TabsContent value="bank"><BankAccountTab settings={settings} /></TabsContent>
       <TabsContent value="facilities"><FacilitiesTab facilities={facilities} /></TabsContent>
       <TabsContent value="fees"><FeeSettings defaults={defaults} units={units} feeTypes={feeTypes} facilities={facilities} prices={prices} /></TabsContent>
-      <TabsContent value="rates"><RatesTab facilities={facilities} rates={rates} /></TabsContent>
     </Tabs>
   )
 }

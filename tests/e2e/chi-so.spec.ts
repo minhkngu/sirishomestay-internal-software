@@ -23,3 +23,10 @@ test('menu Chỉ số và trang có hai tab Ghi chỉ số, Đồng hồ', async
   await expect(page.getByRole('columnheader', { name: 'Dòng phí' })).toBeVisible()
   await expect(page.getByRole('row').nth(1)).toContainText(/Điện|Nước|\(/)
 })
+
+test('tab Cài đặt theo thứ tự và không còn Đơn giá điện nước', async ({ page }) => {
+  await page.goto('/settings')
+  await expect(page.getByRole('tab').first()).toBeVisible()
+  expect(await page.getByRole('tab').allInnerTexts()).toEqual(['Chung', 'Cơ sở', 'Phí dịch vụ', 'Tài khoản nhận tiền'])
+  await expect(page.getByRole('tab', { name: 'Đơn giá điện nước' })).toHaveCount(0)
+})
