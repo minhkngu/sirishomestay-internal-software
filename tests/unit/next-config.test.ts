@@ -5,4 +5,7 @@ describe('next.config', () => {
   it('nâng giới hạn body server action để nhập được file Excel lớn', () => {
     expect(nextConfig.experimental?.serverActions?.bodySizeLimit).toBe('12mb')
   })
+  it('giữ trang đã xem trong trình duyệt', () => {
+    expect(nextConfig.experimental?.staleTimes).toEqual({ dynamic: 3600, static: 3600 })
+  })
 })
