@@ -6,6 +6,7 @@ import { getAccessContext } from '@/server/session'
 import { getFacility } from '@/server/facilities/service'
 import { listRoomsWithStatus } from '@/server/rooms/service'
 import { FacilityBankAccount } from '@/features/facilities/components/facility-form'
+import { listAmenities } from '@/server/amenities/service'
 import { RoomPanels } from '@/features/rooms/components/room-panels'
 import { RoomMap } from '@/features/rooms/components/room-map'
 
@@ -13,7 +14,7 @@ export default async function FacilityPage({ params }: { params: Promise<{ id: s
   const { id } = await params
   const ctx = await getAccessContext()
   const facility = await orNotFound(getFacility(db, ctx, id))
-  const rooms = await listRoomsWithStatus(db, ctx, { facilityId: id })
+  const [rooms, amenities] = await Promise.all([listRoomsWithStatus(db, ctx, { facilityId: id }), ctx.isAdmin ? listAmenities(db, ctx) : Promise.resolve([])])
   const count = (s: RoomStatus) => rooms.filter((r) => r.status === s).length
   const occupied = count('occupied') + count('ending_soon') + count('occupied_with_next')
   const stats: [string, number][] = [
@@ -32,7 +33,7 @@ export default async function FacilityPage({ params }: { params: Promise<{ id: s
           <div key={label} className="rounded-lg border bg-card p-3"><div className="text-2xl font-semibold">{n}</div><div className="text-xs text-muted-foreground">{label}</div></div>
         ))}
       </div>
-      {ctx.isAdmin && <RoomPanels facilityId={id} />}
+      {ctx.isAdmin && <RoomPanels facilityId={id} facilities={[{ id, name: facility.name }]} amenities={amenities.map((a) => ({ id: a.id, name: a.name }))} />}
       <RoomMap rooms={rooms.map((r) => ({ id: r.id, code: r.code, floor: r.floor, status: r.status, tenantName: canViewTenantIdentity(ctx, id) ? r.tenantName : null }))} />
     </div>
   )

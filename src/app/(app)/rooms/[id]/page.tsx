@@ -10,6 +10,8 @@ import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { orNotFound } from '@/lib/or-not-found'
 import { getAccessContext } from '@/server/session'
+import { listAmenities } from '@/server/amenities/service'
+import { RoomEditForm } from '@/features/rooms/components/room-edit-form'
 import { getRoomDetail } from '@/server/rooms/service'
 import { roomMeterHistory } from '@/server/meters/service'
 import { listAssets } from '@/server/assets/service'
@@ -20,6 +22,7 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
   const ctx = await getAccessContext()
   const detail = await orNotFound(getRoomDetail(db, ctx, id))
   const r = detail.room
+  const allAmenities = ctx.isAdmin ? await listAmenities(db, ctx, { includeArchived: true }) : []
   const showContracts = can(ctx, 'tenants_contracts', r.facilityId)
   const history = showContracts ? await listLeases(db, ctx, { roomId: id }) : []
   const deposit = showContracts ? await getPendingDepositContract(db, ctx, id) : null
@@ -32,10 +35,10 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
     <div className="max-w-5xl space-y-6">
       <div className="space-y-2">
         <Link
-          href="/facilities"
+          href="/rooms"
           className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
         >
-          ← Danh sách cơ sở & phòng
+          ← Danh sách phòng
         </Link>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -76,9 +79,19 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
             )}
             <dt className="text-muted-foreground">Sức chứa</dt>
             <dd className="font-medium text-foreground">{r.capacity ? `${r.capacity} người` : '—'}</dd>
+            <dt className="text-muted-foreground">Giường</dt>
+            <dd className="font-medium text-foreground">{r.beds ?? '—'}</dd>
+            <dt className="text-muted-foreground">Tiện ích</dt>
+            <dd className="font-medium text-foreground">{detail.amenities.length ? detail.amenities.map((a) => a.name).join(', ') : '—'}</dd>
             <dt className="text-muted-foreground">Ghi chú</dt>
             <dd className="text-foreground">{r.note || '—'}</dd>
           </dl>
+          {ctx.isAdmin && (
+            <div className="mt-4">
+              <RoomEditForm room={{ id: r.id, code: r.code, floor: r.floor, roomType: r.roomType, areaM2: r.areaM2, beds: r.beds, listPrice: r.listPrice, capacity: r.capacity }}
+                amenities={allAmenities.map((a) => ({ id: a.id, name: a.name, isActive: a.isActive }))} selectedIds={detail.amenities.map((a) => a.id)} />
+            </div>
+          )}
         </div>
 
         {/* Financial Overview */}
