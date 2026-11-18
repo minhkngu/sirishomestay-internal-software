@@ -34,7 +34,7 @@ async function assigneeOk(db: Pick<DB, 'select'>, facilityId: string, id: string
   void facilityId
 }
 
-export async function listIncidents(db: DB, ctx: AccessContext, opts: { facilityId?: string; facilityIds?: string[]; status?: IncidentStatus; assigneeId?: string } = {}): Promise<Incident[]> {
+export async function listIncidents(db: DB, ctx: AccessContext, opts: { facilityId?: string; facilityIds?: string[]; roomId?: string; status?: IncidentStatus; assigneeId?: string } = {}): Promise<Incident[]> {
   assertCan(ctx, 'incidents', opts.facilityId)
   const scope = facilityScope(ctx)
   if (scope !== 'all' && scope.length === 0) return []
@@ -42,6 +42,7 @@ export async function listIncidents(db: DB, ctx: AccessContext, opts: { facility
   if (scope !== 'all') conds.push(inArray(incidents.facilityId, scope))
   if (opts.facilityId) conds.push(eq(incidents.facilityId, opts.facilityId))
   if (opts.facilityIds?.length) conds.push(inArray(incidents.facilityId, opts.facilityIds.filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))))
+  if (opts.roomId) conds.push(eq(incidents.roomId, opts.roomId))
   if (opts.status) conds.push(eq(incidents.status, opts.status))
   if (opts.assigneeId) conds.push(eq(incidents.assigneeId, opts.assigneeId))
   return db.select().from(incidents).where(conds.length ? and(...conds) : undefined).orderBy(desc(incidents.createdAt))
