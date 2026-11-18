@@ -24,6 +24,6 @@ test('báo sự cố từ trang phòng, chuyển sang Xong', async ({ page }) =>
   await expect(page.getByRole('heading', { name: /Đang xử lý/ })).toBeVisible()
   const inProgress = page.locator('section').filter({ has: page.getByRole('heading', { name: /Đang xử lý/ }) })
   await expect(inProgress.getByText(title)).toBeVisible()
-  await inProgress.locator('div').filter({ hasText: title }).last().getByRole('button', { name: 'Hoàn tất' }).click()
+  await inProgress.locator('div').filter({ hasText: title }).filter({ has: page.getByRole('button', { name: 'Hoàn tất' }) }).last().getByRole('button', { name: 'Hoàn tất' }).click()
   await expect(page.locator('section').filter({ has: page.getByRole('heading', { name: /^Xong/ }) }).getByText(title)).toBeVisible()
 })

@@ -9,11 +9,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AmenitySettings, type AmenityRow } from '@/features/settings/components/amenity-settings'
 import { FeeSettings } from '@/features/settings/components/fee-settings'
 import { Msg, useRun } from '@/features/settings/components/use-run'
-import { createFacilityAction, updateFacilityAction } from '@/server/facilities/actions'
 import { updateSettingsAction } from '@/server/settings/actions'
 import type { Settings } from '@/server/settings/service'
 
-type Fac = { id: string; code: string; name: string; address: string; expectedInvoiceDay: number }
+type Fac = { id: string; name: string }
 type Unit = { id: string; name: string }
 type FeeT = { id: string; name: string; unitId: string; defaultPrice: number; billing: string; quantityFrom: string; isActive: boolean }
 
@@ -64,44 +63,11 @@ function BankAccountTab({ settings }: { settings: Settings }) {
   </div>
 }
 
-function FacilitiesTab({ facilities }: { facilities: Fac[] }) {
-  const { pending, error, ok, run } = useRun()
-  const [v, setV] = useState({ code: '', name: '', address: '' })
-  const [days, setDays] = useState<Record<string, string>>(Object.fromEntries(facilities.map((f) => [f.id, String(f.expectedInvoiceDay)])))
-  return (
-    <div className="space-y-4">
-      <div className="overflow-x-auto rounded-md border bg-card">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50 text-left"><tr><th className="p-2">Mã</th><th className="p-2">Tên</th><th className="p-2">Ngày tạo hoá đơn dự kiến</th><th className="p-2" /></tr></thead>
-          <tbody>
-            {facilities.map((f) => (
-              <tr key={f.id} className="border-t">
-                <td className="p-2">{f.code}</td><td className="p-2">{f.name}</td>
-                <td className="p-2"><Input aria-label={`Ngày tạo hoá đơn ${f.code}`} className="w-20" inputMode="numeric" value={days[f.id]} onChange={(e) => setDays({ ...days, [f.id]: e.target.value })} /></td>
-                <td className="p-2"><Button size="sm" variant="outline" disabled={pending} onClick={() => run(() => updateFacilityAction(f.id, { expectedInvoiceDay: Number(days[f.id]) }))}>Lưu</Button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="max-w-md space-y-2 rounded-md border bg-card p-3">
-        <h3 className="text-sm font-medium">Thêm cơ sở</h3>
-        {(['code', 'name', 'address'] as const).map((k) => (
-          <Input key={k} placeholder={{ code: 'Mã cơ sở', name: 'Tên cơ sở', address: 'Địa chỉ' }[k]} value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} />
-        ))}
-        <Button disabled={pending} onClick={() => run(async () => { const r = await createFacilityAction(v); if (r.ok) setV({ code: '', name: '', address: '' }); return r })}>Thêm</Button>
-      </div>
-      <Msg error={error} ok={ok} />
-    </div>
-  )
-}
-
 export function SettingsTabs({ settings, facilities, units, feeTypes, prices, defaults, amenities }: Props) {
   return (
     <Tabs defaultValue="general">
       <TabsList>
         <TabsTrigger value="general">Chung</TabsTrigger>
-        <TabsTrigger value="facilities">Cơ sở</TabsTrigger>
         <TabsTrigger value="fees">Phí dịch vụ</TabsTrigger>
         <TabsTrigger value="amenities">Tiện ích</TabsTrigger>
         <TabsTrigger value="bank">Tài khoản nhận tiền</TabsTrigger>
@@ -109,7 +75,6 @@ export function SettingsTabs({ settings, facilities, units, feeTypes, prices, de
       <TabsContent value="general"><GeneralTab s={settings} /></TabsContent>
       <TabsContent value="amenities"><AmenitySettings amenities={amenities} /></TabsContent>
       <TabsContent value="bank"><BankAccountTab settings={settings} /></TabsContent>
-      <TabsContent value="facilities"><FacilitiesTab facilities={facilities} /></TabsContent>
       <TabsContent value="fees"><FeeSettings defaults={defaults} units={units} feeTypes={feeTypes} facilities={facilities} prices={prices} /></TabsContent>
     </Tabs>
   )

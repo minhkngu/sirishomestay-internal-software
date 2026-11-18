@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { createCanvas } from '@napi-rs/canvas'
+import { createTempRoom, fillMeterReadings } from './helpers'
 
 test.skip(!process.env.E2E_BASE_URL, 'Cần E2E_BASE_URL trỏ tới môi trường thử có dữ liệu mẫu')
 
@@ -28,11 +29,6 @@ async function openFormWithRooms(page: Page, count = 1): Promise<string[]> {
   await page.goto('/contracts/new')
   return Array.from({ length: count }, (_, i) => `${prefix}${901 + i}`)
 }
-/** Phí mặc định theo đồng hồ (vd. Điện) được tự thêm vào form và đòi chỉ số ban đầu: điền cho mọi ô còn trống. */
-async function fillMeterReadings(page: Page) {
-  const inputs = page.getByLabel(/^Chỉ số ban đầu /)
-  for (let i = 0; i < await inputs.count(); i++) if (!(await inputs.nth(i).inputValue())) await inputs.nth(i).fill('100')
-}
 const roomOption = (page: Page, code: string) => page.locator('#room option').filter({ hasText: code })
 
 test('các mục cùng trang, lỗi cạnh trường và đổi phòng xóa tài sản mới', async ({ page }) => {
@@ -60,15 +56,24 @@ test('các mục cùng trang, lỗi cạnh trường và đổi phòng xóa tài
 })
 
 test('xử lý tài sản chỉ có di chuyển và thanh lý, đổi phòng xóa lựa chọn', async ({ page }) => {
-  await openForm(page)
+  test.setTimeout(240_000)
+  // Tự tạo phòng tạm có một tài sản, không phụ thuộc phòng trống có sẵn trong dữ liệu mẫu
+  const roomCode = await createTempRoom(page)
+  await page.goto('/assets')
+  await page.getByRole('button', { name: 'Thêm tài sản' }).click()
+  await page.getByLabel('Cơ sở', { exact: true }).selectOption({ label: 'Thảo Điền' })
+  await page.locator('select[aria-label="Vị trí"]').selectOption({ label: `Phòng ${roomCode}` })
+  const assetCode = `TS-${Date.now()}`
+  await page.getByLabel('Mã tài sản').fill(assetCode)
+  await page.getByLabel('Tên tài sản').fill('Tài sản kiểm thử')
+  await page.getByLabel('Giá trị', { exact: true }).fill('100000')
+  await page.getByRole('button', { name: 'Lưu', exact: true }).first().click()
+  await page.getByLabel('Tìm tài sản').fill(assetCode)
+  await expect(page.getByRole('link', { name: assetCode, exact: true })).toBeVisible()
+  await page.goto('/contracts/new')
   const rooms = page.locator('#room option[value]:not([value=""])')
-  let found = false
-  for (let i = 0; i < await rooms.count() && !found; i++) {
-    await page.locator('#room').selectOption((await rooms.nth(i).getAttribute('value'))!)
-    await page.waitForTimeout(300)
-    found = await page.getByRole('button', { name: 'Xử lý tài sản' }).count() > 0
-  }
-  test.skip(!found, 'Cần phòng trống có tài sản')
+  await page.locator('#room').selectOption((await page.locator('#room option').filter({ hasText: roomCode }).getAttribute('value'))!)
+  await expect(page.getByRole('button', { name: 'Xử lý tài sản' }).first()).toBeVisible()
   const first = page.getByRole('button', { name: 'Xử lý tài sản' }).first()
   await first.click()
   await expect(page.getByRole('button', { name: 'Di chuyển', exact: true })).toBeVisible()
@@ -231,7 +236,15 @@ test('công ty ký và tạo đồng hồ cho phí riêng', async ({ page }) => 
   await expect(page).toHaveURL(/\/contracts\/[a-f0-9-]+$/, { timeout: 60_000 })
   await expect(page.getByText('Phí thử theo đồng hồ')).toBeVisible()
   await expect(page.getByText('Số người ở').locator('..')).toContainText('2')
-  await page.goto('/invoices?view=draft')
+  // Hợp đồng không tự sinh hoá đơn: tạo hàng loạt cho Thảo Điền, kỳ 12/2026 (tháng bắt đầu hợp đồng)
+  await page.goto('/invoices/generate')
+  await page.getByLabel('Cơ sở').selectOption({ label: 'Thảo Điền' })
+  await page.getByLabel('Kỳ (tháng)').fill('2026-12')
+  await page.getByRole('button', { name: 'Xem trước' }).click()
+  const createDrafts = page.getByRole('button', { name: /^Tạo \d+ hoá đơn nháp$/ })
+  await expect(createDrafts).toBeEnabled()
+  await createDrafts.click()
+  await expect(page).toHaveURL(/view=draft/)
   // Danh sách phân trang 15 dòng; hoá đơn nháp từ các lần chạy trước nhiều nên mở rộng tối đa
   await page.getByLabel('Số dòng').selectOption('100')
   const invoiceRow = page.getByRole('row').filter({ hasText: companyName }).filter({ hasText: roomCode }).first()
@@ -254,10 +267,13 @@ test('phí mặc định theo cơ sở tự thêm và có thể xóa hoặc thê
     await page.getByRole('button', { name: 'Tạo loại phí' }).click()
     const card = page.getByRole('article', { name: feeName })
     await expect(card).toBeVisible()
-    await card.getByRole('button', { name: `Sửa phí ${feeName}` }).click()
-    await card.getByRole('checkbox', { name: 'Thảo Điền' }).check()
-    await expect(card.getByRole('checkbox', { name: 'Thảo Điền' })).toBeChecked()
-    await expect(card.getByRole('checkbox', { name: 'Thảo Điền' })).toBeEnabled()
+    await card.getByRole('button', { name: 'Áp dụng theo toà' }).click()
+    const dialog = page.getByRole('dialog')
+    await dialog.getByRole('checkbox', { name: 'Thảo Điền' }).check()
+    await expect(dialog.getByRole('checkbox', { name: 'Thảo Điền' })).toBeChecked()
+    await dialog.getByRole('button', { name: 'Áp dụng', exact: true }).click()
+    await expect(dialog).toHaveCount(0)
+    await expect(card).toContainText('Áp dụng 1 toà')
     await page.goto('/contracts/new')
     const room = roomOption(page, tempRoom)
     await expect(room).toHaveCount(1)

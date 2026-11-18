@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { fillMeterReadings, meterValue } from './helpers'
 
 test.skip(!process.env.E2E_BASE_URL, 'Cần E2E_BASE_URL trỏ tới môi trường thử có dữ liệu mẫu')
 async function login(page: Page, name: RegExp) {
@@ -40,6 +41,7 @@ test('tạo hoá đơn hàng loạt → sửa kỳ → duyệt → thu một ph�
 })
 
 test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → check-in → hoá đơn đầu tiên nháp', async ({ page }) => {
+  test.setTimeout(300_000) // luồng dài nhiều trang, môi trường thử chậm
   await login(page, /^Admin/)
   const name = `Khách luồng ${Date.now()}`
   await page.goto('/tenants/new'); await page.waitForLoadState('networkidle')
@@ -51,7 +53,9 @@ test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → 
   await expect(page).toHaveURL(/\/tenants\/[a-f0-9-]+$/)
 
   await page.goto('/contracts/new?kind=deposit'); await page.waitForLoadState('networkidle')
-  const roomId = await page.locator('#room option').filter({ hasText: 'Trống' }).first().getAttribute('value')
+  const roomOption = page.locator('#room option').filter({ hasText: 'Trống' }).first()
+  const roomId = await roomOption.getAttribute('value')
+  const facilityName = (await roomOption.textContent())!.split(' · ')[0].trim()
   expect(roomId).toBeTruthy()
   await page.locator('#room').selectOption(roomId!)
   await page.locator('#tenant').selectOption({ label: new RegExp(name) as never }).catch(async () => {
@@ -65,8 +69,9 @@ test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → 
   await expect(page).toHaveURL(/\/contracts\/[a-f0-9-]+$/)
   await page.getByRole('link', { name: 'Chuyển thành hợp đồng thuê' }).click()
   await page.getByRole('button', { name: '+12 tháng' }).click()
+  await fillMeterReadings(page)
   await page.getByRole('button', { name: 'Tạo hợp đồng thuê' }).click()
-  await expect(page).toHaveURL(/\/contracts\/[a-f0-9-]+$/)
+  await expect(page).toHaveURL(/\/contracts\/[a-f0-9-]+$/, { timeout: 60_000 })
   const leaseUrl = page.url()
 
   await page.getByRole('tab', { name: 'Bàn giao' }).click()
@@ -75,7 +80,16 @@ test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → 
   await page.getByRole('button', { name: 'Hoàn tất' }).click()
   await expect(page.getByText('Đã hoàn tất biên bản')).toBeVisible()
 
-  await page.goto('/invoices?view=draft')
+  // Hợp đồng không tự sinh hoá đơn: tạo hàng loạt cho cơ sở của phòng, kỳ 12/2026 (tháng bắt đầu hợp đồng)
+  await page.goto('/invoices/generate')
+  await page.getByLabel('Cơ sở').selectOption({ label: facilityName })
+  await page.getByLabel('Kỳ (tháng)').fill('2026-12')
+  await page.getByRole('button', { name: 'Xem trước' }).click()
+  const createDrafts = page.getByRole('button', { name: /^Tạo \d+ hoá đơn nháp$/ })
+  await expect(createDrafts).toBeEnabled()
+  await createDrafts.click()
+  await expect(page).toHaveURL(/view=draft/)
+  await page.getByLabel('Số dòng').selectOption('100')
   await expect(page.getByRole('row').filter({ hasText: name })).toBeVisible()
 
   // thanh lý hợp đồng vừa tạo: hoá đơn thanh lý nháp, duyệt xong hợp đồng kết thúc
@@ -83,7 +97,7 @@ test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → 
   await page.getByRole('tab', { name: 'Phụ lục' }).click()
   await page.getByRole('button', { name: 'Thanh lý hợp đồng' }).click()
   await page.getByLabel('Ngày trả phòng').fill('2026-12-10')
-  for (const input of await page.getByText('Chỉ số tại ngày trả phòng').locator('xpath=..').locator('input[type=number]').all()) await input.fill('999999')
+  for (const input of await page.getByText('Chỉ số tại ngày trả phòng').locator('xpath=..').locator('input[type=number]').all()) await input.fill(String(meterValue()))
   await page.getByRole('button', { name: 'Xem trước tiền' }).click()
   await expect(page.getByText(/Hoá đơn thanh lý \(nháp\)/)).toBeVisible()
   await page.getByRole('button', { name: 'Lưu phụ lục' }).click()
