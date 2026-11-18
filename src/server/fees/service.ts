@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, lte } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, lte } from 'drizzle-orm'
 import { z } from 'zod'
 import { feeTypes, feeTypePrices, feeUnits, utilityRates, feeDefaults, facilities } from '@/db'
 import type { DB } from '@/db/client'
@@ -169,6 +169,46 @@ export async function removeFeeTypePrice(db: DB, ctx: AccessContext, input: unkn
   await db.transaction(async (tx) => {
     const [before] = await tx.delete(feeTypePrices).where(and(eq(feeTypePrices.feeTypeId, data.feeTypeId), eq(feeTypePrices.facilityId, data.facilityId))).returning()
     if (before) await recordAudit(tx, ctx, { action: 'delete', entity: 'fee_type_price', entityId: before.id, facilityId: data.facilityId, summary: 'Xoá giá phí theo toà', before })
+  })
+}
+
+const feeFacilitiesInput = z.object({
+  feeTypeId: z.uuid(),
+  items: z.array(z.object({
+    facilityId: z.uuid(),
+    enabled: z.boolean(),
+    /** Bỏ trống = giữ nguyên, null = xoá giá riêng, số = đặt giá riêng. */
+    price: z.number().int().min(0, 'Đơn giá không hợp lệ').max(2147483647, 'Đơn giá không hợp lệ').nullable().optional(),
+  })).max(500),
+})
+
+/** Lưu một lần: toà áp dụng mặc định và giá riêng theo toà của một loại phí (nút Áp dụng trong popup). */
+export async function saveFeeFacilities(db: DB, ctx: AccessContext, input: unknown): Promise<void> {
+  assertCan(ctx, 'settings')
+  const data = parse(feeFacilitiesInput, input)
+  await db.transaction(async (tx) => {
+    const [fee] = await tx.select().from(feeTypes).where(eq(feeTypes.id, data.feeTypeId))
+    if (!fee) throw new NotFoundError()
+    const ids = [...new Set(data.items.map((i) => i.facilityId))]
+    if (ids.length > 0) {
+      const found = await tx.select({ id: facilities.id }).from(facilities).where(inArray(facilities.id, ids))
+      if (found.length !== ids.length) throw new NotFoundError()
+    }
+    if (!fee.isActive && data.items.some((i) => i.enabled)) throw new ValidationError('Loại phí đã lưu trữ')
+    for (const item of data.items) {
+      if (item.enabled) await tx.insert(feeDefaults).values({ facilityId: item.facilityId, feeTypeId: fee.id }).onConflictDoNothing()
+      else await tx.delete(feeDefaults).where(and(eq(feeDefaults.facilityId, item.facilityId), eq(feeDefaults.feeTypeId, fee.id)))
+      await recordAudit(tx, ctx, { action: 'update', entity: 'fee_default', facilityId: item.facilityId, entityId: fee.id, summary: 'Cập nhật phí mặc định', after: { enabled: item.enabled } })
+      if (item.price === undefined) continue
+      if (item.price === null) {
+        const [before] = await tx.delete(feeTypePrices).where(and(eq(feeTypePrices.feeTypeId, fee.id), eq(feeTypePrices.facilityId, item.facilityId))).returning()
+        if (before) await recordAudit(tx, ctx, { action: 'delete', entity: 'fee_type_price', entityId: before.id, facilityId: item.facilityId, summary: 'Xoá giá phí theo toà', before })
+      } else {
+        const [before] = await tx.select().from(feeTypePrices).where(and(eq(feeTypePrices.feeTypeId, fee.id), eq(feeTypePrices.facilityId, item.facilityId)))
+        const [after] = await tx.insert(feeTypePrices).values({ feeTypeId: fee.id, facilityId: item.facilityId, price: item.price }).onConflictDoUpdate({ target: [feeTypePrices.feeTypeId, feeTypePrices.facilityId], set: { price: item.price, updatedAt: new Date() } }).returning()
+        await recordAudit(tx, ctx, { action: before ? 'update' : 'create', entity: 'fee_type_price', entityId: after.id, facilityId: item.facilityId, summary: 'Lưu giá phí theo toà', before, after })
+      }
+    }
   })
 }
 

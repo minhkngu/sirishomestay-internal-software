@@ -2,14 +2,13 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { billingLabel, isPriceInput, quantityLabel } from '@/features/settings/components/fee-options'
+import { billingLabel, feeApplicationSummary, quantityLabel } from '@/features/settings/components/fee-options'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { FeeFacilitiesDialog } from '@/features/settings/components/fee-facilities-dialog'
 import { FeeTypeForm } from '@/features/settings/components/fee-type-form'
 import { Msg, useRun } from '@/features/settings/components/use-run'
 import { formatVND } from '@/domain/money'
-import {
-  archiveFeeTypeAction, removeFeeTypePriceAction, setFeeDefaultAction, setFeeTypePriceAction, updateFeeTypeAction,
-} from '@/server/fees/actions'
+import { archiveFeeTypeAction, updateFeeTypeAction } from '@/server/fees/actions'
 
 type FacilityOption = { id: string; name: string }
 
@@ -28,57 +27,55 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
   const [selected, setSelected] = useState<Record<string, boolean>>(
     Object.fromEntries(facilities.map((f) => [f.id, defaultFacilityIds.includes(f.id)])),
   )
-  const [values, setValues] = useState<Record<string, string>>(
-    Object.fromEntries(facilities.map((f) => [f.id, prices[f.id] == null ? '' : String(prices[f.id])])),
-  )
   const appliedFacilities = facilities.filter((f) => selected[f.id])
-  const defaultNames = appliedFacilities.map((f) => f.name)
   const priceEntries = appliedFacilities
     .filter((f) => prices[f.id] != null)
     .map((f) => [f.name, prices[f.id]] as const)
-
-  function setDefault(facilityId: string, enabled: boolean) {
-    setSelected((previous) => ({ ...previous, [facilityId]: enabled }))
-    run(async () => {
-      const result = await setFeeDefaultAction({ facilityId, feeTypeId: fee.id, enabled })
-      if (!result.ok) setSelected((previous) => ({ ...previous, [facilityId]: !enabled }))
-      return result
-    })
-  }
 
   function archive() {
     if (!window.confirm(`Lưu trữ phí ${fee.name}?`)) return
     run(() => archiveFeeTypeAction(fee.id), 'Đã lưu trữ')
   }
 
-  function savePrice(facilityId: string) {
-    run(() => setFeeTypePriceAction({ feeTypeId: fee.id, facilityId, price: Number(values[facilityId]) }))
-  }
-
-  function removePrice(facilityId: string) {
-    run(async () => {
-      const result = await removeFeeTypePriceAction({ feeTypeId: fee.id, facilityId })
-      if (result.ok) setValues((previous) => ({ ...previous, [facilityId]: '' }))
-      return result
-    }, 'Đã xoá giá riêng')
-  }
-
   return (
     <article aria-label={fee.name} className="space-y-3 rounded-md border bg-card p-3">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <p className="font-medium">{fee.name}</p>
           <p className="text-xs text-muted-foreground">
             {unitName} · {formatVND(fee.defaultPrice)} đ · {billingLabel(fee.billing)}
             {fee.quantityFrom !== 'manual' ? ` · ${quantityLabel(fee.quantityFrom)}` : ''}
           </p>
+          <p className="text-xs text-muted-foreground">
+            {appliedFacilities.length === 0 ? feeApplicationSummary(0, 0) : (
+              <Popover>
+                <PopoverTrigger
+                  openOnHover delay={100}
+                  render={<button type="button" className="cursor-help underline decoration-dotted underline-offset-2 hover:text-foreground" />}
+                >
+                  {feeApplicationSummary(appliedFacilities.length, priceEntries.length)}
+                </PopoverTrigger>
+                <PopoverContent className="w-auto min-w-48 space-y-1 text-xs">
+                  {appliedFacilities.map((f) => (
+                    <p key={f.id} className="flex justify-between gap-4">
+                      <span>{f.name}</span>
+                      <span className="text-muted-foreground">{prices[f.id] != null ? `${formatVND(prices[f.id])} đ` : 'giá chung'}</span>
+                    </p>
+                  ))}
+                </PopoverContent>
+              </Popover>
+            )}
+          </p>
         </div>
-        {!editing && (
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" aria-label={`Sửa phí ${fee.name}`} onClick={() => setEditing(true)}>Sửa</Button>
-            <Button size="sm" variant="outline" disabled={pending} onClick={archive}>Lưu trữ</Button>
-          </div>
-        )}
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <FeeFacilitiesDialog fee={fee} facilities={facilities} selected={selected} prices={prices} onSelectedChange={setSelected} />
+          {!editing && (
+            <>
+              <Button size="sm" variant="outline" aria-label={`Sửa phí ${fee.name}`} onClick={() => setEditing(true)}>Sửa</Button>
+              <Button size="sm" variant="outline" disabled={pending} onClick={archive}>Lưu trữ</Button>
+            </>
+          )}
+        </div>
       </div>
 
       {editing ? (
@@ -97,56 +94,8 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
               return result
             })}
           />
-
-          <div className="space-y-1">
-            <p className="text-sm font-medium">Mặc định cho cơ sở</p>
-            <div>
-              {facilities.map((f) => (
-                <label key={f.id} className="mr-4 inline-flex items-center gap-1 text-sm">
-                  <input type="checkbox" checked={selected[f.id] ?? false} disabled={pending} onChange={(e) => setDefault(f.id, e.target.checked)} />
-                  {f.name}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Giá riêng theo toà</p>
-            {appliedFacilities.length === 0 && (
-              <p className="text-sm text-muted-foreground">Tick cơ sở áp dụng ở trên để đặt giá riêng.</p>
-            )}
-            {appliedFacilities.map((f) => (
-              <div key={f.id} className="flex flex-wrap items-center gap-2">
-                <span className="w-32 text-sm">{f.name}</span>
-                <Input
-                  aria-label={`Giá riêng ${fee.name} tại ${f.name}`}
-                  inputMode="numeric"
-                  className="w-36"
-                  placeholder={`Theo giá chung ${formatVND(fee.defaultPrice)}`}
-                  value={values[f.id] ?? ''}
-                  onChange={(e) => setValues({ ...values, [f.id]: e.target.value })}
-                />
-                <Button
-                  size="sm" variant="outline" disabled={pending || !isPriceInput(values[f.id] ?? '') || Number(values[f.id]) === prices[f.id]}
-                  onClick={() => savePrice(f.id)}
-                >
-                  Lưu
-                </Button>
-                {prices[f.id] != null && (
-                  <Button size="sm" variant="ghost" disabled={pending} onClick={() => removePrice(f.id)}>Xoá</Button>
-                )}
-              </div>
-            ))}
-          </div>
         </div>
-      ) : (
-        <div className="space-y-0.5 text-xs text-muted-foreground">
-          <p>Mặc định: {defaultNames.length > 0 ? defaultNames.join(', ') : 'chưa đặt'}</p>
-          {priceEntries.length > 0 && (
-            <p>Giá riêng: {priceEntries.map(([name, amount]) => `${name} ${formatVND(amount)} đ`).join(' · ')}</p>
-          )}
-        </div>
-      )}
+      ) : null}
 
       {!editing && <Msg error={error} ok={ok} />}
     </article>
