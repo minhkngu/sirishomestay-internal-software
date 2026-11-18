@@ -196,3 +196,26 @@ export async function setFeeDefault(db: DB, ctx: AccessContext, input: { facilit
     await recordAudit(tx, ctx, { action: 'update', entity: 'fee_default', facilityId: data.facilityId, entityId: data.feeTypeId, summary: 'Cập nhật phí mặc định', after: { enabled: data.enabled } })
   })
 }
+
+/**
+ * Nạp sẵn hai loại phí Điện (kWh) và Nước (m³) tính theo đồng hồ. Có thể chạy nhiều lần:
+ * loại phí đã có (theo tên) được giữ nguyên, không ghi đè giá. Giá mặc định lấy từ đơn giá mới nhất
+ * của cơ sở đầu tiên (theo mã) có đơn giá; cơ sở khác giá thì lưu giá riêng theo toà.
+ */
+export async function ensureUtilityFeeTypes(db: DB, ctx: AccessContext): Promise<{ electric: FeeType; water: FeeType }> {
+  assertCan(ctx, 'settings')
+  const facs = await db.select().from(facilities).orderBy(asc(facilities.code))
+  const rates = await db.select().from(utilityRates).orderBy(desc(utilityRates.effectiveFrom))
+  const ensure = async (utility: 'electric' | 'water', name: string, unit: string): Promise<FeeType> => {
+    const [existing] = await db.select().from(feeTypes).where(eq(feeTypes.name, name))
+    if (existing) return existing
+    const latest = new Map<string, number>()
+    for (const r of rates) if (r.utility === utility && !latest.has(r.facilityId)) latest.set(r.facilityId, r.pricePerUnit)
+    const priced = facs.filter((f) => latest.has(f.id))
+    const defaultPrice = priced.length ? latest.get(priced[0].id)! : 0
+    const created = await createFeeType(db, ctx, { name, newUnitName: unit, defaultPrice, billing: 'per_occurrence', quantityFrom: 'meter' })
+    for (const f of priced) if (latest.get(f.id) !== defaultPrice) await setFeeTypePrice(db, ctx, { feeTypeId: created.id, facilityId: f.id, price: latest.get(f.id)! })
+    return created
+  }
+  return { electric: await ensure('electric', 'Điện', 'kWh'), water: await ensure('water', 'Nước', 'm³') }
+}
