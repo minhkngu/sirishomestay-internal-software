@@ -38,7 +38,7 @@ export function AmenitySettings({ amenities }: { amenities: AmenityRow[] }) {
       )}
       <div className="max-w-md space-y-2 rounded-md border bg-card p-3">
         <h3 className="text-sm font-medium">Thêm tiện ích</h3>
-        <Input aria-label="Tên tiện ích mới" placeholder="Ví dụ: Máy lạnh" value={name} onChange={(e) => setName(e.target.value)} />
+        <Input aria-label="Tên tiện ích mới" placeholder="Ví dụ: Ban công, Bếp, Giặt sấy" value={name} onChange={(e) => setName(e.target.value)} />
         <Button disabled={pending} onClick={() => run(async () => { const r = await createAmenityAction({ name }); if (r.ok) setName(''); return r }, 'Đã thêm')}>Thêm</Button>
       </div>
       <Msg error={error} ok={ok} />
