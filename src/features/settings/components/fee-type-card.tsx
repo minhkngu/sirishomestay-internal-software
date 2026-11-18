@@ -38,13 +38,24 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
 
   return (
     <article aria-label={fee.name} className="space-y-3 rounded-md border bg-card p-3">
-      <div>
-        <p className="font-medium">{fee.name}</p>
-        <p className="text-xs text-muted-foreground">
-          {unitName} · {formatVND(fee.defaultPrice)} đ · {billingLabel(fee.billing)}
-          {fee.quantityFrom !== 'manual' ? ` · ${quantityLabel(fee.quantityFrom)}` : ''}
-        </p>
-        <p className="text-xs text-muted-foreground">{feeApplicationSummary(appliedFacilities.length, priceEntries.length)}</p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="font-medium">{fee.name}</p>
+          <p className="text-xs text-muted-foreground">
+            {unitName} · {formatVND(fee.defaultPrice)} đ · {billingLabel(fee.billing)}
+            {fee.quantityFrom !== 'manual' ? ` · ${quantityLabel(fee.quantityFrom)}` : ''}
+          </p>
+          <p className="text-xs text-muted-foreground">{feeApplicationSummary(appliedFacilities.length, priceEntries.length)}</p>
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <FeeFacilitiesDialog fee={fee} facilities={facilities} selected={selected} prices={prices} onSelectedChange={setSelected} />
+          {!editing && (
+            <>
+              <Button size="sm" variant="outline" aria-label={`Sửa phí ${fee.name}`} onClick={() => setEditing(true)}>Sửa</Button>
+              <Button size="sm" variant="outline" disabled={pending} onClick={archive}>Lưu trữ</Button>
+            </>
+          )}
+        </div>
       </div>
 
       {editing ? (
@@ -65,16 +76,6 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
           />
         </div>
       ) : null}
-
-      <div className="flex flex-wrap gap-2">
-        <FeeFacilitiesDialog fee={fee} facilities={facilities} selected={selected} prices={prices} onSelectedChange={setSelected} />
-        {!editing && (
-          <>
-            <Button size="sm" variant="outline" aria-label={`Sửa phí ${fee.name}`} onClick={() => setEditing(true)}>Sửa</Button>
-            <Button size="sm" variant="outline" disabled={pending} onClick={archive}>Lưu trữ</Button>
-          </>
-        )}
-      </div>
 
       {!editing && <Msg error={error} ok={ok} />}
     </article>
