@@ -202,6 +202,7 @@ test('phí mặc định theo cơ sở tự thêm và có thể xóa hoặc thê
     await page.getByRole('button', { name: 'Tạo loại phí' }).click()
     const card = page.getByRole('article', { name: feeName })
     await expect(card).toBeVisible()
+    await card.getByRole('button', { name: `Sửa phí ${feeName}` }).click()
     await card.getByRole('checkbox', { name: 'Thảo Điền' }).check()
     await expect(card.getByRole('checkbox', { name: 'Thảo Điền' })).toBeChecked()
     await expect(card.getByRole('checkbox', { name: 'Thảo Điền' })).toBeEnabled()

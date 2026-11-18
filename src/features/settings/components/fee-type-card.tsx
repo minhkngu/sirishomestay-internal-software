@@ -31,6 +31,8 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
   const [values, setValues] = useState<Record<string, string>>(
     Object.fromEntries(facilities.map((f) => [f.id, prices[f.id] == null ? '' : String(prices[f.id])])),
   )
+  const defaultNames = facilities.filter((f) => selected[f.id]).map((f) => f.name)
+  const priceEntries = facilities.filter((f) => prices[f.id] != null).map((f) => [f.name, prices[f.id]] as const)
 
   function setDefault(facilityId: string, enabled: boolean) {
     setSelected((previous) => ({ ...previous, [facilityId]: enabled }))
@@ -77,22 +79,22 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
       </div>
 
       {editing ? (
-        <FeeTypeForm
-          units={units}
-          initial={fee}
-          allowNewUnit={false}
-          pending={pending}
-          error={error}
-          submitLabel="Lưu"
-          onCancel={() => setEditing(false)}
-          onSubmit={(values) => run(async () => {
-            const result = await updateFeeTypeAction(fee.id, values)
-            if (result.ok) setEditing(false)
-            return result
-          })}
-        />
-      ) : (
-        <>
+        <div className="space-y-3">
+          <FeeTypeForm
+            units={units}
+            initial={fee}
+            allowNewUnit={false}
+            pending={pending}
+            error={error}
+            submitLabel="Lưu"
+            onCancel={() => setEditing(false)}
+            onSubmit={(values) => run(async () => {
+              const result = await updateFeeTypeAction(fee.id, values)
+              if (result.ok) setEditing(false)
+              return result
+            })}
+          />
+
           <div className="space-y-1">
             <p className="text-sm font-medium">Mặc định cho cơ sở</p>
             <div>
@@ -130,7 +132,14 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
               </div>
             ))}
           </div>
-        </>
+        </div>
+      ) : (
+        <div className="space-y-0.5 text-xs text-muted-foreground">
+          <p>Mặc định: {defaultNames.length > 0 ? defaultNames.join(', ') : 'chưa đặt'}</p>
+          {priceEntries.length > 0 && (
+            <p>Giá riêng: {priceEntries.map(([name, amount]) => `${name} ${formatVND(amount)} đ`).join(' · ')}</p>
+          )}
+        </div>
       )}
 
       {!editing && <Msg error={error} ok={ok} />}

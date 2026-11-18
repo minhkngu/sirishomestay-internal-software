@@ -33,9 +33,29 @@ export function FeeSettings({ facilities, units, feeTypes, prices, defaults }: P
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-semibold">Phí dịch vụ</h2>
-        <Button type="button" variant="outline" aria-expanded={adding} onClick={() => setAdding(!adding)}>+ Thêm loại phí</Button>
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="font-semibold">Phí dịch vụ</h2>
+          <span className="text-sm text-muted-foreground">Đơn vị tính:</span>
+          <div className="flex flex-wrap items-center gap-1">
+            {units.map((u) => <span key={u.id} className="rounded-full border px-2 py-0.5 text-xs">{u.name}</span>)}
+            {units.length === 0 && <span className="text-sm text-muted-foreground">chưa có</span>}
+          </div>
+          <Button type="button" variant="ghost" size="sm" aria-expanded={showUnit} onClick={() => setShowUnit(!showUnit)}>+ Thêm đơn vị</Button>
+          <Button type="button" variant="outline" className="ml-auto" aria-expanded={adding} onClick={() => setAdding(!adding)}>+ Thêm loại phí</Button>
+        </div>
+        {showUnit && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Input placeholder="Tên đơn vị mới" value={unitName} onChange={(e) => setUnitName(e.target.value)} />
+            <Button type="button" size="sm" disabled={unitRun.pending || unitName.trim() === ''}
+              onClick={() => unitRun.run(async () => {
+                const result = await createFeeUnitAction({ name: unitName })
+                if (result.ok) setUnitName('')
+                return result
+              }, 'Đã thêm đơn vị')}>Lưu đơn vị</Button>
+            <Msg error={unitRun.error} ok={unitRun.ok} />
+          </div>
+        )}
       </div>
 
       {adding && (
@@ -74,29 +94,6 @@ export function FeeSettings({ facilities, units, feeTypes, prices, defaults }: P
           </div>
         </details>
       )}
-
-      <section className="space-y-2 rounded-md border bg-card p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-medium">Đơn vị tính</h3>
-          <Button type="button" variant="outline" size="sm" aria-expanded={showUnit} onClick={() => setShowUnit(!showUnit)}>+ Thêm đơn vị</Button>
-        </div>
-        <div className="flex flex-wrap gap-1">
-          {units.map((u) => <span key={u.id} className="rounded-full border px-2 py-0.5 text-xs">{u.name}</span>)}
-          {units.length === 0 && <span className="text-sm text-muted-foreground">Chưa có đơn vị.</span>}
-        </div>
-        {showUnit && (
-          <div className="flex flex-wrap items-center gap-2">
-            <Input placeholder="Tên đơn vị mới" value={unitName} onChange={(e) => setUnitName(e.target.value)} />
-            <Button type="button" size="sm" disabled={unitRun.pending || unitName.trim() === ''}
-              onClick={() => unitRun.run(async () => {
-                const result = await createFeeUnitAction({ name: unitName })
-                if (result.ok) setUnitName('')
-                return result
-              }, 'Đã thêm đơn vị')}>Lưu đơn vị</Button>
-            <Msg error={unitRun.error} ok={unitRun.ok} />
-          </div>
-        )}
-      </section>
     </div>
   )
 }
