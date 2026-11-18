@@ -103,6 +103,17 @@ export async function archiveFeeType(db: DB, ctx: AccessContext, id: string): Pr
   })
 }
 
+/** Mở lại loại phí đã lưu trữ; phí mặc định và giá riêng vẫn còn nguyên trong DB. */
+export async function restoreFeeType(db: DB, ctx: AccessContext, id: string): Promise<void> {
+  assertCan(ctx, 'settings')
+  await db.transaction(async (tx) => {
+    const [before] = await tx.select().from(feeTypes).where(eq(feeTypes.id, id))
+    if (!before) throw new NotFoundError()
+    await tx.update(feeTypes).set({ isActive: true, updatedAt: new Date() }).where(eq(feeTypes.id, id))
+    await recordAudit(tx, ctx, { action: 'update', entity: 'fee_type', entityId: id, summary: `Khôi phục loại phí ${before.name}`, before: { isActive: false }, after: { isActive: true } })
+  })
+}
+
 /** Đơn giá điện nước của một cơ sở (mới nhất trước); người ngoài phạm vi cơ sở → NotFoundError. */
 export async function listRates(db: DB, ctx: AccessContext, facilityId: string): Promise<UtilityRateRow[]> {
   await getFacility(db, ctx, facilityId)

@@ -2,7 +2,7 @@ import { eq, sql } from 'drizzle-orm'
 import { describe, it, expect, beforeEach } from 'vitest'
 import { facilities, feeTypes, feeTypePrices, feeUnits } from '@/db'
 import {
-  setFeeDefault, listFeeDefaults, setFeeTypePrice, removeFeeTypePrice, listFeeTypePrices, createFeeUnit, listFeeUnits, createFeeType, updateFeeType, archiveFeeType, listFeeTypes, createRate, listRates,
+  setFeeDefault, listFeeDefaults, setFeeTypePrice, removeFeeTypePrice, listFeeTypePrices, createFeeUnit, listFeeUnits, createFeeType, updateFeeType, archiveFeeType, restoreFeeType, listFeeTypes, createRate, listRates,
 } from '@/server/fees/service'
 import { ForbiddenError, NotFoundError } from '@/domain/errors'
 import type { AccessContext, Permission } from '@/domain/access'
@@ -103,6 +103,27 @@ describe('fees & rates', () => {
     const base = { name: 'X', defaultPrice: 1, billing: 'monthly_fixed', quantityFrom: 'manual' } as const
     await expect(createFeeType(db, admin, { ...base, unitId: unit.id, newUnitName: 'Y' })).rejects.toThrow('Chọn đơn vị hoặc nhập đơn vị mới')
     await expect(createFeeType(db, admin, base)).rejects.toThrow('Chọn đơn vị hoặc nhập đơn vị mới')
+    expect(await listFeeTypes(db, admin)).toHaveLength(0)
+  })
+
+  it('khôi phục loại phí đã lưu trữ, giữ mặc định và giá riêng', async () => {
+    const unit = await createFeeUnit(db, admin, { name: 'phòng' })
+    const fee = await createFeeType(db, admin, { name: 'Rác', unitId: unit.id, defaultPrice: 1000, billing: 'monthly_fixed', quantityFrom: 'room' })
+    await setFeeDefault(db, admin, { facilityId: fa, feeTypeId: fee.id, enabled: true })
+    await setFeeTypePrice(db, admin, { feeTypeId: fee.id, facilityId: fa, price: 2000 })
+    await archiveFeeType(db, admin, fee.id)
+    await restoreFeeType(db, admin, fee.id)
+    expect((await listFeeTypes(db, admin)).map((f) => f.id)).toContain(fee.id)
+    expect((await listFeeDefaults(db, admin))[fa]).toContain(fee.id)
+    expect(await listFeeTypePrices(db, admin)).toEqual({ [fee.id]: { [fa]: 2000 } })
+  })
+
+  it('chỉ nhóm settings khôi phục được; phí không tồn tại báo không thấy', async () => {
+    const unit = await createFeeUnit(db, admin, { name: 'lần' })
+    const fee = await createFeeType(db, admin, { name: 'Giặt', unitId: unit.id, defaultPrice: 0, billing: 'per_occurrence', quantityFrom: 'manual' })
+    await archiveFeeType(db, admin, fee.id)
+    await expect(restoreFeeType(db, ctxOf(['billing'], [fa]), fee.id)).rejects.toThrow(ForbiddenError)
+    await expect(restoreFeeType(db, admin, crypto.randomUUID())).rejects.toThrow(NotFoundError)
     expect(await listFeeTypes(db, admin)).toHaveLength(0)
   })
 
