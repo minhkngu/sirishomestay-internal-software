@@ -38,8 +38,8 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
 
   return (
     <article aria-label={fee.name} className="space-y-3 rounded-md border bg-card p-3">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
           <p className="font-medium">{fee.name}</p>
           <p className="text-xs text-muted-foreground">
             {unitName} · {formatVND(fee.defaultPrice)} đ · {billingLabel(fee.billing)}
@@ -47,7 +47,7 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
           </p>
         </div>
         {!editing && (
-          <div className="flex gap-2">
+          <div className="flex shrink-0 gap-2">
             <Button size="sm" variant="outline" aria-label={`Sửa phí ${fee.name}`} onClick={() => setEditing(true)}>Sửa</Button>
             <Button size="sm" variant="outline" disabled={pending} onClick={archive}>Lưu trữ</Button>
           </div>
@@ -73,7 +73,7 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
         <p>{feeApplicationSummary(appliedFacilities.length, priceEntries.length)}</p>
         <FeeFacilitiesDialog fee={fee} facilities={facilities} selected={selected} prices={prices} onSelectedChange={setSelected} />
       </div>
