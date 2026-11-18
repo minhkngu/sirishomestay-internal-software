@@ -144,6 +144,26 @@ describe('contracts', () => {
     expect((await db.select().from(handoverItems).where(eq(handoverItems.handoverId, h.id))).map(x => x.assetId)).toEqual([asset.id])
   })
 
+  it('lưu tình trạng từng tài sản vào biên bản và trả ID mục để gắn ảnh', async () => {
+    const [asset] = await db.insert(assets).values({ code: 'DESK', name: 'Bàn', condition: 'Tốt', facilityId: fa, locationKind: 'room', locationId: r301 }).returning()
+    const handover = { expectedRoomAssetIds: [asset.id], addAssetIds: [], newAssets: [{ code: 'CHAIR', name: 'Ghế', model: '', category: '', value: 0, condition: 'Tốt' }], remove: [], conditions: [{ assetCode: 'DESK', condition: 'Trầy nhẹ' }, { assetCode: 'CHAIR', condition: 'Mới' }] }
+    const result = await createLease(db, admin, leaseInput({ handover }))
+    const [h] = await db.select().from(handovers).where(eq(handovers.leaseId, result.lease.id))
+    const items = await db.select().from(handoverItems).where(eq(handoverItems.handoverId, h.id))
+    const desk = items.find(i => i.assetId === asset.id)!
+    expect(desk.condition).toBe('Trầy nhẹ')
+    expect(result.handoverItems).toContainEqual({ assetCode: 'DESK', itemId: desk.id })
+    const chair = result.handoverItems.find(i => i.assetCode === 'CHAIR')!
+    expect(items.find(i => i.id === chair.itemId)?.condition).toBe('Mới')
+    expect((await db.select().from(assets).where(eq(assets.id, asset.id)))[0].condition).toBe('Tốt')
+  })
+
+  it('từ chối tình trạng cho tài sản không thuộc biên bản và hoàn tác hợp đồng', async () => {
+    const handover = { expectedRoomAssetIds: [], addAssetIds: [], newAssets: [], remove: [], conditions: [{ assetCode: 'NOT-FOUND', condition: 'Tốt' }] }
+    await expect(createLease(db, lan(), leaseInput({ handover }))).rejects.toThrow(ValidationError)
+    expect(await db.select().from(leases)).toHaveLength(0)
+  })
+
   it('nhân viên hợp đồng không có quyền tài sản vẫn tạo được biên bản không thay đổi tài sản', async () => {
     const [asset] = await db.insert(assets).values({ code: 'KEEP', name: 'Bàn', facilityId: fa, locationKind: 'room', locationId: r301 }).returning()
     const handover = { expectedRoomAssetIds: [asset.id], addAssetIds: [], newAssets: [], remove: [] }

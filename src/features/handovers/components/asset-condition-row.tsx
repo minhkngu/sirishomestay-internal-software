@@ -19,6 +19,7 @@ export function AssetConditionRow({ item, readOnly, checkInCondition, onChange, 
         <div><span className="font-medium">{item.assetName}</span> <span className="text-xs text-muted-foreground">({item.assetCode} · {formatVND(item.assetValue)})</span></div>
         {checkInCondition && <span className="text-xs text-muted-foreground">Lúc check-in: {checkInCondition}</span>}
       </div>
+      <p className="text-sm">Tình trạng đang ghi: {item.condition}</p>
       <div className="flex flex-wrap gap-2" role="group" aria-label={`Tình trạng ${item.assetCode}`}>
         {CONDITIONS.map((c) => (
           <button key={c} type="button" disabled={readOnly || item.missing} onClick={() => pick(c)}

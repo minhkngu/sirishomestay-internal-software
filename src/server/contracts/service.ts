@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, like, lte, ne } from 'drizzle-orm'
 import {
-  assets, depositContracts, depositEntries, docTemplates, facilities, feeTypes, feeUnits, files, invoiceLines, invoiceTemplates, invoices, leaseFees, leaseFeeSnapshots, leaseOccupants, leases, rooms, tenants,
+  assets, depositContracts, depositEntries, docTemplates, facilities, feeTypes, feeUnits, files, handoverItems, invoiceLines, invoiceTemplates, invoices, leaseFees, leaseFeeSnapshots, leaseOccupants, leases, rooms, tenants,
 } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, facilityScope, type AccessContext } from '@/domain/access'
@@ -145,6 +145,7 @@ export type LeaseInput = {
     expectedAddedLocations?: Array<{ assetId: string; kind: string; id: string }>
     newAssets: Array<{ code: string; name: string; model: string; category: string; value: number; condition: string }>
     remove: Array<{ assetId: string; action: 'warehouse' | 'dispose' | 'unassigned' }>
+    conditions?: Array<{ assetCode: string; condition: string }>
   }
   feeModel?: 'legacy' | 'snapshot'
   fees?: LegacyFeeInput[] | LeaseFeeInput[]
@@ -154,7 +155,7 @@ export type LeaseInput = {
   billWaterByMeter?: boolean
 }
 
-export type LeaseCreated = { lease: Lease; firstInvoiceLines: InvoiceLineInput[]; warnings: string[] }
+export type LeaseCreated = { lease: Lease; firstInvoiceLines: InvoiceLineInput[]; warnings: string[]; handoverItems: Array<{ assetCode: string; itemId: string }> }
 
 async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDepositId: string | null): Promise<LeaseCreated> {
   const room = await loadRoom(tx, ctx, input.roomId)
@@ -227,6 +228,7 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
     await tx.insert(depositEntries).values({ leaseId: lease.id, date: input.startDate, type: 'collect', amount: missing, status: 'pending', note: 'Cọc còn thiếu theo hợp đồng thuê' })
   }
 
+  let createdHandoverItems: Array<{ assetCode: string; itemId: string }> = []
   if (input.handover) {
     const h = input.handover
     if (h.addAssetIds.length || h.newAssets.length || h.remove.length) assertCan(ctx, 'assets', room.facilityId)
@@ -249,7 +251,15 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
       else throw new ValidationError('Cách xử lý tài sản không hợp lệ')
     }
     for (const asset of h.newAssets) await createAssetInTransaction(tx, ctx, { ...asset, facilityId: room.facilityId, location: { kind: 'room', id: room.id } })
-    await startHandoverInTransaction(tx, ctx, lease.id, 'check_in')
+    const handover = await startHandoverInTransaction(tx, ctx, lease.id, 'check_in')
+    createdHandoverItems = await tx.select({ assetCode: assets.code, itemId: handoverItems.id }).from(handoverItems).innerJoin(assets, eq(assets.id, handoverItems.assetId)).where(eq(handoverItems.handoverId, handover.id))
+    const conditions = h.conditions ?? []
+    if (!Array.isArray(conditions) || conditions.some(c => !c || typeof c.assetCode !== 'string') || new Set(conditions.map(c => c.assetCode)).size !== conditions.length) throw new ValidationError('Tình trạng tài sản không hợp lệ')
+    for (const entry of conditions) {
+      const item = createdHandoverItems.find(x => x.assetCode === entry.assetCode)
+      if (!item || typeof entry.condition !== 'string' || !entry.condition.trim() || entry.condition.trim().length > 300) throw new ValidationError('Tình trạng tài sản không hợp lệ hoặc không thuộc biên bản')
+      await tx.update(handoverItems).set({ condition: entry.condition.trim() }).where(eq(handoverItems.id, item.itemId))
+    }
   }
 
   // hoá đơn đầu tiên (nháp) — bảng hoá đơn nối ở Task 14, trước đó trả về dòng nháp
@@ -272,7 +282,7 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
   await recordAudit(tx, ctx, { action: 'create', entity: 'invoice', entityId: firstInvoice.id, facilityId: room.facilityId, summary: `Tạo hoá đơn đầu tiên ${firstInvoice.code}`, after: firstInvoice })
 
   await recordAudit(tx, ctx, { action: 'create', entity: 'lease', entityId: lease.id, facilityId: room.facilityId, summary: `Tạo hợp đồng thuê ${lease.code}`, after: lease })
-  return { lease, firstInvoiceLines, warnings: [] }
+  return { lease, firstInvoiceLines, warnings: [], handoverItems: createdHandoverItems }
 }
 
 export async function createLease(db: DB, ctx: AccessContext, input: LeaseInput): Promise<LeaseCreated> {

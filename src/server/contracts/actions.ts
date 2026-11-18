@@ -22,11 +22,11 @@ export async function cancelDepositContractAction(id: string, outcome: 'forfeit'
 }
 export async function createLeaseAction(input: LeaseInput) {
   const ctx = await getAccessContext()
-  return toActionResult(async () => { const r = await createLease(db, ctx, input); refresh(); return { id: r.lease.id, code: r.lease.code } })
+  return toActionResult(async () => { const r = await createLease(db, ctx, input); refresh(); return { id: r.lease.id, code: r.lease.code, handoverItems: r.handoverItems } })
 }
 export async function convertDepositToLeaseAction(depositId: string, input: LeaseInput) {
   const ctx = await getAccessContext()
-  return toActionResult(async () => { const r = await convertDepositToLease(db, ctx, depositId, input); refresh(); return { id: r.lease.id, code: r.lease.code } })
+  return toActionResult(async () => { const r = await convertDepositToLease(db, ctx, depositId, input); refresh(); return { id: r.lease.id, code: r.lease.code, handoverItems: r.handoverItems } })
 }
 export async function setSignStatusAction(kind: 'lease' | 'deposit', id: string, status: SignStatus, signedFileId?: string) {
   const ctx = await getAccessContext()

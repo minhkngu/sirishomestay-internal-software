@@ -10,7 +10,7 @@ import { resolveFeePrice } from '@/domain/fee-price'
 import { formatVND } from '@/domain/money'
 import { convertDepositToLeaseAction, createLeaseAction } from '@/server/contracts/actions'
 import { replaceSigner } from '../contract-occupants'
-import { uploadLeasePhotos } from '../lease-photo-retry'
+import { assetEntry, buildHandoverPhotoTasks, uploadLeasePhotos, type PendingPhoto } from '../lease-photo-retry'
 import { uploadOne } from '@/components/file-upload'
 import { LeaseFees, type FeeOption, type FeeDraft, type RoomFeeMeter } from './lease-fees'
 import { LeaseAssets, emptyChanges, type AssetOption } from './lease-assets'
@@ -35,12 +35,15 @@ export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAsse
   const [invoiceTemplateId, setInvoiceTemplateId] = useState('')
   const [changes, setChanges] = useState(emptyChanges)
   const [photos, setPhotos] = useState<File[]>([])
-  const [failedPhotos, setFailedPhotos] = useState<File[]>([])
+  const [assetPhotos, setAssetPhotos] = useState<Record<string, File[]>>({})
+  const [assetConditions, setAssetConditions] = useState<Record<string, string>>({})
+  const [failedPhotos, setFailedPhotos] = useState<PendingPhoto<File>[]>([])
   const [createdId, setCreatedId] = useState<string | null>(null)
   const submitting = useRef(false)
   const [roomId, setRoomId] = useState(initial.roomId ?? '')
   const [tenantId, setTenantId] = useState(initial.tenantId ?? '')
   const [additionalOccupantIds, setAdditionalOccupantIds] = useState<string[]>([])
+  const [addingOccupant, setAddingOccupant] = useState(false)
   const occupantIds = replaceSigner(tenantId, additionalOccupantIds)
   const [startDate, setStartDate] = useState(initial.startDate ?? '')
   const [endDate, setEndDate] = useState('')
@@ -56,15 +59,22 @@ export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAsse
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const fieldError = (name: string) => fieldErrors[name] ? <p role="alert" className="text-sm text-destructive">{fieldErrors[name]}</p> : null
 
-  const individuals = tenants.filter((t) => t.kind !== 'company' && t.id !== tenantId)
+  const individuals = tenants.filter((t) => t.kind !== 'company' && !occupantIds.includes(t.id))
   const tenant = tenants.find((t) => t.id === tenantId)
+  const handoverAssets = [
+    ...assets.filter(a => a.locationKind === 'room' && a.locationId === roomId && !changes.remove.some(r => r.assetId === a.id)),
+    ...assets.filter(a => changes.addAssetIds.includes(a.id)),
+    ...changes.newAssets,
+  ]
   const monthlyFixed = fees.filter(f => f.quantitySource === 'room' || f.quantitySource === 'occupants' || f.legacyFixed).reduce((sum, f) => sum + (f.quantitySource === 'occupants' ? occupantIds.length : f.legacyFixed ? Number(f.quantity) : 1) * (Number(f.price) || 0), 0)
 
   function pickTenant(id: string) { setTenantId(id) }
-  const toggleOccupant = (id: string) => setAdditionalOccupantIds(previous => previous.includes(id) ? previous.filter(x => x !== id) : [...previous, id])
 
-  async function uploadPhotos(id: string, list: File[]) {
-    const failed = await uploadLeasePhotos(id, list, (photo, leaseId) => uploadOne(photo, 'lease_photo', leaseId))
+  async function uploadPhotos(id: string, list: PendingPhoto<File>[]) {
+    const failed = await uploadLeasePhotos(id, list, photo => {
+      if (!photo.ownerId) throw new Error('Không tìm thấy tài sản bàn giao')
+      return uploadOne(photo.file, photo.ownerType, photo.ownerId)
+    })
     setFailedPhotos(failed)
     if (failed.length === 0) router.push(`/contracts/${id}`)
   }
@@ -81,6 +91,7 @@ export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAsse
     if (!rent || !Number.isSafeInteger(Number(rent)) || Number(rent) < 0) errors.monthlyRent = 'Nhập giá thuê hợp lệ'
     if (!deposit || !Number.isSafeInteger(Number(deposit)) || Number(deposit) < 0) errors.depositAmount = 'Nhập tiền cọc hợp lệ'
     if (!Number.isSafeInteger(Number(received)) || Number(received) < (initial.receivedDeposit ?? 0) || Number(received) > Number(deposit)) errors.receivedDeposit = 'Tiền thực nhận phải từ cọc kế thừa đến tiền cọc'
+    if (handoverAssets.some(asset => !(assetEntry(assetConditions, asset.code) ?? asset.condition).trim())) errors.handover = 'Nhập tình trạng cho từng tài sản bàn giao'
     for (const fee of fees) {
       const hasMeter = fee.feeTypeId ? roomMeters.some(m => m.roomId === roomId && m.feeTypeId === fee.feeTypeId) : !!fee.existingMeterId
       if (!Number.isSafeInteger(Number(fee.price)) || fee.price.trim() === '' || Number(fee.price) < 0 || (fee.legacyFixed && (!Number.isSafeInteger(Number(fee.quantity)) || Number(fee.quantity) < 0))) errors.fees = `Kiểm tra đơn giá hoặc số lượng phí ${fee.name}`
@@ -91,7 +102,7 @@ export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAsse
     submitting.current = true
     const input = {
       roomId, tenantId, occupantIds, startDate, endDate, monthlyRent: Number(rent), depositAmount: Number(deposit), receivedDeposit: Number(received), note, contractTemplateId: contractTemplateId || null, invoiceTemplateId: invoiceTemplateId || null,
-      handover: { expectedRoomAssetIds: assets.filter(a => a.locationKind === 'room' && a.locationId === roomId).map(a => a.id), expectedAddedLocations: changes.addAssetIds.map(id => { const a = assets.find(x => x.id === id)!; return { assetId: id, kind: a.locationKind, id: a.locationId } }), ...changes },
+      handover: { expectedRoomAssetIds: assets.filter(a => a.locationKind === 'room' && a.locationId === roomId).map(a => a.id), expectedAddedLocations: changes.addAssetIds.map(id => { const a = assets.find(x => x.id === id)!; return { assetId: id, kind: a.locationKind, id: a.locationId } }), ...changes, conditions: handoverAssets.map(asset => ({ assetCode: asset.code, condition: assetEntry(assetConditions, asset.code) ?? asset.condition })) },
       feeModel: 'snapshot' as const,
       fees: fees.map(f => ({ feeTypeId: f.feeTypeId, name: f.name, unit: f.unit, quantitySource: f.quantitySource, unitPrice: Number(f.price), quantity: Number(f.quantity), initialReading: f.initialReading.trim() === '' ? undefined : Number(f.initialReading), existingMeterId: f.existingMeterId })),
       proration: overrideProration || null, billingCycleMonths: Number(cycle) || 1,
@@ -102,7 +113,8 @@ export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAsse
       const r = initial.depositId ? await convertDepositToLeaseAction(initial.depositId, input as never) : await createLeaseAction(input as never)
       if (!r.ok) { submitting.current = false; setError(r.error); setFieldErrors(r.fieldErrors ?? {}); return }
       setCreatedId(r.data.id)
-      await uploadPhotos(r.data.id, photos)
+      const pendingPhotos = buildHandoverPhotoTasks(r.data.id, photos, handoverAssets.map(asset => asset.code), assetPhotos, r.data.handoverItems)
+      await uploadPhotos(r.data.id, pendingPhotos)
       } catch { submitting.current = false; setError('Không thể tạo hợp đồng. Vui lòng thử lại.') }
     })
   }
@@ -116,15 +128,17 @@ export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAsse
       <h2 className="font-semibold">Bên thuê & người ở</h2>
         <div className="space-y-4">
           <div className="space-y-1"><Label htmlFor="room">Phòng</Label>
-            <select id="room" value={roomId} disabled={!!initial.depositId} onChange={(e) => { const oldFacility = rooms.find(r => r.id === roomId)?.facilityId; setRoomId(e.target.value); setChanges(emptyChanges()); const room = rooms.find((r) => r.id === e.target.value); if (room?.facilityId !== oldFacility) setFees(defaultFees(room?.facilityId)); else setFees(previous => previous.map(f => f.quantitySource === 'meter' ? { ...f, initialReading: '', existingMeterId: undefined } : f)); const p = room?.listPrice; if (p && !rent) setRent(String(p)) }} className="h-8 w-full rounded-lg border px-2 text-sm">
+            <select id="room" value={roomId} disabled={!!initial.depositId} onChange={(e) => { const oldFacility = rooms.find(r => r.id === roomId)?.facilityId; setRoomId(e.target.value); setChanges(emptyChanges()); setAssetConditions({}); setAssetPhotos({}); const room = rooms.find((r) => r.id === e.target.value); if (room?.facilityId !== oldFacility) setFees(defaultFees(room?.facilityId)); else setFees(previous => previous.map(f => f.quantitySource === 'meter' ? { ...f, initialReading: '', existingMeterId: undefined } : f)); const p = room?.listPrice; if (p && !rent) setRent(String(p)) }} className="h-8 w-full rounded-lg border px-2 text-sm">
               <option value="">— chọn phòng —</option>{rooms.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}</select>{fieldError('roomId')}</div>
           <div className="space-y-1"><Label htmlFor="tenant">Bên thuê (khách hoặc công ty)</Label>
             <select id="tenant" value={tenantId} onChange={(e) => pickTenant(e.target.value)} className="h-8 w-full rounded-lg border px-2 text-sm">
               <option value="">— chọn —</option>{tenants.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>{fieldError('tenantId')}</div>
           <fieldset className="space-y-1"><legend className="text-sm font-medium">Người ở trong phòng ({occupantIds.length})</legend>
-            <div className="grid max-h-56 gap-1 overflow-auto rounded-md border bg-card p-2 sm:grid-cols-2">
-              {tenant && <p className="text-sm">{tenant.name} (bên ký)</p>}
-              {individuals.map((t) => <label key={t.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={occupantIds.includes(t.id)} onChange={() => toggleOccupant(t.id)} /> {t.name}</label>)}
+            <div className="space-y-2 rounded-md border bg-card p-3">
+              {tenant ? <p className="text-sm">{tenant.name} (bên ký)</p> : <p className="text-sm text-muted-foreground">Chọn bên thuê để thêm người ký.</p>}
+              {occupantIds.filter(id => id !== tenantId).map(id => <div key={id} className="flex items-center justify-between gap-2 text-sm"><span>{tenants.find(t => t.id === id)?.name}</span><button type="button" aria-label={`Bỏ người ở ${tenants.find(t => t.id === id)?.name ?? ''}`} onClick={() => setAdditionalOccupantIds(previous => previous.filter(value => value !== id))}>×</button></div>)}
+              <button type="button" aria-label="Thêm người ở cùng" aria-expanded={addingOccupant} className="rounded border px-2 text-sm" onClick={() => setAddingOccupant(!addingOccupant)}>+</button>
+              {addingOccupant && <select aria-label="Chọn người ở cùng" className="block h-9 w-full rounded border px-2 text-sm" value="" onChange={e => { const id = e.target.value; if (id) setAdditionalOccupantIds(previous => [...previous, id]); setAddingOccupant(false) }}><option value="">— chọn người ở cùng —</option>{individuals.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>}
             </div>{fieldError('occupantIds')}</fieldset>
         </div>
       <h2 className="font-semibold">Thời hạn & giá</h2>
@@ -151,7 +165,8 @@ export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAsse
               {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n} tháng</option>)}</select></div>
         </div>
       <div><Label htmlFor="note">Ghi chú</Label><textarea id="note" className="w-full rounded border p-2" value={note} onChange={e => setNote(e.target.value)} /></div>
-      {canManageAssets ? <LeaseAssets key={roomId} assets={assets} roomId={roomId} facilityId={rooms.find(r => r.id === roomId)?.facilityId} changes={changes} onChange={setChanges} /> : <section className="rounded-lg border p-4"><h2 className="font-semibold">Biên bản bàn giao</h2><p className="text-sm">Tài sản trong phòng: {assets.filter(a => a.locationKind === 'room' && a.locationId === roomId).map(a => [a.name, a.model].filter(Boolean).join(' ')).join(', ') || 'không có'}</p></section>}
+      <LeaseAssets key={roomId} assets={assets} roomId={roomId} facilityId={rooms.find(r => r.id === roomId)?.facilityId} canManageAssets={canManageAssets} changes={changes} onChange={setChanges} conditions={assetConditions} onCondition={(code, value) => setAssetConditions(previous => ({ ...previous, [code]: value }))} photos={assetPhotos} onPhotos={(code, files) => setAssetPhotos(previous => ({ ...previous, [code]: files }))} onForget={code => { setAssetConditions(previous => { const next = { ...previous }; delete next[code]; return next }); setAssetPhotos(previous => { const next = { ...previous }; delete next[code]; return next }) }} />
+      {fieldError('handover')}
       <div><Label htmlFor="photos">Ảnh hợp đồng</Label><Input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e => setPhotos(Array.from(e.target.files ?? []))} /></div>
       <h2 className="font-semibold">Tóm tắt</h2>
 
@@ -166,7 +181,7 @@ export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAsse
         </dl>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
-      {createdId && failedPhotos.length > 0 ? <div className="space-y-2"><p className="text-destructive">Hợp đồng đã tạo. Chưa tải được: {failedPhotos.map(f => f.name).join(', ')}</p><Button disabled={pending} onClick={() => start(async () => uploadPhotos(createdId, failedPhotos))}>Thử tải lại ảnh lỗi</Button> <Button variant="outline" onClick={() => router.push(`/contracts/${createdId}`)}>Tiếp tục đến hợp đồng</Button></div> : <Button disabled={pending || !!createdId} onClick={submit}>Tạo hợp đồng thuê</Button>}
+      {createdId && failedPhotos.length > 0 ? <div className="space-y-2"><p className="text-destructive">Hợp đồng đã tạo. Chưa tải được: {failedPhotos.map(f => f.file.name).join(', ')}</p><Button disabled={pending} onClick={() => start(async () => uploadPhotos(createdId, failedPhotos))}>Thử tải lại ảnh lỗi</Button> <Button variant="outline" onClick={() => router.push(`/contracts/${createdId}`)}>Tiếp tục đến hợp đồng</Button></div> : <Button disabled={pending || !!createdId} onClick={submit}>Tạo hợp đồng thuê</Button>}
     </div>
   )
 }
