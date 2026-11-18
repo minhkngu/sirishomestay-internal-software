@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { CalendarPlus, FilePenLine, RotateCcw, Trash2, UserRoundPlus, CircleStop } from 'lucide-react'
+import { ArrowLeftRight, CalendarPlus, FilePenLine, RotateCcw, Trash2, UserRoundPlus, CircleStop } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { IconTip } from '@/components/ui/tooltip'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -11,8 +11,9 @@ import { createAssignmentAction } from '@/server/addenda/actions'
 import { ContractEditActions } from './contract-edit-actions'
 import { ExtensionDialog } from './extension-dialog'
 import { TerminationWizard } from './termination-wizard'
+import { TransferWizard } from './transfer-wizard'
 
-type Action = 'edit' | 'delete' | 'termination' | 'assignment' | 'extension' | 'restore'
+type Action = 'edit' | 'delete' | 'termination' | 'assignment' | 'extension' | 'transfer' | 'restore'
 type Data = Extract<Awaited<ReturnType<typeof quickContractDataAction>>, { ok: true }>['data']
 type Preview = Extract<Awaited<ReturnType<typeof previewContractRestoreAction>>, { ok: true }>['data']
 const ACTIONS = [
@@ -21,10 +22,11 @@ const ACTIONS = [
   { key: 'termination', label: 'Thanh lý hợp đồng', icon: CircleStop },
   { key: 'assignment', label: 'Chuyển nhượng hợp đồng', icon: UserRoundPlus },
   { key: 'extension', label: 'Gia hạn hợp đồng', icon: CalendarPlus },
+  { key: 'transfer', label: 'Chuyển phòng', icon: ArrowLeftRight },
   { key: 'restore', label: 'Khôi phục hợp đồng', icon: RotateCcw },
 ] as const
 
-export function ContractRowActions({ id, kind, active, canDelete }: { id: string; kind: 'lease' | 'deposit'; active: boolean; canDelete: boolean }) {
+export function ContractRowActions({ id, kind, active, canDelete, redirectAfterDelete }: { id: string; kind: 'lease' | 'deposit'; active: boolean; canDelete: boolean; redirectAfterDelete?: string }) {
   const router = useRouter()
   const [action, setAction] = useState<Action | null>(null)
   const [data, setData] = useState<Data | null>(null)
@@ -49,15 +51,16 @@ export function ContractRowActions({ id, kind, active, canDelete }: { id: string
   const label = ACTIONS.find(item => item.key === action)?.label ?? ''
   return <>
     <div className="flex flex-nowrap items-center gap-0.5">
-      {ACTIONS.filter(item => (item.key !== 'delete' || canDelete) && (!['termination', 'assignment', 'extension'].includes(item.key) || (kind === 'lease' && active))).map(item => <IconTip key={item.key} label={item.label}><Button type="button" variant="ghost" size="icon-sm" aria-label={item.label} onClick={() => open(item.key)}><item.icon className="size-4" /></Button></IconTip>)}
+      {ACTIONS.filter(item => (item.key !== 'delete' || canDelete) && (!['termination', 'assignment', 'extension', 'transfer'].includes(item.key) || (kind === 'lease' && active))).map(item => <IconTip key={item.key} label={item.label}><Button type="button" variant="ghost" size="icon-sm" aria-label={item.label} onClick={() => open(item.key)}><item.icon className="size-4" /></Button></IconTip>)}
     </div>
     <Dialog open={action !== null} onOpenChange={open => { if (!open) close() }}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader><DialogTitle>{label}</DialogTitle><DialogDescription>Hợp đồng và dữ liệu liên quan sẽ được kiểm tra trước khi lưu.</DialogDescription></DialogHeader>
         {pending && !data && !preview && <p>Đang tải…</p>}
         {error && <p role="alert" className="text-destructive">{error}</p>}
-        {data && (action === 'edit' || action === 'delete') && <ContractEditActions contract={data.contract} canDelete={canDelete} rooms={data.rooms} tenants={data.tenants} mode={action} onCompleted={close} />}
+        {data && (action === 'edit' || action === 'delete') && <ContractEditActions contract={data.contract} canDelete={canDelete} rooms={data.rooms} tenants={data.tenants} mode={action} onCompleted={action === 'delete' && redirectAfterDelete ? () => router.replace(redirectAfterDelete) : close} />}
         {data?.form && action === 'extension' && <ExtensionDialog leaseId={id} endDate={data.form.endDate} today={data.form.today} defaultOpen onCompleted={close} />}
+        {data?.form && action === 'transfer' && <TransferWizard leaseId={id} currentRoomId={data.form.currentRoomId} freeRooms={data.form.freeRooms} meters={data.form.meters} today={data.form.today} defaultOpen onCompleted={close} />}
         {data?.form && action === 'termination' && <TerminationWizard leaseId={id} meters={data.form.meters.filter(m => m.roomId === data.form!.currentRoomId)} today={data.form.today} defaultOpen onCompleted={close} />}
         {data?.form && action === 'assignment' && <form className="space-y-4" onSubmit={event => { event.preventDefault(); setError(''); start(async () => { const result = await createAssignmentAction(id, { effectiveDate: date, newTenantId: recipient }); if (!result.ok) setError(result.error); else close() }) }}>
           <p>Người nhận kế thừa hợp đồng; người cũ được đưa khỏi danh sách người ở. Bản hợp đồng đã ký được giữ nguyên.</p>

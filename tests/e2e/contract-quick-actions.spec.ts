@@ -11,7 +11,7 @@ test('danh sách có thao tác nhanh và chi tiết mở trong popup', async ({ 
   await page.waitForURL('**/')
   await page.goto('/contracts')
   const row = page.locator('tbody tr').filter({ has: page.locator('a[href^="/contracts/"]') }).first()
-  for (const name of ['Sửa', 'Xóa', 'Thanh lý', 'Chuyển nhượng', 'Gia hạn', 'Khôi phục']) {
+  for (const name of ['Sửa', 'Xóa', 'Thanh lý', 'Chuyển nhượng', 'Gia hạn', 'Chuyển phòng', 'Khôi phục']) {
     await expect(row.getByRole('button', { name: new RegExp(name, 'i') })).toBeVisible()
   }
   await row.locator('a[href^="/contracts/"]').first().click()
@@ -155,14 +155,13 @@ test('gia hạn, thanh lý, cảnh báo đã ký và xóa trong môi trường c
     await sql`insert into files (owner_type,owner_id,facility_id,storage_key,content_type,confirmed_at,is_demo) values ('export','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','22222222-2222-4222-8222-222222222222','invoice-delete.pdf','application/pdf',now(),true), ('signed_addendum','dddddddd-dddd-4ddd-8ddd-dddddddddddd','22222222-2222-4222-8222-222222222222','addendum-delete.pdf','application/pdf',now(),true)`
     await row.getByRole('button', { name: 'Xóa hợp đồng' }).click()
     modal = page.getByRole('dialog')
-    page.once('dialog', async dialog => {
-      for (const term of ['đã ký', 'hoá đơn', 'tiền cọc', 'thanh toán', 'phụ lục', 'bàn giao', 'tệp']) expect(dialog.message()).toContain(term)
-      await dialog.dismiss()
-    })
     await modal.getByRole('button', { name: 'Xoá hợp đồng' }).click()
+    const confirm = modal.getByRole('alertdialog')
+    for (const term of ['đã ký', 'hoá đơn', 'tiền cọc', 'thanh toán', 'phụ lục', 'bàn giao', 'tệp']) await expect(confirm).toContainText(term)
+    await confirm.getByRole('button', { name: 'Huỷ' }).click()
     await expect(modal).toBeVisible()
-    page.once('dialog', dialog => dialog.accept())
     await modal.getByRole('button', { name: 'Xoá hợp đồng' }).click()
+    await modal.getByRole('button', { name: 'Xác nhận xoá' }).click()
     await expect(modal).toBeHidden()
     await expect(row).toHaveCount(0)
     const [result] = await sql`select (select count(*)::int from leases where id='55555555-5555-4555-8555-555555555555') as leases, (select count(*)::int from invoices where id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') as invoices, (select count(*)::int from payments where id='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb') as payments, (select count(*)::int from deposit_entries where id='cccccccc-cccc-4ccc-8ccc-cccccccccccc') as deposits, (select count(*)::int from addenda where id='dddddddd-dddd-4ddd-8ddd-dddddddddddd') as addenda, (select count(*)::int from handovers where id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee') as handovers`

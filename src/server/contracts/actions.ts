@@ -76,7 +76,7 @@ export async function quickContractDataAction(kind: 'lease' | 'deposit', id: str
     const editContract = kind === 'lease'
       ? (() => { const l = contract as Awaited<ReturnType<typeof getLease>>; return { kind: 'lease' as const, id: l.id, roomId: l.roomId, tenantId: l.tenantId, depositAmount: l.depositAmount, signStatus: l.signStatus, startDate: l.startDate, endDate: l.endDate, monthlyRent: l.monthlyRent, note: l.note } })()
       : (() => { const c = contract as Awaited<ReturnType<typeof getDepositContract>>; return { kind: 'deposit' as const, id: c.id, roomId: c.roomId, tenantId: c.tenantId, depositAmount: c.depositAmount, signStatus: c.signStatus, expectedMoveIn: c.expectedMoveIn, agreedRent: c.agreedRent } })()
-    return { contract: editContract, rooms: allRooms.filter(r => r.facilityId === contract.facilityId).map(r => ({ id: r.id, label: r.code })), tenants: allTenants.filter(t => t.homeFacilityId === contract.facilityId).map(t => ({ id: t.id, label: displayName(t) })), form: form ? { endDate: form.endDate, today: form.today, meters: form.meters, currentRoomId: form.currentRoomId } : null }
+    return { contract: editContract, rooms: allRooms.filter(r => r.facilityId === contract.facilityId).map(r => ({ id: r.id, label: r.code })), tenants: allTenants.filter(t => t.homeFacilityId === contract.facilityId).map(t => ({ id: t.id, label: displayName(t) })), form: form ? { endDate: form.endDate, today: form.today, meters: form.meters, currentRoomId: form.currentRoomId, freeRooms: form.freeRooms } : null }
   })
 }
 
