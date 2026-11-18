@@ -39,10 +39,7 @@ export default async function NewContractPage({ searchParams }: { searchParams: 
 
   const assetOptions = can(ctx, 'assets') ? await listAssets(db, ctx, {}) : facs.length ? await db.select().from(assets).where(and(inArray(assets.facilityId, facs.map(f => f.id)), ne(assets.status, 'disposed'))) : []
   const assetFacs = facs.filter(f => can(ctx, 'assets', f.id))
-  const moveTargets = {
-    warehouses: assetFacs.map(f => ({ facilityId: f.id, label: `Kho ${f.name}` })),
-    rooms: rooms.filter(({ f }) => assetFacs.some(a => a.id === f.id)).map(({ f, r }) => ({ id: r.id, facilityId: f.id, label: `${f.name} · ${r.code}` })),
-  }
+  const moveTargets = { facilities: assetFacs.map(f => ({ id: f.id, name: f.name, rooms: rooms.filter(x => x.f.id === f.id).map(x => ({ id: x.r.id, code: x.r.code })) })) }
   let initial = { roomId: sp.room, tenantId: sp.tenant, depositId: undefined as string | undefined, rent: undefined as number | undefined, deposit: undefined as number | undefined, startDate: undefined as string | undefined, receivedDeposit: 0 }
   if (sp.deposit) {
     const d = await getDepositContract(db, ctx, sp.deposit)
