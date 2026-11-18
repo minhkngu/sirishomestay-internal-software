@@ -70,7 +70,13 @@ export async function createFeeType(db: DB, ctx: AccessContext, input: unknown):
     let unitId = data.unitId
     if (!unitId) {
       const [existing] = await tx.select().from(feeUnits).where(eq(feeUnits.name, data.newUnitName!))
-      unitId = existing?.id ?? (await tx.insert(feeUnits).values({ name: data.newUnitName! }).returning())[0].id
+      if (existing) {
+        unitId = existing.id
+      } else {
+        const [u] = await tx.insert(feeUnits).values({ name: data.newUnitName! }).returning()
+        await recordAudit(tx, ctx, { action: 'create', entity: 'fee_unit', entityId: u.id, summary: `Tạo đơn vị ${u.name}`, after: u })
+        unitId = u.id
+      }
     }
     const [t] = await tx.insert(feeTypes).values({
       name: data.name, unitId, defaultPrice: data.defaultPrice, billing: data.billing, quantityFrom: data.quantityFrom,
