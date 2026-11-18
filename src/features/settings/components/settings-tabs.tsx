@@ -6,13 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { FeeTypeForm } from '@/features/settings/components/fee-type-form'
-import { FeeTypeCard } from '@/features/settings/components/fee-type-card'
+import { FeeSettings } from '@/features/settings/components/fee-settings'
 import { Msg, useRun } from '@/features/settings/components/use-run'
 import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { createFacilityAction, updateFacilityAction } from '@/server/facilities/actions'
-import { createFeeTypeAction, createFeeUnitAction, createRateAction } from '@/server/fees/actions'
+import { createRateAction } from '@/server/fees/actions'
 import { updateSettingsAction } from '@/server/settings/actions'
 import type { Settings } from '@/server/settings/service'
 
@@ -100,39 +99,6 @@ function FacilitiesTab({ facilities }: { facilities: Fac[] }) {
   )
 }
 
-function FeesTab({ units, feeTypes, facilities, prices, defaults }: { units: Unit[]; feeTypes: FeeT[]; facilities: Fac[]; prices: Record<string, Record<string, number>>; defaults: Record<string, string[]> }) {
-  const { pending, error, ok, run } = useRun()
-  const [unit, setUnit] = useState('')
-  const [adding, setAdding] = useState(false)
-  const unitName = new Map(units.map((u) => [u.id, u.name]))
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="space-y-1"><Label htmlFor="unit">Thêm đơn vị</Label><Input id="unit" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="người, xe, kg…" /></div>
-        <Button disabled={pending} onClick={() => run(async () => { const r = await createFeeUnitAction({ name: unit }); if (r.ok) setUnit(''); return r })}>Thêm đơn vị</Button>
-        <span className="text-sm text-muted-foreground">Đơn vị: {units.map((u) => u.name).join(', ') || '—'}</span>
-      </div>
-      <div className="space-y-3">
-        <Button type="button" variant="outline" onClick={() => setAdding(!adding)} aria-expanded={adding}>+ Thêm loại phí</Button>
-        {adding && <FeeTypeForm units={units} allowNewUnit pending={pending} error={error} submitLabel="Tạo loại phí"
-          onCancel={() => setAdding(false)}
-          onSubmit={(values) => run(async () => { const r = await createFeeTypeAction(values); if (r.ok) setAdding(false); return r }, 'Đã thêm loại phí')} />}
-      </div>
-      <div className="space-y-3">
-        {feeTypes.map((fee) => (
-          <FeeTypeCard key={fee.id} fee={fee}
-            unitName={unitName.get(fee.unitId) ?? ''}
-            units={units}
-            facilities={facilities}
-            defaultFacilityIds={facilities.filter((f) => defaults[f.id]?.includes(fee.id)).map((f) => f.id)}
-            prices={prices[fee.id] ?? {}} />
-        ))}
-      </div>
-      <Msg error={error} ok={ok} />
-    </div>
-  )
-}
-
 function RatesTab({ facilities, rates }: { facilities: Fac[]; rates: Rate[] }) {
   const { pending, error, ok, run } = useRun()
   const [fac, setFac] = useState(facilities[0]?.id ?? '')
@@ -169,13 +135,13 @@ export function SettingsTabs({ settings, facilities, units, feeTypes, rates, pri
         <TabsTrigger value="general">Chung</TabsTrigger>
         <TabsTrigger value="bank">Tài khoản nhận tiền</TabsTrigger>
         <TabsTrigger value="facilities">Cơ sở</TabsTrigger>
-        <TabsTrigger value="fees">Đơn vị & loại phí</TabsTrigger>
+        <TabsTrigger value="fees">Phí dịch vụ</TabsTrigger>
         <TabsTrigger value="rates">Đơn giá điện nước</TabsTrigger>
       </TabsList>
       <TabsContent value="general"><GeneralTab s={settings} /></TabsContent>
       <TabsContent value="bank"><BankAccountTab settings={settings} /></TabsContent>
       <TabsContent value="facilities"><FacilitiesTab facilities={facilities} /></TabsContent>
-      <TabsContent value="fees"><FeesTab defaults={defaults} units={units} feeTypes={feeTypes} facilities={facilities} prices={prices} /></TabsContent>
+      <TabsContent value="fees"><FeeSettings defaults={defaults} units={units} feeTypes={feeTypes} facilities={facilities} prices={prices} /></TabsContent>
       <TabsContent value="rates"><RatesTab facilities={facilities} rates={rates} /></TabsContent>
     </Tabs>
   )

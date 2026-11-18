@@ -16,7 +16,7 @@ export default async function SettingsPage() {
 }
 
 async function Settings({ ctx }: { ctx: Awaited<ReturnType<typeof getAccessContext>> }) {
-  const [settings, facilities, units, feeTypes, prices, defaults] = await Promise.all([getSettings(db), listFacilities(db, ctx), listFeeUnits(db, ctx), listFeeTypes(db, ctx), listFeeTypePrices(db, ctx), listFeeDefaults(db, ctx)])
+  const [settings, facilities, units, feeTypes, prices, defaults] = await Promise.all([getSettings(db), listFacilities(db, ctx), listFeeUnits(db, ctx), listFeeTypes(db, ctx, { includeArchived: true }), listFeeTypePrices(db, ctx), listFeeDefaults(db, ctx)])
   const rates = (await Promise.all(facilities.map((f) => listRates(db, ctx, f.id)))).flat()
   return (
     <div className="space-y-4">
