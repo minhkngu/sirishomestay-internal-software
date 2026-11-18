@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { billingLabel, feeApplicationSummary, quantityLabel } from '@/features/settings/components/fee-options'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { FeeFacilitiesDialog } from '@/features/settings/components/fee-facilities-dialog'
 import { FeeTypeForm } from '@/features/settings/components/fee-type-form'
 import { Msg, useRun } from '@/features/settings/components/use-run'
@@ -45,7 +46,26 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
             {unitName} · {formatVND(fee.defaultPrice)} đ · {billingLabel(fee.billing)}
             {fee.quantityFrom !== 'manual' ? ` · ${quantityLabel(fee.quantityFrom)}` : ''}
           </p>
-          <p className="text-xs text-muted-foreground">{feeApplicationSummary(appliedFacilities.length, priceEntries.length)}</p>
+          <p className="text-xs text-muted-foreground">
+            {appliedFacilities.length === 0 ? feeApplicationSummary(0, 0) : (
+              <Popover>
+                <PopoverTrigger
+                  openOnHover delay={100}
+                  render={<button type="button" className="cursor-help underline decoration-dotted underline-offset-2 hover:text-foreground" />}
+                >
+                  {feeApplicationSummary(appliedFacilities.length, priceEntries.length)}
+                </PopoverTrigger>
+                <PopoverContent className="w-auto min-w-48 space-y-1 text-xs">
+                  {appliedFacilities.map((f) => (
+                    <p key={f.id} className="flex justify-between gap-4">
+                      <span>{f.name}</span>
+                      <span className="text-muted-foreground">{prices[f.id] != null ? `${formatVND(prices[f.id])} đ` : 'giá chung'}</span>
+                    </p>
+                  ))}
+                </PopoverContent>
+              </Popover>
+            )}
+          </p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
           <FeeFacilitiesDialog fee={fee} facilities={facilities} selected={selected} prices={prices} onSelectedChange={setSelected} />
