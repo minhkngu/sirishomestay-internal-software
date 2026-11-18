@@ -142,7 +142,7 @@ export async function createRoomsBulk(db: DB, ctx: AccessContext, facilityId: st
       const created = await tx.insert(rooms).values(toCreate.map((code) => ({
         facilityId, code, floor: data.floor, roomType: data.roomType ?? null, areaM2: data.areaM2?.toString() ?? null,
         listPrice: data.listPrice ?? null, capacity: data.capacity ?? null, beds: data.beds ?? null,
-      }))).returning({ id: rooms.id })
+      }))).returning()
       if (ids.length) await tx.insert(roomAmenities).values(created.flatMap((r) => ids.map((amenityId) => ({ roomId: r.id, amenityId }))))
     }
     await recordAudit(tx, ctx, { action: 'create', entity: 'room_bulk', summary: 'Tạo nhiều phòng', facilityId, after: { created: toCreate, skipped } })
