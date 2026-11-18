@@ -18,3 +18,8 @@ export function billingLabel(value: string): string {
 export function quantityLabel(value: string): string {
   return QUANTITY_OPTIONS.find((o) => o.value === value)?.label ?? value
 }
+
+/** Ô giá chỉ nhận số nguyên không âm (chuỗi người dùng gõ). */
+export function isPriceInput(value: string): boolean {
+  return /^\d+$/.test(value.trim())
+}

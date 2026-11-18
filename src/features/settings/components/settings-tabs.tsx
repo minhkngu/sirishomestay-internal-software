@@ -1,44 +1,27 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import { BankAccountFields, emptyBankAccount } from '@/components/bank-account/bank-account-fields'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { FeeTypeForm } from '@/features/settings/components/fee-type-form'
+import { FeeTypeCard } from '@/features/settings/components/fee-type-card'
+import { Msg, useRun } from '@/features/settings/components/use-run'
 import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { createFacilityAction, updateFacilityAction } from '@/server/facilities/actions'
-import { setFeeDefaultAction, setFeeTypePriceAction, removeFeeTypePriceAction, archiveFeeTypeAction, createFeeTypeAction, createFeeUnitAction, createRateAction } from '@/server/fees/actions'
+import { createFeeTypeAction, createFeeUnitAction, createRateAction } from '@/server/fees/actions'
 import { updateSettingsAction } from '@/server/settings/actions'
 import type { Settings } from '@/server/settings/service'
 
 type Fac = { id: string; code: string; name: string; address: string; expectedInvoiceDay: number }
 type Unit = { id: string; name: string }
-type FeeT = { id: string; name: string; unitId: string; defaultPrice: number; billing: string; quantityFrom: string }
+type FeeT = { id: string; name: string; unitId: string; defaultPrice: number; billing: string; quantityFrom: string; isActive: boolean }
 type Rate = { id: string; facilityId: string; utility: string; pricePerUnit: number; effectiveFrom: string }
 
 type Props = { defaults: Record<string, string[]>; prices: Record<string, Record<string, number>>; settings: Settings; facilities: Fac[]; units: Unit[]; feeTypes: FeeT[]; rates: Rate[] }
-
-function useRun() {
-  const router = useRouter()
-  const [pending, start] = useTransition()
-  const [error, setError] = useState<string | null>(null)
-  const [ok, setOk] = useState<string | null>(null)
-  const run = (fn: () => Promise<{ ok: boolean; error?: string }>, okMsg = 'Đã lưu') =>
-    start(async () => {
-      setError(null); setOk(null)
-      const r = await fn()
-      if (!r.ok) setError(r.error ?? 'Có lỗi') ; else { setOk(okMsg); router.refresh() }
-    })
-  return { pending, error, ok, run }
-}
-
-const Msg = ({ error, ok }: { error: string | null; ok: string | null }) => (
-  <>{error && <p className="text-sm text-destructive">{error}</p>}{ok && <p className="text-sm text-green-700">{ok}</p>}</>
-)
 
 function GeneralTab({ s }: { s: Settings }) {
   const { pending, error, ok, run } = useRun()
@@ -117,34 +100,6 @@ function FacilitiesTab({ facilities }: { facilities: Fac[] }) {
   )
 }
 
-function FeePrices({ fee, facilities, prices }: { fee: FeeT; facilities: Fac[]; prices: Record<string, number> }) {
-  const { pending, error, ok, run } = useRun()
-  const [facilityId, setFacilityId] = useState(facilities[0]?.id ?? '')
-  const [price, setPrice] = useState('')
-  return <details className="rounded-md border bg-card p-3"><summary>Giá riêng theo toà — {fee.name}</summary><div className="space-y-2 pt-3">
-    {Object.entries(prices).map(([id, amount]) => <div className="flex items-center gap-2" key={id}><span>{facilities.find((f) => f.id === id)?.name ?? id}: {formatVND(amount)} ₫</span><Button size="sm" variant="outline" disabled={pending} onClick={() => run(() => removeFeeTypePriceAction({ feeTypeId: fee.id, facilityId: id }))}>Xoá</Button></div>)}
-    <label>Toà <select className="rounded border p-1" value={facilityId} onChange={(e) => setFacilityId(e.target.value)}>{facilities.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select></label>
-    <Input aria-label={`Giá riêng ${fee.name}`} inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value)} />
-    <Button disabled={pending || !facilityId || price.trim() === ''} onClick={() => run(() => setFeeTypePriceAction({ feeTypeId: fee.id, facilityId, price: Number(price) }))}>Lưu giá</Button><Msg error={error} ok={ok} />
-  </div></details>
-}
-
-function FeeDefaults({ fee, facilities, defaults }: { fee: FeeT; facilities: Fac[]; defaults: Record<string, string[]> }) {
-  const router = useRouter()
-  const [pending, start] = useTransition()
-  const [selected, setSelected] = useState<Record<string, boolean>>(Object.fromEntries(facilities.map(f => [f.id, defaults[f.id]?.includes(fee.id) ?? false])))
-  const [error, setError] = useState('')
-  function update(facilityId: string, enabled: boolean) {
-    setSelected(previous => ({ ...previous, [facilityId]: enabled }))
-    start(async () => {
-      const result = await setFeeDefaultAction({ facilityId, feeTypeId: fee.id, enabled })
-      if (!result.ok) { setSelected(previous => ({ ...previous, [facilityId]: !enabled })); setError(result.error) }
-      else { setError(''); router.refresh() }
-    })
-  }
-  return <div className="space-y-2 rounded border p-3"><p className="text-sm font-medium">Mặc định theo cơ sở — {fee.name}</p>{facilities.map(f => <label key={f.id} className="mr-4 inline-flex items-center gap-1 text-sm"><input type="checkbox" checked={selected[f.id] ?? false} disabled={pending} onChange={e => update(f.id, e.target.checked)} />{f.name}</label>)}{error && <p role="alert" className="text-sm text-destructive">{error}</p>}</div>
-}
-
 function FeesTab({ units, feeTypes, facilities, prices, defaults }: { units: Unit[]; feeTypes: FeeT[]; facilities: Fac[]; prices: Record<string, Record<string, number>>; defaults: Record<string, string[]> }) {
   const { pending, error, ok, run } = useRun()
   const [unit, setUnit] = useState('')
@@ -163,22 +118,16 @@ function FeesTab({ units, feeTypes, facilities, prices, defaults }: { units: Uni
           onCancel={() => setAdding(false)}
           onSubmit={(values) => run(async () => { const r = await createFeeTypeAction(values); if (r.ok) setAdding(false); return r }, 'Đã thêm loại phí')} />}
       </div>
-      <div className="overflow-x-auto rounded-md border bg-card">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50 text-left"><tr><th className="p-2">Loại phí</th><th className="p-2">Đơn vị</th><th className="p-2">Đơn giá</th><th className="p-2">Kiểu</th><th className="p-2" /></tr></thead>
-          <tbody>
-            {feeTypes.map((f) => (
-              <tr key={f.id} className="border-t">
-                <td className="p-2">{f.name}</td><td className="p-2">{unitName.get(f.unitId)}</td><td className="p-2">{formatVND(f.defaultPrice)}</td>
-                <td className="p-2">{f.billing === 'monthly_fixed' ? 'Cố định hằng tháng (trả trước)' : 'Theo lần / tiêu thụ (trả sau)'}{f.quantityFrom === 'occupants' ? ' · theo số người' : ''}</td>
-                <td className="p-2"><button type="button" className="text-destructive underline" onClick={() => run(() => archiveFeeTypeAction(f.id), 'Đã lưu trữ')}>Lưu trữ</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="space-y-3">
+        {feeTypes.map((fee) => (
+          <FeeTypeCard key={fee.id} fee={fee}
+            unitName={unitName.get(fee.unitId) ?? ''}
+            units={units}
+            facilities={facilities}
+            defaultFacilityIds={facilities.filter((f) => defaults[f.id]?.includes(fee.id)).map((f) => f.id)}
+            prices={prices[fee.id] ?? {}} />
+        ))}
       </div>
-      {feeTypes.map((fee) => <FeeDefaults key={fee.id} fee={fee} facilities={facilities} defaults={defaults} />)}
-      {feeTypes.map((fee) => <FeePrices key={fee.id} fee={fee} facilities={facilities} prices={prices[fee.id] ?? {}} />)}
       <Msg error={error} ok={ok} />
     </div>
   )
