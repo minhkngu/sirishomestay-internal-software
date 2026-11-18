@@ -1,5 +1,5 @@
 import { and, asc, eq, ilike, inArray } from 'drizzle-orm'
-import { depositContracts, depositEntries, leaseOccupants, leases, rooms, tenants } from '@/db'
+import { amenities, depositContracts, depositEntries, leaseOccupants, leases, roomAmenities, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, can, facilityScope, NotFoundError, type AccessContext } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
@@ -14,6 +14,30 @@ export type Room = typeof rooms.$inferSelect
 
 const DUP = 'Mã phòng đã tồn tại trong cơ sở này'
 const MAX_BULK = 500
+
+const BAD_AMENITY = 'Tiện ích không hợp lệ'
+
+/** Tiện ích mới gắn phải tồn tại và đang dùng; tiện ích đã gắn từ trước (`keep`) được giữ dù đã ngừng dùng. */
+async function checkAmenityIds(tx: Pick<DB, 'select'>, ids: string[], keep: Set<string> = new Set()): Promise<string[]> {
+  const unique = [...new Set(ids)]
+  if (!unique.length) return unique
+  const found = await tx.select({ id: amenities.id, isActive: amenities.isActive }).from(amenities).where(inArray(amenities.id, unique))
+  const ok = new Map(found.map((a) => [a.id, a.isActive]))
+  for (const id of unique) {
+    if (!ok.has(id) || (!ok.get(id) && !keep.has(id))) throw new ValidationError(BAD_AMENITY, { amenityIds: BAD_AMENITY })
+  }
+  return unique
+}
+
+async function setRoomAmenities(tx: Pick<DB, 'delete' | 'insert'>, roomId: string, ids: string[]) {
+  await tx.delete(roomAmenities).where(eq(roomAmenities.roomId, roomId))
+  if (ids.length) await tx.insert(roomAmenities).values(ids.map((amenityId) => ({ roomId, amenityId })))
+}
+
+async function roomAmenitiesOf(db: Pick<DB, 'select'>, roomId: string): Promise<{ id: string; name: string }[]> {
+  return db.select({ id: amenities.id, name: amenities.name }).from(roomAmenities)
+    .innerJoin(amenities, eq(amenities.id, roomAmenities.amenityId)).where(eq(roomAmenities.roomId, roomId)).orderBy(asc(amenities.name))
+}
 
 export async function getRoom(db: DB, ctx: AccessContext, id: string): Promise<Room> {
   const [r] = await db.select().from(rooms).where(eq(rooms.id, id))
@@ -52,10 +76,13 @@ export async function createRoom(db: DB, ctx: AccessContext, input: RoomInput): 
   assertCan(ctx, 'settings')
   const data = roomInput.parse(input)
   await getFacility(db, ctx, data.facilityId)
+  const { amenityIds, ...roomData } = data
   return db.transaction(async (tx) => {
     const [dup] = await tx.select({ id: rooms.id }).from(rooms).where(and(eq(rooms.facilityId, data.facilityId), eq(rooms.code, data.code)))
     if (dup) throw new ValidationError(DUP, { code: DUP })
-    const [r] = await tx.insert(rooms).values({ ...data, areaM2: data.areaM2?.toString() ?? null }).returning()
+    const ids = await checkAmenityIds(tx, amenityIds ?? [])
+    const [r] = await tx.insert(rooms).values({ ...roomData, areaM2: roomData.areaM2?.toString() ?? null }).returning()
+    await setRoomAmenities(tx, r.id, ids)
     await recordAudit(tx, ctx, { action: 'create', entity: 'room', summary: 'Tạo phòng', entityId: r.id, facilityId: r.facilityId, after: r })
     return r
   })
@@ -71,7 +98,11 @@ export async function updateRoom(db: DB, ctx: AccessContext, id: string, input: 
       const [dup] = await tx.select({ id: rooms.id }).from(rooms).where(and(eq(rooms.facilityId, before.facilityId), eq(rooms.code, data.code)))
       if (dup) throw new ValidationError(DUP, { code: DUP })
     }
-    const { areaM2, ...rest } = data
+    const { areaM2, amenityIds, ...rest } = data
+    if (amenityIds !== undefined) {
+      const current = new Set((await roomAmenitiesOf(tx, id)).map((a) => a.id))
+      await setRoomAmenities(tx, id, await checkAmenityIds(tx, amenityIds, current))
+    }
     const [after] = await tx.update(rooms)
       .set({ ...rest, ...(areaM2 !== undefined && { areaM2: areaM2?.toString() ?? null }), updatedAt: new Date() })
       .where(eq(rooms.id, id)).returning()
@@ -107,9 +138,12 @@ export async function createRoomsBulk(db: DB, ctx: AccessContext, facilityId: st
       ;(existing.has(code) ? skipped : toCreate).push(code)
     }
     if (toCreate.length) {
-      await tx.insert(rooms).values(toCreate.map((code) => ({
-        facilityId, code, floor: data.floor, roomType: data.roomType ?? null, listPrice: data.listPrice ?? null, capacity: data.capacity ?? null,
-      })))
+      const ids = await checkAmenityIds(tx, data.amenityIds ?? [])
+      const created = await tx.insert(rooms).values(toCreate.map((code) => ({
+        facilityId, code, floor: data.floor, roomType: data.roomType ?? null, areaM2: data.areaM2?.toString() ?? null,
+        listPrice: data.listPrice ?? null, capacity: data.capacity ?? null, beds: data.beds ?? null,
+      }))).returning({ id: rooms.id })
+      if (ids.length) await tx.insert(roomAmenities).values(created.flatMap((r) => ids.map((amenityId) => ({ roomId: r.id, amenityId }))))
     }
     await recordAudit(tx, ctx, { action: 'create', entity: 'room_bulk', summary: 'Tạo nhiều phòng', facilityId, after: { created: toCreate, skipped } })
     return { created: toCreate.length, skipped }
@@ -144,28 +178,29 @@ export async function listRoomsWithStatus(
 
 /** Chi tiết phòng chỉ chứa thông tin phù hợp với quyền của người gọi. */
 export async function getRoomDetail(db: DB, ctx: AccessContext, id: string): Promise<{
-  room: Room; status: RoomStatus
+  room: Room; status: RoomStatus; amenities: { id: string; name: string }[]
   lease?: { id: string; code: string; tenantName: string | null | undefined; occupants: { id: string; name: string | null }[]; endDate: string }
   money?: { monthlyRent: number | null; depositBalance: number; debt: null }
 }> {
   const room = await getRoom(db, ctx, id)
+  const amenityList = await roomAmenitiesOf(db, id)
   const status = (await listRoomsWithStatus(db, ctx, { facilityId: room.facilityId, includeInactive: true })).find((r) => r.id === id)!.status
   const [active] = await db.select().from(leases).where(and(eq(leases.roomId, id), eq(leases.status, 'active')))
   const showLease = can(ctx, 'tenants_contracts', room.facilityId)
   const showMoney = showLease || can(ctx, 'billing', room.facilityId)
   if (!active) {
-    if (!showMoney) return { room, status }
+    if (!showMoney) return { room, status, amenities: amenityList }
     const [pending] = await db.select().from(depositContracts).where(and(eq(depositContracts.roomId, id), eq(depositContracts.status, 'pending')))
-    if (!pending) return { room, status }
+    if (!pending) return { room, status, amenities: amenityList }
     const entries = await db.select().from(depositEntries).where(eq(depositEntries.depositContractId, pending.id))
     const balance = entries.filter((e) => e.status === 'done').reduce((n, e) => n + (e.type === 'collect' || e.type === 'topup' ? e.amount : -e.amount), 0)
-    return { room, status, money: { monthlyRent: null, depositBalance: balance, debt: null } }
+    return { room, status, amenities: amenityList, money: { monthlyRent: null, depositBalance: balance, debt: null } }
   }
   const [tenant] = showLease ? await db.select().from(tenants).where(eq(tenants.id, active.tenantId)) : []
   const occupants = showLease ? await db.select({ id: tenants.id, name: tenants.fullName }).from(leaseOccupants).innerJoin(tenants, eq(tenants.id, leaseOccupants.tenantId)).where(eq(leaseOccupants.leaseId, active.id)) : []
   const entries = showMoney ? await db.select().from(depositEntries).where(eq(depositEntries.leaseId, active.id)) : []
   const balance = entries.filter((e) => e.status === 'done').reduce((n, e) => n + (e.type === 'collect' || e.type === 'topup' ? e.amount : -e.amount), 0)
-  return { room, status,
+  return { room, status, amenities: amenityList,
     ...(showLease ? { lease: { id: active.id, code: active.code, tenantName: tenant?.fullName ?? tenant?.companyName, occupants, endDate: active.endDate } } : {}),
     ...(showMoney ? { money: { monthlyRent: active.monthlyRent, depositBalance: balance, debt: null } } : {}),
   }
