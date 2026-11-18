@@ -18,6 +18,7 @@ export function ContractEditActions({ contract, canDelete, rooms, tenants, mode,
   const [error, setError] = useState('')
   const [pendingFiles, setPendingFiles] = useState(0)
   const [deleted, setDeleted] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [roomId, setRoomId] = useState(contract.roomId)
   const [tenantId, setTenantId] = useState(contract.tenantId)
   const [deposit, setDeposit] = useState(String(contract.depositAmount))
@@ -40,9 +41,8 @@ export function ContractEditActions({ contract, canDelete, rooms, tenants, mode,
       setEditing(false); router.refresh(); onCompleted?.()
     })
   }
+  const deleteWarning = `${signed ? 'Hợp đồng đã ký. ' : ''}Xoá vĩnh viễn hợp đồng này cùng các hoá đơn, khoản tiền cọc, thanh toán, phụ lục, biên bản bàn giao và tệp đính kèm liên quan. Thao tác không thể hoàn tác. Bạn có chắc chắn muốn xoá?`
   function remove() {
-    const warning = `${signed ? 'Hợp đồng đã ký. ' : ''}Xoá vĩnh viễn hợp đồng này cùng các hoá đơn, khoản tiền cọc, thanh toán, phụ lục, biên bản bàn giao và tệp đính kèm liên quan. Thao tác không thể hoàn tác. Bạn có chắc chắn muốn xoá?`
-    if (!window.confirm(warning)) return
     setError('')
     start(async () => {
       const result = await deleteContractAction(contract.kind, contract.id, true)
@@ -64,8 +64,15 @@ export function ContractEditActions({ contract, canDelete, rooms, tenants, mode,
   return <div className="space-y-3">
     <div className="flex flex-wrap gap-2">
       {!mode && <Button type="button" size="sm" variant="outline" onClick={() => { setError(''); setEditing(!editing) }}>{editing ? 'Đóng chỉnh sửa' : 'Chỉnh sửa hợp đồng'}</Button>}
-      {canDelete && mode !== 'edit' && <Button type="button" size="sm" variant="destructive" disabled={pending} onClick={remove}>Xoá hợp đồng</Button>}
+      {canDelete && mode !== 'edit' && !confirmingDelete && <Button type="button" size="sm" variant="destructive" disabled={pending} onClick={() => { setError(''); setConfirmingDelete(true) }}>Xoá hợp đồng</Button>}
     </div>
+    {confirmingDelete && <div className="space-y-3 rounded-xl border border-destructive/40 bg-destructive/5 p-4" role="alertdialog" aria-label="Xác nhận xoá hợp đồng">
+      <p className="text-sm">{deleteWarning}</p>
+      <div className="flex gap-2">
+        <Button type="button" size="sm" variant="destructive" disabled={pending} onClick={remove}>Xác nhận xoá</Button>
+        <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setConfirmingDelete(false)}>Huỷ</Button>
+      </div>
+    </div>}
     {editing && <form onSubmit={save} className="space-y-3 rounded-xl border p-4">
       <p className="text-sm text-muted-foreground">Hoá đơn và các khoản tiền cọc hiện có sẽ được giữ nguyên. Vui lòng tự kiểm tra và điều chỉnh nếu cần.</p>
       <div className="grid gap-3 sm:grid-cols-2">
