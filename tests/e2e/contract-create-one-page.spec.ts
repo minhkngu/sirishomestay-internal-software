@@ -10,8 +10,33 @@ async function openForm(page: Page) {
   await page.goto('/contracts/new')
 }
 
+/** Đăng nhập, tạo `count` phòng tạm mã duy nhất ở Thảo Điền rồi mở form hợp đồng; không phụ thuộc phòng trống có sẵn trong dữ liệu mẫu. */
+async function openFormWithRooms(page: Page, count = 1): Promise<string[]> {
+  await page.goto('/login')
+  await page.getByRole('button', { name: /^Admin/ }).click()
+  await expect(page.getByRole('heading', { name: 'Nhắc việc' })).toBeVisible()
+  await page.goto('/facilities')
+  await page.getByRole('link', { name: /Thảo Điền/ }).first().click()
+  await page.getByRole('button', { name: 'Tạo nhanh nhiều phòng' }).click()
+  const prefix = `E2E${Date.now()}${Math.floor(Math.random() * 1000)}-`
+  await page.getByLabel('Tiền tố mã (tuỳ chọn)').fill(prefix)
+  await page.getByLabel('Tầng', { exact: true }).fill('9')
+  await page.getByLabel('Từ số').fill('901')
+  await page.getByLabel('Đến số').fill(String(900 + count))
+  await page.getByRole('button', { name: 'Tạo', exact: true }).click()
+  await expect(page.getByText(`Đã tạo ${count} phòng`, { exact: true })).toBeVisible()
+  await page.goto('/contracts/new')
+  return Array.from({ length: count }, (_, i) => `${prefix}${901 + i}`)
+}
+/** Phí mặc định theo đồng hồ (vd. Điện) được tự thêm vào form và đòi chỉ số ban đầu: điền cho mọi ô còn trống. */
+async function fillMeterReadings(page: Page) {
+  const inputs = page.getByLabel(/^Chỉ số ban đầu /)
+  for (let i = 0; i < await inputs.count(); i++) if (!(await inputs.nth(i).inputValue())) await inputs.nth(i).fill('100')
+}
+const roomOption = (page: Page, code: string) => page.locator('#room option').filter({ hasText: code })
+
 test('các mục cùng trang, lỗi cạnh trường và đổi phòng xóa tài sản mới', async ({ page }) => {
-  await openForm(page)
+  const codes = await openFormWithRooms(page, 2)
   await expect(page.getByLabel('Phòng', { exact: true })).toBeVisible()
   await expect(page.getByLabel('Tiền đã cọc (VND)')).toBeVisible()
   await expect(page.locator('#deposit').locator('..').locator('..').getByLabel('Tiền đã cọc (VND)')).toBeVisible()
@@ -21,8 +46,8 @@ test('các mục cùng trang, lỗi cạnh trường và đổi phòng xóa tài
   await expect(page.getByRole('button', { name: 'Tiếp tục' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Tạo hợp đồng thuê' }).click()
   await expect(page.getByText('Chọn phòng', { exact: true })).toBeVisible()
-  const rooms = page.locator('#room option').filter({ hasText: 'Trống' })
-  test.skip(await rooms.count() < 2, 'Cần hai phòng trống')
+  const rooms = roomOption(page, codes[0]).or(roomOption(page, codes[1]))
+  await expect(rooms).toHaveCount(2)
   await page.locator('#room').selectOption((await rooms.nth(0).getAttribute('value'))!)
   await expect(page.getByLabel('Mã tài sản mới')).toHaveCount(0)
   await page.getByRole('button', { name: 'Thêm tài sản' }).click()
@@ -84,15 +109,15 @@ test('xử lý tài sản chỉ có di chuyển và thanh lý, đổi phòng xó
 })
 
 test('tạo hợp đồng với tiền thực nhận, ghi chú và tài sản mới', async ({ page }) => {
-  await openForm(page)
+  const [tempRoom] = await openFormWithRooms(page)
   const templates = page.locator('#contract-template')
   let selectedTemplate: string | null = null
   if (await templates.count()) {
     selectedTemplate = await templates.locator('option').last().getAttribute('value')
     await templates.selectOption(selectedTemplate!)
   }
-  const room = page.locator('#room option').filter({ hasText: 'Trống' }).first()
-  test.skip(await room.count() === 0, 'Cần phòng trống')
+  const room = roomOption(page, tempRoom)
+  await expect(room).toHaveCount(1)
   await page.locator('#room').selectOption((await room.getAttribute('value'))!)
   const tenant = page.locator('#tenant option').filter({ hasText: 'Nguyễn Văn An' }).first()
   await page.locator('#tenant').selectOption((await tenant.getAttribute('value'))!)
@@ -112,6 +137,7 @@ test('tạo hợp đồng với tiền thực nhận, ghi chú và tài sản m�
   canvas.getContext('2d').fillRect(0, 0, 8, 8)
   await page.getByLabel(`Ảnh ${assetName}`).setInputFiles({ name: 'ban.png', mimeType: 'image/png', buffer: canvas.toBuffer('image/png') })
   await expect(page.getByAltText(`Ảnh ${assetName} 1`)).toBeVisible()
+  await fillMeterReadings(page)
   await page.getByRole('button', { name: 'Tạo hợp đồng thuê' }).click()
   await expect(page).toHaveURL(/\/contracts\/[a-f0-9-]+$/, { timeout: 60_000 })
   await expect(page.getByText('Ghi chú kiểm thử')).toBeVisible()
@@ -132,9 +158,9 @@ test('tạo hợp đồng với tiền thực nhận, ghi chú và tài sản m�
 })
 
 test('hai dòng phí đồng hồ có chọn đồng hồ riêng và chỉ số ban đầu bắt buộc', async ({ page }) => {
-  await openForm(page)
-  const room = page.locator('#room option').filter({ hasText: 'Trống' }).first()
-  test.skip(await room.count() === 0, 'Cần phòng trống')
+  const [tempRoom] = await openFormWithRooms(page)
+  const room = roomOption(page, tempRoom)
+  await expect(room).toHaveCount(1)
   await page.locator('#room').selectOption((await room.getAttribute('value'))!)
   await page.locator('#tenant').selectOption({ label: 'Nguyễn Văn An' })
   await page.getByLabel('Ngày bắt đầu').fill('2026-12-01')
@@ -171,9 +197,9 @@ test('phí chỉ hiện khi mặc định hoặc được thêm và không có l
 })
 
 test('công ty ký và tạo đồng hồ cho phí riêng', async ({ page }) => {
-  await openForm(page)
-  const room = page.locator('#room option').filter({ hasText: 'Trống' }).first()
-  test.skip(await room.count() === 0, 'Cần phòng trống')
+  const [tempRoom] = await openFormWithRooms(page)
+  const room = roomOption(page, tempRoom)
+  await expect(room).toHaveCount(1)
   const roomId = (await room.getAttribute('value'))!
   const roomCode = (await room.textContent())!.split(' · ')[1].split(' (')[0]
   await page.locator('#room').selectOption(roomId)
@@ -200,11 +226,14 @@ test('công ty ký và tạo đồng hồ cho phí riêng', async ({ page }) => 
   await page.getByLabel('Đơn giá phí riêng').fill('7000')
   await page.getByLabel('Cách tính phí riêng').selectOption('period_input')
   await page.getByRole('button', { name: 'Thêm phí riêng' }).click()
+  await fillMeterReadings(page)
   await page.getByRole('button', { name: 'Tạo hợp đồng thuê' }).click()
-  await expect(page).toHaveURL(/\/contracts\/[a-f0-9-]+$/)
+  await expect(page).toHaveURL(/\/contracts\/[a-f0-9-]+$/, { timeout: 60_000 })
   await expect(page.getByText('Phí thử theo đồng hồ')).toBeVisible()
   await expect(page.getByText('Số người ở').locator('..')).toContainText('2')
   await page.goto('/invoices?view=draft')
+  // Danh sách phân trang 15 dòng; hoá đơn nháp từ các lần chạy trước nhiều nên mở rộng tối đa
+  await page.getByLabel('Số dòng').selectOption('100')
   const invoiceRow = page.getByRole('row').filter({ hasText: companyName }).filter({ hasText: roomCode }).first()
   await invoiceRow.getByRole('link').click()
   await page.getByLabel('Số lượng Phí thử nhập kỳ').fill('3')
@@ -213,7 +242,7 @@ test('công ty ký và tạo đồng hồ cho phí riêng', async ({ page }) => 
 })
 
 test('phí mặc định theo cơ sở tự thêm và có thể xóa hoặc thêm lại', async ({ page }) => {
-  await openForm(page)
+  const [tempRoom] = await openFormWithRooms(page)
   const feeName = `Phí mặc định E2E ${Date.now()}`
   try {
     await page.goto('/settings')
@@ -230,7 +259,7 @@ test('phí mặc định theo cơ sở tự thêm và có thể xóa hoặc thê
     await expect(card.getByRole('checkbox', { name: 'Thảo Điền' })).toBeChecked()
     await expect(card.getByRole('checkbox', { name: 'Thảo Điền' })).toBeEnabled()
     await page.goto('/contracts/new')
-    const room = page.locator('#room option').filter({ hasText: 'Thảo Điền' }).filter({ hasText: 'Trống' }).first()
+    const room = roomOption(page, tempRoom)
     await expect(room).toHaveCount(1)
     await page.locator('#room').selectOption((await room.getAttribute('value'))!)
     await expect(page.getByRole('button', { name: `Xóa phí ${feeName}` })).toBeVisible()
