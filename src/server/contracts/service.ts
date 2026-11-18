@@ -144,7 +144,7 @@ export type LeaseInput = {
     addAssetIds: string[]
     expectedAddedLocations?: Array<{ assetId: string; kind: string; id: string }>
     newAssets: Array<{ code: string; name: string; model: string; category: string; value: number; condition: string }>
-    remove: Array<{ assetId: string; action: 'warehouse' | 'dispose' | 'unassigned' }>
+    remove: Array<{ assetId: string; action: 'dispose' } | { assetId: string; action: 'move'; to: { kind: 'warehouse' | 'room'; id: string } }>
     conditions?: Array<{ assetCode: string; condition: string }>
   }
   feeModel?: 'legacy' | 'snapshot'
@@ -247,8 +247,10 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
     }
     for (const item of h.remove) {
       if (item.action === 'dispose') await setAssetStatusInTransaction(tx, ctx, item.assetId, 'disposed')
-      else if (item.action === 'warehouse' || item.action === 'unassigned') await moveAssetsInTransaction(tx, ctx, [item.assetId], { kind: item.action, id: room.facilityId }, 'Bàn giao nhận phòng')
-      else throw new ValidationError('Cách xử lý tài sản không hợp lệ')
+      else if (item.action === 'move' && item.to && (item.to.kind === 'warehouse' || item.to.kind === 'room') && typeof item.to.id === 'string') {
+        if (item.to.kind === 'room' && item.to.id === room.id) throw new ValidationError('Không thể chuyển tài sản vào chính phòng đang lập hợp đồng')
+        await moveAssetsInTransaction(tx, ctx, [item.assetId], item.to, 'Bàn giao nhận phòng')
+      } else throw new ValidationError('Cách xử lý tài sản không hợp lệ')
     }
     for (const asset of h.newAssets) await createAssetInTransaction(tx, ctx, { ...asset, facilityId: room.facilityId, location: { kind: 'room', id: room.id } })
     const handover = await startHandoverInTransaction(tx, ctx, lease.id, 'check_in')

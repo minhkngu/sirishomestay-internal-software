@@ -181,10 +181,10 @@ describe('contracts', () => {
   it('áp dụng tài sản và tạo snapshot bàn giao trong cùng giao dịch', async () => {
     const rows = await db.insert(assets).values(['A', 'B', 'C'].map(code => ({ code, name: code, facilityId: fa, locationKind: 'room', locationId: r301 }))).returning()
     const [extra] = await db.insert(assets).values({ code: 'D', name: 'D', facilityId: fa, locationKind: 'warehouse', locationId: fa }).returning()
-    const handover = { expectedRoomAssetIds: rows.map(a => a.id), addAssetIds: [extra.id], expectedAddedLocations: [{ assetId: extra.id, kind: 'warehouse', id: fa }], newAssets: [{ code: 'E', name: 'E', model: 'M', category: '', value: 1, condition: 'Tốt' }], remove: [{ assetId: rows[1].id, action: 'warehouse' }, { assetId: rows[2].id, action: 'dispose' }] }
+    const handover = { expectedRoomAssetIds: rows.map(a => a.id), addAssetIds: [extra.id], expectedAddedLocations: [{ assetId: extra.id, kind: 'warehouse', id: fa }], newAssets: [{ code: 'E', name: 'E', model: 'M', category: '', value: 1, condition: 'Tốt' }], remove: [{ assetId: rows[1].id, action: 'move', to: { kind: 'room', id: rB } }, { assetId: rows[2].id, action: 'dispose' }] }
     const { lease } = await createLease(db, admin, leaseInput({ handover }))
     const all = await db.select().from(assets)
-    expect(all.find(a => a.id === rows[1].id)?.locationKind).toBe('warehouse')
+    expect(all.find(a => a.id === rows[1].id)).toMatchObject({ locationKind: 'room', locationId: rB, facilityId: fb })
     expect(all.find(a => a.id === rows[2].id)?.status).toBe('disposed')
     expect((await assetHistory(db, admin, rows[2].id)).moves.some(m => m.reason === 'Thanh lý')).toBe(true)
     expect(all.find(a => a.code === 'E')?.model).toBe('M')
@@ -192,9 +192,48 @@ describe('contracts', () => {
     expect((await db.select().from(handoverItems).where(eq(handoverItems.handoverId, h.id))).map(x => x.assetId).sort()).toEqual([rows[0].id, extra.id, all.find(a => a.code === 'E')!.id].sort())
   })
 
+  it('di chuyển tài sản về kho khi bàn giao', async () => {
+    const [a] = await db.insert(assets).values({ code: 'W1', name: 'Bàn', facilityId: fa, locationKind: 'room', locationId: r301 }).returning()
+    const handover = { expectedRoomAssetIds: [a.id], addAssetIds: [], newAssets: [], remove: [{ assetId: a.id, action: 'move', to: { kind: 'warehouse', id: fa } }] }
+    await createLease(db, admin, leaseInput({ handover }))
+    expect((await db.select().from(assets).where(eq(assets.id, a.id)))[0]).toMatchObject({ locationKind: 'warehouse', locationId: fa })
+  })
+
+  it('từ chối di chuyển vào chính phòng đang lập hợp đồng', async () => {
+    const [a] = await db.insert(assets).values({ code: 'SELF', name: 'Bàn', facilityId: fa, locationKind: 'room', locationId: r301 }).returning()
+    const handover = { expectedRoomAssetIds: [a.id], addAssetIds: [], newAssets: [], remove: [{ assetId: a.id, action: 'move', to: { kind: 'room', id: r301 } }] }
+    await expect(createLease(db, admin, leaseInput({ handover }))).rejects.toThrow(ValidationError)
+    expect(await db.select().from(leases)).toHaveLength(0)
+  })
+
+  it('từ chối đích không tồn tại và rollback toàn bộ', async () => {
+    const [a] = await db.insert(assets).values({ code: 'GONE', name: 'Bàn', facilityId: fa, locationKind: 'room', locationId: r301 }).returning()
+    const handover = { expectedRoomAssetIds: [a.id], addAssetIds: [], newAssets: [], remove: [{ assetId: a.id, action: 'move', to: { kind: 'room', id: crypto.randomUUID() } }] }
+    await expect(createLease(db, admin, leaseInput({ handover }))).rejects.toThrow(NotFoundError)
+    expect(await db.select().from(leases)).toHaveLength(0)
+    expect(await db.select().from(handovers)).toHaveLength(0)
+  })
+
+  it('từ chối hành động cũ warehouse/unassigned', async () => {
+    const [a] = await db.insert(assets).values({ code: 'OLDACT', name: 'Bàn', facilityId: fa, locationKind: 'room', locationId: r301 }).returning()
+    for (const action of ['warehouse', 'unassigned']) {
+      const handover = { expectedRoomAssetIds: [a.id], addAssetIds: [], newAssets: [], remove: [{ assetId: a.id, action }] }
+      await expect(createLease(db, admin, leaseInput({ handover: handover as never }))).rejects.toThrow(ValidationError)
+    }
+    expect(await db.select().from(leases)).toHaveLength(0)
+  })
+
+  it('thiếu quyền ở cơ sở đích → hợp đồng không được tạo', async () => {
+    const [a] = await db.insert(assets).values({ code: 'NOPERM', name: 'Bàn', facilityId: fa, locationKind: 'room', locationId: r301 }).returning()
+    const handover = { expectedRoomAssetIds: [a.id], addAssetIds: [], newAssets: [], remove: [{ assetId: a.id, action: 'move', to: { kind: 'room', id: rB } }] }
+    await expect(createLease(db, ctxOf(['tenants_contracts', 'assets'], [fa]), leaseInput({ handover }))).rejects.toThrow(NotFoundError)
+    expect(await db.select().from(leases)).toHaveLength(0)
+    expect((await db.select().from(assets).where(eq(assets.id, a.id)))[0]).toMatchObject({ locationId: r301, facilityId: fa })
+  })
+
   it('rollback toàn bộ khi mã tài sản mới trùng', async () => {
     const [a] = await db.insert(assets).values({ code: 'DUP', name: 'Bàn', facilityId: fa, locationKind: 'room', locationId: r301 }).returning()
-    const handover = { expectedRoomAssetIds: [a.id], addAssetIds: [], newAssets: [{ code: 'DUP', name: 'Mới', model: '', category: '', value: 0, condition: 'Tốt' }], remove: [{ assetId: a.id, action: 'unassigned' }] }
+    const handover = { expectedRoomAssetIds: [a.id], addAssetIds: [], newAssets: [{ code: 'DUP', name: 'Mới', model: '', category: '', value: 0, condition: 'Tốt' }], remove: [{ assetId: a.id, action: 'move', to: { kind: 'warehouse', id: fa } }] }
     await expect(createLease(db, admin, leaseInput({ handover }))).rejects.toThrow(ValidationError)
     expect(await db.select().from(leases)).toHaveLength(0)
     expect(await db.select().from(handovers)).toHaveLength(0)
