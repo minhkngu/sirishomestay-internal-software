@@ -1,6 +1,6 @@
 import { eq, sql } from 'drizzle-orm'
 import { describe, it, expect, beforeEach } from 'vitest'
-import { facilities, feeTypes, feeTypePrices } from '@/db'
+import { facilities, feeTypes, feeTypePrices, feeUnits } from '@/db'
 import {
   setFeeDefault, listFeeDefaults, setFeeTypePrice, removeFeeTypePrice, listFeeTypePrices, createFeeUnit, listFeeUnits, createFeeType, updateFeeType, archiveFeeType, listFeeTypes, createRate, listRates,
 } from '@/server/fees/service'
@@ -85,6 +85,25 @@ describe('fees & rates', () => {
     expect(await listFeeTypes(db, admin)).toHaveLength(0)
     expect(await listFeeTypes(db, admin, { includeArchived: true })).toHaveLength(1)
     expect((await listFeeUnits(db, admin)).map((u) => u.name)).toEqual(['người'])
+  })
+
+  it('tạo loại phí kèm đơn vị mới, hoặc dùng lại đơn vị cùng tên', async () => {
+    const dien = await createFeeType(db, admin, { name: 'Điện', newUnitName: 'kWh', defaultPrice: 3500, billing: 'per_occurrence', quantityFrom: 'meter' })
+    const units = await listFeeUnits(db, admin)
+    expect(units.find((u) => u.name === 'kWh')?.id).toBe(dien.unitId)
+
+    const again = await createFeeType(db, admin, { name: 'Điện dự phòng', newUnitName: '  kWh ', defaultPrice: 0, billing: 'per_occurrence', quantityFrom: 'meter' })
+    expect(again.unitId).toBe(dien.unitId)
+    expect(units.filter((u) => u.name === 'kWh')).toHaveLength(1)
+    expect(await db.select().from(feeUnits)).toHaveLength(1)
+  })
+
+  it('từ chối khi vừa chọn đơn vị vừa nhập đơn vị mới, hoặc thiếu cả hai', async () => {
+    const unit = await createFeeUnit(db, admin, { name: 'lần' })
+    const base = { name: 'X', defaultPrice: 1, billing: 'monthly_fixed', quantityFrom: 'manual' } as const
+    await expect(createFeeType(db, admin, { ...base, unitId: unit.id, newUnitName: 'Y' })).rejects.toThrow('Chọn đơn vị hoặc nhập đơn vị mới')
+    await expect(createFeeType(db, admin, base)).rejects.toThrow('Chọn đơn vị hoặc nhập đơn vị mới')
+    expect(await listFeeTypes(db, admin)).toHaveLength(0)
   })
 
   it('chỉ nhóm settings tạo/sửa loại phí, đơn vị, đơn giá', async () => {

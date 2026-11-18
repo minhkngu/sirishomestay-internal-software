@@ -12,13 +12,18 @@ export type FeeUnit = typeof feeUnits.$inferSelect
 export type UtilityRateRow = typeof utilityRates.$inferSelect
 
 const unitInput = z.object({ name: z.string().trim().min(1, 'Nhập tên đơn vị') })
-const feeTypeInput = z.object({
+const feeTypeFields = {
   name: z.string().trim().min(1, 'Nhập tên loại phí'),
-  unitId: z.string().uuid('Chọn đơn vị'),
   defaultPrice: z.number().int().min(0, 'Đơn giá không hợp lệ'),
   billing: z.enum(['monthly_fixed', 'per_occurrence']),
   quantityFrom: z.enum(['manual', 'occupants', 'room', 'meter', 'period_input']),
-})
+}
+const feeTypeInput = z.object({
+  ...feeTypeFields,
+  unitId: z.string().uuid('Chọn đơn vị').optional(),
+  newUnitName: z.string().trim().min(1, 'Nhập tên đơn vị').optional(),
+}).refine((v) => Boolean(v.unitId) !== Boolean(v.newUnitName), { message: 'Chọn đơn vị hoặc nhập đơn vị mới', path: ['unitId'] })
+const feeTypeUpdateInput = z.object({ ...feeTypeFields, unitId: z.string().uuid('Chọn đơn vị') }).partial()
 const rateInput = z.object({
   facilityId: z.string().uuid(),
   utility: z.enum(['electric', 'water']),
@@ -62,7 +67,14 @@ export async function createFeeType(db: DB, ctx: AccessContext, input: unknown):
   assertCan(ctx, 'settings')
   const data = parse(feeTypeInput, input)
   return db.transaction(async (tx) => {
-    const [t] = await tx.insert(feeTypes).values(data).returning()
+    let unitId = data.unitId
+    if (!unitId) {
+      const [existing] = await tx.select().from(feeUnits).where(eq(feeUnits.name, data.newUnitName!))
+      unitId = existing?.id ?? (await tx.insert(feeUnits).values({ name: data.newUnitName! }).returning())[0].id
+    }
+    const [t] = await tx.insert(feeTypes).values({
+      name: data.name, unitId, defaultPrice: data.defaultPrice, billing: data.billing, quantityFrom: data.quantityFrom,
+    }).returning()
     await recordAudit(tx, ctx, { action: 'create', entity: 'fee_type', entityId: t.id, summary: `Tạo loại phí ${t.name}`, after: t })
     return t
   })
@@ -70,7 +82,7 @@ export async function createFeeType(db: DB, ctx: AccessContext, input: unknown):
 
 export async function updateFeeType(db: DB, ctx: AccessContext, id: string, input: unknown): Promise<FeeType> {
   assertCan(ctx, 'settings')
-  const data = parse(feeTypeInput.partial(), input)
+  const data = parse(feeTypeUpdateInput, input)
   return db.transaction(async (tx) => {
     const [before] = await tx.select().from(feeTypes).where(eq(feeTypes.id, id))
     if (!before) throw new NotFoundError()
