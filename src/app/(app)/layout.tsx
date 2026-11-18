@@ -8,8 +8,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const ctx = await getAccessContext()
   const hrefs = NAV_ITEMS.filter((i) => !i.requires || can(ctx, i.requires)).map((i) => i.href)
   return (
-    <AppShell hrefs={hrefs} userName={ctx.fullName}
-      demo={process.env.NEXT_PUBLIC_DEMO_MODE === '1'} logoutAction={logout}>
+    <AppShell hrefs={hrefs} userName={ctx.fullName} logoutAction={logout}>
       {children}
     </AppShell>
   )

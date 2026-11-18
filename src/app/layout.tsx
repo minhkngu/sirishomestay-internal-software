@@ -33,7 +33,7 @@ const beVietnam = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Siris",
+  title: "Siris Residences",
   description: "Quản lý khách thuê dài hạn",
 };
 

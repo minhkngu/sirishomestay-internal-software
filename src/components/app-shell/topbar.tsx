@@ -19,12 +19,7 @@ export function Topbar({ onMenu, children }: { onMenu: () => void; children?: Re
         <div className="flex size-7.5 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-2xs">
           <Building className="size-4" />
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-base font-semibold tracking-tight text-foreground">Siris</span>
-          <span className="hidden rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary sm:inline-block">
-            Residences
-          </span>
-        </div>
+        <span className="text-base font-semibold tracking-tight text-foreground">Siris Residences</span>
       </div>
 
       <div className="ml-auto flex items-center gap-3">{children}</div>
