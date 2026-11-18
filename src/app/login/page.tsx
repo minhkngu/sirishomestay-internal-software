@@ -1,7 +1,7 @@
 import { db } from '@/db/client'
 import { listDemoAccounts } from '@/server/users/service'
 import { PERMISSION_LABELS } from '@/domain/access'
-import { Building2, Sparkles } from 'lucide-react'
+import { Building2 } from 'lucide-react'
 import { LoginForm } from './login-form'
 import { DemoQuickLogin } from './demo-quick-login'
 
@@ -17,13 +17,6 @@ export default async function LoginPage() {
       <div className="pointer-events-none absolute -bottom-40 -right-40 size-96 rounded-full bg-accent/30 blur-3xl" />
 
       <div className="relative z-10 mx-auto flex w-full max-w-lg flex-col gap-6">
-        {demo && (
-          <div className="inline-flex items-center justify-center gap-1.5 rounded-full border border-amber-200/70 bg-amber-50/90 px-3 py-1 text-center text-xs font-medium text-amber-900 shadow-2xs backdrop-blur-xs">
-            <Sparkles className="size-3.5 text-amber-600 shrink-0" />
-            <span>Môi trường thử — dữ liệu giả</span>
-          </div>
-        )}
-
         <div className="text-center">
           <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-xs">
             <Building2 className="size-6" />

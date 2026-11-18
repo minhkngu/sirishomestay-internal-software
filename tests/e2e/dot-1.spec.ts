@@ -10,7 +10,7 @@ async function login(page: Page, name: RegExp) {
 
 test('Admin đăng nhập nhanh và tìm khách không dấu', async ({ page }) => {
   await login(page, /^Admin/)
-  await expect(page.getByText('Môi trường thử — dữ liệu giả')).toBeVisible()
+  await expect(page.getByText('Siris Residences').first()).toBeVisible()
   await page.goto('/tenants')
   await page.getByPlaceholder('Tìm tên, SĐT, passport, CCCD…').fill('nguyen van an')
   await expect(page).toHaveURL(/q=nguyen\+van\+an/)

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { DemoBanner } from './demo-banner'
 import { NAV_ITEMS } from './nav'
 import { Sidebar } from './sidebar'
 import { Topbar } from './topbar'
@@ -10,16 +9,14 @@ type Props = {
   children: ReactNode
   hrefs: string[]
   userName: string
-  demo: boolean
   logoutAction: () => Promise<void>
 }
 
-export function AppShell({ children, hrefs, userName, demo, logoutAction }: Props) {
+export function AppShell({ children, hrefs, userName, logoutAction }: Props) {
   const [open, setOpen] = useState(false)
   const items = NAV_ITEMS.filter((i) => hrefs.includes(i.href))
   return (
     <div className="flex min-h-screen flex-col">
-      {demo && <DemoBanner />}
       <Topbar onMenu={() => setOpen(true)}>
         <div className="flex h-8 items-center gap-2 rounded-xl border border-border/80 bg-muted/40 px-2.5">
           <div className="flex size-5.5 items-center justify-center rounded-lg bg-primary/15 text-[11px] font-bold text-primary">
