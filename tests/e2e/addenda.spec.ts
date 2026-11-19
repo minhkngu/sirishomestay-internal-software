@@ -24,7 +24,7 @@ test('gia hạn tăng cọc: xem trước tiền, lưu, sổ cọc có khoản t
   await expect(page.getByText(/Sổ cọc: thu thêm/)).toBeVisible()
   await page.getByRole('button', { name: 'Lưu phụ lục' }).click()
   await expect(page.getByText('Đã lưu phụ lục')).toBeVisible()
-  await expect(page.getByRole('cell', { name: 'Thu bổ sung' }).first()).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'Thu cọc bổ sung' }).first()).toBeVisible()
 })
 
 test('chuyển phòng và thanh lý: bước xem trước tiền không lưu gì', async ({ page }) => {

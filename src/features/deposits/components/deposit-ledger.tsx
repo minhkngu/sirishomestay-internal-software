@@ -3,28 +3,17 @@ import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { formatDateVN, todayVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
+import { DEPOSIT_ENTRY_LABELS, runningDepositBalances } from '@/domain/deposit'
+import type { DepositEntry } from '@/domain/types'
 import { MoneyInput } from '@/components/ui/money-input'
 import { addDepositEntryAction, markDepositDoneAction } from '@/server/charges/actions'
 
+// Dòng từ DB có `type`/`status` kiểu chuỗi; giá trị hợp lệ do cột DB bảo đảm.
 type Entry = { id: string; date: string; type: string; amount: number; status: string }
-const labels: Record<string, string> = {
-  collect: 'Thu cọc',
-  topup: 'Thu bổ sung',
-  deduct: 'Khấu trừ',
-  refund: 'Hoàn cọc',
-  forfeit: 'Mất cọc',
-}
-export function DepositLedger({ entries, canEdit, leaseId }: { entries: Entry[]; canEdit: boolean; leaseId: string }) {
+export function DepositLedger({ entries, canEdit, leaseId }: { entries: Entry[]; canEdit: boolean; leaseId?: string }) {
   const [pending, startTransition] = useTransition()
   const [amount, setAmount] = useState('')
-  const balances = entries.reduce<number[]>((result, entry) => {
-    const previous = result.at(-1) ?? 0
-    return [
-      ...result,
-      previous +
-        (entry.status === 'done' ? (['collect', 'topup'].includes(entry.type) ? entry.amount : -entry.amount) : 0),
-    ]
-  }, [])
+  const balances = runningDepositBalances(entries as Pick<DepositEntry, 'type' | 'amount' | 'status'>[])
   return (
     <div className="space-y-3">
       <div className="overflow-x-auto">
@@ -45,7 +34,7 @@ export function DepositLedger({ entries, canEdit, leaseId }: { entries: Entry[];
               return (
                 <tr key={entry.id} className="border-t">
                   <td>{formatDateVN(entry.date)}</td>
-                  <td>{labels[entry.type]}</td>
+                  <td>{DEPOSIT_ENTRY_LABELS[entry.type as DepositEntry['type']]}</td>
                   <td>{formatVND(entry.amount)}</td>
                   <td>{entry.status === 'done' ? 'Đã xong' : 'Chờ'}</td>
                   <td>{formatVND(current)}</td>
@@ -83,7 +72,7 @@ export function DepositLedger({ entries, canEdit, leaseId }: { entries: Entry[];
           </tbody>
         </table>
       </div>
-      {canEdit && (
+      {canEdit && leaseId && (
         <form
           className="flex flex-wrap gap-2"
           onSubmit={(event) => {
