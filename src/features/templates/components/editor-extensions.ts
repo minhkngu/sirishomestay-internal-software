@@ -32,7 +32,7 @@ export const SummaryItem = Node.create({
   name: 'summaryItem',
   content: 'inline*',
   defining: true,
-  addAttributes() { return { label: { default: '' } } },
+  addAttributes() { return { label: { default: '', parseHTML: (el: HTMLElement) => el.getAttribute('data-label') ?? '' } } },
   parseHTML() { return [{ tag: 'div[data-label]' }] },
   renderHTML({ node }) { return ['div', { 'data-label': node.attrs.label, class: 'summary-item' }, 0] },
 })
