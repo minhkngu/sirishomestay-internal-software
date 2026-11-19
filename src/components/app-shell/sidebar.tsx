@@ -41,7 +41,7 @@ export function Sidebar({ items, onNavigate, className }: { items: NavItem[]; on
 
       <div className="mt-auto pt-4 border-t border-border/60 px-2 text-[11px] text-muted-foreground">
         <p className="font-medium text-foreground/70">Siris Residences</p>
-        <p className="text-[10px] text-muted-foreground/80">Quản trị căn hộ dịch vụ</p>
+        <p className="text-[11px] text-muted-foreground/80">Quản trị căn hộ dịch vụ</p>
       </div>
     </div>
   )
