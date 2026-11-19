@@ -3,8 +3,6 @@
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { TreeFacility } from './location-types'
 
-const KIND_LABEL: Record<string, string> = { warehouse: 'Kho', common: 'Khu chung', unassigned: 'Chưa xếp' }
-
 export function LocationFilters({
   facilities,
   facilityId,
@@ -21,6 +19,13 @@ export function LocationFilters({
   const facility = facilities.find((f) => f.id === facilityId)
   const rooms = facility?.rooms ?? []
   const room = rooms.find((r) => r.id === location)
+  const locationItems = [
+    { value: 'all', label: 'Tất cả vị trí' },
+    { value: 'warehouse', label: facilityId ? 'Kho' : 'Kho (tất cả toà)' },
+    { value: 'common', label: facilityId ? 'Khu chung' : 'Khu chung (tất cả toà)' },
+    { value: 'unassigned', label: facilityId ? 'Chưa xếp' : 'Chưa xếp (tất cả toà)' },
+    ...rooms.map((r) => ({ value: r.id, label: `Phòng ${r.code}` })),
+  ]
 
   return (
     <>
@@ -41,18 +46,11 @@ export function LocationFilters({
       <Select
         value={location || 'all'}
         onValueChange={(value) => onLocationChange(!value || value === 'all' ? '' : value)}
-        items={[
-          { value: 'all', label: 'Tất cả vị trí' },
-          { value: 'warehouse', label: 'Kho' },
-          { value: 'common', label: 'Khu chung' },
-          { value: 'unassigned', label: 'Chưa xếp' },
-          ...rooms.map((r) => ({ value: r.id, label: `Phòng ${r.code}` })),
-        ]}
-        disabled={!facilityId}
+        items={locationItems}
       >
         <SelectTrigger aria-label="Lọc vị trí" className="h-9 w-36 gap-2 border-border/80 bg-card px-2.5 text-[13px] sm:w-40">
           <span className="truncate">
-            {!facilityId ? 'Chọn toà' : !location ? 'Tất cả vị trí' : room ? `Phòng ${room.code}` : KIND_LABEL[location] ?? 'Tất cả vị trí'}
+            {!location ? 'Tất cả vị trí' : room ? `Phòng ${room.code}` : location === 'warehouse' ? (facilityId ? 'Kho' : 'Kho (tất cả toà)') : location === 'common' ? (facilityId ? 'Khu chung' : 'Khu chung (tất cả toà)') : location === 'unassigned' ? (facilityId ? 'Chưa xếp' : 'Chưa xếp (tất cả toà)') : 'Tất cả vị trí'}
           </span>
         </SelectTrigger>
         <SelectContent align="start" className="w-48">
@@ -63,10 +61,12 @@ export function LocationFilters({
             <SelectItem value="common">Khu chung</SelectItem>
             <SelectItem value="unassigned">Chưa xếp</SelectItem>
           </SelectGroup>
-          <SelectGroup>
-            <SelectLabel>Phòng</SelectLabel>
-            {rooms.map((r) => <SelectItem key={r.id} value={r.id}>Phòng {r.code}</SelectItem>)}
-          </SelectGroup>
+          {facilityId && (
+            <SelectGroup>
+              <SelectLabel>Phòng</SelectLabel>
+              {rooms.map((r) => <SelectItem key={r.id} value={r.id}>Phòng {r.code}</SelectItem>)}
+            </SelectGroup>
+          )}
         </SelectContent>
       </Select>
     </>
