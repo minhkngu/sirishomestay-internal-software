@@ -1,26 +1,6 @@
 import { ValidationError } from '@/domain/errors'
 
-const PDF_ERROR = 'Không chuyển được sang PDF, thử lại sau'
 const PNG_ERROR = 'Không chuyển được sang ảnh, thử lại sau'
-
-function baseUrl(): string {
-  const url = process.env.GOTENBERG_URL
-  if (!url) throw new ValidationError('Chưa cấu hình dịch vụ chuyển PDF')
-  return url.replace(/\/+$/, '')
-}
-
-/** Word → PDF qua Gotenberg (LibreOffice). Lỗi mạng hoặc HTTP khác 2xx → thông báo tiếng Việt, không lộ chi tiết nội bộ. */
-export async function convertDocxToPdf(docx: Blob): Promise<Blob> {
-  const form = new FormData()
-  form.append('files', docx, 'document.docx')
-  let res: Response
-  try { res = await fetch(`${baseUrl()}/forms/libreoffice/convert`, { method: 'POST', body: form }) } catch (e) {
-    if (e instanceof ValidationError) throw e
-    throw new ValidationError(PDF_ERROR)
-  }
-  if (!res.ok) throw new ValidationError(PDF_ERROR)
-  return new Blob([await res.arrayBuffer()], { type: 'application/pdf' })
-}
 
 /** Độ phân giải ảnh xuất: 150 dpi (PDF tính theo 72 điểm/inch). */
 const PNG_SCALE = 150 / 72

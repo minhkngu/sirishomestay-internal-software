@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { addenda, assets, auditLogs, files, handoverItems, depositContracts, depositEntries, facilities, handovers, invoices, payments, oneOffCharges, incidents, rooms, leases, tenants, userProfiles, userPermissions } from '@/db'
+import { feeTypes, feeUnits, leaseFeeMeters, leaseFeeSnapshots, addenda, assets, auditLogs, files, handoverItems, depositContracts, depositEntries, facilities, handovers, invoices, payments, oneOffCharges, incidents, rooms, leases, tenants, userProfiles, userPermissions } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'
@@ -32,6 +32,55 @@ describe('sửa và xoá hợp đồng', () => {
     expect((await db.select().from(leases).where(eq(leases.id, lease.id)))[0].monthlyRent).toBe(2000)
     expect(await db.select().from(invoices).where(eq(invoices.id, invoice.id))).toHaveLength(1)
     expect(await db.select().from(depositEntries).where(eq(depositEntries.leaseId, lease.id))).toEqual(before)
+  })
+  it('sửa phí hợp đồng snapshot: thêm từ loại phí đã cài, đổi giá, gỡ phí; chặn loại trùng', async () => {
+    const [unit] = await db.insert(feeUnits).values({ name: 'tháng' }).returning()
+    const [giat] = await db.insert(feeTypes).values({ name: 'Giặt', unitId: unit.id, defaultPrice: 50_000, quantityFrom: 'room' }).returning()
+    const [rac] = await db.insert(feeTypes).values({ name: 'Rác', unitId: unit.id, defaultPrice: 20_000, quantityFrom: 'room' }).returning()
+    const { lease } = await contracts.createLease(db, admin, { ...input(), feeModel: 'snapshot', fees: [{ feeTypeId: giat.id, name: 'x', unit: 'x', quantitySource: 'room', unitPrice: 50_000 }] })
+    const [old] = await db.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, lease.id))
+    await contracts.updateLease(db, admin, lease.id, { ...input(), fees: [{ leaseFeeId: old.id, unitPrice: 60_000 }, { feeTypeId: rac.id, unitPrice: 20_000 }] }, false)
+    const rows = await db.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, lease.id))
+    expect(rows.map(r => [r.name, r.unitPrice]).sort()).toEqual([['Giặt', 60_000], ['Rác', 20_000]])
+    await expect(contracts.updateLease(db, admin, lease.id, { ...input(), fees: [{ leaseFeeId: old.id, unitPrice: 60_000 }, { feeTypeId: giat.id, unitPrice: 1 }] }, false)).rejects.toThrow('đã có')
+    await contracts.updateLease(db, admin, lease.id, { ...input(), fees: [{ leaseFeeId: old.id, unitPrice: 60_000 }] }, false)
+    expect(await db.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, lease.id))).toHaveLength(1)
+    await contracts.updateLease(db, admin, lease.id, input(), false)
+    expect(await db.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, lease.id))).toHaveLength(1)
+  })
+  it('thêm phí điện theo đồng hồ khi sửa hợp đồng: bắt buộc chỉ số đầu, gắn đồng hồ mới; hợp đồng cũ bị từ chối', async () => {
+    const [unit] = await db.insert(feeUnits).values({ name: 'kWh' }).returning()
+    const [dien] = await db.insert(feeTypes).values({ name: 'Điện', unitId: unit.id, defaultPrice: 3500, billing: 'per_occurrence', quantityFrom: 'meter' }).returning()
+    const { lease } = await contracts.createLease(db, admin, { ...input(), feeModel: 'snapshot', fees: [] })
+    await expect(contracts.updateLease(db, admin, lease.id, { ...input(), fees: [{ feeTypeId: dien.id, unitPrice: 3500 }] }, false)).rejects.toThrow('chỉ số')
+    await contracts.updateLease(db, admin, lease.id, { ...input(), fees: [{ feeTypeId: dien.id, unitPrice: 3500, initialReading: 120 }] }, false)
+    const [fee] = await db.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, lease.id))
+    expect([fee.name, fee.quantitySource, fee.unitPrice]).toEqual(['Điện', 'meter', 3500])
+    expect(await db.select().from(leaseFeeMeters).where(eq(leaseFeeMeters.leaseFeeId, fee.id))).toHaveLength(1)
+    // hợp đồng kiểu cũ: tự chuyển sang bản chụp phí khi thêm phí điện, giữ phí cũ
+    const room2 = (await db.insert(rooms).values({ facilityId, code: '102' }).returning())[0].id
+    const [giat] = await db.insert(feeTypes).values({ name: 'Giặt', unitId: unit.id, defaultPrice: 50_000, quantityFrom: 'room' }).returning()
+    const legacy = await contracts.createLease(db, admin, { ...input(), roomId: room2, fees: [{ feeTypeId: giat.id, quantity: 1, unitPrice: 50_000 }] as never })
+    const [oldFee] = await contracts.getLease(db, admin, legacy.lease.id).then(l => l.fees)
+    await contracts.updateLease(db, admin, legacy.lease.id, { ...input(), roomId: room2, fees: [{ leaseFeeId: oldFee.leaseFeeId, unitPrice: 55_000 }, { feeTypeId: dien.id, unitPrice: 3500, initialReading: 10 }] }, false)
+    const rows = await db.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, legacy.lease.id))
+    expect(rows.map(r => [r.name, r.unitPrice]).sort()).toEqual([['Giặt', 55_000], ['Điện', 3500]])
+    expect((await db.select().from(leases).where(eq(leases.id, legacy.lease.id)))[0].feeModel).toBe('snapshot')
+  })
+  it('cập nhật tài sản trong phòng của hợp đồng: thêm, tạo mới, chuyển về kho, thanh lý', async () => {
+    const { lease } = await contracts.createLease(db, admin, input())
+    const mk = (code: string, loc: { kind: string; id: string }) => db.insert(assets).values({ code, name: code, facilityId, locationKind: loc.kind, locationId: loc.id, searchText: code }).returning().then(r => r[0])
+    const inRoom = await mk('TS-1', { kind: 'room', id: roomId })
+    const inRoom2 = await mk('TS-2', { kind: 'room', id: roomId })
+    const stock = await mk('TS-3', { kind: 'warehouse', id: facilityId })
+    await contracts.updateLeaseAssets(db, admin, lease.id, { add: [stock.id], create: [{ code: 'TS-4', name: 'Mới', model: '', category: '', value: 0, condition: 'Tốt' }], remove: [{ assetId: inRoom.id, action: 'warehouse' }, { assetId: inRoom2.id, action: 'dispose' }] })
+    const all = await db.select().from(assets)
+    const where = Object.fromEntries(all.map(a => [a.code, `${a.locationKind}:${a.status}`]))
+    expect(where['TS-1']).toBe('warehouse:in_use')
+    expect(where['TS-2']).toBe(`room:disposed`)
+    expect(where['TS-3']).toBe('room:in_use')
+    expect(where['TS-4']).toBe('room:in_use')
+    await expect(contracts.updateLeaseAssets(db, admin, lease.id, { add: [], create: [], remove: [{ assetId: inRoom.id, action: 'dispose' }] })).rejects.toThrow('không nằm trong phòng')
   })
   it('sửa hợp đồng lưu ghi chú nhiều dòng, để trống thì xoá ghi chú', async () => {
     const { lease } = await contracts.createLease(db, admin, input())

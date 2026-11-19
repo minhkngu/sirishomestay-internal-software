@@ -1,6 +1,6 @@
 import { PDF_DOC_TYPES } from '@/domain/template-fields'
 import { ValidationError } from '@/domain/errors'
-import { convertPdfToPng } from './gotenberg'
+import { convertPdfToPng } from './png'
 
 export type ExportFormat = 'docx' | 'pdf' | 'png'
 export const FORMAT_EXT: Record<ExportFormat, { ext: string; mime: string }> = {

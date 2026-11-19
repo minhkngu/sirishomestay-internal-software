@@ -19,12 +19,11 @@ describe('xuất PDF và ảnh (không cần dịch vụ ngoài)', () => {
     db = await createTestDb(); storage = new MemoryStorage(); fetchSpy.mockClear()
     facilityId = (await db.insert(facilities).values({ code: 'A', name: 'A' }).returning())[0].id
     registerDocLoader('lease', async () => ({ entities: { now: '2026-11-16' }, facilityId, baseName: 'tai-lieu' }))
-    vi.stubEnv('GOTENBERG_URL', '')
     vi.stubGlobal('fetch', fetchSpy)
   })
-  afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals() })
+  afterEach(() => { vi.unstubAllGlobals() })
 
-  it('xuất PDF hợp đồng chạy ngay trong app: không gọi mạng, không cần GOTENBERG_URL', async () => {
+  it('xuất PDF hợp đồng chạy ngay trong app: không gọi mạng, không cần dịch vụ ngoài', async () => {
     await addHtmlTemplate(db, admin, 'lease')
     const r = await exportDocument(db, admin, storage, { docType: 'lease', entityId: crypto.randomUUID(), format: 'pdf' })
     const [row] = await db.select().from(files).where(eq(files.id, r.fileId))

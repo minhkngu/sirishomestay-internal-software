@@ -11,7 +11,7 @@ import {
   type LeaseFeeInput, createDepositContract, cancelDepositContract, listDepositContracts, getDepositContract, convertDepositToLease, createLease, getLease, listLeases, setSignStatus, exportContract,
 } from '@/server/contracts/service'
 import { MemoryStorage } from '@/server/storage/memory'
-import { DOCX_MIME } from '@/lib/docx'
+import { FORMAT_EXT } from '@/server/convert'
 import PizZip from 'pizzip'
 import { removeTemplate } from '@/server/templates/service'
 import { depositBalance } from '@/domain/deposit'
@@ -96,7 +96,7 @@ describe('contracts', () => {
     const [other] = await db.insert(docTemplates).values({ docType: 'deposit_contract', name: 'Sai loại' }).returning()
     const [unfinished] = await db.insert(docTemplates).values({ docType: 'lease', name: 'Chưa có tệp' }).returning()
     const [legacyWord] = await db.insert(docTemplates).values({ docType: 'lease', name: 'Word cũ' }).returning()
-    const [file] = await db.insert(files).values({ storageKey: 'template/legacy.docx', ownerType: 'template', ownerId: legacyWord.id, contentType: DOCX_MIME, confirmedAt: new Date() }).returning()
+    const [file] = await db.insert(files).values({ storageKey: 'template/legacy.docx', ownerType: 'template', ownerId: legacyWord.id, contentType: FORMAT_EXT.docx.mime, confirmedAt: new Date() }).returning()
     await db.update(docTemplates).set({ fileId: file.id }).where(eq(docTemplates.id, legacyWord.id))
     for (const contractTemplateId of [other.id, unfinished.id, legacyWord.id, crypto.randomUUID()]) {
       await expect(createLease(db, lan(), leaseInput({ contractTemplateId }))).rejects.toThrow(ValidationError)
@@ -105,7 +105,7 @@ describe('contracts', () => {
 
   it('chuyển hợp đồng cọc giữ mẫu hợp đồng đã chọn', async () => {
     const [template] = await db.insert(docTemplates).values({ docType: 'lease', name: 'Mẫu thuê', body: '<p>x</p>' }).returning()
-    const [file] = await db.insert(files).values({ storageKey: 'template/test.docx', ownerType: 'template', ownerId: template.id, contentType: DOCX_MIME, confirmedAt: new Date() }).returning()
+    const [file] = await db.insert(files).values({ storageKey: 'template/test.docx', ownerType: 'template', ownerId: template.id, contentType: FORMAT_EXT.docx.mime, confirmedAt: new Date() }).returning()
     await db.update(docTemplates).set({ fileId: file.id }).where(eq(docTemplates.id, template.id))
     const { contract } = await createDepositContract(db, lan(), { roomId: r301, tenantId: tenant1, depositAmount: 1_000_000, agreedRent: 9_000_000, expectedMoveIn: '2026-10-15' })
     const { lease } = await convertDepositToLease(db, lan(), contract.id, leaseInput({ contractTemplateId: template.id }))
