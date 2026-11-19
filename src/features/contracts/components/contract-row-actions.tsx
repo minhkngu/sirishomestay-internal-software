@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { ArrowLeftRight, CalendarPlus, FilePenLine, RotateCcw, Trash2, UserRoundPlus, CircleStop } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { IconTip, IconTipGroup } from '@/components/ui/tooltip'
@@ -28,6 +28,7 @@ const ACTIONS = [
 
 export function ContractRowActions({ id, kind, active, canDelete, redirectAfterDelete, renderCreatePerson, renderCreateFee }: { id: string; kind: 'lease' | 'deposit'; active: boolean; canDelete: boolean; redirectAfterDelete?: string; /** Các mục sửa kèm theo (phí phát sinh, mẫu hoá đơn, giấy tờ, sổ cọc...) do tầng route cấp vì chúng thuộc nhiều tính năng. */ renderCreatePerson?: RenderCreatePerson; renderCreateFee?: RenderCreateFee }) {
   const router = useRouter()
+  const pathname = usePathname()
   const [action, setAction] = useState<Action | null>(null)
   const [data, setData] = useState<Data | null>(null)
   const [preview, setPreview] = useState<Preview | null>(null)
@@ -39,6 +40,8 @@ export function ContractRowActions({ id, kind, active, canDelete, redirectAfterD
   const prefetched = useRef<ReturnType<typeof quickContractDataAction> | null>(null)
   const prefetch = () => { prefetched.current ??= quickContractDataAction(kind, id) }
   const close = () => { prefetched.current = null; setAction(null); setData(null); setPreview(null); setError(''); router.refresh() }
+  /** Lưu xong: đóng popup sửa và mở lại hợp đồng vừa sửa (đang ở chính hợp đồng đó thì chỉ làm mới). */
+  const saved = () => { close(); if (pathname !== `/contracts/${id}`) router.push(`/contracts/${id}`) }
   const open = (next: Action) => {
     setAction(next); setData(null); setPreview(null); setError(''); setRecipient(''); setDate('')
     start(async () => {
@@ -61,7 +64,7 @@ export function ContractRowActions({ id, kind, active, canDelete, redirectAfterD
         <DialogHeader><DialogTitle>{label}</DialogTitle><DialogDescription>Hợp đồng và dữ liệu liên quan sẽ được kiểm tra trước khi lưu.</DialogDescription></DialogHeader>
         {pending && !data && !preview && !error && <div className="space-y-3" aria-busy="true"><div className="h-4 w-1/2 animate-pulse rounded bg-muted" /><div className="h-40 animate-pulse rounded-xl bg-muted" /><div className="h-24 animate-pulse rounded-xl bg-muted" /></div>}
         {error && <p role="alert" className="text-destructive">{error}</p>}
-        {data && (action === 'edit' || action === 'delete') && <ContractEditActions assets={data.assetData} documents={{ signedFileId: data.extras?.signedFileId ?? null, entries: data.extras?.depositEntries ?? [], canEditDeposit: data.extras?.billing ?? false }} facility={data.facility} renderCreatePerson={renderCreatePerson} renderCreateFee={renderCreateFee} contract={data.contract} canDelete={canDelete} rooms={data.rooms} tenants={data.tenants} occupants={kind === 'lease' ? data.occupants : undefined} people={kind === 'lease' && data.form ? data.people : undefined} feeData={kind === 'lease' ? data.feeData : undefined} templates={data.extras ? { contract: data.extras.contractTemplates, contractId: data.extras.contractTemplateId, invoice: data.extras.invoiceTemplates, invoiceId: data.extras.invoiceTemplateId } : undefined} mode={action} onCompleted={action === 'delete' && redirectAfterDelete ? () => router.replace(redirectAfterDelete) : close} />}
+        {data && (action === 'edit' || action === 'delete') && <ContractEditActions assets={data.assetData} documents={{ signedFileId: data.extras?.signedFileId ?? null, entries: data.extras?.depositEntries ?? [], canEditDeposit: data.extras?.billing ?? false }} facility={data.facility} renderCreatePerson={renderCreatePerson} renderCreateFee={renderCreateFee} contract={data.contract} canDelete={canDelete} rooms={data.rooms} tenants={data.tenants} occupants={kind === 'lease' ? data.occupants : undefined} people={kind === 'lease' && data.form ? data.people : undefined} feeData={kind === 'lease' ? data.feeData : undefined} templates={data.extras ? { contract: data.extras.contractTemplates, contractId: data.extras.contractTemplateId, invoice: data.extras.invoiceTemplates, invoiceId: data.extras.invoiceTemplateId } : undefined} mode={action} onCompleted={action === 'delete' && redirectAfterDelete ? () => router.replace(redirectAfterDelete) : close} onSaved={saved} />}
         {data?.form && action === 'extension' && <ExtensionDialog leaseId={id} endDate={data.form.endDate} today={data.form.today} defaultOpen onCompleted={close} />}
         {data?.form && action === 'transfer' && <TransferWizard leaseId={id} currentRoomId={data.form.currentRoomId} freeRooms={data.form.freeRooms} meters={data.form.meters} today={data.form.today} defaultOpen onCompleted={close} />}
         {data?.form && action === 'termination' && <TerminationWizard leaseId={id} meters={data.form.meters.filter(m => m.roomId === data.form!.currentRoomId)} today={data.form.today} defaultOpen onCompleted={close} />}

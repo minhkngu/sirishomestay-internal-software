@@ -199,14 +199,13 @@ export default async function ContractDetail({ id }: { id: string }) {
 
             <div className="flex flex-wrap items-center gap-2">
               <ContractActions id={deposit.id} kind="deposit" active={false} canDelete={can(ctx, 'delete_contracts', deposit.facilityId)} redirectAfterDelete="/contracts" />
-              {/* Thẻ <a> (tải trang đầy đủ) có chủ ý: mở bằng Link thì wizard hiện trong popup và sau khi tạo, URL không chuyển sang trang hợp đồng (invoices.spec bị treo) */}
               {deposit.status === 'pending' && (
-                <a
+                <Link
                   href={`/contracts/new?deposit=${deposit.id}`}
                   className={cn(buttonVariants({ size: 'sm' }), 'rounded-xl shadow-2xs')}
                 >
                   Chuyển thành hợp đồng thuê
-                </a>
+                </Link>
               )}
             </div>
           </div>

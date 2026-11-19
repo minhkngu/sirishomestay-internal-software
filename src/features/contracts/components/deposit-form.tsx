@@ -1,6 +1,6 @@
 'use client'
 
-import { goToContract } from './go-to-contract'
+import { useGoToContract } from './go-to-contract'
 import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,7 @@ export type RoomOption = { id: string; facilityId: string; label: string; listPr
 export type TenantOption = { id: string; name: string; kind: 'foreign' | 'vietnamese' | 'company' }
 
 export function DepositForm({ rooms, tenants, initialRoomId, initialTenantId }: { rooms: RoomOption[]; tenants: TenantOption[]; initialRoomId?: string; initialTenantId?: string }) {
+  const goToContract = useGoToContract()
   const [pending, start] = useTransition()
   const [roomId, setRoomId] = useState(initialRoomId ?? '')
   const [tenantId, setTenantId] = useState(initialTenantId ?? '')

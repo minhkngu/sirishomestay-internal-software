@@ -1,6 +1,6 @@
 'use client'
 
-import { goToContract } from './go-to-contract'
+import { useGoToContract } from './go-to-contract'
 import { useRef, useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -31,6 +31,7 @@ type Props = {
 const TOO_BIG = `Số tiền quá lớn, tối đa ${MAX_MONEY.toLocaleString('vi-VN')} VND`
 
 export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAssets, moveTargets, feeDefaults, roomMeters, rooms, tenants, feeTypes, initial = {}, defaults }: Props) {
+  const goToContract = useGoToContract()
   const [pending, start] = useTransition()
   const [received, setReceived] = useState(String(initial.receivedDeposit ?? 0))
   const [note, setNote] = useState('')
