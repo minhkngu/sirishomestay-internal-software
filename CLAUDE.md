@@ -21,10 +21,11 @@ Web nội bộ cho nhân viên Siris quản lý cơ sở, phòng, khách thuê, 
 - Migration: sửa `src/db/schema/`, rồi `npm run db:generate` (không sửa tay file trong `drizzle/`)
 
 ## Architecture
-- Style: N-Layer. Chosen because đây là kiến trúc đang dùng: route → giao diện theo tính năng → server → domain/db, import chỉ đi một chiều.
-- Modules: `src/app/` route, page, layout (mỏng, gọi `src/server`); `src/features/<tên>/components/` giao diện của từng tính năng; `src/components/` UI dùng chung (`ui/` là shadcn, `app-shell/`); `src/server/<tên>/` `service.ts` (logic + truy vấn), `actions.ts` (server action), `schemas.ts` (zod); `src/domain/` quy tắc nghiệp vụ thuần (tiền, ngày, quyền, tính phí); `src/db/` client và schema Drizzle; `src/lib/` tiện ích, client Supabase.
-- Dependency rules: `domain` không import module nào trong `src`; `db` chỉ import `db`; `server` import `db`, `domain`, `lib`; `features` và `components` import `server` (actions/types), `domain`, `lib`, `components`, không import `db`; một feature không import feature khác; chỉ `app` import `features`.
-- New code: tính năng mới = `src/server/<tên>/` + `src/features/<tên>/components/` + route trong `src/app/(app)/<tên>/`; quy tắc tính toán thuần đặt ở `src/domain/` kèm unit test.
+- Style: Modular monolith, mỗi module chia lớp bên trong (target; mảng chưa chuyển vẫn ở `src/server/<tên>/` + `src/features/<tên>/` theo N-Layer cũ — lộ trình: `docs/superpowers/plans/2026-11-19-chuan-hoa-repo.md`). Chosen because một team, một lần deploy, nghiệp vụ chia rõ theo mảng, còn N-Layer làm một tính năng rải qua 5–6 thư mục.
+- Modules: `src/modules/<mảng>/` gồm `domain/` (quy tắc thuần, kèm unit test), `server/` (service, actions, schemas), `ui/` (component) và ba cổng công khai `index.ts` (server), `actions.ts` (server action), `ui.ts` (component). Mảng: platform, users, tenants, facilities, documents, assets, meters, leasing, import, dashboard. Dùng chung: `src/domain/` (tiền, ngày, lỗi, quyền), `src/components/`, `src/lib/`, `src/db/` (client + schema mọi bảng). `src/app/` route mỏng, ghép module. `src/modules/registrations.ts` đăng ký resolver/loader.
+- Dependency rules: tầng 1 platform; tầng 2 users, tenants, facilities, documents; tầng 3 assets, meters; tầng 4 leasing; tầng 5 import, dashboard. Module chỉ import module tầng thấp hơn, qua cổng công khai. Trong module: `ui` → `domain`, cổng `actions.ts`; `server` → `domain`, `db`; `domain` → `src/domain`. Dùng chung không import module. Ghi bảng của module khác chỉ qua API module đó. Code chưa chuyển: `server` → `db`, `domain`, `lib`; `features` không import `db` hay feature khác.
+- New code: vào `src/modules/<mảng>/` của mảng sở hữu; mảng chưa chuyển thì viết ở chỗ cũ và chuyển cùng module.
+- Chi tiết: đọc [docs/architecture.md](docs/architecture.md) trước khi sửa — mảng nào đã chuyển, luồng yêu cầu, quy tắc nghiệp vụ, bẫy đã biết. Đổi cấu trúc thì cập nhật file đó.
 
 ## Front-end design
 
