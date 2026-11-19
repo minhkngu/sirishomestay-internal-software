@@ -9,6 +9,7 @@ import { Pager } from '@/components/list/pager'
 import { usePager } from '@/components/list/use-list-params'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { formatVND } from '@/domain/money'
 import { removeDiacritics } from '@/domain/text'
@@ -49,6 +50,7 @@ export function AssetTable({ assets, facilities }: { assets: AssetRow[]; facilit
   const [sel, setSel] = useState<Selected>({ kind: 'all' })
   const [q, setQ] = useState('')
   const [state, setState] = useState('')
+  const [room, setRoom] = useState('')
   const [checked, setChecked] = useState<string[]>([])
   const [moving, setMoving] = useState(false)
 
@@ -74,16 +76,25 @@ export function AssetTable({ assets, facilities }: { assets: AssetRow[]; facilit
     if (sel.kind === 'facility' && a.facilityId !== sel.id) return false
     if ((sel.kind === 'warehouse' || sel.kind === 'common' || sel.kind === 'unassigned' || sel.kind === 'room') && (a.locationKind !== sel.kind || a.locationId !== sel.id)) return false
     if (state && assetState(a) !== state) return false
+    if (room.trim()) {
+      if (a.locationKind !== 'room') return false
+      const code = roomCode.get(a.locationId) ?? ''
+      if (!removeDiacritics(code).toLowerCase().includes(removeDiacritics(room).toLowerCase().trim())) return false
+    }
     if (q.trim()) {
       const haystack = `${a.code} ${a.name} ${a.category} ${where(a).top} ${where(a).sub}`
       return removeDiacritics(haystack).toLowerCase().includes(removeDiacritics(q).toLowerCase().trim())
     }
     return true
   })
-  const { pageRows, pager } = usePager(shown, 'assets', `${encodeLocation(sel)}|${state}|${q}`)
+  const { pageRows, pager } = usePager(shown, 'assets', `${encodeLocation(sel)}|${state}|${room}|${q}`)
   const chosen = assets.filter((a) => checked.includes(a.id))
   const oneFacility = new Set(chosen.map((a) => a.facilityId)).size === 1
   const toggle = (id: string) => setChecked(checked.includes(id) ? checked.filter((x) => x !== id) : [...checked, id])
+  const pageIds = pageRows.map((a) => a.id)
+  const allOnPage = pageIds.length > 0 && pageIds.every((id) => checked.includes(id))
+  const someOnPage = pageIds.some((id) => checked.includes(id))
+  const toggleAllOnPage = () => setChecked(allOnPage ? checked.filter((id) => !pageIds.includes(id)) : [...new Set([...checked, ...pageIds])])
 
   const locationOptions = facilities.flatMap((f) => [
     { value: `facility:${f.id}`, label: f.name },
@@ -106,24 +117,27 @@ export function AssetTable({ assets, facilities }: { assets: AssetRow[]; facilit
           <Input aria-label="Tìm tài sản" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm mã, tên, loại…" className="h-9 pl-9" />
         </div>
         <FacilityFilter facilities={facilities.map((f) => ({ id: f.id, name: f.name }))} />
-        <select
-          aria-label="Lọc tình trạng"
-          value={state}
-          onChange={(e) => setState(e.target.value)}
-          className="h-9 rounded-xl border border-border/80 bg-card px-2.5 text-[13px] font-medium text-foreground outline-none transition-colors focus:border-primary"
-        >
-          <option value="">Tình trạng</option>
-          {STATE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <select
-          aria-label="Lọc vị trí"
-          value={encodeLocation(sel)}
-          onChange={(e) => setSel(decodeLocation(e.target.value))}
-          className="h-9 w-28 shrink-0 rounded-xl border border-border/80 bg-card px-2.5 text-[13px] font-medium text-foreground outline-none transition-colors focus:border-primary sm:w-auto sm:max-w-52 lg:hidden"
-        >
-          <option value="all">Tất cả vị trí</option>
-          {locationOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+        <Select value={state || 'all'} onValueChange={(value) => setState(value && value !== 'all' ? value : '')} items={[{ value: 'all', label: 'Tình trạng' }, ...STATE_OPTIONS.map((s) => ({ value: s, label: s }))]}>
+          <SelectTrigger aria-label="Lọc tình trạng" className="h-9 gap-2 border-border/80 bg-card px-2.5 text-[13px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="start">
+            <SelectItem value="all">Tình trạng</SelectItem>
+            {STATE_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Input aria-label="Lọc theo phòng" value={room} onChange={(e) => setRoom(e.target.value)} placeholder="Phòng" className="h-9 w-24 shrink-0 sm:w-28" />
+        <div className="w-24 shrink-0 sm:w-auto lg:hidden">
+          <Select value={encodeLocation(sel)} onValueChange={(value) => setSel(decodeLocation(value ?? 'all'))} items={[{ value: 'all', label: 'Vị trí' }, ...locationOptions]}>
+            <SelectTrigger aria-label="Lọc vị trí" className="h-9 w-full gap-2 border-border/80 bg-card px-2.5 text-[13px] sm:w-52">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent align="start" className="w-64">
+              <SelectItem value="all">Vị trí</SelectItem>
+              {locationOptions.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
         <span className="ml-auto hidden text-xs tabular-nums text-muted-foreground sm:inline">{shown.length} tài sản</span>
       </div>
 
@@ -137,12 +151,12 @@ export function AssetTable({ assets, facilities }: { assets: AssetRow[]; facilit
 
         <div className="min-w-0 space-y-3">
           {checked.length > 0 && !moving && (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2">
-              <span className="text-sm">Đã chọn <strong className="tabular-nums">{checked.length}</strong> tài sản</span>
+            <div className="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-lg items-center justify-between gap-3 rounded-2xl border border-border/80 bg-card px-4 py-3 ring-1 ring-foreground/10 md:left-auto md:right-6 md:mx-0 md:w-[26rem]">
+              <span className="whitespace-nowrap text-sm">Đã chọn <strong className="tabular-nums">{checked.length}</strong> tài sản</span>
               <div className="flex gap-2">
                 <Button variant="ghost" size="sm" onClick={() => setChecked([])}>Bỏ chọn</Button>
                 <Button size="sm" disabled={!oneFacility} title={oneFacility ? '' : 'Chỉ chuyển được các món cùng cơ sở'} onClick={() => setMoving(true)}>
-                  Chuyển {checked.length} tài sản
+                  Chuyển {checked.length}<span className="hidden sm:inline"> tài sản</span>
                 </Button>
               </div>
             </div>
@@ -152,7 +166,16 @@ export function AssetTable({ assets, facilities }: { assets: AssetRow[]; facilit
             <table className="w-full text-sm">
               <thead className="hidden lg:table-header-group">
                 <tr className="border-b border-border/60 text-left text-[13px] font-medium text-muted-foreground">
-                  <th className="w-10 px-3 py-2.5" />
+                  <th className="w-10 px-3 py-2.5">
+                    <input
+                      type="checkbox"
+                      aria-label="Chọn tất cả tài sản"
+                      checked={allOnPage}
+                      ref={(el) => { if (el) el.indeterminate = someOnPage && !allOnPage }}
+                      onChange={toggleAllOnPage}
+                      className="size-4 accent-primary"
+                    />
+                  </th>
                   <th className="px-3 py-2.5">Mã / tài sản</th>
                   <th className="px-3 py-2.5">Loại</th>
                   <th className="px-3 py-2.5">Vị trí</th>

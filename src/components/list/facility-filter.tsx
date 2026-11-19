@@ -41,11 +41,11 @@ export function FacilityFilter({
   }
 
   return (
-    <details ref={detailsRef} className="relative inline-block font-sans">
-      <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-xl border border-border/80 bg-card px-3 py-1.5 text-xs font-medium text-foreground shadow-2xs transition-all hover:bg-muted/60 active:scale-95 whitespace-nowrap">
-        <Building className="size-3.5 text-muted-foreground" />
-        <span>{checked.length ? `Toà (${checked.length})` : 'Tất cả toà'}</span>
-        <ChevronDown className="size-3 text-muted-foreground transition-transform details-open:rotate-180" />
+    <details ref={detailsRef} className="group relative inline-block font-sans">
+      <summary className="inline-flex h-9 cursor-pointer list-none items-center gap-2 rounded-xl border border-border/80 bg-card px-3 text-[13px] font-medium text-foreground transition-colors hover:bg-muted/60 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 [&::-webkit-details-marker]:hidden">
+        <Building className="size-4 text-muted-foreground max-sm:hidden" />
+        <span className="whitespace-nowrap">{checked.length ? `Toà (${checked.length})` : 'Tất cả toà'}</span>
+        <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
       </summary>
       <div className="absolute left-0 z-20 mt-1.5 min-w-56 space-y-2.5 rounded-2xl border border-border/80 bg-popover p-3.5 shadow-lg">
         <div className="flex items-center justify-between border-b border-border/50 pb-2">
