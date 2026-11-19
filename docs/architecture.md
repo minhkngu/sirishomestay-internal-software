@@ -57,15 +57,18 @@ src/modules/<mảng>/
   index.ts     cổng công khai phía server (service, kiểu)
   actions.ts   cổng server action cho giao diện (re-export, không có 'use server' ở file cổng)
   ui.ts        cổng component
-src/modules/registrations.ts   import mọi file có register* (mục 6) (hiện ở src/server/registrations.ts cho tới Task 12)
+src/modules/registrations.ts   import mọi file có register* (mục 6); điểm ghép, không phải module
 ```
 
 Luật:
-- **Tầng:** 1 `platform`; 2 `users`, `tenants`, `facilities`, `documents`; 3 `assets`, `meters`; 4 `leasing`; 5 `import`, `dashboard`. Module chỉ import module **tầng thấp hơn**, chỉ qua `index.ts`/`actions.ts`/`ui.ts`. Thứ tự tầng nằm ở `MODULE_TIERS` (trong `eslint.config.mjs` và `tests/unit/architecture/import-graph.ts`, hai bản phải khớp — có từ Task 12).
-- **Trong module:** `ui` → `domain` và cổng `actions.ts` (không import `index.ts` của module khác trừ `import type`, để code server không lọt vào bundle trình duyệt); `server` → `domain`, `db`; `domain` → `src/domain`.
+- **Tầng:** 1 `platform`; 2 `users`, `tenants`, `facilities`, `documents`; 3 `assets`, `meters`; 4 `leasing`; 5 `import`, `dashboard`. Module chỉ import module **tầng thấp hơn**, chỉ qua `index.ts`/`actions.ts`/`ui.ts`. Thứ tự tầng nằm ở `MODULE_TIERS`, export từ `eslint.config.mjs` (nguồn duy nhất; `tests/unit/architecture/import-graph.ts` import lại). Mảng mới: thêm vào đó.
+- **Trong module:** `ui` → `domain`, cổng `actions.ts` và `server/**/actions.ts` của chính module, `src/components`, `src/domain`, `src/lib`; `import type` từ `index.ts`/`server/**` của chính module và `index.ts` của module tầng thấp hơn (giá trị thì không, để code server không lọt vào bundle trình duyệt); `ui.ts`/`actions.ts` của module tầng thấp hơn. `server` → `domain`, `server` của chính module, `src/db`, `src/domain`, `src/lib`, `index.ts` của module tầng thấp hơn. `domain` → `domain` của chính module, `src/domain`.
 - **Dùng chung** (`src/domain`, `src/components`, `src/lib`, `src/db`) không import module. `src/db` được `import type` từ `src/domain` (không import giá trị).
 - **Ghi bảng của module khác** chỉ qua API module đó. Đọc (select/join) bảng khác thì được. Luật ghi không có công cụ kiểm, chỉ giữ bằng review.
 - **Chia khi chuyển:** file domain chỉ một module dùng → vào module đó; hai module trở lên → ở lại `src/domain`. Component đi theo module của server nó import; import hai module ngang tầng → đặt cạnh route trong `src/app`.
+
+- **`src/modules/registrations.ts`:** import được mọi module và `src/server`; chỉ điểm vào được import nó: `src/app`, `src/server/**/actions.ts`, cổng `actions.ts` và `server/**/actions.ts` của module.
+- **Công cụ kiểm:** `eslint-plugin-boundaries` trong `eslint.config.mjs` kiểm mọi luật trên (`npm run lint`); `tests/unit/architecture/modules.test.ts` dựng đồ thị import (bỏ `import type`) và kiểm lại tầng, cổng công khai, dùng chung không import module.
 
 Luật chuyển tiếp (bỏ ở Task 22): code cũ (`src/server`, `src/features`, `src/app`) được import module qua cổng công khai; module **không** import `src/server`/`src/features`. Chuyển từ tầng thấp lên nên module đã chuyển chỉ cần module đã chuyển.
 
@@ -90,7 +93,7 @@ Luật chuyển tiếp (bỏ ở Task 22): code cũ (`src/server`, `src/features
 
 | Bẫy | Hậu quả | Cách xử lý / trạng thái |
 |---|---|---|
-| Đăng ký kiểu side-effect: `registerOwnerResolver`, `registerExportOwnerResolver`, `registerDocLoader`, `registerPdfLoader` chỉ chạy khi file đăng ký đã được import | Route lạnh báo "Loại tệp chưa được hỗ trợ" hoặc không xuất được giấy tờ | Đã xử lý (Task 8): `src/server/registrations.ts` import mọi file có `register*`, và được import ở dòng đầu mọi `actions.ts`, API `route.ts` và `src/app/(app)/layout.tsx`; test `tests/unit/architecture/registrations.test.ts` kiểm. Module mới có `register*` phải thêm vào file đó |
+| Đăng ký kiểu side-effect: `registerOwnerResolver`, `registerExportOwnerResolver`, `registerDocLoader`, `registerPdfLoader` chỉ chạy khi file đăng ký đã được import | Route lạnh báo "Loại tệp chưa được hỗ trợ" hoặc không xuất được giấy tờ | Đã xử lý (Task 8): `src/modules/registrations.ts` (Task 12 dời từ `src/server/`) import mọi file có `register*`, và được import ở dòng đầu mọi `actions.ts`, API `route.ts` và `src/app/(app)/layout.tsx`; test `tests/unit/architecture/registrations.test.ts` kiểm. Module mới có `register*` phải thêm vào file đó |
 | Font PDF dùng đường dẫn cứng `src/server/pdf/fonts/` ở `next.config.ts` (`outputFileTracingIncludes`) và `src/server/pdf/fonts.ts` | Dời thư mục mà quên: local, test vẫn xanh, **PDF trên Vercel hỏng** | Sửa cả hai chỗ; Task 17 thêm `tests/unit/pdf-fonts.test.ts`; luôn thử "Xem PDF" trên preview |
 | `cascade-delete.ts` (xoá cơ sở/phòng) ghi bảng của hợp đồng, hoá đơn… | Vi phạm luật "ghi bảng module khác" | Ngoại lệ có chủ ý vì DB không có `ON DELETE CASCADE`; không "sửa" bằng cách thêm cascade trong schema nếu chưa bàn |
 | Phụ thuộc hai chiều `addenda ↔ invoices`, `invoices ↔ templates` | Khó tách, dễ vòng import | Cả `addenda` và `invoices` vào `leasing`; `invoices ↔ templates` gỡ ở Task 8 |
