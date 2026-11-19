@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { DOC_TYPES, PDF_DOC_TYPES, DOC_TYPE_LABELS, TEMPLATE_FIELDS, type DocType } from '@/domain/template-fields'
 import { attachTemplateFileAction, createTemplateAction, removeTemplateAction, setDefaultTemplateAction, trialExportAction } from '@/server/templates/actions'
 
-type Tpl = { id: string; docType: string; name: string; hasFile: boolean; isDefault: boolean }
+type Tpl = { id: string; docType: string; name: string; hasFile: boolean; hasBody: boolean; isDefault: boolean }
 
 const DOCX = '.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 

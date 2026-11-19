@@ -24,7 +24,7 @@ async function Templates() {
       <InvoiceTemplateManager templates={invoiceTemplates.map(t => ({ id: t.id, name: t.name, isDefault: t.isDefault, isSystem: t.isSystem, config: invoiceTemplateSchema.parse(t.config) }))} />
       <h2 className="text-lg font-semibold">Mẫu giấy tờ Word</h2>
       <p className="text-sm text-muted-foreground">Soạn mẫu trong Word, đặt chỗ điền dạng {'{ten_truong}'}, tải lên đây. Xem bảng chỗ điền của từng loại để biết mã nào dùng được.</p>
-      <TemplatesManager templates={list.map((t) => ({ id: t.id, docType: t.docType, name: t.name, hasFile: !!t.fileId, isDefault: t.isDefault }))} />
+      <TemplatesManager templates={list.map((t) => ({ id: t.id, docType: t.docType, name: t.name, hasFile: !!t.fileId, hasBody: !!t.body, isDefault: t.isDefault }))} />
     </div>
   )
 }

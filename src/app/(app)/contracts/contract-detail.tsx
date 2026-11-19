@@ -1,4 +1,3 @@
-import { FileUpload } from '@/components/file-upload'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import {
@@ -18,19 +17,18 @@ import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { getAccessContext } from '@/server/session'
 import { listFiles } from '@/server/files/service'
-import { listTemplates } from '@/server/templates/service'
+import { isUsableTemplate, listTemplates } from '@/server/templates/service'
 import { listHandovers } from '@/server/handovers/service'
-import { StartHandoverButtons } from '@/features/handovers/components/start-handover-buttons'
-import { getDepositContract, getLease } from '@/server/contracts/service'
+import { getDepositContract, getLease, listLeaseOccupants } from '@/server/contracts/service'
+import { formatPhoneDisplay } from '@/domain/phone'
 import { ExportMenu } from '@/features/contracts/components/export-menu'
-import { LeaseInvoiceTemplate } from '@/features/contracts/components/lease-invoice-template'
-import { listInvoiceTemplates } from '@/server/invoice-templates/service'
 import { listInvoices } from '@/server/invoices/service'
 import { SignStatus } from '@/features/contracts/components/sign-status'
 import { AddendaList } from '@/features/contracts/components/addenda-list'
-import { OccupantDialog } from '@/features/contracts/components/occupant-dialog'
-import { ContractRowActions } from '@/features/contracts/components/contract-row-actions'
-import { addendumFormData, listAddenda } from '@/server/addenda/service'
+import { ContractActions } from './contract-actions'
+import { HandoverExportButton } from './handover-export-button'
+import { StartHandoverButtons } from '@/features/handovers/components/start-handover-buttons'
+import { listAddenda } from '@/server/addenda/service'
 import { cn } from '@/lib/utils'
 import { signStatusLabel } from '@/domain/sign-status'
 
@@ -124,6 +122,13 @@ function Ledger({ entries }: { entries: Entry[] }) {
   )
 }
 
+function DocRow({ d }: { d: { id: string; label: string; name: string; date: string } }) {
+  return <li className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-xs">
+    <span><span className="font-medium text-foreground">{d.label}</span> <span className="text-muted-foreground">· {d.name}{d.date ? ` · ${d.date}` : ''}</span></span>
+    <span className="flex gap-3"><a className="font-medium text-primary hover:underline" href={`/api/files/${d.id}?inline=1`} target="_blank" rel="noreferrer">Xem trước</a><a className="font-medium text-primary hover:underline" href={`/api/files/${d.id}`}>Tải xuống</a></span>
+  </li>
+}
+
 export default async function ContractDetail({ id }: { id: string }) {
   const ctx = await getAccessContext()
   let lease: Awaited<ReturnType<typeof getLease>> | null = null
@@ -141,7 +146,7 @@ export default async function ContractDetail({ id }: { id: string }) {
       if (e instanceof NotFoundError) notFound()
       throw e
     }
-    const templates = (await listTemplates(db, ctx, 'deposit_contract')).filter((t) => t.fileId)
+    const templates = (await listTemplates(db, ctx, 'deposit_contract')).filter(isUsableTemplate)
     const statusLabels: Record<string, string> = {
       pending: 'Đang chờ',
       converted: 'Đã chuyển thành hợp đồng thuê',
@@ -192,8 +197,8 @@ export default async function ContractDetail({ id }: { id: string }) {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <ContractRowActions id={deposit.id} kind="deposit" active={false} canDelete={can(ctx, 'delete_contracts', deposit.facilityId)} redirectAfterDelete="/contracts" />
-              {/* Thẻ <a> (tải trang đầy đủ): điều hướng mềm từ /contracts/<id> sang /contracts/new bị route chặn @modal/(.)[id] bắt nhầm "new" là mã hợp đồng */}
+              <ContractActions id={deposit.id} kind="deposit" active={false} canDelete={can(ctx, 'delete_contracts', deposit.facilityId)} redirectAfterDelete="/contracts" />
+              {/* Thẻ <a> (tải trang đầy đủ) có chủ ý: mở bằng Link thì wizard hiện trong popup và sau khi tạo, URL không chuyển sang trang hợp đồng (invoices.spec bị treo) */}
               {deposit.status === 'pending' && (
                 <a
                   href={`/contracts/new?deposit=${deposit.id}`}
@@ -259,15 +264,24 @@ export default async function ContractDetail({ id }: { id: string }) {
   const charges = billing ? await listOneOffs(db, ctx, lease.id) : []
   const handoverList = await listHandovers(db, ctx, lease.id)
   const addendaList = await listAddenda(db, ctx, lease.id)
-  const form = lease.status === 'active' ? await addendumFormData(db, ctx, lease.id) : null
-  const [templates, exports, photos, invoiceTemplates] = await Promise.all([
-    listTemplates(db, ctx, 'lease').then((t) => t.filter((x) => x.fileId)),
+  const [templates, exports, photos] = await Promise.all([
+    listTemplates(db, ctx, 'lease').then((t) => t.filter(isUsableTemplate)),
     listFiles(db, ctx, 'export', lease.id),
     listFiles(db, ctx, 'lease_photo', lease.id),
-    listInvoiceTemplates(db, ctx),
   ])
 
   const isActive = lease.status === 'active'
+  const safeFiles = async (ownerId: string) => { try { return await listFiles(db, ctx, 'export', ownerId) } catch { return [] } }
+  const addendumTypeLabel: Record<string, string> = { extension: 'Gia hạn', transfer: 'Chuyển phòng', assignment: 'Chuyển nhượng', termination: 'Thanh lý', occupants: 'Đổi người ở' }
+  const [addendaFiles, handoverFiles] = await Promise.all([Promise.all(addendaList.map(async a => ({ a, files: await safeFiles(a.id) }))), Promise.all(handoverList.map(async h => ({ h, files: await safeFiles(h.id) })))])
+  const fileDate = (f: { createdAt: Date }) => formatDateVN(f.createdAt.toISOString().slice(0, 10))
+  const savedDocs: { id: string; group: 'Hợp đồng' | 'Phụ lục'; label: string; name: string; date: string }[] = [
+    ...(lease.signedFileId ? [{ id: lease.signedFileId, group: 'Hợp đồng' as const, label: 'Bản hợp đồng đã ký', name: 'bản scan', date: '' }] : []),
+    ...exports.map(f => ({ id: f.id, group: 'Hợp đồng' as const, label: f.contentType === 'application/pdf' ? 'Hợp đồng · bản PDF' : 'Hợp đồng · bản Word', name: f.name, date: fileDate(f) })),
+    ...addendaFiles.flatMap(({ a, files }) => [...files.map(f => ({ id: f.id, group: 'Phụ lục' as const, label: `Phụ lục ${addendumTypeLabel[a.type] ?? a.type}`, name: f.name, date: fileDate(f) })), ...(a.signedFileId ? [{ id: a.signedFileId, group: 'Phụ lục' as const, label: `Phụ lục ${addendumTypeLabel[a.type] ?? a.type} đã ký`, name: 'bản scan', date: '' }] : [])]),
+  ]
+  // Mọi thao tác thay đổi nằm trong popup "Sửa hợp đồng"; trang chi tiết chỉ để xem
+  const occupants = await listLeaseOccupants(db, ctx, lease.facilityId, [...new Set([lease.tenantId, ...lease.terms.occupantIds])])
 
   return (
     <div className="max-w-5xl space-y-6">
@@ -326,14 +340,55 @@ export default async function ContractDetail({ id }: { id: string }) {
               )}
             </div>
           </div>
-          <ContractRowActions id={lease.id} kind="lease" active={isActive} canDelete={can(ctx, 'delete_contracts', lease.facilityId)} redirectAfterDelete="/contracts" />
+          <ContractActions id={lease.id} kind="lease" active={isActive} canDelete={can(ctx, 'delete_contracts', lease.facilityId)} redirectAfterDelete="/contracts" />
         </div>
       </div>
 
       <div className="space-y-6">
+      <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-2xs space-y-4">
+        <ExportMenu
+          kind="lease"
+          id={lease.id}
+          selectedTemplateId={lease.contractTemplateId}
+          hideTemplateSelect
+          templates={templates.map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault }))}
+        />
+        <div className="space-y-4 border-t border-border/60 pt-3">
+          <h4 className="text-xs font-semibold text-foreground">Văn bản đã lưu</h4>
+          <div className="space-y-1">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Hợp đồng</div>
+            <ul className="divide-y divide-border/50 rounded-lg border border-border/60">
+              {savedDocs.filter(d => d.group === 'Hợp đồng').map(d => <DocRow key={d.id} d={d} />)}
+              {!savedDocs.some(d => d.group === 'Hợp đồng' && d.label.includes('PDF')) && <li className="px-3 py-1.5 text-xs text-muted-foreground">Chưa có bản PDF. Bấm &ldquo;Xuất PDF&rdquo; ở trên để lưu bản PDF của hợp đồng.</li>}
+            </ul>
+          </div>
+          <div className="space-y-1">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Phụ lục</div>
+            <ul className="divide-y divide-border/50 rounded-lg border border-border/60">
+              {savedDocs.filter(d => d.group === 'Phụ lục').map(d => <DocRow key={d.id} d={d} />)}
+              {!savedDocs.some(d => d.group === 'Phụ lục') && <li className="px-3 py-1.5 text-xs text-muted-foreground">Chưa có phụ lục nào được xuất hoặc ký.</li>}
+            </ul>
+          </div>
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Biên bản bàn giao tài sản</div>
+              <StartHandoverButtons leaseId={lease.id} />
+            </div>
+            <ul className="divide-y divide-border/50 rounded-lg border border-border/60">
+              {handoverFiles.map(({ h, files }) => <li key={h.id} className="space-y-1 px-3 py-1.5 text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span><span className="font-medium text-foreground">{h.kind === 'check_in' ? 'Biên bản check-in' : 'Biên bản check-out'}</span> <span className="text-muted-foreground">· {formatDateVN(h.date)} · {h.status === 'done' ? 'Đã hoàn tất' : 'Nháp'}</span></span>
+                  <span className="flex items-center gap-3"><Link href={`/handovers/${h.id}`} className="font-medium text-primary hover:underline">Xem biên bản</Link><HandoverExportButton id={h.id} /></span>
+                </div>
+                {files.map(f => <div key={f.id} className="flex flex-wrap items-center justify-between gap-2 pl-4 text-muted-foreground"><span>{f.name} · {fileDate(f)}</span><span className="flex gap-3"><a className="font-medium text-primary hover:underline" href={`/api/files/${f.id}?inline=1`} target="_blank" rel="noreferrer">Xem trước</a><a className="font-medium text-primary hover:underline" href={`/api/files/${f.id}`}>Tải xuống</a></span></div>)}
+              </li>)}
+              {handoverFiles.length === 0 && <li className="px-3 py-1.5 text-xs text-muted-foreground">Chưa có biên bản bàn giao nào. Bấm Check-in hoặc Check-out để tạo.</li>}
+            </ul>
+          </div>
+        </div>
+      </div>
         <section className="space-y-4">
           <h2 className="text-base font-semibold">Tổng quan</h2>
-          <LeaseInvoiceTemplate leaseId={lease.id} selectedTemplateId={lease.invoiceTemplateId} templates={invoiceTemplates.map(t => ({ id: t.id, name: t.name, isDefault: t.isDefault }))} />
           {lease.note && <p className="rounded-xl border p-4 text-sm whitespace-pre-wrap">{lease.note}</p>}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
@@ -363,6 +418,33 @@ export default async function ContractDetail({ id }: { id: string }) {
           </div>
 
           <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-2xs space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Người ở</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-max text-xs">
+                <thead className="text-left text-muted-foreground">
+                  <tr>
+                    <th className="py-1.5 pr-4 font-medium">Họ và tên</th>
+                    <th className="py-1.5 pr-4 font-medium">Căn cước / Passport</th>
+                    <th className="py-1.5 font-medium">Số điện thoại</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {[...occupants].sort((a, b) => Number(b.id === lease.tenantId) - Number(a.id === lease.tenantId)).map((o) => (
+                    <tr key={o.id}>
+                      <td className="py-1.5 pr-4 font-medium text-foreground">{o.name}{o.id === lease.tenantId && <span className="ml-2 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">Đại diện</span>}</td>
+                      <td className="py-1.5 pr-4 text-foreground">{o.idNumber ?? '—'}</td>
+                      <td className="py-1.5 text-foreground">{o.phone ? formatPhoneDisplay(o.phone) : '—'}</td>
+                    </tr>
+                  ))}
+                  {occupants.length === 0 && <tr><td colSpan={3} className="py-2 text-muted-foreground">Chưa có người ở.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-2xs space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Phí dịch vụ & Cố định</h3>
             <div className="text-xs text-foreground">
               {lease.terms.fees.length > 0 ? (
@@ -381,19 +463,9 @@ export default async function ContractDetail({ id }: { id: string }) {
                 <span className="text-muted-foreground">Không có phụ phí dịch vụ riêng.</span>
               )}
             </div>
+            {billing && charges.length > 0 && <OneOffDialog leaseId={lease.id} charges={charges} readOnly />}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {billing && <OneOffDialog leaseId={lease.id} charges={charges} />}
-            {form && (
-              <OccupantDialog
-                leaseId={lease.id}
-                people={form.people}
-                currentIds={lease.terms.occupantIds}
-                today={form.today}
-              />
-            )}
-          </div>
         </section>
 
         <section className="space-y-4">
@@ -411,60 +483,6 @@ export default async function ContractDetail({ id }: { id: string }) {
           </div>
         </section>
 
-        <section className="space-y-4">
-          <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-2xs space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-semibold tracking-tight text-foreground">Biên bản bàn giao</h3>
-                <p className="text-xs text-muted-foreground">Biên bản check-in nhận phòng và check-out trả phòng</p>
-              </div>
-              <StartHandoverButtons leaseId={lease.id} />
-            </div>
-
-            {handoverList.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border/80 p-6 text-center text-xs text-muted-foreground">
-                Chưa có biên bản bàn giao nào.
-              </div>
-            ) : (
-              <div className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border/70 bg-card">
-                {handoverList.map((h) => (
-                  <div
-                    key={h.id}
-                    className="flex flex-wrap items-center justify-between gap-3 p-3 text-xs transition-colors hover:bg-muted/30"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <span className="font-semibold text-foreground">
-                        {h.kind === 'check_in' ? 'Check-in' : 'Check-out'}
-                      </span>
-                      <span className="text-muted-foreground">·</span>
-                      <span className="text-muted-foreground">{formatDateVN(h.date)}</span>
-                    </div>
-
-                    <div className="flex items-center gap-2.5">
-                      <span
-                        className={cn(
-                          'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium',
-                          h.status === 'done'
-                            ? 'border border-emerald-200/80 bg-emerald-50 text-emerald-700'
-                            : 'border border-border/80 bg-muted/60 text-muted-foreground'
-                        )}
-                      >
-                        {h.status === 'done' ? 'Đã hoàn tất' : 'Nháp'}
-                      </span>
-                      <Link
-                        href={`/handovers/${h.id}`}
-                        className="font-medium text-primary hover:underline underline-offset-2"
-                      >
-                        Xem biên bản →
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
-
         <section>
           <h2 className="mb-3 text-base font-semibold">Hóa đơn</h2>
           {!billing ? <p className="text-sm text-muted-foreground">Bạn không có quyền xem hóa đơn.</p> : contractInvoices.length ? <ul className="divide-y rounded-xl border">{contractInvoices.map(invoice => <li key={invoice.id} className="flex flex-wrap justify-between gap-2 p-3 text-sm"><Link href={`/invoices/${invoice.id}`} className="font-medium text-primary hover:underline">{invoice.code}</Link><span>{formatDateVN(invoice.periodStart)} – {formatDateVN(invoice.periodEnd)}</span><span>{formatVND(invoice.total)} · Đã thu {formatVND(invoice.paid)}</span></li>)}</ul> : <p className="text-sm text-muted-foreground">Chưa có hóa đơn.</p>}
@@ -473,47 +491,15 @@ export default async function ContractDetail({ id }: { id: string }) {
         <section>
           <h2 className="mb-3 text-base font-semibold">Sổ cọc</h2>
           <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
-            <DepositLedger entries={lease.depositEntries} canEdit={billing} leaseId={lease.id} />
+            <DepositLedger entries={lease.depositEntries} canEdit={false} leaseId={lease.id} />
           </div>
         </section>
 
         <section className="space-y-4">
           <h2 className="text-base font-semibold">Giấy tờ</h2>
-          <section className="space-y-3 rounded-2xl border p-5"><h3 className="font-semibold">Ảnh hợp đồng</h3>
+          <section className="space-y-3 rounded-2xl border p-5"><h3 className="font-semibold">Ảnh chụp hợp đồng (đính kèm)</h3>
             <div className="flex flex-wrap gap-3">{photos.map((f) => <a key={f.id} href={`/api/files/${f.id}`}><img src={`/api/files/${f.id}?thumb=1`} alt={f.name || 'Ảnh hợp đồng'} className="h-24 w-24 rounded object-cover" /></a>)}</div>
-            <FileUpload ownerType="lease_photo" ownerId={lease.id} multiple label="Thêm ảnh hợp đồng" />
           </section>
-          <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-2xs space-y-4">
-            <ExportMenu
-              kind="lease"
-              id={lease.id}
-              selectedTemplateId={lease.contractTemplateId}
-              templates={templates.map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault }))}
-            />
-            <SignStatus
-              kind="lease"
-              id={lease.id}
-              status={lease.signStatus as 'draft'}
-              signedFileId={lease.signedFileId}
-            />
-            {exports.length > 0 && (
-              <div className="space-y-2 pt-3 border-t border-border/60">
-                <h4 className="text-xs font-semibold text-foreground">Tệp đã xuất</h4>
-                <div className="space-y-1">
-                  {exports.map((f) => (
-                    <div key={f.id} className="text-xs">
-                      <a
-                        className="font-medium text-primary hover:underline underline-offset-2"
-                        href={`/api/files/${f.id}`}
-                      >
-                        {f.name}
-                      </a>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
         </section>
       </div>
     </div>

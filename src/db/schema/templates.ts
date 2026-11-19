@@ -6,6 +6,10 @@ export const docTemplates = pgTable('doc_templates', {
   docType: text('doc_type').notNull(),
   name: text('name').notNull(),
   fileId: uuid('file_id'),
+  /** Nội dung mẫu soạn trong app (HTML); mẫu chỉ có `fileId` là mẫu Word cũ, không còn dùng được. */
+  body: text('body'),
+  /** Kiểu trình bày khi xuất: 'formal' (Trang trọng) hoặc 'modern' (Hiện đại). */
+  style: text('style').notNull().default('formal'),
   isDefault: boolean('is_default').notNull().default(false),
   isDemo: boolean('is_demo').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

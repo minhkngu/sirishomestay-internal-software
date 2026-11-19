@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { facilities, files } from '@/db'
 import {
-  createTemplate, attachTemplateFile, listTemplates, setDefaultTemplate, removeTemplate, exportDocument, registerDocLoader,
+  createTemplate, updateTemplate, isUsableTemplate, attachTemplateFile, listTemplates, setDefaultTemplate, removeTemplate, exportDocument, registerDocLoader,
 } from '@/server/templates/service'
 import { requestUpload, confirmUpload } from '@/server/files/service'
 import { MemoryStorage } from '@/server/storage/memory'
@@ -65,6 +65,31 @@ describe('templates', () => {
     await removeTemplate(db, admin, storage, a.id)
     expect(storage.deleted).toContain(fileA.storageKey)
     expect((await listTemplates(db, admin, 'lease')).map((t) => [t.id, t.isDefault])).toEqual([[b.id, true]])
+  })
+
+  describe('mẫu soạn trong app (body, style)', () => {
+    it('updateTemplate đặt nội dung, tên và kiểu; mẫu đầu tiên có nội dung thành mặc định', async () => {
+      const t = await createTemplate(db, admin, { docType: 'lease', name: 'Mới' })
+      expect(t).toMatchObject({ body: null, style: 'formal' })
+      expect(isUsableTemplate(t)).toBe(false)
+      const u = await updateTemplate(db, admin, t.id, { name: 'Hợp đồng hiện đại', body: '<p>Xin chào</p>', style: 'modern' })
+      expect(u).toMatchObject({ name: 'Hợp đồng hiện đại', body: '<p>Xin chào</p>', style: 'modern', isDefault: true })
+      expect(isUsableTemplate(u)).toBe(true)
+      const t2 = await createTemplate(db, admin, { docType: 'lease', name: 'Thứ hai', body: '<p>b</p>' })
+      expect(t2.isDefault).toBe(false)
+    })
+    it('chỉ nhóm settings sửa mẫu; nội dung rỗng, quá dài hoặc kiểu lạ bị từ chối', async () => {
+      const t = await createTemplate(db, admin, { docType: 'lease', name: 'Mẫu' })
+      await expect(updateTemplate(db, ctxOf(['tenants_contracts'], [fa]), t.id, { body: '<p>x</p>' })).rejects.toThrow(ForbiddenError)
+      await expect(updateTemplate(db, admin, t.id, { body: '   ' })).rejects.toThrow('Nhập nội dung mẫu')
+      await expect(updateTemplate(db, admin, t.id, { body: '<p>' + 'a'.repeat(200_001) + '</p>' })).rejects.toThrow('quá dài')
+      await expect(updateTemplate(db, admin, t.id, { style: 'khac' as never })).rejects.toThrow('Kiểu trình bày không hợp lệ')
+      await expect(updateTemplate(db, admin, crypto.randomUUID(), { name: 'x' })).rejects.toThrow(NotFoundError)
+    })
+    it('mẫu Word cũ (chỉ có tệp) không dùng được', async () => {
+      const legacy = await addTemplate('lease', 'Word cũ')
+      expect(isUsableTemplate(legacy)).toBe(false)
+    })
   })
 
   describe('exportDocument', () => {
