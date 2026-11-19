@@ -1,3 +1,4 @@
+// Ngoại lệ có chủ ý: xoá cơ sở/phòng ghi bảng của leasing vì DB không có ON DELETE CASCADE.
 import { sql } from 'drizzle-orm'
 import type { DB } from '@/db/client'
 import { ValidationError } from '@/domain/errors'

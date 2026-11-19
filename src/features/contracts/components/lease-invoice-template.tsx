@@ -1,7 +1,7 @@
 'use client'
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { selectLeaseInvoiceTemplateAction } from '@/server/invoice-templates/actions'
+import { selectLeaseInvoiceTemplateAction } from '@/server/invoices/actions'
 
 export function LeaseInvoiceTemplate({
   leaseId,

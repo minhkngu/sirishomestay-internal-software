@@ -20,6 +20,7 @@ import {
   setPeriod,
   updateLines,
 } from './service'
+import { selectInvoiceTemplate, selectLeaseInvoiceTemplate } from './template-assignment'
 
 const refresh = () => {
   revalidatePath('/invoices', 'layout')
@@ -103,6 +104,24 @@ export async function saveInvoiceFeeQuantitiesAction(
   const ctx = await getAccessContext()
   return toActionResult(async () => {
     await saveInvoiceFeeQuantities(db, ctx, id, quantities)
+    refresh()
+    return {}
+  })
+}
+export async function selectInvoiceTemplateAction(id: string, templateId: string | null) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => {
+    await selectInvoiceTemplate(db, ctx, id, templateId)
+    revalidatePath('/templates')
+    refresh()
+    return {}
+  })
+}
+export async function selectLeaseInvoiceTemplateAction(id: string, templateId: string | null) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => {
+    await selectLeaseInvoiceTemplate(db, ctx, id, templateId)
+    revalidatePath('/templates')
     refresh()
     return {}
   })

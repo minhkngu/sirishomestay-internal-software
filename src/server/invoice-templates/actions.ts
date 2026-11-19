@@ -14,8 +14,6 @@ import {
   previewInvoiceTemplateHtml,
   deleteInvoiceTemplate,
   previewInvoiceTemplate,
-  selectInvoiceTemplate,
-  selectLeaseInvoiceTemplate,
   setDefaultInvoiceTemplate,
   updateInvoiceTemplate,
 } from './service'
@@ -54,22 +52,6 @@ export async function deleteInvoiceTemplateAction(id: string) {
   const ctx = await getAccessContext()
   return toActionResult(async () => {
     await deleteInvoiceTemplate(db, ctx, id)
-    refresh()
-    return {}
-  })
-}
-export async function selectInvoiceTemplateAction(id: string, templateId: string | null) {
-  const ctx = await getAccessContext()
-  return toActionResult(async () => {
-    await selectInvoiceTemplate(db, ctx, id, templateId)
-    refresh()
-    return {}
-  })
-}
-export async function selectLeaseInvoiceTemplateAction(id: string, templateId: string | null) {
-  const ctx = await getAccessContext()
-  return toActionResult(async () => {
-    await selectLeaseInvoiceTemplate(db, ctx, id, templateId)
     refresh()
     return {}
   })

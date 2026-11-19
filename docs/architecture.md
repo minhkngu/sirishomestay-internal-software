@@ -72,8 +72,8 @@ Luật chuyển tiếp (bỏ ở Task 22): code cũ (`src/server`, `src/features
 ### Vì sao chia như vậy
 
 - **`leasing` gom hợp đồng, phụ lục, bàn giao, sổ cọc, phí phát sinh, hoá đơn, sự cố.** `contracts`/`addenda` ghi khoảng 20 bảng (hoá đơn đầu tiên khi tạo hợp đồng, hoá đơn thanh lý, chỉ số khi bàn giao, xoá dây chuyền khi xoá hợp đồng); duyệt hoá đơn thanh lý lại chốt hợp đồng. Tách thành hai module sẽ phụ thuộc vòng.
-- **Trạng thái phòng** (`listRoomsWithStatus`, `getRoomDetail`) cần dữ liệu hợp đồng nên thuộc `leasing`; `facilities` chỉ CRUD cơ sở, phòng, tiện ích, phí (Task 9).
-- **Gán mẫu hoá đơn** cho hợp đồng/hoá đơn ghi bảng của `leasing` nên thuộc `leasing`, không thuộc `documents` (Task 9).
+- **Trạng thái phòng** (`listRoomsWithStatus`, `getRoomDetail`) cần dữ liệu hợp đồng nên thuộc `leasing`; `facilities` chỉ CRUD cơ sở, phòng, tiện ích, phí (đã làm ở Task 9: `src/server/contracts/room-view.ts`).
+- **Gán mẫu hoá đơn** cho hợp đồng/hoá đơn ghi bảng của `leasing` nên thuộc `leasing`, không thuộc `documents` (đã làm ở Task 9: `src/server/invoices/template-assignment.ts`).
 - **`documents`** không biết hợp đồng hay hoá đơn: module tầng trên đăng ký loader cho nó (mục 6).
 
 ## 5. Quy tắc nghiệp vụ cần biết trước khi sửa

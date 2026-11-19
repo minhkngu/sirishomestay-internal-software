@@ -4,6 +4,7 @@ import type { AccessContext } from '@/domain/access'
 import { formatVND } from '@/domain/money'
 import { orNotFound } from '@/lib/or-not-found'
 import { getAccessContext } from '@/server/session'
+import { incidentsForAsset } from '@/server/incidents/service'
 import { assetHistory, assetLocationLabel, getAsset } from '@/server/assets/service'
 
 export default async function AssetPage({ params }: { params: Promise<{ id: string }> }) {
@@ -24,7 +25,8 @@ async function Asset({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const ctx = await getAccessContext()
   const a = await orNotFound(getAsset(db, ctx, id))
-  const history = await assetHistory(db, ctx, id)
+  const [assetMoves, incidents] = await Promise.all([assetHistory(db, ctx, id), incidentsForAsset(db, id)])
+  const history = { ...assetMoves, incidents }
   const moves = await Promise.all(
     history.moves.map(async (m) => ({
       ...m,

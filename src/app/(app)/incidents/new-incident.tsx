@@ -3,7 +3,7 @@ import { db } from '@/db/client'
 import { assertCan } from '@/domain/access'
 import { IncidentForm } from '@/features/incidents/components/incident-form'
 import { listAssignees } from '@/server/incidents/service'
-import { getRoomDetail } from '@/server/rooms/service'
+import { getRoomDetail } from '@/server/contracts/room-view'
 import { getAccessContext } from '@/server/session'
 import { listFacilities } from '@/server/facilities/service'
 

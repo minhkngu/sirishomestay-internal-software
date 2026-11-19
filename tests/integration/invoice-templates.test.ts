@@ -12,11 +12,10 @@ import {
   deleteInvoiceTemplate,
   listInvoiceTemplates,
   setDefaultInvoiceTemplate,
-  selectInvoiceTemplate,
-  selectLeaseInvoiceTemplate,
   resolveInvoiceTemplate,
   previewInvoiceTemplate,
 } from '@/server/invoice-templates/service'
+import { selectInvoiceTemplate, selectLeaseInvoiceTemplate } from '@/server/invoices/template-assignment'
 
 describe('quản lý và chọn mẫu hóa đơn', () => {
   let db: DB, facilityId: string, leaseId: string, invoiceId: string

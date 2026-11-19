@@ -2,7 +2,6 @@ import { and, asc, desc, eq, ilike, inArray, ne } from 'drizzle-orm'
 import { z } from 'zod'
 import { assetMoves, assets, facilities, handoverItems, handovers, rooms } from '@/db'
 import type { DB } from '@/db/client'
-import { incidentsForAsset } from '@/server/incidents/service'
 import { assertCan, can, facilityScope, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { buildSearchText, removeDiacritics } from '@/domain/text'
@@ -255,7 +254,7 @@ export async function setAssetStatusInTransaction(
   })
 }
 
-/** Lịch sử của tài sản: di chuyển (bàn giao và sự cố được nối thêm ở các bước sau). */
+/** Lịch sử của tài sản: di chuyển (bàn giao). */
 export async function assetHistory(db: DB, ctx: AccessContext, id: string) {
   await loadAsset(db, ctx, id)
   const moves = await db.select().from(assetMoves).where(eq(assetMoves.assetId, id)).orderBy(desc(assetMoves.movedAt))
@@ -272,7 +271,7 @@ export async function assetHistory(db: DB, ctx: AccessContext, id: string) {
     .innerJoin(handovers, eq(handovers.id, handoverItems.handoverId))
     .where(eq(handoverItems.assetId, id))
     .orderBy(desc(handovers.date))
-  return { moves, handovers: hs, incidents: await incidentsForAsset(db, id) }
+  return { moves, handovers: hs }
 }
 
 /** Nhãn vị trí: "Phòng <mã>" (hoặc "?" khi không có phòng) hoặc tên cơ sở (chuỗi rỗng khi không có cơ sở). Quyền do trang gọi kiểm trước. */

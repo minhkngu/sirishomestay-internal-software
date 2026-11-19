@@ -398,7 +398,7 @@ describe('phụ lục hợp đồng', () => {
     ).rejects.toThrow(ForbiddenError)
   })
   it('sau khi duyệt thanh lý: phòng về Trống, hoặc Đã cọc nếu có cọc chờ', async () => {
-    const { getRoomDetail } = await import('@/server/rooms/service')
+    const { getRoomDetail } = await import('@/server/contracts/room-view')
     const { depositContracts } = await import('@/db')
     const r = await createTermination(db, ctx(), leaseId, {
       endDate: '2026-12-10',

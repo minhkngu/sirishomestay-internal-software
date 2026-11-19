@@ -3,7 +3,7 @@ import { db } from '@/db/client'
 import { getAccessContext } from '@/server/session'
 import { listAmenities } from '@/server/amenities/service'
 import { listFacilities } from '@/server/facilities/service'
-import { listRoomsWithStatus } from '@/server/rooms/service'
+import { listRoomsWithStatus } from '@/server/contracts/room-view'
 import { RoomGrid } from '@/features/rooms/components/room-grid'
 import { RoomPanels } from '@/features/rooms/components/room-panels'
 

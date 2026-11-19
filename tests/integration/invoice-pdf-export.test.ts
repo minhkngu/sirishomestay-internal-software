@@ -12,7 +12,8 @@ import { exportDocument } from '@/server/templates/service'
 import '@/server/invoices/service'
 import { MemoryStorage } from '@/server/storage/memory'
 import { createTestDb } from '../helpers/db'
-import { createInvoiceTemplate, selectInvoiceTemplate } from '@/server/invoice-templates/service'
+import { createInvoiceTemplate } from '@/server/invoice-templates/service'
+import { selectInvoiceTemplate } from '@/server/invoices/template-assignment'
 import { defaultInvoiceTemplate } from '@/domain/invoice-template'
 
 let db: DB, storage: MemoryStorage, ctx: AccessContext, facilityId: string, invoiceId: string, paymentId: string
