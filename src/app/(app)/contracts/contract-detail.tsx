@@ -21,6 +21,7 @@ import { isUsableTemplate, listTemplates } from '@/server/templates/service'
 import { listHandovers } from '@/server/handovers/service'
 import { getDepositContract, getLease, listLeaseOccupants } from '@/server/contracts/service'
 import { formatPhoneDisplay } from '@/domain/phone'
+import { PdfViewButton } from '@/components/pdf-view-button'
 import { ExportMenu } from '@/features/contracts/components/export-menu'
 import { listInvoices } from '@/server/invoices/service'
 import { SignStatus } from '@/features/contracts/components/sign-status'
@@ -123,10 +124,10 @@ function Ledger({ entries }: { entries: Entry[] }) {
 }
 
 function DocRow({ d }: { d: { id: string; label: string; name: string; date: string; previewHref?: string } }) {
-  if (d.previewHref) return <li className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-xs"><span><span className="font-medium text-foreground">{d.label}</span> <span className="text-muted-foreground">· {d.name}</span></span><a className="font-medium text-primary hover:underline" href={d.previewHref} target="_blank" rel="noreferrer">Xem PDF</a></li>
+  if (d.previewHref) return <li className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-xs"><span><span className="font-medium text-foreground">{d.label}</span> <span className="text-muted-foreground">· {d.name}</span></span><PdfViewButton href={d.previewHref} title={d.label}>Xem PDF</PdfViewButton></li>
   return <li className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-xs">
     <span><span className="font-medium text-foreground">{d.label}</span> <span className="text-muted-foreground">· {d.name}{d.date ? ` · ${d.date}` : ''}</span></span>
-    <span className="flex gap-3"><a className="font-medium text-primary hover:underline" href={`/api/files/${d.id}?inline=1`} target="_blank" rel="noreferrer">Xem trước</a><a className="font-medium text-primary hover:underline" href={`/api/files/${d.id}`}>Tải xuống</a></span>
+    <span className="flex gap-3">{d.label.includes('PDF') ? <PdfViewButton href={`/api/files/${d.id}?inline=1`} title={d.label}>Xem trước</PdfViewButton> : <a className="font-medium text-primary hover:underline" href={`/api/files/${d.id}?inline=1`} target="_blank" rel="noreferrer">Xem trước</a>}<a className="font-medium text-primary hover:underline" href={`/api/files/${d.id}`}>Tải xuống</a></span>
   </li>
 }
 
@@ -381,8 +382,8 @@ export default async function ContractDetail({ id }: { id: string }) {
                   <span><span className="font-medium text-foreground">{h.kind === 'check_in' ? 'Biên bản check-in' : 'Biên bản check-out'}</span> <span className="text-muted-foreground">· {formatDateVN(h.date)} · {h.status === 'done' ? 'Đã hoàn tất' : 'Nháp'}</span></span>
                   <span className="flex items-center gap-3"><Link href={`/handovers/${h.id}`} className="font-medium text-primary hover:underline">Xem biên bản</Link><HandoverExportButton id={h.id} /></span>
                 </div>
-                {!files.some(f => f.contentType === 'application/pdf') && <div className="flex flex-wrap items-center justify-between gap-2 pl-4 text-muted-foreground"><span>Bản PDF · dựng từ mẫu, sẽ được lưu khi bấm Lưu thay đổi</span><a className="font-medium text-primary hover:underline" href={`/api/documents/preview?docType=${h.kind === 'check_in' ? 'handover_check_in' : 'handover_check_out'}&id=${h.id}`} target="_blank" rel="noreferrer">Xem PDF</a></div>}
-                {files.map(f => <div key={f.id} className="flex flex-wrap items-center justify-between gap-2 pl-4 text-muted-foreground"><span>{f.name} · {fileDate(f)}</span><span className="flex gap-3"><a className="font-medium text-primary hover:underline" href={`/api/files/${f.id}?inline=1`} target="_blank" rel="noreferrer">Xem trước</a><a className="font-medium text-primary hover:underline" href={`/api/files/${f.id}`}>Tải xuống</a></span></div>)}
+                {!files.some(f => f.contentType === 'application/pdf') && <div className="flex flex-wrap items-center justify-between gap-2 pl-4 text-muted-foreground"><span>Bản PDF · dựng từ mẫu, sẽ được lưu khi bấm Lưu thay đổi</span><PdfViewButton href={`/api/documents/preview?docType=${h.kind === 'check_in' ? 'handover_check_in' : 'handover_check_out'}&id=${h.id}`} title={h.kind === 'check_in' ? 'Biên bản check-in' : 'Biên bản check-out'}>Xem PDF</PdfViewButton></div>}
+                {files.map(f => <div key={f.id} className="flex flex-wrap items-center justify-between gap-2 pl-4 text-muted-foreground"><span>{f.name} · {fileDate(f)}</span><span className="flex gap-3">{f.contentType === 'application/pdf' ? <PdfViewButton href={`/api/files/${f.id}?inline=1`} title={f.name}>Xem trước</PdfViewButton> : <a className="font-medium text-primary hover:underline" href={`/api/files/${f.id}?inline=1`} target="_blank" rel="noreferrer">Xem trước</a>}<a className="font-medium text-primary hover:underline" href={`/api/files/${f.id}`}>Tải xuống</a></span></div>)}
               </li>)}
               {handoverFiles.length === 0 && <li className="px-3 py-1.5 text-xs text-muted-foreground">Chưa có biên bản bàn giao nào. Bấm Check-in hoặc Check-out để tạo.</li>}
             </ul>
