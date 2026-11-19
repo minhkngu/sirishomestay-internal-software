@@ -37,15 +37,13 @@ test('soạn mẫu hợp đồng thuê: gõ chữ, chèn chip, kéo thả chip, 
   await dialog.getByRole('button', { name: 'Hiện đại' }).click()
   await expect(dialog.getByRole('button', { name: 'Hiện đại' })).toHaveAttribute('aria-pressed', 'true')
 
-  // xem trước PDF mở tab mới
-  const popup = context.waitForEvent('page')
+  // xem trước PDF mở popup có khung xem, không mở tab mới
   await dialog.getByRole('button', { name: 'Xem trước PDF' }).click()
-  const pdf = await popup
-  // tab mở ngay; có trình xem PDF thì chuyển sang blob:, trình duyệt headless thì tải tệp xuống (điều hướng bị huỷ)
-  await pdf.waitForTimeout(4000)
-  expect(pdf.isClosed()).toBe(false)
+  const viewer = page.getByRole('dialog', { name: 'Xem trước mẫu' })
+  await expect(viewer.locator('iframe')).toBeVisible({ timeout: 30_000 })
   await expect(dialog.getByRole('alert')).toBeHidden()
-  await pdf.close()
+  await page.keyboard.press('Escape')
+  await expect(viewer).toBeHidden()
 
   await dialog.getByRole('button', { name: 'Lưu' }).click()
   await expect(dialog).toBeHidden()

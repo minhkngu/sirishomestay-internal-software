@@ -2,14 +2,15 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { FormDialog } from '@/components/form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { sampleTemplateHtml, type TemplateStyle } from '@/domain/doc-template'
 import { DOC_TYPE_LABELS, TEMPLATE_DOC_TYPES, type DocType } from '@/domain/template-fields'
-import { openBlankTab, showBase64 } from '@/lib/open-base64'
 import { createTemplateAction, previewTemplateAction, removeTemplateAction, restoreDefaultTemplatesAction, setDefaultTemplateAction, updateTemplateAction } from '@/server/templates/actions'
+import { PdfBlobDialog } from './pdf-blob-dialog'
 import { TemplateEditor } from './template-editor'
 
 type Tpl = { id: string; docType: string; name: string; hasFile: boolean; hasBody: boolean; isDefault: boolean; style: TemplateStyle; body: string | null }
@@ -23,14 +24,14 @@ function TemplateDialog({ docType, template, onClose, onSaved }: { docType: DocT
   const [html, setHtml] = useState(initial)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<'pdf' | 'save' | null>(null)
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
 
   async function preview() {
     setError(null); setBusy('pdf')
-    const tab = openBlankTab()
     const r = await previewTemplateAction({ docType, body: html, style, format: 'pdf' })
     setBusy(null)
-    if (!r.ok) { tab?.close(); setError(r.error ?? 'Không dựng được bản xem trước'); return }
-    showBase64(tab, r.data)
+    if (!r.ok) { setError(r.error ?? 'Không dựng được bản xem trước'); return }
+    setPdfUrl(r.data.base64)
     if (r.data.warnings.length) setError(`Chỗ điền không có dữ liệu mẫu: ${r.data.warnings.join(', ')}`)
   }
   async function save() {
@@ -42,6 +43,8 @@ function TemplateDialog({ docType, template, onClose, onSaved }: { docType: DocT
   }
 
   return (
+    <>
+    {pdfUrl && <PdfBlobDialog base64={pdfUrl} title="Xem trước mẫu" onClose={() => setPdfUrl(null)} />}
     <FormDialog open onOpenChange={(o) => { if (!o) onClose() }} size="xl" title={template ? `Sửa mẫu: ${DOC_TYPE_LABELS[docType]}` : `Soạn mẫu mới: ${DOC_TYPE_LABELS[docType]}`} description="Gõ nội dung, bấm hoặc kéo chỗ điền vào đúng vị trí; xem trước PDF trước khi lưu.">
       <div className="space-y-3 pb-1">
         {template && !template.hasBody && <p className="rounded-md bg-amber-50 p-2 text-sm text-amber-900">Mẫu Word cũ không dùng được nữa. Đây là mẫu khởi đầu, hãy soạn lại rồi lưu.</p>}
@@ -63,6 +66,7 @@ function TemplateDialog({ docType, template, onClose, onSaved }: { docType: DocT
         </div>
       </div>
     </FormDialog>
+    </>
   )
 }
 
@@ -72,6 +76,17 @@ export function TemplatesManager({ templates }: { templates: Tpl[] }) {
   const [error, setError] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
   const [editing, setEditing] = useState<{ docType: DocType; template: Tpl | null } | null>(null)
+  const [pdf, setPdf] = useState<{ base64: string; title: string } | null>(null)
+  const [viewing, setViewing] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<Tpl | null>(null)
+
+  async function view(t: Tpl) {
+    setError(null); setViewing(t.id)
+    const r = await previewTemplateAction({ docType: t.docType as DocType, body: t.body ?? '', style: t.style, format: 'pdf' })
+    setViewing(null)
+    if (!r.ok) { setError(r.error ?? 'Không dựng được bản xem trước'); return }
+    setPdf({ base64: r.data.base64, title: t.name })
+  }
 
   const act = (fn: () => Promise<{ ok: boolean; error?: string }>) =>
     start(async () => { setError(null); setMsg(null); const r = await fn(); if (!r.ok) setError(r.error ?? 'Có lỗi'); else router.refresh() })
@@ -98,9 +113,10 @@ export function TemplatesManager({ templates }: { templates: Tpl[] }) {
                   <span className="font-medium">{t.name}</span>
                   {t.hasBody ? <span className="rounded bg-muted px-2 py-0.5 text-xs">{STYLE_LABEL[t.style]}</span> : <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-900">Mẫu Word cũ, cần soạn lại</span>}
                   {t.isDefault && t.hasBody && <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-900">Mặc định</span>}
+                  {t.hasBody && <Button size="sm" variant="outline" disabled={viewing === t.id} onClick={() => view(t)}>{viewing === t.id ? 'Đang dựng…' : 'Xem'}</Button>}
                   <Button size="sm" variant="outline" onClick={() => setEditing({ docType: dt, template: t })}>{t.hasBody ? 'Sửa' : 'Soạn lại'}</Button>
                   {t.hasBody && !t.isDefault && <Button size="sm" variant="outline" disabled={pending} onClick={() => act(() => setDefaultTemplateAction(t.id))}>Đặt mặc định</Button>}
-                  <button type="button" className="text-destructive underline" onClick={() => { if (window.confirm('Xoá mẫu này?')) act(() => removeTemplateAction(t.id)) }}>Xoá</button>
+                  <button type="button" className="text-destructive underline" onClick={() => setDeleting(t)}>Xoá</button>
                 </li>
               ))}
               {list.length === 0 && <li className="text-sm text-muted-foreground">Chưa có mẫu nào. Khi xuất giấy tờ, hệ thống tự tạo mẫu mặc định.</li>}
@@ -108,6 +124,8 @@ export function TemplatesManager({ templates }: { templates: Tpl[] }) {
           </section>
         )
       })}
+      {pdf && <PdfBlobDialog base64={pdf.base64} title={pdf.title} onClose={() => setPdf(null)} />}
+      <ConfirmDialog open={deleting !== null} onOpenChange={(o) => { if (!o) setDeleting(null) }} title="Xoá mẫu này?" description={deleting?.name} confirmLabel="Xoá" destructive onConfirm={() => { if (deleting) act(() => removeTemplateAction(deleting.id)) }} />
       {editing && <TemplateDialog key={editing.template?.id ?? `new-${editing.docType}`} docType={editing.docType} template={editing.template} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); router.refresh() }} />}
     </div>
   )
