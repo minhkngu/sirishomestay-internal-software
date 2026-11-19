@@ -19,6 +19,7 @@ Web nội bộ cho nhân viên Siris quản lý cơ sở, phòng, khách thuê, 
 - Test: `npm test`
 - E2E: `E2E_BASE_URL=<môi trường thử có NEXT_PUBLIC_DEMO_MODE=1> npm run test:e2e`; kiểm tra trước bằng `node scripts/e2e-preflight.mjs`
 - Migration: sửa `src/db/schema/`, rồi `npm run db:generate` (không sửa tay file trong `drizzle/`)
+- Định dạng: npm run format (CI chạy format:check)
 
 ## Architecture
 - Style: Modular monolith, mỗi module chia lớp bên trong (target; mảng chưa chuyển vẫn ở `src/server/<tên>/` + `src/features/<tên>/` theo N-Layer cũ — lộ trình: `docs/superpowers/plans/2026-11-19-chuan-hoa-repo.md`). Chosen because một team, một lần deploy, nghiệp vụ chia rõ theo mảng, còn N-Layer làm một tính năng rải qua 5–6 thư mục.
