@@ -162,7 +162,7 @@ function loopTable(docType: TemplateDocType, key: string): string {
 const body = (docType: TemplateDocType, p: string) => (p.startsWith('@bang:') ? loopTable(docType, p.slice(6)) : para(docType, p))
 
 function signTable(labels: string[]): string {
-  const cell = (l: string) => `<td><p style="text-align:center"><strong>${esc(l)}</strong></p><p style="text-align:center">(Ký, ghi rõ họ tên)</p><p> </p><p> </p></td>`
+  const cell = (l: string) => `<td><p style="text-align:center"><strong>${esc(l)}</strong></p><p style="text-align:center">(Ký, ghi rõ họ tên)</p><p> </p><p> </p><p style="text-align:center">………………………</p></td>`
   return `<table><tr>${labels.map(cell).join('')}</tr></table>`
 }
 
