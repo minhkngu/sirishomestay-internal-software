@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { facilities } from '@/db'
-import { createTenant } from '@/server/tenants/service'
+import { createTenant } from '@/modules/tenants/server/tenants/service'
 import { updateSettings } from '@/modules/platform/server/settings/service'
 import { getExpiringVisas } from '@/server/dashboard/service'
 import type { AccessContext, Permission } from '@/domain/access'

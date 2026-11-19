@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { formatPhoneDisplay, normalizePhone } from '@/domain/phone'
-import { createTenantAction, updateTenantAction } from '@/server/tenants/actions'
+import { createTenantAction, updateTenantAction } from '../server/tenants/actions'
 
 type Kind = 'foreign' | 'vietnamese' | 'company'
 type Field = { key: string; label: string; type?: 'date' | 'text' }

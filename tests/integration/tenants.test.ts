@@ -1,6 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { facilities } from '@/db'
-import { createTenant, updateTenant, getTenant, searchTenants, maskTenant, displayName } from '@/server/tenants/service'
+import {
+  createTenant,
+  updateTenant,
+  getTenant,
+  searchTenants,
+  maskTenant,
+  displayName,
+} from '@/modules/tenants/server/tenants/service'
 import { ForbiddenError, NotFoundError, type AccessContext, type Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'
 import type { DB } from '@/db/client'

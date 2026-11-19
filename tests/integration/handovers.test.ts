@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { assets, facilities, leaseFeeMeters, leaseFeeSnapshots, meterReadings, meters, rooms } from '@/db'
-import { createTenant } from '@/server/tenants/service'
+import { createTenant } from '@/modules/tenants/server/tenants/service'
 import { createLease } from '@/server/contracts/service'
 import { startHandover, getHandover, saveHandover, completeHandover, listHandovers } from '@/server/handovers/service'
 import { assetHistory, setAssetStatus } from '@/server/assets/service'

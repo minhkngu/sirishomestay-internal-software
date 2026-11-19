@@ -18,7 +18,7 @@ Muốn biết một mảng đang ở đâu: xem bảng dưới. **Mỗi PR chuy�
 |---|---|---|---|---|
 | 1 | `platform` | Đã chuyển | `src/modules/platform/` (`features/settings/components/settings-tabs.tsx` ở lại, chuyển ở Task 16; `auth-user.ts` nằm ở `src/lib/supabase/`) | 13 |
 | 2 | `users` | Đã chuyển | `src/modules/users/` | 14 |
-| 2 | `tenants` | Chưa chuyển | `src/server/tenants`, `src/features/tenants` | 15 |
+| 2 | `tenants` | Đã chuyển | `src/modules/tenants/` | 15 |
 | 2 | `facilities` | Chưa chuyển | `src/server/{facilities,rooms,amenities,fees,cascade-delete.ts}`, `src/features/{facilities,settings,rooms}` | 16 |
 | 2 | `documents` | Chưa chuyển | `src/server/{templates,invoice-templates,pdf,word,convert}`, `src/features/templates` | 17 |
 | 3 | `assets` | Chưa chuyển | `src/server/{assets,stock}`, `src/features/assets` | 18 |

@@ -7,13 +7,12 @@ import { ForbiddenError } from '@/domain/access'
 import { getAccessContext } from '@/modules/platform'
 import { orNotFound } from '@/lib/or-not-found'
 import { listFacilities } from '@/server/facilities/service'
-import { getTenant } from '@/server/tenants/service'
+import { getTenant } from '@/modules/tenants'
 import { listLeases } from '@/server/contracts/service'
 import { listFiles } from '@/modules/platform'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { TenantDocuments } from '@/features/tenants/components/tenant-documents'
-import { TenantForm } from '@/features/tenants/components/tenant-form'
+import { TenantDocuments, TenantForm } from '@/modules/tenants/ui'
 
 export default async function TenantPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

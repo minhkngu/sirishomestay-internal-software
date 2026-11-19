@@ -5,7 +5,7 @@ import { FacilityFilter } from '@/components/list/facility-filter'
 import { Pager } from '@/components/list/pager'
 import { useFacilitySelection, useListParam, usePager } from '@/components/list/use-list-params'
 import { matchesTenantQuery } from '@/domain/list-filters'
-import type { Tenant } from '@/server/tenants/service'
+import type { Tenant } from '../server/tenants/service'
 import { TenantSearch } from './tenant-search'
 import { TenantTable } from './tenant-table'
 

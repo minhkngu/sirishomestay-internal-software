@@ -7,8 +7,8 @@ import { getAccessContext } from '@/modules/platform'
 import { listFacilities } from '@/server/facilities/service'
 import { getSettings } from '@/modules/platform'
 import { listLeases } from '@/server/contracts/service'
-import { searchTenants } from '@/server/tenants/service'
-import { TenantList } from '@/features/tenants/components/tenant-list'
+import { searchTenants } from '@/modules/tenants'
+import { TenantList } from '@/modules/tenants/ui'
 import { notFound } from 'next/navigation'
 
 export default async function TenantsPage() {

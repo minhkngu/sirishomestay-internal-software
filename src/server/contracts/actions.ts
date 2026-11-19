@@ -171,7 +171,7 @@ export async function quickContractDataAction(kind: 'lease' | 'deposit', id: str
   return toActionResult(async () => {
     const { getLease, getDepositContract } = await import('./service')
     const { listRooms } = await import('@/server/rooms/service')
-    const { searchTenants, displayName } = await import('@/server/tenants/service')
+    const { searchTenants, displayName } = await import('@/modules/tenants')
     const { addendumFormData } = await import('@/server/addenda/service')
     const { listLeaseOccupants } = await import('./service')
     const contract = kind === 'lease' ? await getLease(db, ctx, id) : await getDepositContract(db, ctx, id)
