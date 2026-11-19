@@ -88,7 +88,8 @@ test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → 
   await expect(createDrafts).toBeEnabled()
   await createDrafts.click()
   await expect(page).toHaveURL(/view=draft/)
-  await page.getByLabel('Số dòng').selectOption('100')
+  await page.getByLabel('Số dòng').click()
+  await page.getByRole('option', { name: '100' }).click()
   await expect(page.getByRole('row').filter({ hasText: name })).toBeVisible()
 
   // thanh lý hợp đồng vừa tạo: hoá đơn thanh lý nháp, duyệt xong hợp đồng kết thúc
