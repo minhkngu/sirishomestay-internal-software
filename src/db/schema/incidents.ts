@@ -1,3 +1,4 @@
+import type { IncidentStatus } from '@/domain/statuses'
 import { boolean, index, integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 import { assets } from './assets'
 import { facilities, rooms } from './facilities'
@@ -14,7 +15,7 @@ export const incidents = pgTable(
     title: text('title').notNull(),
     description: text('description').notNull().default(''),
     priority: text('priority').notNull().default('normal'), // low | normal | high
-    status: text('status').notNull().default('new'), // new | in_progress | done | cancelled
+    status: text('status').$type<IncidentStatus>().notNull().default('new'),
     reportedBy: uuid('reported_by').notNull(),
     assigneeId: uuid('assignee_id'),
     cost: integer('cost'),

@@ -1,3 +1,11 @@
+import type {
+  CancelOutcome,
+  DepositContractStatus,
+  DepositEntryStatus,
+  DepositEntryType,
+  LeaseStatus,
+  SignStatus,
+} from '@/domain/statuses'
 import { sql } from 'drizzle-orm'
 import {
   boolean,
@@ -30,9 +38,9 @@ export const depositContracts = pgTable(
     depositAmount: integer('deposit_amount').notNull(),
     agreedRent: integer('agreed_rent').notNull(),
     expectedMoveIn: date('expected_move_in', { mode: 'string' }).notNull(),
-    status: text('status').notNull().default('pending'), // pending | converted | cancelled
-    cancelOutcome: text('cancel_outcome'), // forfeit | refund
-    signStatus: text('sign_status').notNull().default('draft'), // draft | exported | signed
+    status: text('status').$type<DepositContractStatus>().notNull().default('pending'),
+    cancelOutcome: text('cancel_outcome').$type<CancelOutcome>(),
+    signStatus: text('sign_status').$type<SignStatus>().notNull().default('draft'),
     signedFileId: uuid('signed_file_id'),
     isDemo: boolean('is_demo').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -70,8 +78,8 @@ export const leases = pgTable(
     dueRule: jsonb('due_rule'),
     proration: text('proration'),
     fromDepositContractId: uuid('from_deposit_contract_id').references(() => depositContracts.id),
-    status: text('status').notNull().default('active'), // active | ended
-    signStatus: text('sign_status').notNull().default('draft'),
+    status: text('status').$type<LeaseStatus>().notNull().default('active'),
+    signStatus: text('sign_status').$type<SignStatus>().notNull().default('draft'),
     signedFileId: uuid('signed_file_id'),
     isDemo: boolean('is_demo').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -129,9 +137,9 @@ export const depositEntries = pgTable('deposit_entries', {
   leaseId: uuid('lease_id').references(() => leases.id),
   depositContractId: uuid('deposit_contract_id').references(() => depositContracts.id),
   date: date('date', { mode: 'string' }).notNull(),
-  type: text('type').notNull(), // collect | topup | deduct | refund | forfeit
+  type: text('type').$type<DepositEntryType>().notNull(),
   amount: integer('amount').notNull(),
-  status: text('status').notNull().default('pending'), // pending | done
+  status: text('status').$type<DepositEntryStatus>().notNull().default('pending'),
   method: text('method'),
   note: text('note').notNull().default(''),
   isDemo: boolean('is_demo').notNull().default(false),

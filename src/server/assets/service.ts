@@ -10,7 +10,8 @@ import { recordAudit } from '@/server/audit'
 export type Asset = typeof assets.$inferSelect
 export type LocationKind = 'room' | 'common' | 'warehouse' | 'unassigned'
 export type Location = { kind: LocationKind; id: string }
-export type AssetStatus = 'in_use' | 'broken' | 'disposed'
+import type { AssetStatus } from '@/domain/statuses'
+export type { AssetStatus } from '@/domain/statuses'
 
 const createInput = z.object({
   code: z.string().trim().min(1, 'Nhập mã tài sản'),

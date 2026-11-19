@@ -4,16 +4,15 @@ import { toast } from 'sonner'
 import { formatDateVN, todayVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { DEPOSIT_ENTRY_LABELS, runningDepositBalances } from '@/domain/deposit'
-import type { DepositEntry } from '@/domain/types'
+import type { DepositEntryStatus, DepositEntryType } from '@/domain/statuses'
 import { MoneyInput } from '@/components/ui/money-input'
 import { addDepositEntryAction, markDepositDoneAction } from '@/server/charges/actions'
 
-// Dòng từ DB có `type`/`status` kiểu chuỗi; giá trị hợp lệ do cột DB bảo đảm.
-type Entry = { id: string; date: string; type: string; amount: number; status: string }
+type Entry = { id: string; date: string; type: DepositEntryType; amount: number; status: DepositEntryStatus }
 export function DepositLedger({ entries, canEdit, leaseId }: { entries: Entry[]; canEdit: boolean; leaseId?: string }) {
   const [pending, startTransition] = useTransition()
   const [amount, setAmount] = useState('')
-  const balances = runningDepositBalances(entries as Pick<DepositEntry, 'type' | 'amount' | 'status'>[])
+  const balances = runningDepositBalances(entries)
   return (
     <div className="space-y-3">
       <div className="overflow-x-auto">
@@ -34,7 +33,7 @@ export function DepositLedger({ entries, canEdit, leaseId }: { entries: Entry[];
               return (
                 <tr key={entry.id} className="border-t">
                   <td>{formatDateVN(entry.date)}</td>
-                  <td>{DEPOSIT_ENTRY_LABELS[entry.type as DepositEntry['type']] ?? entry.type}</td>
+                  <td>{DEPOSIT_ENTRY_LABELS[entry.type] ?? entry.type}</td>
                   <td>{formatVND(entry.amount)}</td>
                   <td>{entry.status === 'done' ? 'Đã xong' : 'Chờ'}</td>
                   <td>{formatVND(current)}</td>

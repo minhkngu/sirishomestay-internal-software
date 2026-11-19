@@ -1,3 +1,4 @@
+import type { SignStatus } from '@/domain/statuses'
 import { bigint, boolean, date, index, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 import { leases } from './contracts'
 import { rooms } from './facilities'
@@ -24,7 +25,7 @@ export const addenda = pgTable(
     oldOccupantIds: jsonb('old_occupant_ids'),
     depositForfeit: jsonb('deposit_forfeit'),
     adjustmentTarget: text('adjustment_target').notNull().default('next'),
-    signStatus: text('sign_status').notNull().default('draft'),
+    signStatus: text('sign_status').$type<SignStatus>().notNull().default('draft'),
     signedFileId: uuid('signed_file_id'),
     isDemo: boolean('is_demo').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

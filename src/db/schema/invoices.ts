@@ -1,3 +1,4 @@
+import type { InvoiceStatus } from '@/domain/statuses'
 import {
   bigint,
   boolean,
@@ -35,7 +36,7 @@ export const invoices = pgTable(
     proration: text('proration'),
     issueDate: date('issue_date', { mode: 'string' }).notNull(),
     dueDate: date('due_date', { mode: 'string' }),
-    status: text('status').notNull().default('draft'),
+    status: text('status').$type<InvoiceStatus>().notNull().default('draft'),
     source: text('source'),
     note: text('note').notNull().default(''),
     invoiceTemplateId: uuid('invoice_template_id').references(() => invoiceTemplates.id),

@@ -9,7 +9,6 @@ import { buttonVariants } from '@/components/ui/button'
 import { db } from '@/db/client'
 import { NotFoundError } from '@/domain/errors'
 import { DEPOSIT_ENTRY_LABELS, depositBalance, runningDepositBalances } from '@/domain/deposit'
-import type { DepositEntry } from '@/domain/types'
 import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { getAccessContext } from '@/server/session'
@@ -28,12 +27,12 @@ import { StartHandoverButtons } from '@/features/handovers/components/start-hand
 import { listAddenda } from '@/server/addenda/service'
 import { cn } from '@/lib/utils'
 import { signStatusLabel } from '@/domain/sign-status'
+import type { DepositEntryStatus, DepositEntryType } from '@/domain/statuses'
 
-type Entry = { id: string; date: string; type: string; amount: number; status: string }
+type Entry = { id: string; date: string; type: DepositEntryType; amount: number; status: DepositEntryStatus }
 
 function Ledger({ entries }: { entries: Entry[] }) {
-  // Dòng từ DB có `type`/`status` kiểu chuỗi; giá trị hợp lệ do cột DB bảo đảm.
-  const typed = entries as Pick<DepositEntry, 'type' | 'amount' | 'status'>[]
+  const typed = entries
   const done = runningDepositBalances(typed)
   const currentBalance = depositBalance(typed)
 
@@ -55,9 +54,7 @@ function Ledger({ entries }: { entries: Entry[] }) {
               <tr key={e.id} className="transition-colors hover:bg-muted/30">
                 <td className="px-4 py-3 font-medium text-foreground">{formatDateVN(e.date)}</td>
                 <td className="px-4 py-3">
-                  <span className="font-medium text-foreground">
-                    {DEPOSIT_ENTRY_LABELS[e.type as DepositEntry['type']] ?? e.type}
-                  </span>
+                  <span className="font-medium text-foreground">{DEPOSIT_ENTRY_LABELS[e.type] ?? e.type}</span>
                 </td>
                 <td className="px-4 py-3 text-right font-medium tabular-nums text-foreground">{formatVND(e.amount)}</td>
                 <td className="px-4 py-3 text-center">

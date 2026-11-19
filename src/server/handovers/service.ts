@@ -23,7 +23,8 @@ import type { StorageAdapter } from '@/server/storage/types'
 import { exportDocument, registerDocLoader } from '@/server/templates/service'
 
 export type Handover = typeof handovers.$inferSelect
-export type HandoverKind = 'check_in' | 'check_out'
+import type { HandoverKind } from '@/domain/statuses'
+export type { HandoverKind } from '@/domain/statuses'
 
 async function leaseRoom(db: Pick<DB, 'select'>, ctx: AccessContext, leaseId: string) {
   const [row] = await db

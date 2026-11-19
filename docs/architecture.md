@@ -44,7 +44,7 @@ Việc nền trước khi chuyển (Prettier, CI, gỡ ghép ngược…) là Ta
 - `src/features/<tên>/components/` giao diện; không import `db`, không import feature khác.
 - `src/server/<tên>/` `service.ts`, `actions.ts`, `schemas.ts`; import `db`, `domain`, `lib`.
 - `src/domain/` quy tắc thuần, không import gì ngoài `src/domain`.
-- `src/db/` chỉ import `db` (một ngoại lệ có `eslint-disable`: `schema/facilities.ts` import kiểu `BankAccount`).
+- `src/db/` chỉ import `db`, trừ `import type` từ `src/domain` (kiểu trạng thái, `BankAccount`); ESLint chỉ cho dependency kind `type`.
 - `eslint-plugin-boundaries` trong `eslint.config.mjs` kiểm các luật này khi `npm run lint`.
 
 ## 4. Kiến trúc đích: Modular monolith
@@ -63,7 +63,7 @@ src/modules/registrations.ts   import mọi file có register* (mục 6) (hiện
 Luật:
 - **Tầng:** 1 `platform`; 2 `users`, `tenants`, `facilities`, `documents`; 3 `assets`, `meters`; 4 `leasing`; 5 `import`, `dashboard`. Module chỉ import module **tầng thấp hơn**, chỉ qua `index.ts`/`actions.ts`/`ui.ts`. Thứ tự tầng nằm ở `MODULE_TIERS` (trong `eslint.config.mjs` và `tests/unit/architecture/import-graph.ts`, hai bản phải khớp — có từ Task 12).
 - **Trong module:** `ui` → `domain` và cổng `actions.ts` (không import `index.ts` của module khác trừ `import type`, để code server không lọt vào bundle trình duyệt); `server` → `domain`, `db`; `domain` → `src/domain`.
-- **Dùng chung** (`src/domain`, `src/components`, `src/lib`, `src/db`) không import module.
+- **Dùng chung** (`src/domain`, `src/components`, `src/lib`, `src/db`) không import module. `src/db` được `import type` từ `src/domain` (không import giá trị).
 - **Ghi bảng của module khác** chỉ qua API module đó. Đọc (select/join) bảng khác thì được. Luật ghi không có công cụ kiểm, chỉ giữ bằng review.
 - **Chia khi chuyển:** file domain chỉ một module dùng → vào module đó; hai module trở lên → ở lại `src/domain`. Component đi theo module của server nó import; import hai module ngang tầng → đặt cạnh route trong `src/app`.
 

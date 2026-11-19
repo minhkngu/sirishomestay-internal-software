@@ -9,7 +9,8 @@ import { recordAudit } from '@/server/audit'
 import { registerOwnerResolver } from '@/server/files/owners'
 
 export type Incident = typeof incidents.$inferSelect
-export type IncidentStatus = 'new' | 'in_progress' | 'done' | 'cancelled'
+import type { IncidentStatus } from '@/domain/statuses'
+export type { IncidentStatus } from '@/domain/statuses'
 const base = {
   title: z.string().trim().min(1, 'Nhập tiêu đề'),
   description: z.string().default(''),

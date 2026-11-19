@@ -1,3 +1,4 @@
+import type { AssetStatus } from '@/domain/statuses'
 import { boolean, integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 import { facilities } from './facilities'
 
@@ -14,7 +15,7 @@ export const assets = pgTable('assets', {
   facilityId: uuid('facility_id')
     .notNull()
     .references(() => facilities.id),
-  status: text('status').notNull().default('in_use'), // in_use | broken | disposed
+  status: text('status').$type<AssetStatus>().notNull().default('in_use'),
   searchText: text('search_text').notNull().default(''),
   isDemo: boolean('is_demo').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
