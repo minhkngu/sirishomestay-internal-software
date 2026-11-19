@@ -36,15 +36,15 @@ function registeringFiles(): string[] {
 }
 
 function registrationsFile(): string {
-  return ['src/modules/registrations.ts', 'src/server/registrations.ts'].find((p) => existsSync(join(ROOT, p)))!
+  return 'src/modules/registrations.ts'
 }
 
 const importsOf = (src: string) => [...src.matchAll(/^import\s+['"]([^'"]+)['"]/gm)].map((m) => m[1])
-const registrationsSpecifier = /^(@\/(modules|server)\/registrations|(\.\.?\/)+registrations)$/
+const registrationsSpecifier = /^(@\/modules\/registrations|(\.\.?\/)+registrations)$/
 
 describe('đăng ký resolver và loader', () => {
   it('có file registrations', () => {
-    expect(registrationsFile()).toBeDefined()
+    expect(existsSync(join(ROOT, registrationsFile()))).toBe(true)
   })
 
   it('mọi file gọi register* ở cấp module đều được import trong registrations', () => {
