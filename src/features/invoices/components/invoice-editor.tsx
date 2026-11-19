@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { formatVND } from '@/domain/money'
+import { MoneyInput } from '@/components/ui/money-input'
 import { cn } from '@/lib/utils'
 import {
   approveInvoiceAction,
@@ -256,12 +257,11 @@ export function InvoiceEditor(p: Props) {
                     />
                   </td>
                   <td className="p-2.5">
-                    <input
-                      type="number"
-                      step="1"
-                      value={l.unitPrice}
+                    <MoneyInput
+                      allowNegative
+                      value={String(l.unitPrice)}
                       disabled={typeof l.meta?.leaseFeeId === 'string'}
-                      onChange={(e) => set(i, { unitPrice: Number(e.target.value) })}
+                      onValueChange={(value) => set(i, { unitPrice: value === '' || value === '-' ? 0 : Number(value) })}
                       className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
                     />
                   </td>

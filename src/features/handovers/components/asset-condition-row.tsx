@@ -2,6 +2,7 @@
 
 import { FileUpload } from '@/components/file-upload'
 import { formatVND } from '@/domain/money'
+import { MoneyInput } from '@/components/ui/money-input'
 import { cn } from '@/lib/utils'
 
 export type ItemState = { id: string; assetCode: string; assetName: string; assetValue: number; condition: string; note: string; damaged: boolean; missing: boolean; penalty: string; photoIds: string[] }
@@ -31,7 +32,7 @@ export function AssetConditionRow({ item, readOnly, checkInCondition, onChange, 
       <input aria-label={`Ghi chú ${item.assetCode}`} disabled={readOnly} placeholder="Ghi chú" value={item.note} onChange={(e) => onChange({ note: e.target.value })} className="h-10 w-full rounded-lg border px-2 text-sm" />
       {(item.damaged || item.missing) && (
         <label className="flex items-center gap-2 text-sm">Tiền phạt (VND)
-          <input aria-label={`Tiền phạt ${item.assetCode}`} disabled={readOnly} inputMode="numeric" value={item.penalty} onChange={(e) => onChange({ penalty: e.target.value })} className="h-10 w-36 rounded-lg border px-2" />
+          <MoneyInput aria-label={`Tiền phạt ${item.assetCode}`} disabled={readOnly} value={item.penalty} onValueChange={(penalty) => onChange({ penalty })} className="h-10 w-36 rounded-lg border px-2" />
         </label>
       )}
       <div className="flex flex-wrap items-center gap-2">

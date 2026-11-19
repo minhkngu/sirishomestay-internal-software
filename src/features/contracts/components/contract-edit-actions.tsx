@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { MoneyInput } from '@/components/ui/money-input'
 import { Label } from '@/components/ui/label'
 import { deleteContractAction, retryContractFileCleanupAction, updateDepositContractAction, updateLeaseAction } from '@/server/contracts/actions'
 
@@ -78,8 +79,8 @@ export function ContractEditActions({ contract, canDelete, rooms, tenants, mode,
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1"><Label htmlFor="edit-room">Phòng</Label><select id="edit-room" value={roomId} onChange={e => setRoomId(e.target.value)} className="h-9 w-full rounded-lg border bg-background px-2 text-sm">{rooms.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}</select></div>
         <div className="space-y-1"><Label htmlFor="edit-tenant">Bên thuê</Label><select id="edit-tenant" value={tenantId} onChange={e => setTenantId(e.target.value)} className="h-9 w-full rounded-lg border bg-background px-2 text-sm">{tenants.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}</select></div>
-        <div className="space-y-1"><Label htmlFor="edit-rent">Giá thuê (VND/tháng)</Label><Input id="edit-rent" required type="number" min="0" step="1" value={rent} onChange={e => setRent(e.target.value)} /></div>
-        <div className="space-y-1"><Label htmlFor="edit-deposit">Tiền cọc (VND)</Label><Input id="edit-deposit" required type="number" min="0" step="1" value={deposit} onChange={e => setDeposit(e.target.value)} /></div>
+        <div className="space-y-1"><Label htmlFor="edit-rent">Giá thuê (VND/tháng)</Label><MoneyInput id="edit-rent" required value={rent} onValueChange={setRent} /></div>
+        <div className="space-y-1"><Label htmlFor="edit-deposit">Tiền cọc (VND)</Label><MoneyInput id="edit-deposit" required value={deposit} onValueChange={setDeposit} /></div>
         <div className="space-y-1"><Label htmlFor="edit-start">{contract.kind === 'lease' ? 'Ngày bắt đầu' : 'Ngày vào ở dự kiến'}</Label><Input id="edit-start" required type="date" value={startDate} onChange={e => setStartDate(e.target.value)} /></div>
         {contract.kind === 'lease' && <div className="space-y-1"><Label htmlFor="edit-end">Ngày kết thúc</Label><Input id="edit-end" required type="date" value={endDate} onChange={e => setEndDate(e.target.value)} /></div>}
       </div>

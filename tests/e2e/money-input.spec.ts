@@ -18,10 +18,10 @@ test('ô tiền tự thêm dấu chấm khi gõ và dán', async ({ page }) => {
   await expect(rent).toHaveValue('15.000.000')
 
   await rent.fill('9000000')
-  await rent.evaluate((el) => el.setSelectionRange(2, 2))
+  await rent.evaluate((el) => (el as HTMLInputElement).setSelectionRange(2, 2))
   await page.keyboard.type('1')
   await expect(rent).toHaveValue('91.000.000')
-  await expect.poll(() => rent.evaluate((el) => el.selectionStart)).toBe(2)
+  await expect.poll(() => rent.evaluate((el) => (el as HTMLInputElement).selectionStart)).toBe(2)
 
   await rent.fill('')
   await rent.evaluate((el) => {

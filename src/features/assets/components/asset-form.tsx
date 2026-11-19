@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { MoneyInput } from '@/components/ui/money-input'
 import { createAssetAction } from '@/server/assets/actions'
 import type { TreeFacility } from './location-tree'
 
@@ -21,7 +22,7 @@ export function AssetForm({ facilities }: { facilities: TreeFacility[] }) {
       <Input aria-label="Mã tài sản" placeholder="Mã tài sản" value={v.code} onChange={(e) => setV({ ...v, code: e.target.value })} />
       <Input aria-label="Tên tài sản" placeholder="Tên tài sản" value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} />
       <Input aria-label="Loại" placeholder="Loại (điện lạnh, nội thất…)" value={v.category} onChange={(e) => setV({ ...v, category: e.target.value })} />
-      <Input aria-label="Giá trị" placeholder="Giá trị (VND)" inputMode="numeric" value={v.value} onChange={(e) => setV({ ...v, value: e.target.value })} />
+      <MoneyInput aria-label="Giá trị" placeholder="Giá trị (VND)" value={v.value} onValueChange={(value) => setV({ ...v, value })} />
       <select aria-label="Cơ sở" value={v.facilityId} onChange={(e) => setV({ ...v, facilityId: e.target.value, where: `warehouse:${e.target.value}` })} className="h-8 rounded-lg border px-2 text-sm">{facilities.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select>
       <select aria-label="Vị trí" value={v.where} onChange={(e) => setV({ ...v, where: e.target.value })} className="h-8 rounded-lg border px-2 text-sm">
         <option value={`warehouse:${v.facilityId}`}>Kho</option><option value={`common:${v.facilityId}`}>Khu chung</option>

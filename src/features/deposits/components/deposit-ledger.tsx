@@ -1,14 +1,16 @@
 'use client'
-import { useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { formatDateVN, todayVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
+import { MoneyInput } from '@/components/ui/money-input'
 import { addDepositEntryAction, markDepositDoneAction } from '@/server/charges/actions'
 
 type Entry = { id: string; date: string; type: string; amount: number; status: string }
 const labels: Record<string, string> = { collect: 'Thu cọc', topup: 'Thu bổ sung', deduct: 'Khấu trừ', refund: 'Hoàn cọc', forfeit: 'Mất cọc' }
 export function DepositLedger({ entries, canEdit, leaseId }: { entries: Entry[]; canEdit: boolean; leaseId: string }) {
   const [pending, startTransition] = useTransition()
+  const [amount, setAmount] = useState('')
   const balances = entries.reduce<number[]>((result, entry) => {
     const previous = result.at(-1) ?? 0
     return [...result, previous + (entry.status === 'done' ? (['collect', 'topup'].includes(entry.type) ? entry.amount : -entry.amount) : 0)]
@@ -24,8 +26,8 @@ export function DepositLedger({ entries, canEdit, leaseId }: { entries: Entry[];
     const data = new FormData(event.currentTarget)
     startTransition(async () => {
       const result = await addDepositEntryAction(leaseId, { date: String(data.get('date')), type: data.get('type') as 'collect' | 'topup' | 'deduct' | 'refund' | 'forfeit', amount: Number(data.get('amount')), status: 'pending' })
-      if (!result.ok) toast.error(result.error); else toast.success('Đã thêm dòng sổ cọc')
+      if (!result.ok) toast.error(result.error); else { toast.success('Đã thêm dòng sổ cọc'); setAmount('') }
     })
-  }}><label>Ngày <input type="date" name="date" defaultValue={todayVN()} required /></label><label>Loại <select name="type"><option value="topup">Thu bổ sung</option><option value="collect">Thu cọc</option><option value="deduct">Khấu trừ</option><option value="refund">Hoàn cọc</option><option value="forfeit">Mất cọc</option></select></label><label>Số tiền <input type="number" name="amount" min="1" step="1" required className="w-28 rounded border" /></label><button disabled={pending} className="rounded border px-2">Thêm dòng</button></form>}
+  }}><label>Ngày <input type="date" name="date" defaultValue={todayVN()} required /></label><label>Loại <select name="type"><option value="topup">Thu bổ sung</option><option value="collect">Thu cọc</option><option value="deduct">Khấu trừ</option><option value="refund">Hoàn cọc</option><option value="forfeit">Mất cọc</option></select></label><label>Số tiền <MoneyInput name="amount" required value={amount} onValueChange={setAmount} className="w-28 rounded border" /></label><button disabled={pending} className="rounded border px-2">Thêm dòng</button></form>}
   </div>
 }

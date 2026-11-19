@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { createTerminationAction } from '@/server/addenda/actions'
 import { AddendumShell, Field, inputCls, ReadingInputs, toReadings, type MeterOption } from './addendum-shell'
+import { MoneyInput } from '@/components/ui/money-input'
 
 export function TerminationWizard({ leaseId, meters, today, defaultOpen, onCompleted }: { leaseId: string; meters: MeterOption[]; today: string; defaultOpen?: boolean; onCompleted?: () => void }) {
   const [endDate, setEnd] = useState(today)
@@ -13,7 +14,7 @@ export function TerminationWizard({ leaseId, meters, today, defaultOpen, onCompl
     <AddendumShell label="Thanh lý hợp đồng" kind="termination" leaseId={leaseId} input={input} create={createTerminationAction} defaultOpen={defaultOpen} onCompleted={onCompleted}>
       <Field label="Ngày trả phòng"><input type="date" className={inputCls} value={endDate} onChange={(e) => setEnd(e.target.value)} /></Field>
       <Field label="Mất cọc"><select className={inputCls} value={mode} onChange={(e) => setMode(e.target.value as 'none')}><option value="none">Không mất cọc</option><option value="partial">Mất một phần</option><option value="all">Mất toàn bộ</option></select></Field>
-      {mode === 'partial' && <Field label="Số tiền mất cọc"><input type="number" className={inputCls} value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>}
+      {mode === 'partial' && <Field label="Số tiền mất cọc"><MoneyInput className={inputCls} value={amount} onValueChange={setAmount} /></Field>}
       <ReadingInputs title="Chỉ số tại ngày trả phòng" meters={meters} values={readings} onChange={setReadings} />
       <p className="text-muted-foreground">Lưu sẽ tạo biên bản check-out và hoá đơn thanh lý nháp. Hợp đồng chỉ kết thúc khi hoá đơn được duyệt.</p>
     </AddendumShell>
