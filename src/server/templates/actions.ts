@@ -3,15 +3,13 @@
 import { revalidatePath } from 'next/cache'
 import { db } from '@/db/client'
 import { toActionResult } from '@/lib/action-result'
-import { DOCX_MIME, renderDocx } from '@/lib/docx'
+import { renderTemplate, type TemplateStyle } from '@/domain/doc-template'
 import { sampleDataFor, type DocType } from '@/domain/template-fields'
 import { assertCan } from '@/domain/access'
-import { NotFoundError, ValidationError } from '@/domain/errors'
-import { eq } from 'drizzle-orm'
-import { docTemplates, files } from '@/db'
+import { ValidationError } from '@/domain/errors'
 import { getAccessContext } from '@/server/session'
 import { getStorage } from '@/server/storage'
-import { attachTemplateFile, createTemplate, exportDocument, removeTemplate, setDefaultTemplate } from './service'
+import { attachTemplateFile, createTemplate, exportDocument, previewDocument, removeTemplate, setDefaultTemplate } from './service'
 
 export async function createTemplateAction(input: { docType: string; name: string }) {
   const ctx = await getAccessContext()
@@ -36,17 +34,29 @@ export async function exportDocumentAction(input: { docType: DocType; entityId: 
   return toActionResult(() => exportDocument(db, ctx, getStorage(), input))
 }
 
-/** "Thử xuất với dữ liệu mẫu": điền mẫu bằng ví dụ của từng chỗ điền, trả file về trình duyệt (không lưu). */
-export async function trialExportAction(templateId: string) {
+const toBase64 = (bytes: Uint8Array) => Buffer.from(bytes).toString('base64')
+const MIME = { pdf: 'application/pdf', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' } as const
+
+/** Xem trước (hoặc tải thử) mẫu đang soạn với dữ liệu mẫu của từng chỗ điền; trả tệp về trình duyệt, không lưu. */
+export async function previewTemplateAction(input: { docType: DocType; body: string; style: TemplateStyle; format: 'pdf' | 'docx' }) {
   const ctx = await getAccessContext()
   return toActionResult(async () => {
     assertCan(ctx, 'settings')
-    const [t] = await db.select().from(docTemplates).where(eq(docTemplates.id, templateId))
-    if (!t) throw new NotFoundError()
-    if (!t.fileId) throw new ValidationError('Mẫu chưa có file')
-    const [f] = await db.select().from(files).where(eq(files.id, t.fileId))
-    if (!f) throw new ValidationError('Mẫu chưa có file')
-    const { blob, warnings } = renderDocx(await getStorage().read(f.storageKey), sampleDataFor(t.docType as DocType))
-    return { base64: Buffer.from(await blob.arrayBuffer()).toString('base64'), name: `thu-${t.docType}.docx`, mime: DOCX_MIME, warnings }
+    if (!['formal', 'modern'].includes(input.style)) throw new ValidationError('Kiểu trình bày không hợp lệ')
+    if (!input.body.trim()) throw new ValidationError('Nhập nội dung mẫu')
+    const { doc, warnings } = renderTemplate(input.body, sampleDataFor(input.docType))
+    const bytes = input.format === 'docx'
+      ? await (await import('@/server/word/build-docx')).buildDocx(doc, input.style)
+      : await (await import('@/server/pdf/template-pdf')).renderTemplatePdf(doc, input.style)
+    return { base64: toBase64(bytes), name: `thu-${input.docType}.${input.format}`, mime: MIME[input.format], warnings }
+  })
+}
+
+/** Xem trước PDF của giấy tờ thật (hợp đồng đang sửa...) bằng mẫu đã chọn; không lưu tệp. */
+export async function previewDocumentAction(input: { docType: DocType; entityId: string; templateId?: string }) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => {
+    const r = await previewDocument(db, ctx, input)
+    return { base64: toBase64(r.bytes), name: r.name, mime: MIME.pdf, warnings: r.warnings }
   })
 }

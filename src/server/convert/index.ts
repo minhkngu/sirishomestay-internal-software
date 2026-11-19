@@ -1,6 +1,6 @@
 import { PDF_DOC_TYPES } from '@/domain/template-fields'
 import { ValidationError } from '@/domain/errors'
-import { convertDocxToPdf, convertPdfToPng } from './gotenberg'
+import { convertPdfToPng } from './gotenberg'
 
 export type ExportFormat = 'docx' | 'pdf' | 'png'
 export const FORMAT_EXT: Record<ExportFormat, { ext: string; mime: string }> = {
@@ -13,9 +13,4 @@ export function assertFormatAllowed(docType: string, format: ExportFormat) {
   if ((PDF_DOC_TYPES as readonly string[]).includes(docType) && format === 'docx') throw new ValidationError('Hoá đơn và phiếu thu chỉ xuất PDF hoặc ảnh')
   if (format === 'png' && !(PDF_DOC_TYPES as readonly string[]).includes(docType)) throw new ValidationError('Chỉ hoá đơn mới xuất được ảnh')
 }
-export async function convertDocx(docx: Blob, format: ExportFormat): Promise<Blob> {
-  if (format === 'docx') return docx
-  const pdf = await convertDocxToPdf(docx)
-  return format === 'pdf' ? pdf : convertPdfToPng(pdf)
-}
-export { convertDocxToPdf, convertPdfToPng }
+export { convertPdfToPng }

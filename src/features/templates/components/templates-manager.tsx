@@ -6,7 +6,7 @@ import { FileUpload } from '@/components/file-upload'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DOC_TYPES, PDF_DOC_TYPES, DOC_TYPE_LABELS, TEMPLATE_FIELDS, type DocType } from '@/domain/template-fields'
-import { attachTemplateFileAction, createTemplateAction, removeTemplateAction, setDefaultTemplateAction, trialExportAction } from '@/server/templates/actions'
+import { attachTemplateFileAction, createTemplateAction, removeTemplateAction, setDefaultTemplateAction } from '@/server/templates/actions'
 
 type Tpl = { id: string; docType: string; name: string; hasFile: boolean; hasBody: boolean; isDefault: boolean }
 
@@ -50,15 +50,6 @@ export function TemplatesManager({ templates }: { templates: Tpl[] }) {
   const act = (fn: () => Promise<{ ok: boolean; error?: string }>) =>
     start(async () => { setError(null); setMsg(null); const r = await fn(); if (!r.ok) setError(r.error ?? 'Có lỗi'); else router.refresh() })
 
-  async function trial(id: string) {
-    setError(null); setMsg(null)
-    const r = await trialExportAction(id)
-    if (!r.ok) { setError(r.error); return }
-    const bytes = Uint8Array.from(atob(r.data.base64), (c) => c.charCodeAt(0))
-    const url = URL.createObjectURL(new Blob([bytes], { type: r.data.mime }))
-    const a = document.createElement('a'); a.href = url; a.download = r.data.name; a.click(); URL.revokeObjectURL(url)
-    setMsg(r.data.warnings.length ? `Đã xuất. Chỗ điền thiếu dữ liệu: ${r.data.warnings.join(', ')}` : 'Đã xuất file thử')
-  }
 
   return (
     <div className="space-y-6">
@@ -81,7 +72,6 @@ export function TemplatesManager({ templates }: { templates: Tpl[] }) {
                     <FileUpload ownerType="template" ownerId={t.id} accept={DOCX} label="Tải file .docx" onUploaded={(fileId) => act(() => attachTemplateFileAction(t.id, fileId))} />
                   )}
                   {t.hasFile && !t.isDefault && <Button size="sm" variant="outline" disabled={pending} onClick={() => act(() => setDefaultTemplateAction(t.id))}>Đặt mặc định</Button>}
-                  {t.hasFile && <Button size="sm" variant="outline" disabled={pending} onClick={() => trial(t.id)}>Thử xuất với dữ liệu mẫu</Button>}
                   <button type="button" className="text-destructive underline" onClick={() => { if (window.confirm('Xoá mẫu này?')) act(() => removeTemplateAction(t.id)) }}>Xoá</button>
                 </li>
               ))}

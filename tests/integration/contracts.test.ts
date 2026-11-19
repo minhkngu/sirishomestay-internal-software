@@ -11,9 +11,8 @@ import {
   type LeaseFeeInput, createDepositContract, cancelDepositContract, listDepositContracts, getDepositContract, convertDepositToLease, createLease, getLease, listLeases, setSignStatus, exportContract,
 } from '@/server/contracts/service'
 import { MemoryStorage } from '@/server/storage/memory'
-import { buildSampleTemplate } from '../../scripts/build-sample-templates'
 import { DOCX_MIME } from '@/lib/docx'
-import { vi } from 'vitest'
+import PizZip from 'pizzip'
 import { removeTemplate } from '@/server/templates/service'
 import { depositBalance } from '@/domain/deposit'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
@@ -80,21 +79,16 @@ describe('contracts', () => {
 
   it('lưu mẫu hợp đồng đã chọn và dùng mẫu đó khi xuất dù mẫu mặc định đã đổi', async () => {
     const storage = new MemoryStorage()
-    const [selected] = await db.insert(docTemplates).values({ docType: 'lease', name: 'Mẫu chọn', body: '<p>x</p>' }).returning()
-    const [other] = await db.insert(docTemplates).values({ docType: 'lease', name: 'Mẫu mặc định', isDefault: true, body: '<p>y</p>' }).returning()
-    for (const t of [selected, other]) {
-      const key = `template/${t.id}.docx`
-      await storage.write(key, await buildSampleTemplate('lease'), DOCX_MIME)
-      const [file] = await db.insert(files).values({ storageKey: key, ownerType: 'template', ownerId: t.id, contentType: DOCX_MIME, confirmedAt: new Date() }).returning()
-      await db.update(docTemplates).set({ fileId: file.id }).where(eq(docTemplates.id, t.id))
-    }
+    const [selected] = await db.insert(docTemplates).values({ docType: 'lease', name: 'Mẫu chọn', body: '<p>MAU-CHON</p>' }).returning()
+    const [other] = await db.insert(docTemplates).values({ docType: 'lease', name: 'Mẫu mặc định', isDefault: true, body: '<p>MAU-MAC-DINH</p>' }).returning()
     const { lease } = await createLease(db, lan(), leaseInput({ contractTemplateId: selected.id }))
     expect((await getLease(db, lan(), lease.id)).contractTemplateId).toBe(selected.id)
-    const read = vi.spyOn(storage, 'read')
-    await exportContract(db, lan(), storage, 'lease', lease.id)
-    expect(read).toHaveBeenCalledWith(`template/${selected.id}.docx`)
-    await exportContract(db, lan(), storage, 'lease', lease.id, other.id)
-    expect(read).toHaveBeenCalledWith(`template/${other.id}.docx`)
+    const textOf = async (fileId: string) => {
+      const [row] = await db.select().from(files).where(eq(files.id, fileId))
+      return new PizZip(await storage.read(row.storageKey)).file('word/document.xml')!.asText()
+    }
+    expect(await textOf((await exportContract(db, lan(), storage, 'lease', lease.id)).fileId)).toContain('MAU-CHON')
+    expect(await textOf((await exportContract(db, lan(), storage, 'lease', lease.id, other.id)).fileId)).toContain('MAU-MAC-DINH')
     await expect(removeTemplate(db, admin, storage, selected.id)).rejects.toThrow('đang được hợp đồng sử dụng')
   })
 

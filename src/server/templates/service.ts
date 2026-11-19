@@ -4,11 +4,10 @@ import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { DOC_TYPES, PDF_DOC_TYPES, type PdfDocType, type DocEntities, type DocType } from '@/domain/template-fields'
-import { renderDocx } from '@/lib/docx'
 import { renderTemplate, type TemplateStyle } from '@/domain/doc-template'
 import { recordAudit } from '@/server/audit'
 import { fileAccessPermission } from '@/server/files/owners'
-import { assertFormatAllowed, convertDocx, convertPdfToPng, FORMAT_EXT, type ExportFormat } from '@/server/convert'
+import { assertFormatAllowed, convertPdfToPng, FORMAT_EXT, type ExportFormat } from '@/server/convert'
 import type { StorageAdapter } from '@/server/storage/types'
 
 export type DocTemplate = Omit<typeof docTemplates.$inferSelect, 'style'> & { style: TemplateStyle }
@@ -136,41 +135,67 @@ export function registerDocLoader(docType: DocType, loader: DocLoader) {
   loaders[docType] = loader
 }
 
-export async function exportDocument(
-  db: DB, ctx: AccessContext, storage: StorageAdapter, input: { docType: DocType; entityId: string; templateId?: string; format?: ExportFormat; /** Bản tự tạo khi lưu hợp đồng; được thay bằng bản mới ở lần lưu sau. */ auto?: boolean },
-): Promise<{ fileId: string; warnings: string[] }> {
+type Produced = { bytes: Uint8Array; facilityId: string; baseName: string; warnings: string[]; format: ExportFormat }
+
+/** Chọn mẫu để xuất: theo `templateId`, không có thì mẫu mặc định có nội dung, không có nữa thì mẫu có nội dung đầu tiên. */
+async function pickTemplate(db: DB, docType: DocType, templateId?: string): Promise<DocTemplate> {
+  const legacy = () => new ValidationError('Mẫu Word cũ không còn dùng được, hãy soạn lại mẫu trong Cài đặt')
+  if (templateId) {
+    const [t] = await db.select().from(docTemplates).where(eq(docTemplates.id, templateId))
+    if (t && t.docType !== docType) throw new ValidationError('Mẫu không thuộc loại giấy tờ này')
+    if (!t) throw new ValidationError('Chưa có mẫu cho loại giấy tờ này')
+    if (!t.body) throw t.fileId ? legacy() : new ValidationError('Chưa có mẫu cho loại giấy tờ này')
+    return t as DocTemplate
+  }
+  const all = (await db.select().from(docTemplates).where(eq(docTemplates.docType, docType)).orderBy(asc(docTemplates.createdAt))) as DocTemplate[]
+  const usable = all.filter(isUsableTemplate)
+  const pick = usable.find((t) => t.isDefault) ?? usable[0]
+  if (pick) return pick
+  throw all.some((t) => t.fileId) ? legacy() : new ValidationError('Chưa có mẫu cho loại giấy tờ này')
+}
+
+/** Dựng nội dung giấy tờ (chưa lưu): PDF cho hoá đơn/phiếu thu; hợp đồng, phụ lục, biên bản dựng từ mẫu soạn trong app ra Word hoặc PDF. */
+async function produceDocument(
+  db: DB, ctx: AccessContext, input: { docType: DocType; entityId: string; templateId?: string; format?: ExportFormat },
+): Promise<Produced> {
   const isPdf = (PDF_DOC_TYPES as readonly string[]).includes(input.docType)
   const format = input.format ?? (isPdf ? 'pdf' : 'docx')
   assertFormatAllowed(input.docType, format)
-  let bytes: Uint8Array, facilityId: string, baseName: string, warnings: string[] = []
   if (isPdf) {
     if (!pdfLoaders[input.docType as PdfDocType]) await import('@/server/invoices/service')
     const loader = pdfLoaders[input.docType as PdfDocType]
     if (!loader) throw new ValidationError('Chưa hỗ trợ xuất loại giấy tờ này')
     const loaded = await loader(db, ctx, input.entityId)
-    facilityId = loaded.facilityId; baseName = loaded.baseName
-    assertCan(ctx, fileAccessPermission('export', { docType: input.docType }), facilityId)
+    assertCan(ctx, fileAccessPermission('export', { docType: input.docType }), loaded.facilityId)
     const pdf = await loaded.render()
     const out = format === 'png' ? await convertPdfToPng(new Blob([new Uint8Array(pdf)])) : new Blob([new Uint8Array(pdf)], { type: 'application/pdf' })
-    bytes = new Uint8Array(await out.arrayBuffer())
-  } else {
-    const loader = loaders[input.docType]
-    if (!loader) throw new ValidationError('Chưa hỗ trợ xuất loại giấy tờ này')
-    const loaded = await loader(db, ctx, input.entityId)
-    facilityId = loaded.facilityId; baseName = loaded.baseName
-    assertCan(ctx, fileAccessPermission('export', { docType: input.docType }), facilityId)
-    const [tpl] = input.templateId
-      ? await db.select().from(docTemplates).where(eq(docTemplates.id, input.templateId))
-      : await db.select().from(docTemplates).where(and(eq(docTemplates.docType, input.docType), eq(docTemplates.isDefault, true)))
-    if (input.templateId && tpl && tpl.docType !== input.docType) throw new ValidationError('Mẫu không thuộc loại giấy tờ này')
-    if (!tpl || !tpl.fileId) throw new ValidationError('Chưa có mẫu cho loại giấy tờ này')
-    const [tplFile] = await db.select().from(files).where(eq(files.id, tpl.fileId))
-    if (!tplFile) throw new ValidationError('Chưa có mẫu cho loại giấy tờ này')
-    const { buildTemplateData } = await import('@/domain/template-fields')
-    const rendered = renderDocx(await storage.read(tplFile.storageKey), buildTemplateData(input.docType, loaded.entities))
-    warnings = rendered.warnings
-    bytes = new Uint8Array(await (await convertDocx(rendered.blob, format)).arrayBuffer())
+    return { bytes: new Uint8Array(await out.arrayBuffer()), facilityId: loaded.facilityId, baseName: loaded.baseName, warnings: [], format }
   }
+  const loader = loaders[input.docType]
+  if (!loader) throw new ValidationError('Chưa hỗ trợ xuất loại giấy tờ này')
+  const loaded = await loader(db, ctx, input.entityId)
+  assertCan(ctx, fileAccessPermission('export', { docType: input.docType }), loaded.facilityId)
+  const template = await pickTemplate(db, input.docType, input.templateId)
+  const { buildTemplateData } = await import('@/domain/template-fields')
+  const { doc, warnings } = renderTemplate(template.body!, buildTemplateData(input.docType, loaded.entities))
+  const bytes = format === 'docx'
+    ? await (await import('@/server/word/build-docx')).buildDocx(doc, template.style)
+    : await (await import('@/server/pdf/template-pdf')).renderTemplatePdf(doc, template.style)
+  return { bytes, facilityId: loaded.facilityId, baseName: loaded.baseName, warnings, format }
+}
+
+/** Xem trước giấy tờ thật bằng mẫu đã chọn, không lưu tệp. */
+export async function previewDocument(
+  db: DB, ctx: AccessContext, input: { docType: DocType; entityId: string; templateId?: string },
+): Promise<{ bytes: Uint8Array; name: string; warnings: string[] }> {
+  const r = await produceDocument(db, ctx, { ...input, format: 'pdf' })
+  return { bytes: r.bytes, name: `${r.baseName}.pdf`, warnings: r.warnings }
+}
+
+export async function exportDocument(
+  db: DB, ctx: AccessContext, storage: StorageAdapter, input: { docType: DocType; entityId: string; templateId?: string; format?: ExportFormat; /** Bản tự tạo khi lưu hợp đồng; được thay bằng bản mới ở lần lưu sau. */ auto?: boolean },
+): Promise<{ fileId: string; warnings: string[] }> {
+  const { bytes, facilityId, baseName, warnings, format } = await produceDocument(db, ctx, input)
   const { ext, mime } = FORMAT_EXT[format]
 
   const id = crypto.randomUUID()
