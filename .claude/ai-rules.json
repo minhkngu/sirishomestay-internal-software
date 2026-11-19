@@ -13,7 +13,9 @@
         "npm run build"
       ],
       "lint": [
-        "npm run lint"
+        "npm run lint",
+        "npm run typecheck",
+        "npm run format:check"
       ]
     },
     "e2ePreflight": "node scripts/e2e-preflight.mjs"
