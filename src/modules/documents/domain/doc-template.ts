@@ -1,5 +1,5 @@
 import { parse, HTMLElement, TextNode, type Node } from 'node-html-parser'
-import { DOC_TYPE_LABELS, TEMPLATE_FIELDS, type DocType } from './template-fields'
+import { DOC_TYPE_LABELS, TEMPLATE_FIELDS, type DocType } from '@/domain/template-fields'
 
 export type TemplateStyle = 'formal' | 'modern'
 export type Align = 'left' | 'center' | 'right' | 'justify'

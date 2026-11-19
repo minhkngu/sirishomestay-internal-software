@@ -1,9 +1,9 @@
 import { db } from '@/db/client'
 import { RequirePermission } from '@/modules/platform'
 import { getAccessContext } from '@/modules/platform'
-import { listTemplates } from '@/server/templates/service'
-import { listInvoiceTemplates } from '@/server/invoice-templates/service'
-import { TemplatesView } from '@/features/templates/components/templates-view'
+import { listTemplates } from '@/modules/documents'
+import { listInvoiceTemplates } from '@/modules/documents'
+import { TemplatesView } from '@/modules/documents/ui'
 
 export default async function TemplatesPage() {
   return (

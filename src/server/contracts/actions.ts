@@ -231,8 +231,8 @@ export async function quickContractDataAction(kind: 'lease' | 'deposit', id: str
         ? await (async () => {
             const l = contract as Awaited<ReturnType<typeof getLease>>
             const { can } = await import('@/domain/access')
-            const { listInvoiceTemplates } = await import('@/server/invoice-templates/service')
-            const { listTemplates, isUsableTemplate } = await import('@/server/templates/service')
+            const { listInvoiceTemplates } = await import('@/modules/documents')
+            const { listTemplates, isUsableTemplate } = await import('@/modules/documents')
             const billing = can(ctx, 'billing', l.facilityId)
             const [templates, contractTemplates] = await Promise.all([
               listInvoiceTemplates(db, ctx),

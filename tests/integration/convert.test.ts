@@ -4,7 +4,7 @@ import { facilities, files } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
 import { MemoryStorage } from '@/modules/platform/server/storage/memory'
-import { exportDocument, registerDocLoader } from '@/server/templates/service'
+import { exportDocument, registerDocLoader } from '@/modules/documents/server/templates/service'
 import { createTestDb } from '../helpers/db'
 import { addHtmlTemplate } from '../helpers/templates'
 

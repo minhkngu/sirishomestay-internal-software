@@ -7,14 +7,14 @@ import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
 import { ForbiddenError } from '@/domain/errors'
 import { getDownloadUrl } from '@/modules/platform'
-import { convertPdfToPng } from '@/server/convert'
-import { exportDocument } from '@/server/templates/service'
+import { convertPdfToPng } from '@/modules/documents/server/convert'
+import { exportDocument } from '@/modules/documents/server/templates/service'
 import '@/server/invoices/service'
 import { MemoryStorage } from '@/modules/platform/server/storage/memory'
 import { createTestDb } from '../helpers/db'
-import { createInvoiceTemplate } from '@/server/invoice-templates/service'
+import { createInvoiceTemplate } from '@/modules/documents/server/invoice-templates/service'
 import { selectInvoiceTemplate } from '@/server/invoices/template-assignment'
-import { defaultInvoiceTemplate } from '@/domain/invoice-template'
+import { defaultInvoiceTemplate } from '@/modules/documents/domain/invoice-template'
 
 let db: DB, storage: MemoryStorage, ctx: AccessContext, facilityId: string, invoiceId: string, paymentId: string
 beforeEach(async () => {

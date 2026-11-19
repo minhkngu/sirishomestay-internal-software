@@ -1,6 +1,6 @@
 // Image của @react-pdf không phải thẻ <img> HTML và không có thuộc tính alt; đặt tên khác để jsx-a11y/alt-text không áp dụng nhầm.
 import { Document, Image as PdfImage, Page, StyleSheet, Text, View, renderToBuffer } from '@react-pdf/renderer'
-import type { Align, DocBlock, Inline, TemplateStyle } from '@/domain/doc-template'
+import type { Align, DocBlock, Inline, TemplateStyle } from '../../domain/doc-template'
 import './fonts'
 
 const BRAND = '#0F6B4F'

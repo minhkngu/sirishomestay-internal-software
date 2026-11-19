@@ -2,9 +2,9 @@ import { eq } from 'drizzle-orm'
 import { docTemplates, files } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
-import { sampleTemplateHtml, type TemplateStyle } from '@/domain/doc-template'
+import { sampleTemplateHtml, type TemplateStyle } from '@/modules/documents/domain/doc-template'
 import type { DocType } from '@/domain/template-fields'
-import { attachTemplateFile, createTemplate, type DocTemplate } from '@/server/templates/service'
+import { attachTemplateFile, createTemplate, type DocTemplate } from '@/modules/documents/server/templates/service'
 
 /** Tạo mẫu soạn trong app (có nội dung HTML); mặc định là mẫu tối thiểu của loại giấy tờ. */
 export function addHtmlTemplate(

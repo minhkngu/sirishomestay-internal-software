@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { decodeFieldDrag, encodeFieldDrag, FIELD_DRAG_MIME } from '@/features/templates/components/field-drag'
+import { decodeFieldDrag, encodeFieldDrag, FIELD_DRAG_MIME } from '@/modules/documents/ui/field-drag'
 
 describe('field-drag', () => {
   it('có kiểu dữ liệu riêng', () => expect(FIELD_DRAG_MIME).toBe('application/x-siris-field'))

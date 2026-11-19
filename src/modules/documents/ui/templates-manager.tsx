@@ -5,7 +5,7 @@ import { useState, useTransition } from 'react'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { PdfBlobDialog } from '@/components/pdf-blob-dialog'
 import { Button } from '@/components/ui/button'
-import { type TemplateStyle } from '@/domain/doc-template'
+import { type TemplateStyle } from '../domain/doc-template'
 import { DOC_TYPE_LABELS, TEMPLATE_DOC_TYPES, type DocType } from '@/domain/template-fields'
 import {
   createTemplateAction,
@@ -14,7 +14,7 @@ import {
   restoreDefaultTemplatesAction,
   setDefaultTemplateAction,
   updateTemplateAction,
-} from '@/server/templates/actions'
+} from '../server/templates/actions'
 import { STYLE_LABEL, TemplateDialog, type TemplateOps } from './template-dialog'
 
 type Tpl = {

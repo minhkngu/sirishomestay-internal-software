@@ -3,7 +3,7 @@ import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { exportDocumentAction } from '@/server/templates/actions'
+import { exportDocumentAction } from '@/modules/documents/actions'
 import { selectInvoiceTemplateAction } from '@/server/invoices/actions'
 
 import { Download, Eye, FileImage } from 'lucide-react'

@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/db/client'
 import { toActionResult } from '@/lib/action-result'
 import { getAccessContext } from '@/modules/platform'
-import type { TemplateStyle } from '@/domain/doc-template'
+import type { TemplateStyle } from '../../domain/doc-template'
 import { restoreDefaultInvoiceTemplates } from './defaults'
 import {
   createInvoiceTemplate,

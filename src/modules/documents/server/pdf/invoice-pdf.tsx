@@ -2,7 +2,7 @@
 import { Document, Image as PdfImage, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
 import { formatVND, numberToVietnameseWords } from '@/domain/money'
 import type { InvoicePdfData } from './types'
-import type { InvoiceTemplateConfig, InvoiceSection } from '@/domain/invoice-template'
+import type { InvoiceTemplateConfig, InvoiceSection } from '../../domain/invoice-template'
 import './fonts'
 
 const styles = StyleSheet.create({

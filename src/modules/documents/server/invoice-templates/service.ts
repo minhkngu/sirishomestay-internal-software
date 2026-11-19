@@ -3,13 +3,13 @@ import { invoiceTemplates, invoices, leases } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
-import type { TemplateStyle } from '@/domain/doc-template'
+import type { TemplateStyle } from '../../domain/doc-template'
 import {
   defaultInvoiceTemplate,
   invoiceTemplateSchema,
   resolveInvoiceTemplateId,
   type InvoiceTemplateConfig,
-} from '@/domain/invoice-template'
+} from '../../domain/invoice-template'
 import { recordAudit } from '@/modules/platform'
 
 type TemplateInput = { name: string; config?: unknown; body?: string; style?: TemplateStyle }
@@ -43,7 +43,7 @@ function checked(input: TemplateInput) {
 export async function previewInvoiceTemplate(ctx: AccessContext, config: unknown): Promise<Uint8Array> {
   assertCan(ctx, 'settings')
   const validated = checked({ name: 'Xem trước', config }).config
-  const { renderInvoicePdf } = await import('@/server/pdf')
+  const { renderInvoicePdf } = await import('../pdf')
   return renderInvoicePdf(
     {
       kind: 'monthly',
@@ -95,14 +95,14 @@ export async function previewInvoiceTemplateHtml(
   assertCan(ctx, 'settings')
   if (!input.body.trim()) throw new ValidationError('Nhập nội dung mẫu')
   if (input.body.length > 200_000) throw new ValidationError('Nội dung mẫu quá dài')
-  const { renderInvoiceFromTemplate } = await import('@/server/pdf')
+  const { renderInvoiceFromTemplate } = await import('../pdf')
   return renderInvoiceFromTemplate(SAMPLE_INVOICE, input, { sample: true })
 }
 /** Xem nhanh một mẫu hoá đơn đã lưu với dữ liệu mẫu, để chọn mẫu cho hợp đồng; mẫu cũ dựng theo khối vẫn xem được. */
 export async function previewInvoiceTemplateById(db: Pick<DB, 'select'>, templateId: string): Promise<Uint8Array> {
   const [t] = await db.select().from(invoiceTemplates).where(eq(invoiceTemplates.id, templateId))
   if (!t) throw new NotFoundError()
-  const pdf = await import('@/server/pdf')
+  const pdf = await import('../pdf')
   return t.body
     ? pdf.renderInvoiceFromTemplate(SAMPLE_INVOICE, { body: t.body, style: t.style as TemplateStyle }, { sample: true })
     : pdf.renderInvoicePdf(SAMPLE_INVOICE, invoiceTemplateSchema.parse(t.config), { sample: true })

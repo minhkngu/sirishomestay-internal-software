@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest'
 import nextConfig from '../../next.config'
 
 const root = process.cwd()
-const fontsSource = path.join(root, 'src/server/pdf/fonts.ts')
+const fontsSource = path.join(root, 'src/modules/documents/server/pdf/fonts.ts')
 
 // Lấy các đường dẫn font viết cứng dạng 'src/.../x.ttf' trong fonts.ts
 function fontPaths(): string[] {

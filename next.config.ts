@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['@napi-rs/canvas'],
   outputFileTracingIncludes: {
     '/*': [
-      './src/server/pdf/fonts/*.ttf',
+      './src/modules/documents/server/pdf/fonts/*.ttf',
       './node_modules/pdfkit/js/standard-fonts/**/*.cjs',
       './node_modules/@napi-rs/canvas*/**/*',
     ],

@@ -13,7 +13,7 @@ import { InvoiceStatus } from '@/features/invoices/components/invoice-status'
 import { PaymentDialog } from '@/features/invoices/components/payment-dialog'
 import { getInvoiceDetail, tenantBalance } from '@/server/invoices/service'
 import { getAccessContext } from '@/modules/platform'
-import { listInvoiceTemplates } from '@/server/invoice-templates/service'
+import { listInvoiceTemplates } from '@/modules/documents'
 
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

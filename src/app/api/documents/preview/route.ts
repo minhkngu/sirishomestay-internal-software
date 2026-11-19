@@ -6,7 +6,7 @@ import { db } from '@/db/client'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { loadAccessContext } from '@/modules/platform'
-import { previewDocument } from '@/server/templates/service'
+import { previewDocument } from '@/modules/documents'
 
 const ALLOWED = ['lease', 'deposit_contract', 'handover_check_in', 'handover_check_out'] as const
 

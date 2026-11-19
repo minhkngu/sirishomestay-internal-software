@@ -15,8 +15,8 @@ import type { DepositEntry } from '@/domain/types'
 import { getDepositContract } from '@/server/contracts/service'
 import { DepositForm } from '@/features/contracts/components/deposit-form'
 import { LeaseWizard } from '@/features/contracts/components/lease-wizard'
-import { isUsableTemplate, listTemplates } from '@/server/templates/service'
-import { listInvoiceTemplates } from '@/server/invoice-templates/service'
+import { isUsableTemplate, listTemplates } from '@/modules/documents'
+import { listInvoiceTemplates } from '@/modules/documents'
 
 export type NewContractSP = { kind?: string; room?: string; tenant?: string; deposit?: string }
 

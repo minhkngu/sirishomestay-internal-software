@@ -3,7 +3,7 @@ import { docTemplates } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
-import type { TemplateStyle } from '@/domain/doc-template'
+import type { TemplateStyle } from '../../domain/doc-template'
 import {
   DOC_TYPE_LABELS,
   TEMPLATE_DOC_TYPES,

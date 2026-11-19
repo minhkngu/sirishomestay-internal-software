@@ -20,7 +20,7 @@ import { todayVN } from '@/domain/dates'
 import { recordAudit } from '@/modules/platform'
 import { registerExportOwnerResolver, registerOwnerResolver } from '@/modules/platform'
 import type { StorageAdapter } from '@/modules/platform'
-import { exportDocument, registerDocLoader } from '@/server/templates/service'
+import { exportDocument, registerDocLoader } from '@/modules/documents'
 
 export type Handover = typeof handovers.$inferSelect
 import type { HandoverKind } from '@/domain/statuses'

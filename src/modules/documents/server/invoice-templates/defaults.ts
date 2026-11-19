@@ -1,8 +1,8 @@
 import { invoiceTemplates } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
-import { DEFAULT_INVOICE_TEMPLATES } from '@/domain/invoice-template-html'
-import { defaultInvoiceTemplate } from '@/domain/invoice-template'
+import { DEFAULT_INVOICE_TEMPLATES } from '../../domain/invoice-template-html'
+import { defaultInvoiceTemplate } from '../../domain/invoice-template'
 
 /** Tạo hai mẫu hoá đơn HTML còn thiếu (theo tên); không ghi đè mẫu đã sửa, không đổi mẫu mặc định. Trả số mẫu đã tạo. */
 export async function restoreDefaultInvoiceTemplates(db: DB, ctx: AccessContext): Promise<number> {
