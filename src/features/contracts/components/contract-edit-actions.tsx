@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { MoneyInput } from '@/components/ui/money-input'
 import { Label } from '@/components/ui/label'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { FormDialog } from '@/components/form-dialog'
 import { formatVND } from '@/domain/money'
 import { todayVN } from '@/domain/dates'
@@ -83,9 +84,13 @@ export function ContractEditActions({ contract, canDelete, rooms, tenants, mode,
   const occIds = occ.filter(o => !o.isCompany).map(o => o.id)
   const addable = (people ?? []).filter(p => !occ.some(o => o.id === p.id))
 
+  const [confirmingSave, setConfirmingSave] = useState(false)
   function save(e: React.FormEvent) {
     e.preventDefault()
-    if (signed && !window.confirm('Hợp đồng đã ký. Bạn có chắc muốn lưu thay đổi? Hãy kiểm tra lại bản đã ký.')) return
+    if (signed) { setConfirmingSave(true); return }
+    doSave()
+  }
+  function doSave() {
     setError('')
     start(async () => {
       if (editOccupants && !occ.some(o => o.id === tenantId)) { setError('Người đại diện phải nằm trong danh sách người ở'); return }
@@ -290,6 +295,7 @@ export function ContractEditActions({ contract, canDelete, rooms, tenants, mode,
           </ul>
         </div>}
     </FormDialog>
+    <ConfirmDialog open={confirmingSave} onOpenChange={setConfirmingSave} title="Lưu thay đổi hợp đồng đã ký?" description="Hợp đồng đã ký. Hãy kiểm tra lại bản đã ký trước khi lưu." confirmLabel="Lưu thay đổi" onConfirm={doSave} />
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {editing && <div className="sticky bottom-0 -mx-1 flex flex-wrap items-center gap-3 border-t bg-background px-1 pt-3">
       <Button type="submit" form="edit-contract-form" disabled={pending}>Lưu thay đổi</Button>
