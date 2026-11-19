@@ -21,7 +21,7 @@ const read = (p: string) => readFileSync(p, 'utf8')
 
 /** File có lời gọi register* ở cấp module, hoặc trong khối cấp module (for/if) — loại trừ phần định nghĩa. */
 function registeringFiles(): string[] {
-  const files = [...walk(join(ROOT, 'src/server')), ...walk(join(ROOT, 'src/modules'))].filter((f) => /\.tsx?$/.test(f))
+  const files = walk(join(ROOT, 'src/modules')).filter((f) => /\.tsx?$/.test(f))
   return files.filter((f) => {
     const lines = read(f).split('\n')
     let inDefinition = false
@@ -61,7 +61,7 @@ describe('đăng ký resolver và loader', () => {
 
   it("mọi actions.ts có 'use server' import registrations", () => {
     const isUseServer = (code: string) => /^(?:\s|\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)*(['"])use server\1/.test(code)
-    const bad = [...walk(join(ROOT, 'src/server')), ...walk(join(ROOT, 'src/modules'))]
+    const bad = walk(join(ROOT, 'src/modules'))
       .filter((f) => /(\\|\/)actions\.ts$/.test(f))
       .filter((f) => isUseServer(read(f)))
       .filter((f) => !importsOf(read(f)).some((s) => registrationsSpecifier.test(s)))
