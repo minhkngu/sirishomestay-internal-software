@@ -525,3 +525,42 @@ export async function listMeterOverview(db: DB, ctx: AccessContext, facilityId: 
       (a.feeName ?? '').localeCompare(b.feeName ?? ''),
   )
 }
+
+export type RoomMeterOption = {
+  id: string
+  roomId: string
+  feeTypeId: string | null
+  name: string
+  unit: string
+  busy: boolean
+}
+
+/** Đồng hồ phí của các phòng, đánh dấu busy khi đang gắn dòng phí của hợp đồng còn hiệu lực. Quyền do trang gọi kiểm trước. */
+export async function listRoomMeterOptions(db: DB, ctx: AccessContext, roomIds: string[]): Promise<RoomMeterOption[]> {
+  void ctx
+  const meterRows = roomIds.length
+    ? await db
+        .select({
+          id: meters.id,
+          roomId: meters.roomId,
+          feeTypeId: meters.feeTypeId,
+          name: leaseFeeSnapshots.name,
+          unit: leaseFeeSnapshots.unit,
+        })
+        .from(meters)
+        .innerJoin(leaseFeeMeters, eq(leaseFeeMeters.meterId, meters.id))
+        .innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId))
+        .where(and(inArray(meters.roomId, roomIds), eq(meters.utility, 'fee'), isNull(meters.removedOn)))
+    : []
+  const meterIds = [...new Set(meterRows.map((m) => m.id))]
+  const busyRows = meterIds.length
+    ? await db
+        .select({ meterId: leaseFeeMeters.meterId })
+        .from(leaseFeeMeters)
+        .innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId))
+        .innerJoin(leases, eq(leases.id, leaseFeeSnapshots.leaseId))
+        .where(and(inArray(leaseFeeMeters.meterId, meterIds), eq(leases.status, 'active')))
+    : []
+  const busyIds = new Set(busyRows.map((r) => r.meterId))
+  return [...new Map(meterRows.map((m) => [m.id, { ...m, busy: busyIds.has(m.id) }])).values()]
+}

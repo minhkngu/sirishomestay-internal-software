@@ -1,8 +1,7 @@
 import { notFound } from 'next/navigation'
-import { asc } from 'drizzle-orm'
 import { db } from '@/db/client'
-import { facilities } from '@/db'
 import { assertCan } from '@/domain/access'
+import { listFacilities } from '@/server/facilities/service'
 import { getAccessContext } from '@/server/session'
 import { listUsers } from '@/server/users/queries'
 import { UserForm } from '@/features/users/components/user-form'
@@ -15,10 +14,7 @@ export default async function UserPage({ params }: { params: Promise<{ id: strin
   } catch {
     notFound()
   }
-  const facs = await db
-    .select({ id: facilities.id, name: facilities.name })
-    .from(facilities)
-    .orderBy(asc(facilities.name))
+  const facs = (await listFacilities(db, ctx, { includeInactive: true })).map((f) => ({ id: f.id, name: f.name }))
   const user = (await listUsers(db, ctx)).find((u) => u.id === id)
   if (!user) notFound()
   return (

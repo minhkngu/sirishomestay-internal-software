@@ -1,4 +1,4 @@
-import { asc } from 'drizzle-orm'
+import { asc, inArray } from 'drizzle-orm'
 import { userProfiles, userFacilities, userPermissions, facilities } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext, type Permission } from '@/domain/access'
@@ -34,4 +34,15 @@ export async function listUsers(db: DB, ctx: AccessContext): Promise<UserRow[]> 
       permissions: up.filter((x) => x.userId === u.id).map((x) => x.permission as Permission),
     }
   })
+}
+
+/** Tên người dùng theo id (id không tồn tại thì bỏ qua). Phạm vi quyền do trang gọi kiểm trước. */
+export async function userNamesByIds(db: DB, ctx: AccessContext, ids: string[]): Promise<Map<string, string>> {
+  void ctx
+  if (!ids.length) return new Map()
+  const rows = await db
+    .select({ id: userProfiles.id, name: userProfiles.fullName })
+    .from(userProfiles)
+    .where(inArray(userProfiles.id, ids))
+  return new Map(rows.map((r) => [r.id, r.name]))
 }

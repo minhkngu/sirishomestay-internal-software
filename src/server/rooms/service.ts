@@ -439,3 +439,11 @@ export async function getRoomDetail(
     },
   }
 }
+
+/** Mã phòng theo id (id không tồn tại thì bỏ qua). Phạm vi quyền do trang gọi kiểm trước. */
+export async function roomCodesByIds(db: DB, ctx: AccessContext, ids: string[]): Promise<Map<string, string>> {
+  void ctx
+  if (!ids.length) return new Map()
+  const rows = await db.select({ id: rooms.id, code: rooms.code }).from(rooms).where(inArray(rooms.id, ids))
+  return new Map(rows.map((r) => [r.id, r.code]))
+}

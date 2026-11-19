@@ -8,8 +8,8 @@ import { IncidentList } from '@/features/incidents/components/incident-list'
 import { listIncidents } from '@/server/incidents/service'
 import { getAccessContext } from '@/server/session'
 import { listFacilities } from '@/server/facilities/service'
-import { userProfiles, rooms } from '@/db'
-import { inArray } from 'drizzle-orm'
+import { roomCodesByIds } from '@/server/rooms/service'
+import { userNamesByIds } from '@/server/users/queries'
 
 export default async function IncidentsPage() {
   const ctx = await getAccessContext()
@@ -20,18 +20,16 @@ export default async function IncidentsPage() {
   }
   // Nạp mọi sự cố trong quyền một lần; "Việc của tôi" và lọc toà làm ở trình duyệt
   const list = await listIncidents(db, ctx, {})
-  const people = list.some((i) => i.assigneeId)
-    ? await db
-        .select({ id: userProfiles.id, name: userProfiles.fullName })
-        .from(userProfiles)
-        .where(inArray(userProfiles.id, list.map((i) => i.assigneeId!).filter(Boolean)))
-    : []
-  const roomRows = list.some((i) => i.roomId)
-    ? await db
-        .select({ id: rooms.id, code: rooms.code })
-        .from(rooms)
-        .where(inArray(rooms.id, list.map((i) => i.roomId!).filter(Boolean)))
-    : []
+  const people = await userNamesByIds(
+    db,
+    ctx,
+    list.map((i) => i.assigneeId).filter((x): x is string => !!x),
+  )
+  const roomCodes = await roomCodesByIds(
+    db,
+    ctx,
+    list.map((i) => i.roomId).filter((x): x is string => !!x),
+  )
   const facilities = await listFacilities(db, ctx)
   return (
     <div className="space-y-4">
@@ -53,8 +51,8 @@ export default async function IncidentsPage() {
             title: i.title,
             priority: i.priority,
             status: i.status,
-            assigneeName: people.find((p) => p.id === i.assigneeId)?.name ?? null,
-            place: `${facilities.find((f) => f.id === i.facilityId)?.name ?? ''}${i.roomId ? ` · Phòng ${roomRows.find((r) => r.id === i.roomId)?.code ?? ''}` : ''}`,
+            assigneeName: (i.assigneeId ? people.get(i.assigneeId) : undefined) ?? null,
+            place: `${facilities.find((f) => f.id === i.facilityId)?.name ?? ''}${i.roomId ? ` · Phòng ${roomCodes.get(i.roomId) ?? ''}` : ''}`,
             facilityId: i.facilityId,
             assigneeId: i.assigneeId,
           }))}

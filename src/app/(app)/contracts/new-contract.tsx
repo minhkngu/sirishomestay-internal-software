@@ -1,5 +1,3 @@
-import { and, eq, inArray, isNull, ne } from 'drizzle-orm'
-import { assets, leaseFeeMeters, leaseFeeSnapshots, leases, meters } from '@/db'
 import { notFound } from 'next/navigation'
 import { db } from '@/db/client'
 import { assertCan, can } from '@/domain/access'
@@ -10,7 +8,8 @@ import { listRoomsWithStatus } from '@/server/rooms/service'
 import { searchTenants, displayName } from '@/server/tenants/service'
 import { listFeeDefaults, listFeeTypes, listFeeUnits, listFeeTypePrices } from '@/server/fees/service'
 import { getSettings } from '@/server/settings/service'
-import { listAssets } from '@/server/assets/service'
+import { listContractAssetOptions } from '@/server/assets/service'
+import { listRoomMeterOptions } from '@/server/meters/service'
 import { depositBalance } from '@/domain/deposit'
 import type { DepositEntry } from '@/domain/types'
 import { getDepositContract } from '@/server/contracts/service'
@@ -45,51 +44,15 @@ export async function NewContract({ sp, showHeading = true }: { sp: NewContractS
   const allRooms = await listRoomsWithStatus(db, ctx, {})
   const rooms = facs.flatMap((f) => allRooms.filter((r) => r.facilityId === f.id).map((r) => ({ f, r })))
   const roomIds = rooms.map(({ r }) => r.id)
-  const meterRows = roomIds.length
-    ? await db
-        .select({
-          id: meters.id,
-          roomId: meters.roomId,
-          feeTypeId: meters.feeTypeId,
-          name: leaseFeeSnapshots.name,
-          unit: leaseFeeSnapshots.unit,
-        })
-        .from(meters)
-        .innerJoin(leaseFeeMeters, eq(leaseFeeMeters.meterId, meters.id))
-        .innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId))
-        .where(and(inArray(meters.roomId, roomIds), eq(meters.utility, 'fee'), isNull(meters.removedOn)))
-    : []
-  const meterIds = [...new Set(meterRows.map((m) => m.id))]
-  // Đồng hồ đang gắn dòng phí của hợp đồng còn hiệu lực thì không được chọn lại
-  const busyRows = meterIds.length
-    ? await db
-        .select({ meterId: leaseFeeMeters.meterId })
-        .from(leaseFeeMeters)
-        .innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId))
-        .innerJoin(leases, eq(leases.id, leaseFeeSnapshots.leaseId))
-        .where(and(inArray(leaseFeeMeters.meterId, meterIds), eq(leases.status, 'active')))
-    : []
-  const busyIds = new Set(busyRows.map((r) => r.meterId))
-  const roomMeters = [...new Map(meterRows.map((m) => [m.id, { ...m, busy: busyIds.has(m.id) }])).values()]
+  const roomMeters = await listRoomMeterOptions(db, ctx, roomIds)
   const tenantOptions = tenants.map((t) => ({ id: t.id, name: displayName(t), kind: t.kind }))
   const unitName = new Map(units.map((u) => [u.id, u.name]))
 
-  const assetOptions = can(ctx, 'assets')
-    ? await listAssets(db, ctx, {})
-    : facs.length
-      ? await db
-          .select()
-          .from(assets)
-          .where(
-            and(
-              inArray(
-                assets.facilityId,
-                facs.map((f) => f.id),
-              ),
-              ne(assets.status, 'disposed'),
-            ),
-          )
-      : []
+  const assetOptions = await listContractAssetOptions(
+    db,
+    ctx,
+    facs.map((f) => f.id),
+  )
   const assetFacs = facs.filter((f) => can(ctx, 'assets', f.id))
   const moveTargets = {
     facilities: assetFacs.map((f) => ({
