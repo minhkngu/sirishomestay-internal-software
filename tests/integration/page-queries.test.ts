@@ -3,7 +3,7 @@ import { facilities, leaseFeeMeters, leaseFeeSnapshots, leases, meters, rooms, t
 import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
 import { assetLocationLabel } from '@/modules/assets/server/assets/service'
-import { listRoomMeterOptions } from '@/server/meters/service'
+import { listRoomMeterOptions } from '@/modules/meters'
 import { roomCodesByIds } from '@/modules/facilities/server/rooms/service'
 import { userNamesByIds } from '@/modules/users'
 import { createTestDb } from '../helpers/db'

@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useRef, useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { saveReadingsAction } from '@/server/meters/actions'
+import { saveReadingsAction } from '../server/meters/actions'
 import { ReplaceMeterDialog } from './replace-meter-dialog'
 
 export type GridCell = {

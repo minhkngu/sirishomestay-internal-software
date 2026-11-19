@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { facilities, meterReadings, meters, rooms } from '@/db'
-import { listMeterOverview, listReadingSheet, saveReadings, replaceMeter } from '@/server/meters/service'
+import { listMeterOverview, listReadingSheet, saveReadings, replaceMeter } from '@/modules/meters/server/meters/service'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import type { AccessContext, Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'

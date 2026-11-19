@@ -21,7 +21,7 @@ import { createAsset, updateAsset } from '@/modules/assets'
 import { recordAudit } from '@/modules/platform'
 import { nextLeaseCode } from '@/server/contracts/service'
 import { nextInvoiceCode } from '@/server/invoices/service'
-import { saveReadings } from '@/server/meters/service'
+import { saveReadings } from '@/modules/meters'
 import type { ImportError, NormalizedRow, OpsTarget } from './validate'
 
 type OpsRow = Extract<NormalizedRow, { target: OpsTarget }>

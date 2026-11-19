@@ -1,4 +1,4 @@
-import type { MeterOverviewRow } from '@/server/meters/service'
+import type { MeterOverviewRow } from '../server/meters/service'
 
 /** Danh sách đồng hồ của cơ sở theo phòng và dòng phí (chỉ xem), kèm lịch sử chỉ số của từng đồng hồ. */
 export function MeterList({ rows }: { rows: MeterOverviewRow[] }) {

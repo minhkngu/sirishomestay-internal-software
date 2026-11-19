@@ -6,9 +6,8 @@ import { db } from '@/db/client'
 import { daysInMonth, todayVN } from '@/domain/dates'
 import { getAccessContext } from '@/modules/platform'
 import { listFacilities } from '@/modules/facilities'
-import { listMeterOverview, listReadingSheet } from '@/server/meters/service'
-import { MeterList } from '@/features/meters/components/meter-list'
-import { ReadingGrid } from '@/features/meters/components/reading-grid'
+import { listMeterOverview, listReadingSheet } from '@/modules/meters'
+import { MeterList, ReadingGrid } from '@/modules/meters/ui'
 
 export default async function MetersPage({
   searchParams,
