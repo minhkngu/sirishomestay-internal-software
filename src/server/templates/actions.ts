@@ -55,6 +55,7 @@ export async function previewTemplateAction(input: { docType: DocType; body: str
     assertCan(ctx, 'settings')
     if (!['formal', 'modern'].includes(input.style)) throw new ValidationError('Kiểu trình bày không hợp lệ')
     if (!input.body.trim()) throw new ValidationError('Nhập nội dung mẫu')
+    if (input.body.length > 200_000) throw new ValidationError('Nội dung mẫu quá dài')
     const { doc, warnings } = renderTemplate(input.body, sampleDataFor(input.docType))
     const bytes = input.format === 'docx'
       ? await (await import('@/server/word/build-docx')).buildDocx(doc, input.style)
