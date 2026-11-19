@@ -69,14 +69,14 @@ export function ContractEditActions({ contract, canDelete, rooms, tenants, mode,
   const defaultContractTemplate = templates?.contract.find(t => t.id === templates.contractId)?.id ?? templates?.contract.find(t => t.isDefault)?.id ?? templates?.contract[0]?.id ?? ''
   const [contractTpl, setContractTpl] = useState(defaultContractTemplate)
   const [tplPdf, setTplPdf] = useState<{ base64: string; title: string } | null>(null)
-  const [previewingTpl, setPreviewingTpl] = useState(false)
+  const [previewingTpl, setPreviewingTpl] = useState<string | null>(null)
   /** Xem nhanh mẫu đang chọn với dữ liệu mẫu, không cần dữ liệu hợp đồng. */
-  async function previewTemplate() {
-    setPreviewingTpl(true)
-    const r = await previewTemplateByIdAction(contractTpl)
-    setPreviewingTpl(false)
+  async function previewTemplate(id: string) {
+    setPreviewingTpl(id)
+    const r = await previewTemplateByIdAction(id)
+    setPreviewingTpl(null)
     if (!r.ok) { toast.error(r.error); return }
-    setTplPdf({ base64: r.data.base64, title: templates?.contract.find(t => t.id === contractTpl)?.name ?? 'Xem nhanh mẫu' })
+    setTplPdf({ base64: r.data.base64, title: templates?.contract.find(t => t.id === id)?.name ?? 'Xem nhanh mẫu' })
   }
   const [invoiceTpl, setInvoiceTpl] = useState(templates?.invoiceId ?? '')
   const editOccupants = contract.kind === 'lease' && occupants !== undefined && !!people
@@ -201,7 +201,15 @@ export function ContractEditActions({ contract, canDelete, rooms, tenants, mode,
       </div>
       {contract.kind === 'lease' && <div className="space-y-1"><Label htmlFor="edit-note">Ghi chú</Label><textarea id="edit-note" value={note} onChange={e => setNote(e.target.value)} className="min-h-20 w-full rounded-lg border bg-background p-2 text-sm" /></div>}
       {templates && <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1"><Label htmlFor="edit-contract-tpl">Mẫu hợp đồng</Label><select id="edit-contract-tpl" value={contractTpl} onChange={e => setContractTpl(e.target.value)} className="h-9 w-full rounded-lg border bg-background px-2 text-sm">{templates.contract.length === 0 && <option value="">Mẫu mặc định của hệ thống</option>}{templates.contract.map(t => <option key={t.id} value={t.id}>{t.name}{t.isDefault ? ' (mặc định)' : ''}</option>)}</select><Button type="button" variant="outline" size="sm" disabled={!contractTpl || previewingTpl} onClick={previewTemplate}>{previewingTpl ? 'Đang dựng…' : 'Xem nhanh mẫu'}</Button></div>
+        <div className="space-y-1">
+          <Label id="edit-contract-tpl-label">Mẫu hợp đồng</Label>
+          {templates.contract.length === 0 ? <p className="text-sm text-muted-foreground">Mẫu mặc định của hệ thống</p> : <ul role="radiogroup" aria-labelledby="edit-contract-tpl-label" className="divide-y divide-border/60 rounded-lg border">
+            {templates.contract.map(t => <li key={t.id} className="flex items-center gap-2 px-2 py-1">
+              <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 py-1 text-sm"><input type="radio" name="edit-contract-tpl" checked={contractTpl === t.id} onChange={() => setContractTpl(t.id)} /><span className="truncate">{t.name}{t.isDefault ? ' (mặc định)' : ''}</span></label>
+              <Button type="button" variant="ghost" size="xs" disabled={previewingTpl !== null} onClick={() => previewTemplate(t.id)}>{previewingTpl === t.id ? 'Đang dựng…' : 'Xem'}</Button>
+            </li>)}
+          </ul>}
+        </div>
         <div className="space-y-1"><Label htmlFor="edit-invoice-tpl">Mẫu hoá đơn</Label><select id="edit-invoice-tpl" value={invoiceTpl} onChange={e => setInvoiceTpl(e.target.value)} className="h-9 w-full rounded-lg border bg-background px-2 text-sm"><option value="">Theo mặc định hệ thống</option>{templates.invoice.map(t => <option key={t.id} value={t.id}>{t.name}{t.isDefault ? ' (mặc định)' : ''}</option>)}</select></div>
       </div>}
       {editOccupants && (
