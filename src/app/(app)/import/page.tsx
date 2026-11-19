@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { getAccessContext } from '@/modules/platform'
-import { ImportWizard } from '@/features/import/components/import-wizard'
+import { ImportWizard } from '@/modules/import/ui'
 
 export default async function ImportPage() {
   const ctx = await getAccessContext()

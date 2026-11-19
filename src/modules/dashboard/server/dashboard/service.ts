@@ -18,7 +18,7 @@ import {
 import type { DB } from '@/db/client'
 import { can, facilityScope, type AccessContext } from '@/domain/access'
 import { addDays, todayVN } from '@/domain/dates'
-import { buildReminders, type Reminder, type Snapshot } from '@/domain/reminders'
+import { buildReminders, type Reminder, type Snapshot } from '../../domain/reminders'
 import { getSettings } from '@/modules/platform'
 
 export type ExpiringVisa = {

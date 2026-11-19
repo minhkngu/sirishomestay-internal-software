@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AccessContext, Permission } from '@/domain/access'
-import { buildReminders, type Snapshot } from '@/domain/reminders'
+import { buildReminders, type Snapshot } from '@/modules/dashboard/domain/reminders'
 
 const ctx = (permissions: Permission[], facilityIds: string[]): AccessContext => ({
   userId: 'u',

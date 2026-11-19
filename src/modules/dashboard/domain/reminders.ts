@@ -1,5 +1,5 @@
-import { can, type AccessContext } from './access'
-import { addDays, formatDateVN } from './dates'
+import { can, type AccessContext } from '@/domain/access'
+import { addDays, formatDateVN } from '@/domain/dates'
 
 export type Severity = 'danger' | 'warning' | 'info'
 export type ReminderKind =

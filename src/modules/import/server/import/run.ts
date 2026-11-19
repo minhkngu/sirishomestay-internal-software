@@ -6,7 +6,7 @@ import { ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/modules/platform'
 import { findDuplicateField, toTenantRow } from '@/modules/tenants'
 import type { Tenant } from '@/modules/tenants'
-import type { ImportTarget } from './targets'
+import type { ImportTarget } from '../../domain/targets'
 import { applyOpsRows } from './ops'
 import { OPS_TARGETS, type ImportError, type NormalizedRow, type OpsTarget } from './validate'
 

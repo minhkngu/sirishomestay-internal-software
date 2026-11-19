@@ -10,7 +10,7 @@ import { toActionResult } from '@/lib/action-result'
 import { ValidationError } from '@/domain/errors'
 import { buildTemplateWorkbook, parseWorkbook, type ParsedSheet } from '@/lib/excel'
 import { findImportConflicts, findMissingFacilities, runImport } from './run'
-import { IMPORT_TARGETS, templateColumns, type ImportTarget } from './targets'
+import { IMPORT_TARGETS, templateColumns, type ImportTarget } from '../../domain/targets'
 import { previewOpsRows } from './ops'
 import { OPS_TARGETS, validateRows, type ImportError, type NormalizedRow, type OpsTarget } from './validate'
 

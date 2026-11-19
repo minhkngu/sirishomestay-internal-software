@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { IMPORT_TARGETS, suggestMapping } from '@/server/import/targets'
-import { validateRows } from '@/server/import/validate'
+import { IMPORT_TARGETS, suggestMapping } from '@/modules/import/domain/targets'
+import { validateRows } from '@/modules/import/server/import/validate'
 
 describe('suggestMapping', () => {
   it('ghép cột theo tiêu đề tiếng Việt có dấu', () => {
@@ -100,7 +100,7 @@ describe('validateRows rooms', () => {
 
 describe('nhập Excel — gợi ý ghép cột và loại mới', () => {
   it('suggestMapping hiểu tiêu đề tiếng Việt', async () => {
-    const { suggestMapping } = await import('@/server/import/targets')
+    const { suggestMapping } = await import('@/modules/import/domain/targets')
     expect(suggestMapping(['Số điện thoại', 'Họ tên', 'Hết hạn visa'], 'tenants')).toMatchObject({
       phone: 'Số điện thoại',
       fullName: 'Họ tên',
@@ -108,7 +108,7 @@ describe('nhập Excel — gợi ý ghép cột và loại mới', () => {
     })
   })
   it('hợp đồng: cần giấy tờ hoặc SĐT khách, ngày hợp lệ, kết thúc không trước bắt đầu', async () => {
-    const { validateRows } = await import('@/server/import/validate')
+    const { validateRows } = await import('@/modules/import/server/import/validate')
     const m = { facilityCode: 'f', roomCode: 'r', startDate: 's', endDate: 'e', monthlyRent: 'p', tenantDocument: 'd' }
     const ok = validateRows(
       'leases',
@@ -125,7 +125,7 @@ describe('nhập Excel — gợi ý ghép cột và loại mới', () => {
     expect(bad.errors.map((e) => e.field)).toEqual(expect.arrayContaining(['tenantDocument', 'endDate']))
   })
   it('chỉ số: loại điện/nước và kỳ tháng/năm', async () => {
-    const { validateRows } = await import('@/server/import/validate')
+    const { validateRows } = await import('@/modules/import/server/import/validate')
     const m = { facilityCode: 'f', roomCode: 'r', utility: 'u', period: 'p', value: 'v' }
     const r = validateRows(
       'meter_readings',

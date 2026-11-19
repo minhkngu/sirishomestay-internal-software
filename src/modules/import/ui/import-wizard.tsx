@@ -7,9 +7,9 @@ import {
   previewImportAction,
   runImportAction,
   sampleWorkbookAction,
-} from '@/server/import/actions'
-import { IMPORT_TARGETS, suggestMapping, type ImportTarget } from '@/server/import/targets'
-import type { ImportError } from '@/server/import/validate'
+} from '../server/import/actions'
+import { IMPORT_TARGETS, suggestMapping, type ImportTarget } from '../domain/targets'
+import type { ImportError } from '../server/import/validate'
 
 type Sheet = { name: string; headers: string[]; rows: Record<string, unknown>[] }
 

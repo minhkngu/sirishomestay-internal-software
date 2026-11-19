@@ -24,8 +24,8 @@ Muốn biết một mảng đang ở đâu: xem bảng dưới. **Mỗi PR chuy�
 | 3 | `assets` | Đã chuyển | `src/modules/assets/` | 18 |
 | 3 | `meters` | Đã chuyển | `src/modules/meters/` | 19 |
 | 4 | `leasing` | Đã chuyển | `src/modules/leasing/` (`server/`, `domain/`, `ui/` theo thư mục cũ: contracts, deposits, handovers, charges, invoices, incidents) | 20–21 |
-| 5 | `import` | Chưa chuyển | `src/server/import`, `src/features/import` | 21 |
-| 5 | `dashboard` | Chưa chuyển | `src/server/dashboard`, `src/features/dashboard` | 21 |
+| 5 | `import` | Đã chuyển | `src/modules/import/` (`server/import/`, `ui/`; `targets.ts` thuần nên ở `domain/` để `ui` dùng được) | 21 |
+| 5 | `dashboard` | Đã chuyển | `src/modules/dashboard/` (`server/dashboard/`, `ui/`, `domain/reminders.ts`) | 21 |
 
 Việc nền trước khi chuyển (Prettier, CI, gỡ ghép ngược…) là Task 1–12 của plan; xem checkbox trong plan để biết task nào xong.
 
