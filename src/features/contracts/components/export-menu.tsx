@@ -7,7 +7,7 @@ import { exportContractAction } from '@/server/contracts/actions'
 export type TemplateOption = { id: string; name: string; isDefault: boolean }
 
 /** Word và PDF đều dựng trong app từ mẫu HTML. */
-export function ExportMenu({ kind, id, templates, selectedTemplateId, templateSlot, actionSlot, hideTemplateSelect }: {
+export function ExportMenu({ kind, id, templates, selectedTemplateId, templateSlot, actionSlot, hideTemplateSelect, compact }: {
   kind: 'lease' | 'deposit'; id: string; templates: TemplateOption[]; selectedTemplateId?: string | null
   /** Ô chọn khác đặt cùng hàng với ô chọn mẫu hợp đồng (ví dụ mẫu hoá đơn). */
   templateSlot?: ReactNode
@@ -15,6 +15,8 @@ export function ExportMenu({ kind, id, templates, selectedTemplateId, templateSl
   actionSlot?: ReactNode
   /** Ẩn ô chọn mẫu: dùng mẫu đã chọn của hợp đồng (chọn trong popup "Sửa hợp đồng"). */
   hideTemplateSelect?: boolean
+  /** Chỉ hiện nút Tải Word, không khung và tiêu đề. */
+  compact?: boolean
 }) {
   const [pending, start] = useTransition()
   const [templateId, setTemplateId] = useState(templates.find(t => t.id === selectedTemplateId)?.id ?? templates.find((t) => t.isDefault)?.id ?? templates[0]?.id ?? '')
@@ -29,6 +31,13 @@ export function ExportMenu({ kind, id, templates, selectedTemplateId, templateSl
       setMsg(r.data.warnings.length ? `Chỗ điền thiếu dữ liệu: ${r.data.warnings.join(', ')}` : 'Đã xuất')
       window.location.href = `/api/files/${r.data.fileId}`
     })
+
+  if (compact) return (
+    <span className="flex items-center gap-2">
+      {templates.length > 0 && <button type="button" disabled={pending} onClick={() => doExport('docx')} className="text-xs font-medium text-primary hover:underline disabled:opacity-50">{pending ? 'Đang xuất…' : 'Tải Word'}</button>}
+      {error && <span className="text-xs text-destructive">{error}</span>}
+    </span>
+  )
 
   return (
     <section className="space-y-2 rounded-lg border bg-card p-4">

@@ -27,7 +27,6 @@ import { listInvoices } from '@/server/invoices/service'
 import { SignStatus } from '@/features/contracts/components/sign-status'
 import { AddendaList } from '@/features/contracts/components/addenda-list'
 import { ContractActions } from './contract-actions'
-import { HandoverExportButton } from './handover-export-button'
 import { StartHandoverButtons } from '@/features/handovers/components/start-handover-buttons'
 import { listAddenda } from '@/server/addenda/service'
 import { cn } from '@/lib/utils'
@@ -124,7 +123,7 @@ function Ledger({ entries }: { entries: Entry[] }) {
 }
 
 function DocRow({ d }: { d: { id: string; label: string; name: string; date: string; previewHref?: string } }) {
-  if (d.previewHref) return <li className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-xs"><span><span className="font-medium text-foreground">{d.label}</span> <span className="text-muted-foreground">· {d.name}</span></span><PdfViewButton href={d.previewHref} title={d.label}>Xem PDF</PdfViewButton></li>
+  if (d.previewHref) return <li className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-xs"><span><span className="font-medium text-foreground">{d.label}</span> {d.name && <span className="text-muted-foreground">· {d.name}</span>}</span><PdfViewButton href={d.previewHref} title={d.label}>Xem PDF</PdfViewButton></li>
   return <li className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-xs">
     <span><span className="font-medium text-foreground">{d.label}</span> <span className="text-muted-foreground">· {d.name}{d.date ? ` · ${d.date}` : ''}</span></span>
     <span className="flex gap-3">{d.label.includes('PDF') ? <PdfViewButton href={`/api/files/${d.id}?inline=1`} title={d.label}>Xem trước</PdfViewButton> : <a className="font-medium text-primary hover:underline" href={`/api/files/${d.id}?inline=1`} target="_blank" rel="noreferrer">Xem trước</a>}<a className="font-medium text-primary hover:underline" href={`/api/files/${d.id}`}>Tải xuống</a></span>
@@ -348,20 +347,21 @@ export default async function ContractDetail({ id }: { id: string }) {
 
       <div className="space-y-6">
       <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-2xs space-y-4">
-        <ExportMenu
-          kind="lease"
-          id={lease.id}
-          selectedTemplateId={lease.contractTemplateId}
-          hideTemplateSelect
-          templates={templates.map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault }))}
-        />
-        <div className="space-y-4 border-t border-border/60 pt-3">
-          <h4 className="text-xs font-semibold text-foreground">Văn bản đã lưu</h4>
+        <div className="space-y-4">
           <div className="space-y-1">
-            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Hợp đồng</div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Hợp đồng</div>
+              <ExportMenu
+                compact
+                kind="lease"
+                id={lease.id}
+                selectedTemplateId={lease.contractTemplateId}
+                templates={templates.map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault }))}
+              />
+            </div>
             <ul className="divide-y divide-border/50 rounded-lg border border-border/60">
               {savedDocs.filter(d => d.group === 'Hợp đồng').map(d => <DocRow key={d.id} d={d} />)}
-              {!savedDocs.some(d => d.group === 'Hợp đồng' && d.label.includes('PDF')) && <DocRow d={{ id: 'lease-preview', label: 'Hợp đồng · bản PDF', name: 'dựng từ mẫu, sẽ được lưu khi bấm Lưu thay đổi', date: '', previewHref: `/api/documents/preview?docType=lease&id=${lease.id}${lease.contractTemplateId ? `&templateId=${lease.contractTemplateId}` : ''}` }} />}
+              {!savedDocs.some(d => d.group === 'Hợp đồng' && d.label.includes('PDF')) && <DocRow d={{ id: 'lease-preview', label: 'Hợp đồng thuê', name: '', date: '', previewHref: `/api/documents/preview?docType=lease&id=${lease.id}${lease.contractTemplateId ? `&templateId=${lease.contractTemplateId}` : ''}` }} />}
             </ul>
           </div>
           <div className="space-y-1">
@@ -377,14 +377,15 @@ export default async function ContractDetail({ id }: { id: string }) {
               <StartHandoverButtons leaseId={lease.id} />
             </div>
             <ul className="divide-y divide-border/50 rounded-lg border border-border/60">
-              {handoverFiles.map(({ h, files }) => <li key={h.id} className="space-y-1 px-3 py-1.5 text-xs">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span><span className="font-medium text-foreground">{h.kind === 'check_in' ? 'Biên bản check-in' : 'Biên bản check-out'}</span> <span className="text-muted-foreground">· {formatDateVN(h.date)} · {h.status === 'done' ? 'Đã hoàn tất' : 'Nháp'}</span></span>
-                  <span className="flex items-center gap-3"><Link href={`/handovers/${h.id}`} className="font-medium text-primary hover:underline">Xem biên bản</Link><HandoverExportButton id={h.id} /></span>
-                </div>
-                {!files.some(f => f.contentType === 'application/pdf') && <div className="flex flex-wrap items-center justify-between gap-2 pl-4 text-muted-foreground"><span>Bản PDF · dựng từ mẫu, sẽ được lưu khi bấm Lưu thay đổi</span><PdfViewButton href={`/api/documents/preview?docType=${h.kind === 'check_in' ? 'handover_check_in' : 'handover_check_out'}&id=${h.id}`} title={h.kind === 'check_in' ? 'Biên bản check-in' : 'Biên bản check-out'}>Xem PDF</PdfViewButton></div>}
-                {files.map(f => <div key={f.id} className="flex flex-wrap items-center justify-between gap-2 pl-4 text-muted-foreground"><span>{f.name} · {fileDate(f)}</span><span className="flex gap-3">{f.contentType === 'application/pdf' ? <PdfViewButton href={`/api/files/${f.id}?inline=1`} title={f.name}>Xem trước</PdfViewButton> : <a className="font-medium text-primary hover:underline" href={`/api/files/${f.id}?inline=1`} target="_blank" rel="noreferrer">Xem trước</a>}<a className="font-medium text-primary hover:underline" href={`/api/files/${f.id}`}>Tải xuống</a></span></div>)}
-              </li>)}
+              {handoverFiles.map(({ h, files }) => {
+                const savedPdf = files.find(f => f.contentType === 'application/pdf')
+                const title = h.kind === 'check_in' ? 'Biên bản check-in' : 'Biên bản check-out'
+                const href = savedPdf ? `/api/files/${savedPdf.id}?inline=1` : `/api/documents/preview?docType=${h.kind === 'check_in' ? 'handover_check_in' : 'handover_check_out'}&id=${h.id}`
+                return <li key={h.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-xs">
+                  <span><Link href={`/handovers/${h.id}`} className="font-medium text-foreground hover:underline">{title}</Link> <span className="text-muted-foreground">· {formatDateVN(h.date)} · {h.status === 'done' ? 'Đã hoàn tất' : 'Nháp'}</span></span>
+                  <PdfViewButton href={href} title={title}>Xem PDF</PdfViewButton>
+                </li>
+              })}
               {handoverFiles.length === 0 && <li className="px-3 py-1.5 text-xs text-muted-foreground">Chưa có biên bản bàn giao nào. Bấm Check-in hoặc Check-out để tạo.</li>}
             </ul>
           </div>
