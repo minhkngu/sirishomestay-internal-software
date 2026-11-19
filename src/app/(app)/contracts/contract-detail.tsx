@@ -8,7 +8,7 @@ import { DepositLedger } from '@/features/deposits/components/deposit-ledger'
 import { buttonVariants } from '@/components/ui/button'
 import { db } from '@/db/client'
 import { NotFoundError } from '@/domain/errors'
-import { depositBalance } from '@/domain/deposit'
+import { DEPOSIT_ENTRY_LABELS, depositBalance, runningDepositBalances } from '@/domain/deposit'
 import type { DepositEntry } from '@/domain/types'
 import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
@@ -28,6 +28,72 @@ import { StartHandoverButtons } from '@/features/handovers/components/start-hand
 import { listAddenda } from '@/server/addenda/service'
 import { cn } from '@/lib/utils'
 import { signStatusLabel } from '@/domain/sign-status'
+
+type Entry = { id: string; date: string; type: string; amount: number; status: string }
+
+function Ledger({ entries }: { entries: Entry[] }) {
+  // Dòng từ DB có `type`/`status` kiểu chuỗi; giá trị hợp lệ do cột DB bảo đảm.
+  const typed = entries as Pick<DepositEntry, 'type' | 'amount' | 'status'>[]
+  const done = runningDepositBalances(typed)
+  const currentBalance = depositBalance(typed)
+
+  return (
+    <div className="space-y-3">
+      <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-2xs">
+        <table className="w-full text-left text-xs">
+          <thead className="border-b border-border/70 bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <th className="px-4 py-3">Ngày</th>
+              <th className="px-4 py-3">Nghiệp vụ</th>
+              <th className="px-4 py-3 text-right">Số tiền</th>
+              <th className="px-4 py-3 text-center">Trạng thái</th>
+              <th className="px-4 py-3 text-right">Số dư luỹ kế</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/60">
+            {entries.map((e, i) => (
+              <tr key={e.id} className="transition-colors hover:bg-muted/30">
+                <td className="px-4 py-3 font-medium text-foreground">{formatDateVN(e.date)}</td>
+                <td className="px-4 py-3">
+                  <span className="font-medium text-foreground">
+                    {DEPOSIT_ENTRY_LABELS[e.type as DepositEntry['type']] ?? e.type}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-right font-medium tabular-nums text-foreground">{formatVND(e.amount)}</td>
+                <td className="px-4 py-3 text-center">
+                  <span
+                    className={cn(
+                      'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium',
+                      e.status === 'done'
+                        ? 'border border-emerald-200/80 bg-emerald-50 text-emerald-700'
+                        : 'border border-amber-200/80 bg-amber-50 text-amber-700',
+                    )}
+                  >
+                    {e.status === 'done' ? 'Đã xong' : 'Chờ'}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-right font-semibold tabular-nums text-foreground">
+                  {formatVND(done[i])}
+                </td>
+              </tr>
+            ))}
+            {entries.length === 0 && (
+              <tr>
+                <td colSpan={5} className="py-8 text-center text-xs text-muted-foreground">
+                  Chưa có dòng ghi sổ cọc nào.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/20 px-4 py-2.5 text-xs">
+        <span className="text-muted-foreground">Số dư cọc hiện tại:</span>
+        <strong className="text-sm font-bold text-foreground tabular-nums">{formatVND(currentBalance)}</strong>
+      </div>
+    </div>
+  )
+}
 
 function DocRow({ d }: { d: { id: string; label: string; name: string; date: string; previewHref?: string } }) {
   if (d.previewHref)
@@ -200,16 +266,7 @@ export default async function ContractDetail({ id }: { id: string }) {
 
         <section className="space-y-3 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
           <h2 className="text-sm font-semibold tracking-tight text-foreground">Sổ cọc</h2>
-          <DepositLedger entries={deposit.entries} canEdit={false} />
-          {deposit.entries.length === 0 && (
-            <p className="py-4 text-center text-xs text-muted-foreground">Chưa có dòng ghi sổ cọc nào.</p>
-          )}
-          <div className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/20 px-4 py-2.5 text-xs">
-            <span className="text-muted-foreground">Số dư cọc hiện tại:</span>
-            <strong className="text-sm font-bold text-foreground tabular-nums">
-              {formatVND(depositBalance(deposit.entries as DepositEntry[]))}
-            </strong>
-          </div>
+          <Ledger entries={deposit.entries} />
         </section>
       </div>
     )

@@ -34,7 +34,7 @@ export function DepositLedger({ entries, canEdit, leaseId }: { entries: Entry[];
               return (
                 <tr key={entry.id} className="border-t">
                   <td>{formatDateVN(entry.date)}</td>
-                  <td>{DEPOSIT_ENTRY_LABELS[entry.type as DepositEntry['type']]}</td>
+                  <td>{DEPOSIT_ENTRY_LABELS[entry.type as DepositEntry['type']] ?? entry.type}</td>
                   <td>{formatVND(entry.amount)}</td>
                   <td>{entry.status === 'done' ? 'Đã xong' : 'Chờ'}</td>
                   <td>{formatVND(current)}</td>
@@ -99,11 +99,11 @@ export function DepositLedger({ entries, canEdit, leaseId }: { entries: Entry[];
           <label>
             Loại{' '}
             <select name="type">
-              <option value="topup">Thu bổ sung</option>
-              <option value="collect">Thu cọc</option>
-              <option value="deduct">Khấu trừ</option>
-              <option value="refund">Hoàn cọc</option>
-              <option value="forfeit">Mất cọc</option>
+              {(['topup', 'collect', 'deduct', 'refund', 'forfeit'] as const).map((type) => (
+                <option key={type} value={type}>
+                  {DEPOSIT_ENTRY_LABELS[type]}
+                </option>
+              ))}
             </select>
           </label>
           <label>
