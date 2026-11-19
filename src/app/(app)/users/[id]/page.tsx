@@ -14,7 +14,10 @@ export default async function UserPage({ params }: { params: Promise<{ id: strin
   } catch {
     notFound()
   }
-  const facs = (await listFacilities(db, ctx, { includeInactive: true })).map((f) => ({ id: f.id, name: f.name }))
+  const facs = (await listFacilities(db, ctx, { includeInactive: true, orderBy: 'name' })).map((f) => ({
+    id: f.id,
+    name: f.name,
+  }))
   const user = (await listUsers(db, ctx)).find((u) => u.id === id)
   if (!user) notFound()
   return (

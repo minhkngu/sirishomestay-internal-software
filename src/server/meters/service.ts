@@ -537,6 +537,7 @@ export type RoomMeterOption = {
 
 /** Đồng hồ phí của các phòng, đánh dấu busy khi đang gắn dòng phí của hợp đồng còn hiệu lực. Quyền do trang gọi kiểm trước. */
 export async function listRoomMeterOptions(db: DB, ctx: AccessContext, roomIds: string[]): Promise<RoomMeterOption[]> {
+  // Cố ý không lọc theo phạm vi cơ sở: trang gọi đã kiểm quyền trước, giữ nguyên như khi truy vấn còn nằm trong trang.
   void ctx
   const meterRows = roomIds.length
     ? await db

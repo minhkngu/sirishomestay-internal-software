@@ -13,7 +13,7 @@ export type Facility = typeof facilities.$inferSelect
 export async function listFacilities(
   db: DB,
   ctx: AccessContext,
-  opts: { includeInactive?: boolean } = {},
+  opts: { includeInactive?: boolean; orderBy?: 'name' | 'code' } = {},
 ): Promise<Facility[]> {
   const scope = facilityScope(ctx)
   if (scope !== 'all' && scope.length === 0) return []
@@ -24,7 +24,7 @@ export async function listFacilities(
     .select()
     .from(facilities)
     .where(and(...conds))
-    .orderBy(asc(facilities.code))
+    .orderBy(asc(opts.orderBy === 'name' ? facilities.name : facilities.code))
 }
 
 export async function getFacility(db: DB, ctx: AccessContext, id: string): Promise<Facility> {

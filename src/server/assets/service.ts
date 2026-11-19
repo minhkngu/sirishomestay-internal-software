@@ -275,13 +275,14 @@ export async function assetHistory(db: DB, ctx: AccessContext, id: string) {
   return { moves, handovers: hs, incidents: await incidentsForAsset(db, id) }
 }
 
-/** Nhãn vị trí: "Phòng <mã>" (hoặc "?" khi không có phòng) hoặc tên cơ sở. Quyền do trang gọi kiểm trước. */
+/** Nhãn vị trí: "Phòng <mã>" (hoặc "?" khi không có phòng) hoặc tên cơ sở (chuỗi rỗng khi không có cơ sở). Quyền do trang gọi kiểm trước. */
 export async function assetLocationLabel(
   db: DB,
   ctx: AccessContext,
   kind: 'room' | 'facility',
   id: string,
 ): Promise<string> {
+  // Cố ý không lọc theo phạm vi cơ sở: trang gọi đã kiểm quyền trước, giữ nguyên như khi truy vấn còn nằm trong trang.
   void ctx
   if (kind === 'room') {
     const [r] = await db.select().from(rooms).where(eq(rooms.id, id))

@@ -13,7 +13,10 @@ export async function NewUser({ showHeading = true }: { showHeading?: boolean })
   } catch {
     notFound()
   }
-  const facs = (await listFacilities(db, ctx, { includeInactive: true })).map((f) => ({ id: f.id, name: f.name }))
+  const facs = (await listFacilities(db, ctx, { includeInactive: true, orderBy: 'name' })).map((f) => ({
+    id: f.id,
+    name: f.name,
+  }))
   return (
     <div className="space-y-4">
       {showHeading && <h1 className="text-xl font-semibold">Thêm người dùng</h1>}
