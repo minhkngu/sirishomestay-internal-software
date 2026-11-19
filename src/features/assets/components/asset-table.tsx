@@ -6,10 +6,11 @@ import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { FacilityFilter } from '@/components/list/facility-filter'
 import { Pager } from '@/components/list/pager'
+import { useFacilitySelection } from '@/components/list/use-list-params'
 import { usePager } from '@/components/list/use-list-params'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { formatVND } from '@/domain/money'
 import { removeDiacritics } from '@/domain/text'
@@ -50,10 +51,11 @@ export function AssetTable({ assets, facilities }: { assets: AssetRow[]; facilit
   const [sel, setSel] = useState<Selected>({ kind: 'all' })
   const [q, setQ] = useState('')
   const [state, setState] = useState('')
-  const [room, setRoom] = useState('')
   const [checked, setChecked] = useState<string[]>([])
   const [moving, setMoving] = useState(false)
 
+  const selectedFacilities = useFacilitySelection(facilities.map((f) => f.id))
+  const visibleFacilities = selectedFacilities.length ? facilities.filter((f) => selectedFacilities.includes(f.id)) : facilities
   const roomCode = useMemo(() => new Map(facilities.flatMap((f) => f.rooms.map((r) => [r.id, `Phòng ${r.code}`] as const))), [facilities])
   const facName = useMemo(() => new Map(facilities.map((f) => [f.id, f.name] as const)), [facilities])
 
@@ -76,18 +78,13 @@ export function AssetTable({ assets, facilities }: { assets: AssetRow[]; facilit
     if (sel.kind === 'facility' && a.facilityId !== sel.id) return false
     if ((sel.kind === 'warehouse' || sel.kind === 'common' || sel.kind === 'unassigned' || sel.kind === 'room') && (a.locationKind !== sel.kind || a.locationId !== sel.id)) return false
     if (state && assetState(a) !== state) return false
-    if (room.trim()) {
-      if (a.locationKind !== 'room') return false
-      const code = roomCode.get(a.locationId) ?? ''
-      if (!removeDiacritics(code).toLowerCase().includes(removeDiacritics(room).toLowerCase().trim())) return false
-    }
     if (q.trim()) {
       const haystack = `${a.code} ${a.name} ${a.category} ${where(a).top} ${where(a).sub}`
       return removeDiacritics(haystack).toLowerCase().includes(removeDiacritics(q).toLowerCase().trim())
     }
     return true
   })
-  const { pageRows, pager } = usePager(shown, 'assets', `${encodeLocation(sel)}|${state}|${room}|${q}`)
+  const { pageRows, pager } = usePager(shown, 'assets', `${encodeLocation(sel)}|${state}|${q}`)
   const chosen = assets.filter((a) => checked.includes(a.id))
   const oneFacility = new Set(chosen.map((a) => a.facilityId)).size === 1
   const toggle = (id: string) => setChecked(checked.includes(id) ? checked.filter((x) => x !== id) : [...checked, id])
@@ -104,6 +101,21 @@ export function AssetTable({ assets, facilities }: { assets: AssetRow[]; facilit
     ...f.rooms.map((r) => ({ value: `room:${r.id}`, label: `${f.name} · Phòng ${r.code}` })),
   ])
 
+  const roomGroups = visibleFacilities.map((f) => ({
+    name: f.name,
+    rooms: f.rooms.map((r) => ({ value: r.id, code: r.code, label: `Phòng ${r.code} · ${f.name}` })),
+  }))
+  const roomItems = [{ value: 'all', label: 'Tất cả phòng' }, ...roomGroups.flatMap((g) => g.rooms)]
+
+  const shortLocation = (s: Selected) => {
+    if (s.kind === 'all') return 'Vị trí'
+    if (s.kind === 'facility') return facName.get(s.id) ?? 'Toà'
+    if (s.kind === 'room') return roomCode.get(s.id) ?? 'Phòng'
+    if (s.kind === 'warehouse') return 'Kho'
+    if (s.kind === 'common') return 'Khu chung'
+    return 'Chưa xếp'
+  }
+
   const stateChip = (a: AssetRow) => {
     const label = assetState(a)
     return <span className={cn('inline-flex h-6 items-center rounded-full border px-2.5 text-xs font-medium whitespace-nowrap', stateTone(label))}>{label}</span>
@@ -116,7 +128,21 @@ export function AssetTable({ assets, facilities }: { assets: AssetRow[]; facilit
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70" />
           <Input aria-label="Tìm tài sản" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm mã, tên, loại…" className="h-9 pl-9" />
         </div>
-        <FacilityFilter facilities={facilities.map((f) => ({ id: f.id, name: f.name }))} />
+        <FacilityFilter facilities={facilities.map((f) => ({ id: f.id, name: f.name }))} onChange={() => setSel({ kind: 'all' })} />
+        <Select value={sel.kind === 'room' ? sel.id : 'all'} onValueChange={(value) => setSel(!value || value === 'all' ? { kind: 'all' } : { kind: 'room', id: value })} items={roomItems}>
+          <SelectTrigger aria-label="Lọc theo phòng" className="h-9 w-32 gap-2 border-border/80 bg-card px-2.5 text-[13px] sm:w-44">
+            <span className="truncate">{sel.kind === 'room' ? (roomCode.get(sel.id) ?? 'Phòng') : 'Tất cả phòng'}</span>
+          </SelectTrigger>
+          <SelectContent align="start" className="w-64">
+            <SelectItem value="all">Tất cả phòng</SelectItem>
+            {roomGroups.map((g) => (
+              <SelectGroup key={g.name}>
+                <SelectLabel>{g.name}</SelectLabel>
+                {g.rooms.map((r) => <SelectItem key={r.value} value={r.value}>Phòng {r.code}</SelectItem>)}
+              </SelectGroup>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={state || 'all'} onValueChange={(value) => setState(value && value !== 'all' ? value : '')} items={[{ value: 'all', label: 'Tình trạng' }, ...STATE_OPTIONS.map((s) => ({ value: s, label: s }))]}>
           <SelectTrigger aria-label="Lọc tình trạng" className="h-9 gap-2 border-border/80 bg-card px-2.5 text-[13px]">
             <SelectValue />
@@ -126,11 +152,10 @@ export function AssetTable({ assets, facilities }: { assets: AssetRow[]; facilit
             {STATE_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Input aria-label="Lọc theo phòng" value={room} onChange={(e) => setRoom(e.target.value)} placeholder="Phòng" className="h-9 w-24 shrink-0 sm:w-28" />
-        <div className="w-24 shrink-0 sm:w-auto lg:hidden">
+        <div className="w-28 shrink-0 sm:w-auto lg:hidden">
           <Select value={encodeLocation(sel)} onValueChange={(value) => setSel(decodeLocation(value ?? 'all'))} items={[{ value: 'all', label: 'Vị trí' }, ...locationOptions]}>
             <SelectTrigger aria-label="Lọc vị trí" className="h-9 w-full gap-2 border-border/80 bg-card px-2.5 text-[13px] sm:w-52">
-              <SelectValue />
+              <span className="truncate">{shortLocation(sel)}</span>
             </SelectTrigger>
             <SelectContent align="start" className="w-64">
               <SelectItem value="all">Vị trí</SelectItem>
@@ -143,9 +168,12 @@ export function AssetTable({ assets, facilities }: { assets: AssetRow[]; facilit
 
       <div className="grid gap-3 lg:grid-cols-[14rem_1fr]">
         <aside className="hidden self-start lg:sticky lg:top-20 lg:block">
-          <p className="px-2 pb-2 text-[13px] font-medium text-muted-foreground">Vị trí</p>
+          <div className="px-2 pb-2">
+            <p className="text-[13px] font-medium text-muted-foreground">Lọc theo vị trí</p>
+            <p className="mt-0.5 text-xs leading-4 text-muted-foreground/80">Bấm để lọc bảng bên cạnh.</p>
+          </div>
           <div className="max-h-[64vh] overflow-auto">
-            <LocationTree facilities={facilities} value={sel} onChange={setSel} count={count} />
+            <LocationTree facilities={visibleFacilities} value={sel} onChange={setSel} count={count} />
           </div>
         </aside>
 

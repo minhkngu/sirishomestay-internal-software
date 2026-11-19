@@ -6,8 +6,10 @@ import { setListParams, useFacilitySelection } from './use-list-params'
 
 export function FacilityFilter({
   facilities,
+  onChange,
 }: {
   facilities: { id: string; name: string }[]
+  onChange?: (ids: string[]) => void
 }) {
   const allowed = useMemo(() => facilities.map((f) => f.id), [facilities])
   const checked = useFacilitySelection(allowed)
@@ -38,6 +40,7 @@ export function FacilityFilter({
 
   function update(ids: string[]) {
     setListParams({ toa: ids.join(',') || null })
+    onChange?.(ids)
   }
 
   return (
