@@ -35,18 +35,24 @@ export function AssetsView({
   stock: StockRow[]
 }) {
   const [facilityId, setFacility] = useState('')
-  const [roomId, setRoom] = useState('')
+  const [location, setLocation] = useState('')
 
-  const shownAssets = useMemo(() => assets.filter((a) => {
-    if (facilityId && a.facilityId !== facilityId) return false
-    if (roomId && (a.locationKind !== 'room' || a.locationId !== roomId)) return false
-    return true
-  }), [assets, facilityId, roomId])
-  const shownStock = useMemo(() => stock.filter((r) => {
-    if (facilityId && r.facilityId !== facilityId) return false
-    if (roomId && (r.locationKind !== 'room' || r.locationId !== roomId)) return false
-    return true
-  }), [stock, facilityId, roomId])
+  const shownAssets = useMemo(() => {
+    const match = (kind: string, id: string) => {
+      if (!location) return true
+      if (location === 'warehouse' || location === 'common' || location === 'unassigned') return kind === location
+      return kind === 'room' && id === location
+    }
+    return assets.filter((a) => (!facilityId || a.facilityId === facilityId) && match(a.locationKind, a.locationId))
+  }, [assets, facilityId, location])
+  const shownStock = useMemo(() => {
+    const match = (kind: string | null, id: string | null) => {
+      if (!location) return true
+      if (location === 'warehouse' || location === 'common' || location === 'unassigned') return kind === location || (location === 'unassigned' && kind === null)
+      return kind === 'room' && id === location
+    }
+    return stock.filter((r) => (!facilityId || r.facilityId === facilityId) && match(r.locationKind, r.locationId))
+  }, [stock, facilityId, location])
 
   const totalValue = shownAssets.reduce((sum, a) => sum + a.value, 0)
   const attention = shownAssets.filter((a) => ['Hỏng', 'Trầy xước', 'Hư'].includes(assetState(a))).length
@@ -91,8 +97,8 @@ export function AssetsView({
       </div>
 
       {tab === 'assets'
-        ? <AssetTable assets={shownAssets} facilities={tree} facilityId={facilityId} roomId={roomId} onFacilityChange={(value) => { setFacility(value); setRoom('') }} onRoomChange={setRoom} />
-        : <StockTable facilities={tree} rows={shownStock} facilityId={facilityId} roomId={roomId} onFacilityChange={(value) => { setFacility(value); setRoom('') }} onRoomChange={setRoom} />}
+        ? <AssetTable assets={shownAssets} facilities={tree} facilityId={facilityId} location={location} onFacilityChange={(value) => { setFacility(value); setLocation('') }} onLocationChange={setLocation} />
+        : <StockTable facilities={tree} rows={shownStock} facilityId={facilityId} location={location} onFacilityChange={(value) => { setFacility(value); setLocation('') }} onLocationChange={setLocation} />}
     </div>
   )
 }

@@ -42,16 +42,16 @@ export function AssetTable({
   assets,
   facilities,
   facilityId,
-  roomId,
+  location,
   onFacilityChange,
-  onRoomChange,
+  onLocationChange,
 }: {
   assets: AssetRow[]
   facilities: TreeFacility[]
   facilityId: string
-  roomId: string
+  location: string
   onFacilityChange: (value: string) => void
-  onRoomChange: (value: string) => void
+  onLocationChange: (value: string) => void
 }) {
   const router = useRouter()
   const [q, setQ] = useState('')
@@ -78,7 +78,7 @@ export function AssetTable({
     }
     return true
   })
-  const { pageRows, pager } = usePager(shown, 'assets', `${facilityId}|${roomId}|${state}|${q}`)
+  const { pageRows, pager } = usePager(shown, 'assets', `${facilityId}|${location}|${state}|${q}`)
   const chosen = assets.filter((a) => checked.includes(a.id))
   const oneFacility = new Set(chosen.map((a) => a.facilityId)).size === 1
   const toggle = (id: string) => setChecked(checked.includes(id) ? checked.filter((x) => x !== id) : [...checked, id])
@@ -99,7 +99,7 @@ export function AssetTable({
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70" />
           <Input aria-label="Tìm tài sản" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm mã, tên, loại…" className="h-9 pl-9" />
         </div>
-        <LocationFilters facilities={facilities} facilityId={facilityId} roomId={roomId} onFacilityChange={onFacilityChange} onRoomChange={onRoomChange} />
+        <LocationFilters facilities={facilities} facilityId={facilityId} location={location} onFacilityChange={onFacilityChange} onLocationChange={onLocationChange} />
         <Select value={state || 'all'} onValueChange={(value) => setState(value && value !== 'all' ? value : '')} items={[{ value: 'all', label: 'Tình trạng' }, ...STATE_OPTIONS.map((s) => ({ value: s, label: s }))]}>
           <SelectTrigger aria-label="Lọc tình trạng" className="h-9 gap-2 border-border/80 bg-card px-2.5 text-[13px]">
             <SelectValue />

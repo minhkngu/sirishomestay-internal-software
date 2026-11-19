@@ -13,7 +13,7 @@ import { AddStockItemDialog, StockMoveDialog } from './stock-dialogs'
 
 export type StockRow = { itemId: string; name: string; unit: string; category: string; facilityId: string; locationKind: string | null; locationId: string | null; quantity: number | null }
 
-export function StockTable({ facilities, rows, facilityId, roomId, onFacilityChange, onRoomChange }: { facilities: TreeFacility[]; rows: StockRow[]; facilityId: string; roomId: string; onFacilityChange: (value: string) => void; onRoomChange: (value: string) => void }) {
+export function StockTable({ facilities, rows, facilityId, location, onFacilityChange, onLocationChange }: { facilities: TreeFacility[]; rows: StockRow[]; facilityId: string; location: string; onFacilityChange: (value: string) => void; onLocationChange: (value: string) => void }) {
   const [q, setQ] = useState('')
   const [addOpen, setAddOpen] = useState(false)
   const [moveOpen, setMoveOpen] = useState(false)
@@ -35,7 +35,7 @@ export function StockTable({ facilities, rows, facilityId, roomId, onFacilityCha
     const haystack = `${r.name} ${r.category} ${r.unit} ${loc.top} ${loc.sub}`
     return removeDiacritics(haystack).toLowerCase().includes(removeDiacritics(q).toLowerCase().trim())
   })
-  const { pageRows, pager } = usePager(shown, 'stock', `${facilityId}|${roomId}|${q}`)
+  const { pageRows, pager } = usePager(shown, 'stock', `${facilityId}|${location}|${q}`)
 
   return (
     <div className="space-y-3">
@@ -44,7 +44,7 @@ export function StockTable({ facilities, rows, facilityId, roomId, onFacilityCha
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70" />
           <Input aria-label="Tìm vật tư" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm vật tư, vị trí…" className="h-9 pl-9" />
         </div>
-        <LocationFilters facilities={facilities} facilityId={facilityId} roomId={roomId} onFacilityChange={onFacilityChange} onRoomChange={onRoomChange} />
+        <LocationFilters facilities={facilities} facilityId={facilityId} location={location} onFacilityChange={onFacilityChange} onLocationChange={onLocationChange} />
         <span className="ml-auto hidden text-xs tabular-nums text-muted-foreground sm:inline">{shown.length} dòng</span>
         <div className="flex gap-2 sm:ml-auto">
           <Button variant="outline" size="sm" className="h-9" onClick={() => setAddOpen(true)}>Thêm vật tư</Button>
