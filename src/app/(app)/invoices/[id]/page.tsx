@@ -99,7 +99,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      {inv.status === 'draft' && <InvoiceFeeQuantities key={inv.updatedAt.toISOString()} invoiceId={id} fees={d.periodFees} />}
+      {inv.status === 'draft' && (
+        <InvoiceFeeQuantities key={inv.updatedAt.toISOString()} invoiceId={id} fees={d.periodFees} />
+      )}
       <InvoiceEditor
         key={inv.updatedAt.toISOString()}
         id={id}
@@ -134,7 +136,12 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
       <section className="space-y-3 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
         <h2 className="text-sm font-semibold tracking-tight text-foreground">Xuất hoá đơn & Phiếu thu</h2>
-        <InvoiceExport invoiceId={id} kind={d.invoice.kind} selectedTemplateId={inv.invoiceTemplateId} templates={invoiceTemplates.map(t => ({ id: t.id, name: t.name }))} />
+        <InvoiceExport
+          invoiceId={id}
+          kind={d.invoice.kind}
+          selectedTemplateId={inv.invoiceTemplateId}
+          templates={invoiceTemplates.map((t) => ({ id: t.id, name: t.name }))}
+        />
       </section>
     </div>
   )

@@ -1,10 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import {
-  ArrowLeft,
-  Calendar,
-  User,
-} from 'lucide-react'
+import { ArrowLeft, Calendar, User } from 'lucide-react'
 import { can } from '@/domain/access'
 import { listOneOffs } from '@/server/charges/service'
 import { OneOffDialog } from '@/features/charges/components/one-off-dialog'
@@ -61,7 +57,7 @@ function Ledger({ entries }: { entries: Entry[] }) {
       type: e.type as 'collect',
       amount: e.amount,
       status: e.status as 'done',
-    }))
+    })),
   )
 
   return (
@@ -84,16 +80,14 @@ function Ledger({ entries }: { entries: Entry[] }) {
                 <td className="px-4 py-3">
                   <span className="font-medium text-foreground">{ENTRY[e.type] || e.type}</span>
                 </td>
-                <td className="px-4 py-3 text-right font-medium tabular-nums text-foreground">
-                  {formatVND(e.amount)}
-                </td>
+                <td className="px-4 py-3 text-right font-medium tabular-nums text-foreground">{formatVND(e.amount)}</td>
                 <td className="px-4 py-3 text-center">
                   <span
                     className={cn(
                       'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium',
                       e.status === 'done'
                         ? 'border border-emerald-200/80 bg-emerald-50 text-emerald-700'
-                        : 'border border-amber-200/80 bg-amber-50 text-amber-700'
+                        : 'border border-amber-200/80 bg-amber-50 text-amber-700',
                     )}
                   >
                     {e.status === 'done' ? 'Đã xong' : 'Chờ'}
@@ -123,11 +117,48 @@ function Ledger({ entries }: { entries: Entry[] }) {
 }
 
 function DocRow({ d }: { d: { id: string; label: string; name: string; date: string; previewHref?: string } }) {
-  if (d.previewHref) return <li className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-xs"><span><span className="font-medium text-foreground">{d.label}</span> {d.name && <span className="text-muted-foreground">· {d.name}</span>}</span><PdfViewButton href={d.previewHref} title={d.label}>Xem PDF</PdfViewButton></li>
-  return <li className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-xs">
-    <span><span className="font-medium text-foreground">{d.label}</span> <span className="text-muted-foreground">· {d.name}{d.date ? ` · ${d.date}` : ''}</span></span>
-    <span className="flex gap-3">{d.label.includes('PDF') ? <PdfViewButton href={`/api/files/${d.id}?inline=1`} title={d.label}>Xem trước</PdfViewButton> : <a className="font-medium text-primary hover:underline" href={`/api/files/${d.id}?inline=1`} target="_blank" rel="noreferrer">Xem trước</a>}<a className="font-medium text-primary hover:underline" href={`/api/files/${d.id}`}>Tải xuống</a></span>
-  </li>
+  if (d.previewHref)
+    return (
+      <li className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-xs">
+        <span>
+          <span className="font-medium text-foreground">{d.label}</span>{' '}
+          {d.name && <span className="text-muted-foreground">· {d.name}</span>}
+        </span>
+        <PdfViewButton href={d.previewHref} title={d.label}>
+          Xem PDF
+        </PdfViewButton>
+      </li>
+    )
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-xs">
+      <span>
+        <span className="font-medium text-foreground">{d.label}</span>{' '}
+        <span className="text-muted-foreground">
+          · {d.name}
+          {d.date ? ` · ${d.date}` : ''}
+        </span>
+      </span>
+      <span className="flex gap-3">
+        {d.label.includes('PDF') ? (
+          <PdfViewButton href={`/api/files/${d.id}?inline=1`} title={d.label}>
+            Xem trước
+          </PdfViewButton>
+        ) : (
+          <a
+            className="font-medium text-primary hover:underline"
+            href={`/api/files/${d.id}?inline=1`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Xem trước
+          </a>
+        )}
+        <a className="font-medium text-primary hover:underline" href={`/api/files/${d.id}`}>
+          Tải xuống
+        </a>
+      </span>
+    </li>
+  )
 }
 
 export default async function ContractDetail({ id }: { id: string }) {
@@ -177,20 +208,22 @@ export default async function ContractDetail({ id }: { id: string }) {
                     deposit.status === 'pending'
                       ? 'border-amber-200/80 bg-amber-50 text-amber-700'
                       : deposit.status === 'converted'
-                      ? 'border-emerald-200/80 bg-emerald-50 text-emerald-700'
-                      : 'border-border/80 bg-muted/60 text-muted-foreground'
+                        ? 'border-emerald-200/80 bg-emerald-50 text-emerald-700'
+                        : 'border-border/80 bg-muted/60 text-muted-foreground',
                   )}
                 >
                   {statusLabels[deposit.status] || deposit.status}
                 </span>
                 <span
-                className={cn(
-                  'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
-                  deposit.signStatus === 'signed' ? 'border-emerald-200/80 bg-emerald-50 text-emerald-700' : 'border-border/80 bg-muted/60 text-muted-foreground'
-                )}
-              >
-                {signStatusLabel(deposit.signStatus)}
-              </span>
+                  className={cn(
+                    'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
+                    deposit.signStatus === 'signed'
+                      ? 'border-emerald-200/80 bg-emerald-50 text-emerald-700'
+                      : 'border-border/80 bg-muted/60 text-muted-foreground',
+                  )}
+                >
+                  {signStatusLabel(deposit.signStatus)}
+                </span>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
                 Khách thuê: <strong className="font-medium text-foreground">{deposit.tenantName}</strong>
@@ -198,7 +231,13 @@ export default async function ContractDetail({ id }: { id: string }) {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <ContractActions id={deposit.id} kind="deposit" active={false} canDelete={can(ctx, 'delete_contracts', deposit.facilityId)} redirectAfterDelete="/contracts" />
+              <ContractActions
+                id={deposit.id}
+                kind="deposit"
+                active={false}
+                canDelete={can(ctx, 'delete_contracts', deposit.facilityId)}
+                redirectAfterDelete="/contracts"
+              />
               {/* Thẻ <a> (tải trang đầy đủ) có chủ ý: popup tạo mở đè lên trang cọc này không chuyển được sang hợp đồng thuê vừa tạo (invoices.spec). */}
               {deposit.status === 'pending' && (
                 <a
@@ -220,21 +259,15 @@ export default async function ContractDetail({ id }: { id: string }) {
           </div>
           <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
             <div className="text-[11px] font-medium text-muted-foreground">Tiền cọc giữ chỗ</div>
-            <div className="mt-1 text-sm font-bold tabular-nums text-primary">
-              {formatVND(deposit.depositAmount)}
-            </div>
+            <div className="mt-1 text-sm font-bold tabular-nums text-primary">{formatVND(deposit.depositAmount)}</div>
           </div>
           <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
             <div className="text-[11px] font-medium text-muted-foreground">Giá thuê thoả thuận</div>
-            <div className="mt-1 text-sm font-bold tabular-nums text-foreground">
-              {formatVND(deposit.agreedRent)}
-            </div>
+            <div className="mt-1 text-sm font-bold tabular-nums text-foreground">{formatVND(deposit.agreedRent)}</div>
           </div>
           <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
             <div className="text-[11px] font-medium text-muted-foreground">Vào ở dự kiến</div>
-            <div className="mt-1 text-sm font-semibold text-foreground">
-              {formatDateVN(deposit.expectedMoveIn)}
-            </div>
+            <div className="mt-1 text-sm font-semibold text-foreground">{formatDateVN(deposit.expectedMoveIn)}</div>
           </div>
         </div>
 
@@ -261,7 +294,9 @@ export default async function ContractDetail({ id }: { id: string }) {
   }
 
   const billing = can(ctx, 'billing', lease.facilityId)
-  const contractInvoices = billing ? (await listInvoices(db, ctx, { facilityId: lease.facilityId })).filter(invoice => invoice.leaseId === lease.id) : []
+  const contractInvoices = billing
+    ? (await listInvoices(db, ctx, { facilityId: lease.facilityId })).filter((invoice) => invoice.leaseId === lease.id)
+    : []
   const charges = billing ? await listOneOffs(db, ctx, lease.id) : []
   const handoverList = await listHandovers(db, ctx, lease.id)
   const addendaList = await listAddenda(db, ctx, lease.id)
@@ -272,17 +307,69 @@ export default async function ContractDetail({ id }: { id: string }) {
   ])
 
   const isActive = lease.status === 'active'
-  const safeFiles = async (ownerId: string) => { try { return await listFiles(db, ctx, 'export', ownerId) } catch { return [] } }
-  const addendumTypeLabel: Record<string, string> = { extension: 'Gia hạn', transfer: 'Chuyển phòng', assignment: 'Chuyển nhượng', termination: 'Thanh lý', occupants: 'Đổi người ở' }
-  const [addendaFiles, handoverFiles] = await Promise.all([Promise.all(addendaList.map(async a => ({ a, files: await safeFiles(a.id) }))), Promise.all(handoverList.map(async h => ({ h, files: await safeFiles(h.id) })))])
+  const safeFiles = async (ownerId: string) => {
+    try {
+      return await listFiles(db, ctx, 'export', ownerId)
+    } catch {
+      return []
+    }
+  }
+  const addendumTypeLabel: Record<string, string> = {
+    extension: 'Gia hạn',
+    transfer: 'Chuyển phòng',
+    assignment: 'Chuyển nhượng',
+    termination: 'Thanh lý',
+    occupants: 'Đổi người ở',
+  }
+  const [addendaFiles, handoverFiles] = await Promise.all([
+    Promise.all(addendaList.map(async (a) => ({ a, files: await safeFiles(a.id) }))),
+    Promise.all(handoverList.map(async (h) => ({ h, files: await safeFiles(h.id) }))),
+  ])
   const fileDate = (f: { createdAt: Date }) => formatDateVN(f.createdAt.toISOString().slice(0, 10))
   const savedDocs: { id: string; group: 'Hợp đồng' | 'Phụ lục'; label: string; name: string; date: string }[] = [
-    ...(lease.signedFileId ? [{ id: lease.signedFileId, group: 'Hợp đồng' as const, label: 'Bản hợp đồng đã ký', name: 'bản scan', date: '' }] : []),
-    ...exports.map(f => ({ id: f.id, group: 'Hợp đồng' as const, label: f.contentType === 'application/pdf' ? 'Hợp đồng · bản PDF' : 'Hợp đồng · bản Word', name: f.name, date: fileDate(f) })),
-    ...addendaFiles.flatMap(({ a, files }) => [...files.map(f => ({ id: f.id, group: 'Phụ lục' as const, label: `Phụ lục ${addendumTypeLabel[a.type] ?? a.type}`, name: f.name, date: fileDate(f) })), ...(a.signedFileId ? [{ id: a.signedFileId, group: 'Phụ lục' as const, label: `Phụ lục ${addendumTypeLabel[a.type] ?? a.type} đã ký`, name: 'bản scan', date: '' }] : [])]),
+    ...(lease.signedFileId
+      ? [
+          {
+            id: lease.signedFileId,
+            group: 'Hợp đồng' as const,
+            label: 'Bản hợp đồng đã ký',
+            name: 'bản scan',
+            date: '',
+          },
+        ]
+      : []),
+    ...exports.map((f) => ({
+      id: f.id,
+      group: 'Hợp đồng' as const,
+      label: f.contentType === 'application/pdf' ? 'Hợp đồng · bản PDF' : 'Hợp đồng · bản Word',
+      name: f.name,
+      date: fileDate(f),
+    })),
+    ...addendaFiles.flatMap(({ a, files }) => [
+      ...files.map((f) => ({
+        id: f.id,
+        group: 'Phụ lục' as const,
+        label: `Phụ lục ${addendumTypeLabel[a.type] ?? a.type}`,
+        name: f.name,
+        date: fileDate(f),
+      })),
+      ...(a.signedFileId
+        ? [
+            {
+              id: a.signedFileId,
+              group: 'Phụ lục' as const,
+              label: `Phụ lục ${addendumTypeLabel[a.type] ?? a.type} đã ký`,
+              name: 'bản scan',
+              date: '',
+            },
+          ]
+        : []),
+    ]),
   ]
   // Mọi thao tác thay đổi nằm trong popup "Sửa hợp đồng"; trang chi tiết chỉ để xem
-  const occupants = await listLeaseOccupants(db, ctx, lease.facilityId, [...new Set([lease.tenantId, ...lease.terms.occupantIds])])
+  const occupants = await listLeaseOccupants(db, ctx, lease.facilityId, [
+    ...new Set([lease.tenantId, ...lease.terms.occupantIds]),
+  ])
 
   return (
     <div className="max-w-5xl space-y-6">
@@ -305,7 +392,7 @@ export default async function ContractDetail({ id }: { id: string }) {
                   'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
                   isActive
                     ? 'border border-emerald-200/80 bg-emerald-50 text-emerald-700'
-                    : 'border border-border/80 bg-muted/60 text-muted-foreground'
+                    : 'border border-border/80 bg-muted/60 text-muted-foreground',
                 )}
               >
                 {isActive ? 'Đang hiệu lực' : 'Đã kết thúc'}
@@ -313,7 +400,9 @@ export default async function ContractDetail({ id }: { id: string }) {
               <span
                 className={cn(
                   'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
-                  lease.signStatus === 'signed' ? 'border-emerald-200/80 bg-emerald-50 text-emerald-700' : 'border-border/80 bg-muted/60 text-muted-foreground'
+                  lease.signStatus === 'signed'
+                    ? 'border-emerald-200/80 bg-emerald-50 text-emerald-700'
+                    : 'border-border/80 bg-muted/60 text-muted-foreground',
                 )}
               >
                 {signStatusLabel(lease.signStatus)}
@@ -341,56 +430,101 @@ export default async function ContractDetail({ id }: { id: string }) {
               )}
             </div>
           </div>
-          <ContractActions id={lease.id} kind="lease" active={isActive} canDelete={can(ctx, 'delete_contracts', lease.facilityId)} redirectAfterDelete="/contracts" />
+          <ContractActions
+            id={lease.id}
+            kind="lease"
+            active={isActive}
+            canDelete={can(ctx, 'delete_contracts', lease.facilityId)}
+            redirectAfterDelete="/contracts"
+          />
         </div>
       </div>
 
       <div className="space-y-6">
-      <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-2xs space-y-4">
-        <div className="space-y-4">
-          <div className="space-y-1">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Hợp đồng</div>
-              <ExportMenu
-                compact
-                kind="lease"
-                id={lease.id}
-                selectedTemplateId={lease.contractTemplateId}
-                templates={templates.map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault }))}
-              />
+        <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-2xs space-y-4">
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Hợp đồng</div>
+                <ExportMenu
+                  compact
+                  kind="lease"
+                  id={lease.id}
+                  selectedTemplateId={lease.contractTemplateId}
+                  templates={templates.map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault }))}
+                />
+              </div>
+              <ul className="divide-y divide-border/50 rounded-lg border border-border/60">
+                {savedDocs
+                  .filter((d) => d.group === 'Hợp đồng')
+                  .map((d) => (
+                    <DocRow key={d.id} d={d} />
+                  ))}
+                {!savedDocs.some((d) => d.group === 'Hợp đồng' && d.label.includes('PDF')) && (
+                  <DocRow
+                    d={{
+                      id: 'lease-preview',
+                      label: 'Hợp đồng thuê',
+                      name: '',
+                      date: '',
+                      previewHref: `/api/documents/preview?docType=lease&id=${lease.id}${lease.contractTemplateId ? `&templateId=${lease.contractTemplateId}` : ''}`,
+                    }}
+                  />
+                )}
+              </ul>
             </div>
-            <ul className="divide-y divide-border/50 rounded-lg border border-border/60">
-              {savedDocs.filter(d => d.group === 'Hợp đồng').map(d => <DocRow key={d.id} d={d} />)}
-              {!savedDocs.some(d => d.group === 'Hợp đồng' && d.label.includes('PDF')) && <DocRow d={{ id: 'lease-preview', label: 'Hợp đồng thuê', name: '', date: '', previewHref: `/api/documents/preview?docType=lease&id=${lease.id}${lease.contractTemplateId ? `&templateId=${lease.contractTemplateId}` : ''}` }} />}
-            </ul>
-          </div>
-          <div className="space-y-1">
-            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Phụ lục</div>
-            <ul className="divide-y divide-border/50 rounded-lg border border-border/60">
-              {savedDocs.filter(d => d.group === 'Phụ lục').map(d => <DocRow key={d.id} d={d} />)}
-              {!savedDocs.some(d => d.group === 'Phụ lục') && <li className="px-3 py-1.5 text-xs text-muted-foreground">Chưa có phụ lục nào được xuất hoặc ký.</li>}
-            </ul>
-          </div>
-          <div className="space-y-1">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Biên bản bàn giao tài sản</div>
-              <StartHandoverButtons leaseId={lease.id} />
+            <div className="space-y-1">
+              <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Phụ lục</div>
+              <ul className="divide-y divide-border/50 rounded-lg border border-border/60">
+                {savedDocs
+                  .filter((d) => d.group === 'Phụ lục')
+                  .map((d) => (
+                    <DocRow key={d.id} d={d} />
+                  ))}
+                {!savedDocs.some((d) => d.group === 'Phụ lục') && (
+                  <li className="px-3 py-1.5 text-xs text-muted-foreground">Chưa có phụ lục nào được xuất hoặc ký.</li>
+                )}
+              </ul>
             </div>
-            <ul className="divide-y divide-border/50 rounded-lg border border-border/60">
-              {handoverFiles.map(({ h, files }) => {
-                const savedPdf = files.find(f => f.contentType === 'application/pdf')
-                const title = h.kind === 'check_in' ? 'Biên bản check-in' : 'Biên bản check-out'
-                const href = savedPdf ? `/api/files/${savedPdf.id}?inline=1` : `/api/documents/preview?docType=${h.kind === 'check_in' ? 'handover_check_in' : 'handover_check_out'}&id=${h.id}`
-                return <li key={h.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-xs">
-                  <span><Link href={`/handovers/${h.id}`} className="font-medium text-foreground hover:underline">{title}</Link> <span className="text-muted-foreground">· {formatDateVN(h.date)} · {h.status === 'done' ? 'Đã hoàn tất' : 'Nháp'}</span></span>
-                  <PdfViewButton href={href} title={title}>Xem PDF</PdfViewButton>
-                </li>
-              })}
-              {handoverFiles.length === 0 && <li className="px-3 py-1.5 text-xs text-muted-foreground">Chưa có biên bản bàn giao nào. Bấm Check-in hoặc Check-out để tạo.</li>}
-            </ul>
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Biên bản bàn giao tài sản
+                </div>
+                <StartHandoverButtons leaseId={lease.id} />
+              </div>
+              <ul className="divide-y divide-border/50 rounded-lg border border-border/60">
+                {handoverFiles.map(({ h, files }) => {
+                  const savedPdf = files.find((f) => f.contentType === 'application/pdf')
+                  const title = h.kind === 'check_in' ? 'Biên bản check-in' : 'Biên bản check-out'
+                  const href = savedPdf
+                    ? `/api/files/${savedPdf.id}?inline=1`
+                    : `/api/documents/preview?docType=${h.kind === 'check_in' ? 'handover_check_in' : 'handover_check_out'}&id=${h.id}`
+                  return (
+                    <li key={h.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-xs">
+                      <span>
+                        <Link href={`/handovers/${h.id}`} className="font-medium text-foreground hover:underline">
+                          {title}
+                        </Link>{' '}
+                        <span className="text-muted-foreground">
+                          · {formatDateVN(h.date)} · {h.status === 'done' ? 'Đã hoàn tất' : 'Nháp'}
+                        </span>
+                      </span>
+                      <PdfViewButton href={href} title={title}>
+                        Xem PDF
+                      </PdfViewButton>
+                    </li>
+                  )
+                })}
+                {handoverFiles.length === 0 && (
+                  <li className="px-3 py-1.5 text-xs text-muted-foreground">
+                    Chưa có biên bản bàn giao nào. Bấm Check-in hoặc Check-out để tạo.
+                  </li>
+                )}
+              </ul>
+            </div>
           </div>
         </div>
-      </div>
         <section className="space-y-4">
           <h2 className="text-base font-semibold">Tổng quan</h2>
           {lease.note && <p className="rounded-xl border p-4 text-sm whitespace-pre-wrap">{lease.note}</p>}
@@ -398,7 +532,8 @@ export default async function ContractDetail({ id }: { id: string }) {
             <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
               <div className="text-[11px] font-medium text-muted-foreground">Giá thuê hàng tháng</div>
               <div className="mt-1 text-sm font-bold tabular-nums text-foreground">
-                {formatVND(lease.terms.monthlyRent)} <span className="text-xs font-normal text-muted-foreground">/tháng</span>
+                {formatVND(lease.terms.monthlyRent)}{' '}
+                <span className="text-xs font-normal text-muted-foreground">/tháng</span>
               </div>
             </div>
             <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
@@ -416,7 +551,8 @@ export default async function ContractDetail({ id }: { id: string }) {
             <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
               <div className="text-[11px] font-medium text-muted-foreground">Số người ở</div>
               <div className="mt-1 text-sm font-bold text-foreground">
-                {lease.terms.occupantIds.length} <span className="text-xs font-normal text-muted-foreground">người</span>
+                {lease.terms.occupantIds.length}{' '}
+                <span className="text-xs font-normal text-muted-foreground">người</span>
               </div>
             </div>
           </div>
@@ -435,21 +571,38 @@ export default async function ContractDetail({ id }: { id: string }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
-                  {[...occupants].sort((a, b) => Number(b.id === lease.tenantId) - Number(a.id === lease.tenantId)).map((o) => (
-                    <tr key={o.id}>
-                      <td className="py-1.5 pr-4 font-medium text-foreground">{o.name}{o.id === lease.tenantId && <span className="ml-2 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">Đại diện</span>}</td>
-                      <td className="py-1.5 pr-4 text-foreground">{o.idNumber ?? '—'}</td>
-                      <td className="py-1.5 text-foreground">{o.phone ? formatPhoneDisplay(o.phone) : '—'}</td>
+                  {[...occupants]
+                    .sort((a, b) => Number(b.id === lease.tenantId) - Number(a.id === lease.tenantId))
+                    .map((o) => (
+                      <tr key={o.id}>
+                        <td className="py-1.5 pr-4 font-medium text-foreground">
+                          {o.name}
+                          {o.id === lease.tenantId && (
+                            <span className="ml-2 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                              Đại diện
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-1.5 pr-4 text-foreground">{o.idNumber ?? '—'}</td>
+                        <td className="py-1.5 text-foreground">{o.phone ? formatPhoneDisplay(o.phone) : '—'}</td>
+                      </tr>
+                    ))}
+                  {occupants.length === 0 && (
+                    <tr>
+                      <td colSpan={3} className="py-2 text-muted-foreground">
+                        Chưa có người ở.
+                      </td>
                     </tr>
-                  ))}
-                  {occupants.length === 0 && <tr><td colSpan={3} className="py-2 text-muted-foreground">Chưa có người ở.</td></tr>}
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
 
           <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-2xs space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Phí dịch vụ & Cố định</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Phí dịch vụ & Cố định
+            </h3>
             <div className="text-xs text-foreground">
               {lease.terms.fees.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
@@ -469,7 +622,6 @@ export default async function ContractDetail({ id }: { id: string }) {
             </div>
             {billing && charges.length > 0 && <OneOffDialog leaseId={lease.id} charges={charges} readOnly />}
           </div>
-
         </section>
 
         <section className="space-y-4">
@@ -489,7 +641,27 @@ export default async function ContractDetail({ id }: { id: string }) {
 
         <section>
           <h2 className="mb-3 text-base font-semibold">Hóa đơn</h2>
-          {!billing ? <p className="text-sm text-muted-foreground">Bạn không có quyền xem hóa đơn.</p> : contractInvoices.length ? <ul className="divide-y rounded-xl border">{contractInvoices.map(invoice => <li key={invoice.id} className="flex flex-wrap justify-between gap-2 p-3 text-sm"><Link href={`/invoices/${invoice.id}`} className="font-medium text-primary hover:underline">{invoice.code}</Link><span>{formatDateVN(invoice.periodStart)} – {formatDateVN(invoice.periodEnd)}</span><span>{formatVND(invoice.total)} · Đã thu {formatVND(invoice.paid)}</span></li>)}</ul> : <p className="text-sm text-muted-foreground">Chưa có hóa đơn.</p>}
+          {!billing ? (
+            <p className="text-sm text-muted-foreground">Bạn không có quyền xem hóa đơn.</p>
+          ) : contractInvoices.length ? (
+            <ul className="divide-y rounded-xl border">
+              {contractInvoices.map((invoice) => (
+                <li key={invoice.id} className="flex flex-wrap justify-between gap-2 p-3 text-sm">
+                  <Link href={`/invoices/${invoice.id}`} className="font-medium text-primary hover:underline">
+                    {invoice.code}
+                  </Link>
+                  <span>
+                    {formatDateVN(invoice.periodStart)} – {formatDateVN(invoice.periodEnd)}
+                  </span>
+                  <span>
+                    {formatVND(invoice.total)} · Đã thu {formatVND(invoice.paid)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground">Chưa có hóa đơn.</p>
+          )}
         </section>
 
         <section>
@@ -501,8 +673,19 @@ export default async function ContractDetail({ id }: { id: string }) {
 
         <section className="space-y-4">
           <h2 className="text-base font-semibold">Giấy tờ</h2>
-          <section className="space-y-3 rounded-2xl border p-5"><h3 className="font-semibold">Ảnh chụp hợp đồng (đính kèm)</h3>
-            <div className="flex flex-wrap gap-3">{photos.map((f) => <a key={f.id} href={`/api/files/${f.id}`}><img src={`/api/files/${f.id}?thumb=1`} alt={f.name || 'Ảnh hợp đồng'} className="h-24 w-24 rounded object-cover" /></a>)}</div>
+          <section className="space-y-3 rounded-2xl border p-5">
+            <h3 className="font-semibold">Ảnh chụp hợp đồng (đính kèm)</h3>
+            <div className="flex flex-wrap gap-3">
+              {photos.map((f) => (
+                <a key={f.id} href={`/api/files/${f.id}`}>
+                  <img
+                    src={`/api/files/${f.id}?thumb=1`}
+                    alt={f.name || 'Ảnh hợp đồng'}
+                    className="h-24 w-24 rounded object-cover"
+                  />
+                </a>
+              ))}
+            </div>
           </section>
         </section>
       </div>

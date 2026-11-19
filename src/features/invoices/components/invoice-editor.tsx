@@ -3,24 +3,9 @@
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import {
-  Calendar,
-  Check,
-  CheckCircle2,
-  Clock,
-  Layers,
-  Plus,
-  RefreshCw,
-  Trash2,
-} from 'lucide-react'
+import { Calendar, Check, CheckCircle2, Clock, Layers, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatVND } from '@/domain/money'
 import { MoneyInput } from '@/components/ui/money-input'
 import { cn } from '@/lib/utils'
@@ -182,7 +167,7 @@ export function InvoiceEditor(p: Props) {
                       coefficient: period.coefficient ? Number(period.coefficient) : undefined,
                       fullMonth: period.fullMonth,
                     }),
-                  'Đã tính lại tiền phòng và phí cố định'
+                  'Đã tính lại tiền phòng và phí cố định',
                 )
               }
               className="h-9 w-full rounded-xl border-border/80 gap-1.5 font-medium hover:bg-muted"
@@ -263,7 +248,9 @@ export function InvoiceEditor(p: Props) {
                       allowNegative
                       value={l.unitPriceText}
                       disabled={typeof l.meta?.leaseFeeId === 'string'}
-                      onValueChange={(value) => set(i, { unitPriceText: value, unitPrice: value === '' || value === '-' ? 0 : Number(value) })}
+                      onValueChange={(value) =>
+                        set(i, { unitPriceText: value, unitPrice: value === '' || value === '-' ? 0 : Number(value) })
+                      }
                       className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
                     />
                   </td>
@@ -316,7 +303,22 @@ export function InvoiceEditor(p: Props) {
           <Button
             size="sm"
             disabled={pending}
-            onClick={() => run(() => updateLinesAction(p.id, lines.map((l) => ({ type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta: l.meta }))), 'Đã lưu các dòng')}
+            onClick={() =>
+              run(
+                () =>
+                  updateLinesAction(
+                    p.id,
+                    lines.map((l) => ({
+                      type: l.type,
+                      description: l.description,
+                      quantity: l.quantity,
+                      unitPrice: l.unitPrice,
+                      meta: l.meta,
+                    })),
+                  ),
+                'Đã lưu các dòng',
+              )
+            }
             className="gap-1.5 rounded-xl font-medium text-xs shadow-2xs"
           >
             <Check className="size-3.5" />
@@ -331,9 +333,7 @@ export function InvoiceEditor(p: Props) {
           <div>
             <div className="flex items-center gap-2">
               <Clock className="size-4 text-primary" />
-              <h3 className="text-sm font-semibold tracking-tight text-foreground">
-                Hạn thanh toán & Trạng thái
-              </h3>
+              <h3 className="text-sm font-semibold tracking-tight text-foreground">Hạn thanh toán & Trạng thái</h3>
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {approved
@@ -367,9 +367,9 @@ export function InvoiceEditor(p: Props) {
                     () =>
                       approveInvoiceAction(
                         p.id,
-                        dueDay ? { dueRule: { kind: 'day_of_next_month', day: Number(dueDay) } } : {}
+                        dueDay ? { dueRule: { kind: 'day_of_next_month', day: Number(dueDay) } } : {},
                       ),
-                    'Đã duyệt hoá đơn'
+                    'Đã duyệt hoá đơn',
                   )
                 }
                 className="gap-1.5 rounded-xl text-xs font-medium shadow-2xs"
@@ -384,7 +384,11 @@ export function InvoiceEditor(p: Props) {
                 disabled={pending}
                 onClick={() => {
                   if (confirm('Xoá hoá đơn nháp này?'))
-                    run(() => deleteInvoiceAction(p.id), 'Đã xoá', () => router.push('/invoices'))
+                    run(
+                      () => deleteInvoiceAction(p.id),
+                      'Đã xoá',
+                      () => router.push('/invoices'),
+                    )
                 }}
                 className="gap-1.5 rounded-xl border-rose-200/80 text-rose-700 hover:bg-rose-50 hover:text-rose-800 text-xs font-medium"
               >
@@ -409,7 +413,11 @@ export function InvoiceEditor(p: Props) {
                 disabled={pending}
                 onClick={() => {
                   if (confirm('Xoá hoá đơn đã duyệt? Phải gỡ hết khoản thu trước.'))
-                    run(() => deleteInvoiceAction(p.id), 'Đã xoá', () => router.push('/invoices'))
+                    run(
+                      () => deleteInvoiceAction(p.id),
+                      'Đã xoá',
+                      () => router.push('/invoices'),
+                    )
                 }}
                 className="gap-1.5 rounded-xl border-rose-200/80 text-rose-700 hover:bg-rose-50 hover:text-rose-800 text-xs font-medium"
               >

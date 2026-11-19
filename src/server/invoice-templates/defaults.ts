@@ -1,4 +1,3 @@
-
 import { invoiceTemplates } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
@@ -9,7 +8,9 @@ import { defaultInvoiceTemplate } from '@/domain/invoice-template'
 export async function restoreDefaultInvoiceTemplates(db: DB, ctx: AccessContext): Promise<number> {
   assertCan(ctx, 'settings')
   return db.transaction(async (tx) => {
-    const existing = new Set((await tx.select({ name: invoiceTemplates.name }).from(invoiceTemplates)).map((r) => r.name))
+    const existing = new Set(
+      (await tx.select({ name: invoiceTemplates.name }).from(invoiceTemplates)).map((r) => r.name),
+    )
     let created = 0
     for (const style of ['formal', 'modern'] as const) {
       const { name, html } = DEFAULT_INVOICE_TEMPLATES[style]

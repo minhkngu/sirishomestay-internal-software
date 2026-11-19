@@ -8,15 +8,30 @@ import { db } from '@/db/client'
 import { toActionResult } from '@/lib/action-result'
 import { getAccessContext } from '@/server/session'
 import { getStorage } from '@/server/storage'
-import { completeHandover, exportHandover, saveHandover, startHandover, type HandoverKind, type HandoverSave } from './service'
+import {
+  completeHandover,
+  exportHandover,
+  saveHandover,
+  startHandover,
+  type HandoverKind,
+  type HandoverSave,
+} from './service'
 
 export async function startHandoverAction(leaseId: string, kind: HandoverKind) {
   const ctx = await getAccessContext()
-  return toActionResult(async () => { const h = await startHandover(db, ctx, leaseId, kind); revalidatePath('/contracts', 'layout'); return { id: h.id } })
+  return toActionResult(async () => {
+    const h = await startHandover(db, ctx, leaseId, kind)
+    revalidatePath('/contracts', 'layout')
+    return { id: h.id }
+  })
 }
 export async function saveHandoverAction(id: string, input: HandoverSave) {
   const ctx = await getAccessContext()
-  return toActionResult(async () => { await saveHandover(db, ctx, id, input); revalidatePath(`/handovers/${id}`); return {} })
+  return toActionResult(async () => {
+    await saveHandover(db, ctx, id, input)
+    revalidatePath(`/handovers/${id}`)
+    return {}
+  })
 }
 export async function completeHandoverAction(id: string) {
   const ctx = await getAccessContext()
@@ -30,7 +45,9 @@ export async function completeHandoverAction(id: string) {
         if (!h?.leaseId) return
         const { syncContractDocuments } = await import('@/server/contracts/documents')
         await syncContractDocuments(db, ctx, getStorage(), h.leaseId)
-      } catch { /* tạo lại ở lần lưu sau */ }
+      } catch {
+        /* tạo lại ở lần lưu sau */
+      }
     })
     return {}
   })

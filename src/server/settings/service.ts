@@ -21,8 +21,14 @@ export type Settings = typeof SETTINGS_DEFAULTS
 const DAYS_MSG = 'Số ngày phải từ 1 đến 365'
 const days = z.number({ error: DAYS_MSG }).int(DAYS_MSG).min(1, DAYS_MSG).max(365, DAYS_MSG)
 export const dueRuleSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('day_of_next_month'), day: z.number().int().min(1, 'Ngày phải từ 1 đến 31').max(31, 'Ngày phải từ 1 đến 31') }),
-  z.object({ kind: z.literal('days_after_approval'), days: z.number().int().min(0, 'Số ngày phải từ 0 đến 90').max(90, 'Số ngày phải từ 0 đến 90') }),
+  z.object({
+    kind: z.literal('day_of_next_month'),
+    day: z.number().int().min(1, 'Ngày phải từ 1 đến 31').max(31, 'Ngày phải từ 1 đến 31'),
+  }),
+  z.object({
+    kind: z.literal('days_after_approval'),
+    days: z.number().int().min(0, 'Số ngày phải từ 0 đến 90').max(90, 'Số ngày phải từ 0 đến 90'),
+  }),
 ])
 const settingsPatch = z.object({
   bankAccount: bankAccountSchema.nullable().optional(),
@@ -51,7 +57,10 @@ export async function updateSettings(db: DB, ctx: AccessContext, partial: Partia
     const before = await getSettings(tx)
     for (const [key, value] of Object.entries(parsed.data)) {
       if (value === undefined) continue
-      await tx.insert(appSettings).values({ key, value }).onConflictDoUpdate({ target: appSettings.key, set: { value } })
+      await tx
+        .insert(appSettings)
+        .values({ key, value })
+        .onConflictDoUpdate({ target: appSettings.key, set: { value } })
     }
     const after = await getSettings(tx)
     await recordAudit(tx, ctx, { action: 'update', entity: 'settings', summary: 'Sửa cài đặt chung', before, after })

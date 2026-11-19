@@ -40,7 +40,10 @@ async function silentPooler() {
           if (buf.length < len) return
           const code = buf.readInt32BE(4)
           buf = buf.subarray(len)
-          if (code === 80877102) { socket.destroy(); return } // CancelRequest: bỏ qua, như pooler im lặng
+          if (code === 80877102) {
+            socket.destroy()
+            return
+          } // CancelRequest: bỏ qua, như pooler im lặng
           started = true
           socket.write(Buffer.concat([msg('R', int32s(0)), msg('K', int32s(1, 2)), msg('Z', Buffer.from('I'))]))
           continue
@@ -53,7 +56,10 @@ async function silentPooler() {
       }
     })
   })
-  await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', resolve)
+  })
   const address = server.address()
   if (!address || typeof address === 'string') throw new Error('No TCP address')
   const close = async () => {
@@ -86,8 +92,12 @@ it('pooler nhận truy vấn mà im lặng → báo QUERY_TIMEOUT thay vì treo'
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     const { db } = await import('@/db/client')
-    const deadline = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Truy vấn treo, không hết giờ')), 9000) })
-    await expect(Promise.race([db.execute(sql`select 1`), deadline])).rejects.toMatchObject({ cause: { code: 'QUERY_TIMEOUT' } })
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error('Truy vấn treo, không hết giờ')), 9000)
+    })
+    await expect(Promise.race([db.execute(sql`select 1`), deadline])).rejects.toMatchObject({
+      cause: { code: 'QUERY_TIMEOUT' },
+    })
   } finally {
     clearTimeout(timer)
     await pooler.close()

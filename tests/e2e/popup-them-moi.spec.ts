@@ -9,7 +9,9 @@ async function login(page: Page) {
 }
 
 test.describe('thao tác thêm mới hiện popup, không tải trang mới', () => {
-  test.beforeEach(async ({ page }) => { await login(page) })
+  test.beforeEach(async ({ page }) => {
+    await login(page)
+  })
 
   test('tạo hợp đồng thuê từ trang khách hiện popup, F5 ra trang đầy đủ, Esc quay lại', async ({ page }) => {
     await page.goto('/tenants')
@@ -57,7 +59,10 @@ test.describe('thao tác thêm mới hiện popup, không tải trang mới', ()
 
   test('Báo sự cố từ trang phòng hiện popup và giữ ?room=', async ({ page }) => {
     await page.goto('/facilities')
-    await page.getByRole('link', { name: /Thảo Điền/ }).first().click()
+    await page
+      .getByRole('link', { name: /Thảo Điền/ })
+      .first()
+      .click()
     await page.locator('a[href^="/rooms/"]').first().click()
     await page.getByRole('link', { name: 'Báo sự cố' }).click()
     await expect(page.getByRole('dialog')).toBeVisible()

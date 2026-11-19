@@ -5,15 +5,39 @@ import { createTestDb } from '../helpers/db'
 import type { AccessContext, Permission } from '@/domain/access'
 
 function context(permissions: Permission[], facilityId: string): AccessContext {
-  return { userId: crypto.randomUUID(), email: 'a@x.com', fullName: 'A', permissions: new Set(permissions), facilityIds: new Set([facilityId]), isAdmin: false }
+  return {
+    userId: crypto.randomUUID(),
+    email: 'a@x.com',
+    fullName: 'A',
+    permissions: new Set(permissions),
+    facilityIds: new Set([facilityId]),
+    isAdmin: false,
+  }
 }
 describe('phân quyền thông tin phòng', () => {
   it('chỉ trả tên khách cho quyền hợp đồng và tiền cho quyền tài chính', async () => {
     const db = await createTestDb()
     const [facility] = await db.insert(facilities).values({ code: 'BT', name: 'Bình Thạnh' }).returning()
     const [room] = await db.insert(rooms).values({ facilityId: facility.id, code: '301', listPrice: 100 }).returning()
-    const [tenant] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: facility.id, fullName: 'Khách riêng tư', phone: '+84901234567', idNumber: '012345678901' }).returning()
-    await db.insert(leases).values({ code: 'HD1', roomId: room.id, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-12-31', monthlyRent: 9000000, depositAmount: 9000000 })
+    const [tenant] = await db
+      .insert(tenants)
+      .values({
+        kind: 'vietnamese',
+        homeFacilityId: facility.id,
+        fullName: 'Khách riêng tư',
+        phone: '+84901234567',
+        idNumber: '012345678901',
+      })
+      .returning()
+    await db.insert(leases).values({
+      code: 'HD1',
+      roomId: room.id,
+      tenantId: tenant.id,
+      startDate: '2026-01-01',
+      endDate: '2027-12-31',
+      monthlyRent: 9000000,
+      depositAmount: 9000000,
+    })
     const meter = context(['meters'], facility.id)
     const detail = await getRoomDetail(db, meter, room.id)
     expect(detail.status).toBe('occupied')
@@ -31,9 +55,29 @@ describe('phân quyền thông tin phòng', () => {
     const db = await createTestDb()
     const [facility] = await db.insert(facilities).values({ code: 'TD', name: 'Thảo Điền' }).returning()
     const [room] = await db.insert(rooms).values({ facilityId: facility.id, code: '101' }).returning()
-    const [tenant] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: facility.id, fullName: 'Khách', phone: '+84901234567', idNumber: '012345678901' }).returning()
-    const [contract] = await db.insert(depositContracts).values({ roomId: room.id, tenantId: tenant.id, depositAmount: 5000000, agreedRent: 9000000, expectedMoveIn: '2027-01-01' }).returning()
-    await db.insert(depositEntries).values({ depositContractId: contract.id, date: '2026-11-01', type: 'collect', amount: 5000000, status: 'done' })
+    const [tenant] = await db
+      .insert(tenants)
+      .values({
+        kind: 'vietnamese',
+        homeFacilityId: facility.id,
+        fullName: 'Khách',
+        phone: '+84901234567',
+        idNumber: '012345678901',
+      })
+      .returning()
+    const [contract] = await db
+      .insert(depositContracts)
+      .values({
+        roomId: room.id,
+        tenantId: tenant.id,
+        depositAmount: 5000000,
+        agreedRent: 9000000,
+        expectedMoveIn: '2027-01-01',
+      })
+      .returning()
+    await db
+      .insert(depositEntries)
+      .values({ depositContractId: contract.id, date: '2026-11-01', type: 'collect', amount: 5000000, status: 'done' })
     for (const perms of [['billing'], ['tenants_contracts'], ['meters']] as Permission[][]) {
       const detail = await getRoomDetail(db, context(perms, facility.id), room.id)
       expect(detail.status).toBe('deposited')
@@ -45,8 +89,25 @@ describe('phân quyền thông tin phòng', () => {
     const db = await createTestDb()
     const [facility] = await db.insert(facilities).values({ code: 'BT', name: 'Bình Thạnh' }).returning()
     const [room] = await db.insert(rooms).values({ facilityId: facility.id, code: '301' }).returning()
-    const [tenant] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: facility.id, fullName: 'Khách', phone: '+84901234567', idNumber: '012345678901' }).returning()
-    await db.insert(leases).values({ code: 'HD1', roomId: room.id, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-12-31', monthlyRent: 9000000, depositAmount: 18000000 })
+    const [tenant] = await db
+      .insert(tenants)
+      .values({
+        kind: 'vietnamese',
+        homeFacilityId: facility.id,
+        fullName: 'Khách',
+        phone: '+84901234567',
+        idNumber: '012345678901',
+      })
+      .returning()
+    await db.insert(leases).values({
+      code: 'HD1',
+      roomId: room.id,
+      tenantId: tenant.id,
+      startDate: '2026-01-01',
+      endDate: '2027-12-31',
+      monthlyRent: 9000000,
+      depositAmount: 18000000,
+    })
     const detail = await getRoomDetail(db, context(['tenants_contracts'], facility.id), room.id)
     expect(detail.lease?.terms).toMatchObject({ monthlyRent: 9000000, depositAmount: 18000000, endDate: '2027-12-31' })
     expect(detail.lease?.terms.fees).toEqual([])
@@ -57,17 +118,51 @@ describe('phân quyền thông tin phòng', () => {
     async function setup() {
       const db = await createTestDb()
       const [facility] = await db.insert(facilities).values({ code: 'BT', name: 'Bình Thạnh' }).returning()
-      const [rented, vacant, unpaid] = await db.insert(rooms).values([
-        { facilityId: facility.id, code: '301' }, { facilityId: facility.id, code: '302' }, { facilityId: facility.id, code: '303' },
-      ]).returning()
-      const [tenant] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: facility.id, fullName: 'Khách riêng tư', phone: '+84901234567', idNumber: '012345678901' }).returning()
-      const [lease] = await db.insert(leases).values({ code: 'HD1', roomId: rented.id, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-12-31', monthlyRent: 9000000, depositAmount: 9000000 }).returning()
-      await db.insert(leases).values({ code: 'HD2', roomId: unpaid.id, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-12-31', monthlyRent: 7000000, depositAmount: 7000000 })
+      const [rented, vacant, unpaid] = await db
+        .insert(rooms)
+        .values([
+          { facilityId: facility.id, code: '301' },
+          { facilityId: facility.id, code: '302' },
+          { facilityId: facility.id, code: '303' },
+        ])
+        .returning()
+      const [tenant] = await db
+        .insert(tenants)
+        .values({
+          kind: 'vietnamese',
+          homeFacilityId: facility.id,
+          fullName: 'Khách riêng tư',
+          phone: '+84901234567',
+          idNumber: '012345678901',
+        })
+        .returning()
+      const [lease] = await db
+        .insert(leases)
+        .values({
+          code: 'HD1',
+          roomId: rented.id,
+          tenantId: tenant.id,
+          startDate: '2026-01-01',
+          endDate: '2027-12-31',
+          monthlyRent: 9000000,
+          depositAmount: 9000000,
+        })
+        .returning()
+      await db.insert(leases).values({
+        code: 'HD2',
+        roomId: unpaid.id,
+        tenantId: tenant.id,
+        startDate: '2026-01-01',
+        endDate: '2027-12-31',
+        monthlyRent: 7000000,
+        depositAmount: 7000000,
+      })
       await db.insert(depositEntries).values([
         { leaseId: lease.id, date: '2026-01-01', type: 'collect', amount: 9000000, status: 'done' },
         { leaseId: lease.id, date: '2026-02-01', type: 'topup', amount: 1000000, status: 'pending' },
       ])
-      const row = async (ctx: AccessContext, id: string) => (await listRoomsWithStatus(db, ctx, { facilityId: facility.id })).find((r) => r.id === id)!
+      const row = async (ctx: AccessContext, id: string) =>
+        (await listRoomsWithStatus(db, ctx, { facilityId: facility.id })).find((r) => r.id === id)!
       return { db, facility, rented, vacant, unpaid, row }
     }
 
@@ -92,7 +187,8 @@ describe('phân quyền thông tin phòng', () => {
     it('người chỉ có quyền công tơ không thấy khách, ngày hết hạn, giá thuê, tiền cọc', async () => {
       const { facility, rented, row } = await setup()
       const r = await row(context(['meters'], facility.id), rented.id)
-      for (const key of ['tenantName', 'leaseEndDate', 'monthlyRent', 'depositBalance']) expect(r).not.toHaveProperty(key)
+      for (const key of ['tenantName', 'leaseEndDate', 'monthlyRent', 'depositBalance'])
+        expect(r).not.toHaveProperty(key)
     })
 
     it('hợp đồng chưa thu cọc hiện cọc 0; phòng trống không có hai trường tiền', async () => {

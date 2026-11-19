@@ -4,7 +4,16 @@ import type { DB } from '@/db/client'
 import type { Permission } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 
-export const OWNER_TYPES = ['tenant_document', 'lease_photo', 'handover_photo', 'incident_photo', 'signed_contract', 'signed_addendum', 'template', 'export'] as const
+export const OWNER_TYPES = [
+  'tenant_document',
+  'lease_photo',
+  'handover_photo',
+  'incident_photo',
+  'signed_contract',
+  'signed_addendum',
+  'template',
+  'export',
+] as const
 export type OwnerType = (typeof OWNER_TYPES)[number]
 
 /** Nhóm quyền cần để thao tác với tệp của từng loại chủ sở hữu. `export` phụ thuộc loại giấy tờ gốc. */
@@ -38,7 +47,11 @@ const resolvers: Partial<Record<OwnerType, OwnerResolver>> = {
   // bản xuất: thử lần lượt các resolver mà từng module đăng ký (hợp đồng, bàn giao, hoá đơn…)
   export: async (db, id) => {
     for (const r of exportResolvers) {
-      try { return await r(db, id) } catch (e) { if (!(e instanceof NotFoundError)) throw e }
+      try {
+        return await r(db, id)
+      } catch (e) {
+        if (!(e instanceof NotFoundError)) throw e
+      }
     }
     throw new NotFoundError()
   },
@@ -79,6 +92,9 @@ export const ALLOWED_TYPES: Record<OwnerType, { types: string[]; message: string
 }
 
 export const EXT: Record<string, string> = {
-  'image/webp': 'webp', 'image/jpeg': 'jpg', 'image/png': 'png', 'application/pdf': 'pdf',
+  'image/webp': 'webp',
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'application/pdf': 'pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
 }

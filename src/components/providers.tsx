@@ -5,7 +5,9 @@ import { useState, type ReactNode } from 'react'
 import { Toaster } from '@/components/ui/sonner'
 
 export function Providers({ children }: { children: ReactNode }) {
-  const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { staleTime: 0, refetchOnWindowFocus: false, retry: false } } }))
+  const [client] = useState(
+    () => new QueryClient({ defaultOptions: { queries: { staleTime: 0, refetchOnWindowFocus: false, retry: false } } }),
+  )
   return (
     <QueryClientProvider client={client}>
       {children}

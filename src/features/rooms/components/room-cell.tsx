@@ -40,14 +40,27 @@ export function RoomCell({ room }: { room: CellRoom }) {
   }
   return (
     <div className="group relative">
-      <Link href={`/rooms/${room.id}`} className={cn('flex h-[4.5rem] flex-col overflow-hidden rounded-lg border p-2 text-sm transition-colors hover:brightness-95', tone(room.status, room.isActive ?? true))}>
+      <Link
+        href={`/rooms/${room.id}`}
+        className={cn(
+          'flex h-[4.5rem] flex-col overflow-hidden rounded-lg border p-2 text-sm transition-colors hover:brightness-95',
+          tone(room.status, room.isActive ?? true),
+        )}
+      >
         <div className="font-semibold">{room.code}</div>
-        <div className="truncate text-xs">{room.isActive === false ? 'Ngừng sử dụng' : ROOM_STATUS_LABELS[room.status]}</div>
+        <div className="truncate text-xs">
+          {room.isActive === false ? 'Ngừng sử dụng' : ROOM_STATUS_LABELS[room.status]}
+        </div>
         <div className="min-h-4 truncate text-xs opacity-80">{room.tenantName}</div>
       </Link>
-      {room.manage && <RoomQuickActions id={room.id} code={room.code} isActive={room.isActive ?? true} manage={room.manage} />}
+      {room.manage && (
+        <RoomQuickActions id={room.id} code={room.code} isActive={room.isActive ?? true} manage={room.manage} />
+      )}
       {details.length > 0 && (
-        <dl role="tooltip" className="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden min-w-48 gap-x-3 gap-y-1 rounded-lg border bg-popover p-2.5 text-xs text-popover-foreground shadow-lg group-focus-within:grid group-hover:grid grid-cols-[auto_1fr]">
+        <dl
+          role="tooltip"
+          className="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden min-w-48 gap-x-3 gap-y-1 rounded-lg border bg-popover p-2.5 text-xs text-popover-foreground shadow-lg group-focus-within:grid group-hover:grid grid-cols-[auto_1fr]"
+        >
           {details.map(([label, value]) => (
             <div key={label} className="contents">
               <dt className="text-muted-foreground">{label}</dt>

@@ -12,7 +12,13 @@ import { formatVND } from '@/domain/money'
 import type { DepositListItem, LeaseListItem } from '@/server/contracts/service'
 import type { ReactNode } from 'react'
 
-const VIEWS = [['active', 'Đang hiệu lực'], ['expiring', 'Sắp hết hạn'], ['unsigned', 'Chưa ký'], ['ended', 'Đã kết thúc'], ['deposits', 'Cọc chờ']] as const
+const VIEWS = [
+  ['active', 'Đang hiệu lực'],
+  ['expiring', 'Sắp hết hạn'],
+  ['unsigned', 'Chưa ký'],
+  ['ended', 'Đã kết thúc'],
+  ['deposits', 'Cọc chờ'],
+] as const
 const SIGN = { draft: 'Nháp', exported: 'Đã xuất', signed: 'Đã ký' } as const
 
 export function ContractList({
@@ -45,13 +51,18 @@ export function ContractList({
       return { leases: [] as LeaseListItem[], deposits: deposits.filter((d) => inScope(d.facilityId)) }
     }
     return {
-      leases: leases.filter((l) => inScope(l.facilityId) && matchesContractView(view as ContractView, l, today, warningDays)),
+      leases: leases.filter(
+        (l) => inScope(l.facilityId) && matchesContractView(view as ContractView, l, today, warningDays),
+      ),
       deposits: [] as DepositListItem[],
     }
   }, [leases, deposits, view, selected, today, warningDays])
 
   const all = useMemo(
-    () => [...rows.leases.map((l) => ({ kind: 'lease' as const, l })), ...rows.deposits.map((c) => ({ kind: 'deposit' as const, c }))],
+    () => [
+      ...rows.leases.map((l) => ({ kind: 'lease' as const, l })),
+      ...rows.deposits.map((c) => ({ kind: 'deposit' as const, c })),
+    ],
     [rows],
   )
   const { pageRows, pager } = usePager(all, 'contracts', `${view}|${selected.join(',')}`)
@@ -94,7 +105,14 @@ export function ContractList({
                     {l.code}
                   </PopupLink>
                 </td>
-                <td className="p-3">{renderActions({ id: l.id, kind: 'lease', active: l.status === 'active', canDelete: deleteFacilityIds.includes(l.facilityId) })}</td>
+                <td className="p-3">
+                  {renderActions({
+                    id: l.id,
+                    kind: 'lease',
+                    active: l.status === 'active',
+                    canDelete: deleteFacilityIds.includes(l.facilityId),
+                  })}
+                </td>
                 <td className="p-3 font-medium text-foreground">{l.roomCode}</td>
                 {facilities.length > 1 && <td className="p-3 text-muted-foreground">{names[l.facilityId]}</td>}
                 <td className="p-3 font-medium text-foreground">{l.tenantName}</td>
@@ -108,8 +126,8 @@ export function ContractList({
                       l.signStatus === 'signed'
                         ? 'border border-emerald-200/60 bg-emerald-50 text-emerald-700'
                         : l.signStatus === 'exported'
-                        ? 'border border-amber-200/60 bg-amber-50 text-amber-700'
-                        : 'border border-border/80 bg-muted/60 text-muted-foreground'
+                          ? 'border border-amber-200/60 bg-amber-50 text-amber-700'
+                          : 'border border-border/80 bg-muted/60 text-muted-foreground'
                     }`}
                   >
                     {SIGN[l.signStatus as keyof typeof SIGN]}
@@ -127,7 +145,14 @@ export function ContractList({
                     Cọc {c.roomCode}
                   </PopupLink>
                 </td>
-                <td className="p-3">{renderActions({ id: c.id, kind: 'deposit', active: false, canDelete: deleteFacilityIds.includes(c.facilityId) })}</td>
+                <td className="p-3">
+                  {renderActions({
+                    id: c.id,
+                    kind: 'deposit',
+                    active: false,
+                    canDelete: deleteFacilityIds.includes(c.facilityId),
+                  })}
+                </td>
                 <td className="p-3 font-medium text-foreground">{c.roomCode}</td>
                 {facilities.length > 1 && <td className="p-3 text-muted-foreground">{names[c.facilityId]}</td>}
                 <td className="p-3 font-medium text-foreground">{c.tenantName}</td>
@@ -142,10 +167,7 @@ export function ContractList({
             ))}
             {shown.leases.length + shown.deposits.length === 0 && (
               <tr>
-                <td
-                  colSpan={facilities.length > 1 ? 8 : 7}
-                  className="p-8 text-center text-xs text-muted-foreground"
-                >
+                <td colSpan={facilities.length > 1 ? 8 : 7} className="p-8 text-center text-xs text-muted-foreground">
                   Không có hợp đồng nào
                 </td>
               </tr>

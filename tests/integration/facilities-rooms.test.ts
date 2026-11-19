@@ -1,10 +1,15 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { rooms, roomAmenities } from '@/db'
+import { listFacilities, getFacility, createFacility, updateFacility } from '@/server/facilities/service'
 import {
-  listFacilities, getFacility, createFacility, updateFacility,
-} from '@/server/facilities/service'
-import {
-  getRoom, getRoomDetail, listRooms, listRoomsWithStatus, createRoom, updateRoom, setRoomActive, createRoomsBulk,
+  getRoom,
+  getRoomDetail,
+  listRooms,
+  listRoomsWithStatus,
+  createRoom,
+  updateRoom,
+  setRoomActive,
+  createRoomsBulk,
 } from '@/server/rooms/service'
 import { createAmenity, updateAmenity } from '@/server/amenities/service'
 import { ValidationError } from '@/domain/errors'
@@ -13,7 +18,14 @@ import { createTestDb } from '../helpers/db'
 import type { DB } from '@/db/client'
 
 function ctxOf(perms: Permission[], facilityIds: string[] = []): AccessContext {
-  return { userId: crypto.randomUUID(), email: 'a@x.com', fullName: 'A', permissions: new Set(perms), facilityIds: new Set(facilityIds), isAdmin: perms.includes('settings') }
+  return {
+    userId: crypto.randomUUID(),
+    email: 'a@x.com',
+    fullName: 'A',
+    permissions: new Set(perms),
+    facilityIds: new Set(facilityIds),
+    isAdmin: perms.includes('settings'),
+  }
 }
 
 describe('facilities & rooms', () => {
@@ -31,7 +43,11 @@ describe('facilities & rooms', () => {
   it('lưu tài khoản riêng của toà rồi xoá về null', async () => {
     const account = { bankBin: '970418', bankName: 'giả', accountNumber: '123456', accountName: '  chu nha ' }
     const updated = await updateFacility(db, admin, fa, { bankAccount: account })
-    expect(updated.bankAccount).toEqual({ ...account, bankName: 'Ngân hàng TMCP Đầu tư và Phát triển Việt Nam', accountName: 'CHU NHA' })
+    expect(updated.bankAccount).toEqual({
+      ...account,
+      bankName: 'Ngân hàng TMCP Đầu tư và Phát triển Việt Nam',
+      accountName: 'CHU NHA',
+    })
     await updateFacility(db, admin, fa, { bankAccount: null })
     expect((await getFacility(db, admin, fa)).bankAccount).toBeNull()
   })
@@ -63,7 +79,9 @@ describe('facilities & rooms', () => {
 
   it('trùng mã phòng báo lỗi tiếng Việt; trùng mã cơ sở cũng vậy', async () => {
     await createRoom(db, admin, { facilityId: fa, code: '101' })
-    await expect(createRoom(db, admin, { facilityId: fa, code: '101' })).rejects.toThrow('Mã phòng đã tồn tại trong cơ sở này')
+    await expect(createRoom(db, admin, { facilityId: fa, code: '101' })).rejects.toThrow(
+      'Mã phòng đã tồn tại trong cơ sở này',
+    )
     await expect(createFacility(db, admin, { code: 'A', name: 'Khác' })).rejects.toThrow('Mã cơ sở đã tồn tại')
   })
 
@@ -78,7 +96,9 @@ describe('facilities & rooms', () => {
     const r = await createRoomsBulk(db, admin, fa, { prefix: 'P', floor: '1', from: 1, to: 3 })
     expect(r.created).toBe(3)
     expect((await listRooms(db, admin, { facilityId: fa })).map((x) => x.code)).toEqual(['P1', 'P2', 'P3'])
-    await expect(createRoomsBulk(db, admin, fa, { floor: '1', from: 5, to: 1 })).rejects.toThrow('Dải phòng không hợp lệ')
+    await expect(createRoomsBulk(db, admin, fa, { floor: '1', from: 5, to: 1 })).rejects.toThrow(
+      'Dải phòng không hợp lệ',
+    )
   })
 
   it('listRooms lọc theo từ khoá, ẩn phòng ngừng dùng, và theo phạm vi', async () => {
@@ -98,12 +118,12 @@ describe('facilities & rooms', () => {
     const staff = ctxOf(['tenants_contracts'], [fa, fb])
     expect((await listRooms(db, staff, {})).map((r) => r.code)).toEqual(['A01', 'B01'])
     expect((await listRoomsWithStatus(db, staff, {})).map((r) => [r.code, r.facilityId, r.status])).toEqual([
-      ['A01', fa, 'vacant'], ['B01', fb, 'vacant'],
+      ['A01', fa, 'vacant'],
+      ['B01', fb, 'vacant'],
     ])
     expect((await listRooms(db, admin, {})).map((r) => r.code)).toEqual(['A01', 'B01', 'C01'])
     expect(await listRooms(db, ctxOf(['meters']), {})).toEqual([])
   })
-
 })
 
 describe('phòng có diện tích, giường và tiện ích', () => {
@@ -122,7 +142,13 @@ describe('phòng có diện tích, giường và tiện ích', () => {
   })
 
   it('tạo phòng lưu diện tích, giường và tiện ích', async () => {
-    const r = await createRoom(db, admin, { facilityId: fa, code: '101', areaM2: 25.5, beds: 2, amenityIds: [wifi, lanh] })
+    const r = await createRoom(db, admin, {
+      facilityId: fa,
+      code: '101',
+      areaM2: 25.5,
+      beds: 2,
+      amenityIds: [wifi, lanh],
+    })
     const detail = await getRoomDetail(db, admin, r.id)
     expect(detail.room.beds).toBe(2)
     expect(Number(detail.room.areaM2)).toBe(25.5)
@@ -131,8 +157,12 @@ describe('phòng có diện tích, giường và tiện ích', () => {
 
   it('không gắn tiện ích đã ngừng dùng hoặc không tồn tại cho phòng mới', async () => {
     await updateAmenity(db, admin, wifi, { isActive: false })
-    await expect(createRoom(db, admin, { facilityId: fa, code: '101', amenityIds: [wifi] })).rejects.toBeInstanceOf(ValidationError)
-    await expect(createRoom(db, admin, { facilityId: fa, code: '102', amenityIds: [crypto.randomUUID()] })).rejects.toBeInstanceOf(ValidationError)
+    await expect(createRoom(db, admin, { facilityId: fa, code: '101', amenityIds: [wifi] })).rejects.toBeInstanceOf(
+      ValidationError,
+    )
+    await expect(
+      createRoom(db, admin, { facilityId: fa, code: '102', amenityIds: [crypto.randomUUID()] }),
+    ).rejects.toBeInstanceOf(ValidationError)
     expect(await listRooms(db, admin, { facilityId: fa })).toHaveLength(0)
   })
 
@@ -154,7 +184,14 @@ describe('phòng có diện tích, giường và tiện ích', () => {
 
   it('tạo nhanh chỉ gắn thông tin cho phòng mới, không đè phòng đã có mã trùng', async () => {
     const old = await createRoom(db, admin, { facilityId: fa, code: '102' })
-    const res = await createRoomsBulk(db, admin, fa, { floor: '1', from: 101, to: 103, beds: 1, areaM2: 20, amenityIds: [wifi] })
+    const res = await createRoomsBulk(db, admin, fa, {
+      floor: '1',
+      from: 101,
+      to: 103,
+      beds: 1,
+      areaM2: 20,
+      amenityIds: [wifi],
+    })
     expect(res).toEqual({ created: 2, skipped: ['102'] })
     const all = await listRooms(db, admin, { facilityId: fa })
     for (const code of ['101', '103']) {

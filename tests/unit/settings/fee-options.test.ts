@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { buildFeeFacilityItems, feeApplicationSummary, filterFacilitiesByName, isPriceInput } from '@/features/settings/components/fee-options'
+import {
+  buildFeeFacilityItems,
+  feeApplicationSummary,
+  filterFacilitiesByName,
+  isPriceInput,
+} from '@/features/settings/components/fee-options'
 
 it('chỉ nhận chuỗi số nguyên không âm cho ô giá', () => {
   expect(isPriceInput('3500')).toBe(true)
@@ -38,7 +43,11 @@ describe('buildFeeFacilityItems', () => {
   it('chỉ gửi toà đổi tick hoặc đổi giá; xoá ô giá riêng thành null', () => {
     const draft = { ...same, a: { on: true, price: '' }, b: { on: true, price: '45' }, c: { on: false, price: '' } }
     expect(buildFeeFacilityItems(ids, applied, prices, draft)).toEqual({
-      items: [{ facilityId: 'a', enabled: true, price: null }, { facilityId: 'b', enabled: true, price: 45 }, { facilityId: 'c', enabled: false }],
+      items: [
+        { facilityId: 'a', enabled: true, price: null },
+        { facilityId: 'b', enabled: true, price: 45 },
+        { facilityId: 'c', enabled: false },
+      ],
       invalid: false,
     })
   })

@@ -10,10 +10,18 @@ const subscribe = () => () => {}
  * tải trang đầy đủ (chỉ chưa có phản hồi); nạp xong thì là `Link` thường, điều hướng mềm ra popup.
  */
 export function PopupLink(props: ComponentProps<typeof Link>) {
-  const ready = useSyncExternalStore(subscribe, () => true, () => false)
+  const ready = useSyncExternalStore(
+    subscribe,
+    () => true,
+    () => false,
+  )
   if (!ready) {
     const { children, className, title } = props
-    return <a className={className} title={title} role="link" aria-disabled="true">{children}</a>
+    return (
+      <a className={className} title={title} role="link" aria-disabled="true">
+        {children}
+      </a>
+    )
   }
   return <Link {...props} />
 }

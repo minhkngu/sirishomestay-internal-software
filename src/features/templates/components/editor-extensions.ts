@@ -10,11 +10,24 @@ export const FieldChip = Node.create({
   inline: true,
   atom: true,
   draggable: true,
-  addAttributes() { return { key: { default: '' }, label: { default: '' } } },
-  parseHTML() {
-    return [{ tag: 'span[data-field]', getAttrs: (el) => { const e = el as HTMLElement; const key = e.getAttribute('data-field') ?? ''; return { key, label: e.textContent || key } } }]
+  addAttributes() {
+    return { key: { default: '' }, label: { default: '' } }
   },
-  renderHTML({ node }) { return ['span', { 'data-field': node.attrs.key, class: 'field-chip' }, node.attrs.label] },
+  parseHTML() {
+    return [
+      {
+        tag: 'span[data-field]',
+        getAttrs: (el) => {
+          const e = el as HTMLElement
+          const key = e.getAttribute('data-field') ?? ''
+          return { key, label: e.textContent || key }
+        },
+      },
+    ]
+  },
+  renderHTML({ node }) {
+    return ['span', { 'data-field': node.attrs.key, class: 'field-chip' }, node.attrs.label]
+  },
 })
 
 /** Ngắt trang: `<hr data-page-break>`. */
@@ -23,8 +36,12 @@ export const PageBreak = Node.create({
   group: 'block',
   atom: true,
   selectable: true,
-  parseHTML() { return [{ tag: 'hr[data-page-break]', priority: 200 }] },
-  renderHTML() { return ['hr', { 'data-page-break': '', class: 'page-break' }] },
+  parseHTML() {
+    return [{ tag: 'hr[data-page-break]', priority: 200 }]
+  },
+  renderHTML() {
+    return ['hr', { 'data-page-break': '', class: 'page-break' }]
+  },
 })
 
 /** Mã QR thanh toán của hoá đơn: `<div data-role="qr">`; khi xuất PDF được thay bằng mã QR thật. */
@@ -33,8 +50,12 @@ export const QrBlock = Node.create({
   group: 'block',
   atom: true,
   selectable: true,
-  parseHTML() { return [{ tag: 'div[data-role="qr"]', priority: 200 }] },
-  renderHTML() { return ['div', { 'data-role': 'qr', class: 'qr-block' }, 'Mã QR thanh toán'] },
+  parseHTML() {
+    return [{ tag: 'div[data-role="qr"]', priority: 200 }]
+  },
+  renderHTML() {
+    return ['div', { 'data-role': 'qr', class: 'qr-block' }, 'Mã QR thanh toán']
+  },
 })
 
 /** Khối tóm tắt của kiểu Hiện đại: `<div data-role="summary"><div data-label="Phòng">…</div>…</div>`. */
@@ -42,9 +63,15 @@ export const SummaryItem = Node.create({
   name: 'summaryItem',
   content: 'inline*',
   defining: true,
-  addAttributes() { return { label: { default: '', parseHTML: (el: HTMLElement) => el.getAttribute('data-label') ?? '' } } },
-  parseHTML() { return [{ tag: 'div[data-label]' }] },
-  renderHTML({ node }) { return ['div', { 'data-label': node.attrs.label, class: 'summary-item' }, 0] },
+  addAttributes() {
+    return { label: { default: '', parseHTML: (el: HTMLElement) => el.getAttribute('data-label') ?? '' } }
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-label]' }]
+  },
+  renderHTML({ node }) {
+    return ['div', { 'data-label': node.attrs.label, class: 'summary-item' }, 0]
+  },
 })
 export const Summary = Node.create({
   name: 'summary',
@@ -52,8 +79,12 @@ export const Summary = Node.create({
   content: 'summaryItem+',
   defining: true,
   isolating: true,
-  parseHTML() { return [{ tag: 'div[data-role="summary"]', priority: 200 }] },
-  renderHTML() { return ['div', { 'data-role': 'summary', class: 'summary-block' }, 0] },
+  parseHTML() {
+    return [{ tag: 'div[data-role="summary"]', priority: 200 }]
+  },
+  renderHTML() {
+    return ['div', { 'data-role': 'summary', class: 'summary-block' }, 0]
+  },
 })
 
 /** Hàng bảng có thể lặp theo danh sách: `<tr data-loop="khoá">`. */
@@ -61,16 +92,35 @@ export const LoopRow = TableRow.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
-      loop: { default: null, parseHTML: (el: HTMLElement) => el.getAttribute('data-loop'), renderHTML: (a: Record<string, unknown>) => (a.loop ? { 'data-loop': a.loop as string } : {}) },
+      loop: {
+        default: null,
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-loop'),
+        renderHTML: (a: Record<string, unknown>) => (a.loop ? { 'data-loop': a.loop as string } : {}),
+      },
     }
   },
 })
 
 export function editorExtensions() {
   return [
-    StarterKit.configure({ heading: { levels: [1, 2, 3] }, horizontalRule: false, code: false, codeBlock: false, blockquote: false, strike: false, link: false }),
+    StarterKit.configure({
+      heading: { levels: [1, 2, 3] },
+      horizontalRule: false,
+      code: false,
+      codeBlock: false,
+      blockquote: false,
+      strike: false,
+      link: false,
+    }),
     TextAlign.configure({ types: ['heading', 'paragraph'] }),
-    Table, LoopRow, TableHeader, TableCell,
-    FieldChip, PageBreak, QrBlock, Summary, SummaryItem,
+    Table,
+    LoopRow,
+    TableHeader,
+    TableCell,
+    FieldChip,
+    PageBreak,
+    QrBlock,
+    Summary,
+    SummaryItem,
   ]
 }

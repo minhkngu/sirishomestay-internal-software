@@ -6,22 +6,26 @@ import { NextResponse, type NextRequest } from 'next/server'
 /** Làm mới phiên Supabase và chuyển người chưa đăng nhập về /login. */
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })
-  const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, resolveSupabaseKey(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY), {
-    cookies: {
-      getAll: () => request.cookies.getAll(),
-      setAll: (list, headers) => {
-        list.forEach(({ name, value }) => request.cookies.set(name, value))
-        const previous = response
-        response = NextResponse.next({ request })
-        previous.cookies.getAll().forEach((cookie) => response.cookies.set(cookie))
-        previous.headers.forEach((value, key) => {
-          if (!key.startsWith('x-middleware-') && key !== 'set-cookie') response.headers.set(key, value)
-        })
-        list.forEach(({ name, value, options }) => response.cookies.set(name, value, options))
-        Object.entries(headers).forEach(([key, value]) => response.headers.set(key, value))
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    resolveSupabaseKey(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY),
+    {
+      cookies: {
+        getAll: () => request.cookies.getAll(),
+        setAll: (list, headers) => {
+          list.forEach(({ name, value }) => request.cookies.set(name, value))
+          const previous = response
+          response = NextResponse.next({ request })
+          previous.cookies.getAll().forEach((cookie) => response.cookies.set(cookie))
+          previous.headers.forEach((value, key) => {
+            if (!key.startsWith('x-middleware-') && key !== 'set-cookie') response.headers.set(key, value)
+          })
+          list.forEach(({ name, value, options }) => response.cookies.set(name, value, options))
+          Object.entries(headers).forEach(([key, value]) => response.headers.set(key, value))
+        },
       },
     },
-  })
+  )
   const userId = await readUserId(supabase)
   const isLogin = request.nextUrl.pathname.startsWith('/login')
   if (!userId && !isLogin) {

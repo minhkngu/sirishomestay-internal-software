@@ -64,8 +64,10 @@ export function buildFeeFacilityItems(
     if (d.on) {
       const text = d.price.trim()
       if (text === '') price = prices[id] != null ? null : undefined
-      else if (!isPriceInput(text)) { invalid = true; continue }
-      else price = Number(text) === prices[id] ? undefined : Number(text)
+      else if (!isPriceInput(text)) {
+        invalid = true
+        continue
+      } else price = Number(text) === prices[id] ? undefined : Number(text)
     }
     if (d.on !== (applied[id] ?? false) || price !== undefined) {
       items.push({ facilityId: id, enabled: d.on, ...(price !== undefined ? { price } : {}) })

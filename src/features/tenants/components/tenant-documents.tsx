@@ -25,24 +25,39 @@ export function TenantDocuments({ tenantId, docs }: { tenantId: string; docs: Do
   return (
     <section className="space-y-3">
       <h2 className="text-lg font-medium">Ảnh giấy tờ</h2>
-      <FileUpload ownerType="tenant_document" ownerId={tenantId} capture label="Thêm ảnh giấy tờ"
+      <FileUpload
+        ownerType="tenant_document"
+        ownerId={tenantId}
+        capture
+        label="Thêm ảnh giấy tờ"
         nameFor={(f) => window.prompt('Ghi chú cho ảnh (vd. Passport, Visa, CCCD mặt trước)', f.name) ?? f.name}
-        onUploaded={() => router.refresh()} />
+        onUploaded={() => router.refresh()}
+      />
       {error && <p className="text-sm text-destructive">{error}</p>}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {docs.map((d) => (
           <figure key={d.id} className="space-y-1">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={`/api/files/${d.id}?thumb=1`} alt={d.name || 'Ảnh giấy tờ'} className="aspect-square w-full cursor-pointer rounded-md border object-cover" onClick={() => setBig(d)} />
+            <img
+              src={`/api/files/${d.id}?thumb=1`}
+              alt={d.name || 'Ảnh giấy tờ'}
+              className="aspect-square w-full cursor-pointer rounded-md border object-cover"
+              onClick={() => setBig(d)}
+            />
             <figcaption className="flex items-center justify-between text-xs">
               <span className="truncate">{d.name}</span>
-              <button type="button" disabled={pending} className="text-destructive underline" onClick={() => remove(d)}>Xoá</button>
+              <button type="button" disabled={pending} className="text-destructive underline" onClick={() => remove(d)}>
+                Xoá
+              </button>
             </figcaption>
           </figure>
         ))}
       </div>
       {big && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setBig(null)}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setBig(null)}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={`/api/files/${big.id}`} alt={big.name} className="max-h-full max-w-full rounded" />
         </div>

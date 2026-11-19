@@ -11,6 +11,9 @@ export function useGoToContract() {
   const router = useRouter()
   const inModal = useInRouteModal()
   return (id: string) => {
-    if (inModal) { router.replace(`/contracts/${id}`); router.refresh() } else window.location.assign(`/contracts/${id}`)
+    if (inModal) {
+      router.replace(`/contracts/${id}`)
+      router.refresh()
+    } else window.location.assign(`/contracts/${id}`)
   }
 }

@@ -7,12 +7,30 @@ const doc: DocBlock[] = [
   { type: 'heading', level: 1, align: 'center', inlines: [{ text: 'Đặng Thị Ỷ — HỢP ĐỒNG' }] },
   { type: 'paragraph', inlines: [{ text: 'Đậm', bold: true }, { br: true }, { text: 'dòng sau' }] },
   { type: 'list', ordered: false, items: [[{ text: 'mục một' }], [{ text: 'mục hai' }]] },
-  { type: 'summary', cells: [{ label: 'Phòng', value: [{ text: '103' }] }, { label: 'Giá thuê', value: [{ text: '11.500.000' }] }] },
-  { type: 'table', rows: [{ cells: [{ inlines: [{ text: 'Mã' }], header: true }, { inlines: [{ text: 'Tên' }], header: true }] }, { cells: [{ inlines: [{ text: 'GD-1' }] }, { inlines: [{ text: 'Giường' }] }] }] },
+  {
+    type: 'summary',
+    cells: [
+      { label: 'Phòng', value: [{ text: '103' }] },
+      { label: 'Giá thuê', value: [{ text: '11.500.000' }] },
+    ],
+  },
+  {
+    type: 'table',
+    rows: [
+      {
+        cells: [
+          { inlines: [{ text: 'Mã' }], header: true },
+          { inlines: [{ text: 'Tên' }], header: true },
+        ],
+      },
+      { cells: [{ inlines: [{ text: 'GD-1' }] }, { inlines: [{ text: 'Giường' }] }] },
+    ],
+  },
   { type: 'pageBreak' },
   { type: 'paragraph', inlines: [{ text: 'Trang hai' }] },
 ]
-const xmlOf = async (style: 'formal' | 'modern') => new PizZip(await buildDocx(doc, style)).file('word/document.xml')!.asText()
+const xmlOf = async (style: 'formal' | 'modern') =>
+  new PizZip(await buildDocx(doc, style)).file('word/document.xml')!.asText()
 
 describe('buildDocx', () => {
   it('ra tệp .docx hợp lệ có chữ tiếng Việt, bảng, danh sách, ngắt trang và khổ A4', async () => {

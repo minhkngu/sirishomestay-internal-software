@@ -67,5 +67,17 @@ export function usePager<T>(rows: T[], tableKey: string, resetKey: string): { pa
     [tableKey, resetKey],
   )
 
-  return { pageRows, pager: { total: rows.length, page: p.page, pageCount: p.pageCount, start: p.start, end: p.end, size, onPage, onSize } }
+  return {
+    pageRows,
+    pager: {
+      total: rows.length,
+      page: p.page,
+      pageCount: p.pageCount,
+      start: p.start,
+      end: p.end,
+      size,
+      onPage,
+      onSize,
+    },
+  }
 }

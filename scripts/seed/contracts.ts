@@ -9,13 +9,19 @@ import type { SeedModule } from './types'
  */
 export const contractSeed: SeedModule = {
   name: 'contracts',
-  async isSeeded({ db }) { return (await db.select({ id: leases.id }).from(leases).where(eq(leases.isDemo, true)).limit(1)).length > 0 },
+  async isSeeded({ db }) {
+    return (await db.select({ id: leases.id }).from(leases).where(eq(leases.isDemo, true)).limit(1)).length > 0
+  },
   async run({ db, rng, today, state }) {
     const facs = await db.select().from(facilities).where(eq(facilities.isDemo, true))
     const codeOf = new Map(facs.map((f) => [f.id, f.code]))
     const occupied = new Set((await db.select().from(leases)).filter((l) => l.status === 'active').map((l) => l.roomId))
-    const pending = new Set((await db.select().from(depositContracts)).filter((d) => d.status === 'pending').map((d) => d.roomId))
-    const allRooms = (await db.select().from(rooms).where(eq(rooms.isDemo, true))).sort((a, b) => (codeOf.get(a.facilityId)! + a.code < codeOf.get(b.facilityId)! + b.code ? -1 : 1))
+    const pending = new Set(
+      (await db.select().from(depositContracts)).filter((d) => d.status === 'pending').map((d) => d.roomId),
+    )
+    const allRooms = (await db.select().from(rooms).where(eq(rooms.isDemo, true))).sort((a, b) =>
+      codeOf.get(a.facilityId)! + a.code < codeOf.get(b.facilityId)! + b.code ? -1 : 1,
+    )
     const allTenants = await db.select().from(tenants).where(eq(tenants.isDemo, true))
     const people = allTenants.filter((t) => t.kind !== 'company')
     const companies = allTenants.filter((t) => t.kind === 'company')
@@ -36,38 +42,87 @@ export const contractSeed: SeedModule = {
       const key = `${fcode}-${year}`
       seq[key] = (seq[key] ?? 0) + 1
       const rent = room.listPrice ?? 10_000_000
-      const [lease] = await db.insert(leases).values({
-        id: rng.uuid(), code: `${fcode}-HĐ-${year}-${String(seq[key]).padStart(4, '0')}`, roomId: room.id, tenantId: tenant.id,
-        startDate, endDate, monthlyRent: rent, depositAmount: rent, signStatus: i === 5 || i === 17 ? (i === 5 ? 'draft' : 'exported') : 'signed',
-        status: 'active', isDemo: true,
-      }).returning()
-      const occupants = isCompany ? [people[(i + 3) % people.length], people[(i + 7) % people.length]] : [tenant, ...(i % 4 === 0 ? [people[(i + 5) % people.length]] : [])]
+      const [lease] = await db
+        .insert(leases)
+        .values({
+          id: rng.uuid(),
+          code: `${fcode}-HĐ-${year}-${String(seq[key]).padStart(4, '0')}`,
+          roomId: room.id,
+          tenantId: tenant.id,
+          startDate,
+          endDate,
+          monthlyRent: rent,
+          depositAmount: rent,
+          signStatus: i === 5 || i === 17 ? (i === 5 ? 'draft' : 'exported') : 'signed',
+          status: 'active',
+          isDemo: true,
+        })
+        .returning()
+      const occupants = isCompany
+        ? [people[(i + 3) % people.length], people[(i + 7) % people.length]]
+        : [tenant, ...(i % 4 === 0 ? [people[(i + 5) % people.length]] : [])]
       const uniq = [...new Map(occupants.map((o) => [o.id, o])).values()]
       await db.insert(leaseOccupants).values(uniq.map((o) => ({ leaseId: lease.id, tenantId: o.id })))
-      await db.insert(leaseFees).values([
-        { leaseId: lease.id, feeTypeId: feeIds['Phí dịch vụ'], quantity: 1, unitPrice: 200_000 },
-        ...(i % 3 === 0 ? [{ leaseId: lease.id, feeTypeId: feeIds['Gửi xe máy'], quantity: 1, unitPrice: 100_000 }] : []),
-        ...(i % 2 === 0 ? [{ leaseId: lease.id, feeTypeId: feeIds['Internet'], quantity: 1, unitPrice: 150_000 }] : []),
-      ])
-      await db.insert(depositEntries).values({ leaseId: lease.id, date: startDate, type: 'collect', amount: rent, status: 'done', method: 'transfer', note: 'Thu cọc khi ký', isDemo: true })
+      await db
+        .insert(leaseFees)
+        .values([
+          { leaseId: lease.id, feeTypeId: feeIds['Phí dịch vụ'], quantity: 1, unitPrice: 200_000 },
+          ...(i % 3 === 0
+            ? [{ leaseId: lease.id, feeTypeId: feeIds['Gửi xe máy'], quantity: 1, unitPrice: 100_000 }]
+            : []),
+          ...(i % 2 === 0
+            ? [{ leaseId: lease.id, feeTypeId: feeIds['Internet'], quantity: 1, unitPrice: 150_000 }]
+            : []),
+        ])
+      await db.insert(depositEntries).values({
+        leaseId: lease.id,
+        date: startDate,
+        type: 'collect',
+        amount: rent,
+        status: 'done',
+        method: 'transfer',
+        note: 'Thu cọc khi ký',
+        isDemo: true,
+      })
       leaseIds.push(lease.id)
     }
 
     state.leaseIds = leaseIds
 
     // 3 hợp đồng cọc chờ: phòng đang có khách (có khách kế tiếp) + 2 phòng trống
-    const availableDeposits = allRooms.filter((r) => !occupied.has(r.id) && !pending.has(r.id) && !leased.some((l) => l.id === r.id))
+    const availableDeposits = allRooms.filter(
+      (r) => !occupied.has(r.id) && !pending.has(r.id) && !leased.some((l) => l.id === r.id),
+    )
     const targets = [leased.find((r) => !pending.has(r.id))!, ...availableDeposits.slice(0, 2)]
-    if (leased.length < 26 || targets.length < 3 || targets.some((r) => !r)) throw new Error('Không đủ phòng demo trống để nạp hợp đồng mẫu')
+    if (leased.length < 26 || targets.length < 3 || targets.some((r) => !r))
+      throw new Error('Không đủ phòng demo trống để nạp hợp đồng mẫu')
     const depIds: string[] = []
     for (let i = 0; i < targets.length; i++) {
       const room = targets[i]
       const tenant = people[(i + 20) % people.length]
-      const [d] = await db.insert(depositContracts).values({
-        id: rng.uuid(), roomId: room.id, tenantId: tenant.id, depositAmount: 3_000_000, agreedRent: room.listPrice ?? 10_000_000,
-        expectedMoveIn: i === 0 ? addDays(today, 40) : addDays(today, 10 + i * 8), status: 'pending', isDemo: true,
-      }).returning()
-      await db.insert(depositEntries).values({ depositContractId: d.id, date: today, type: 'collect', amount: 3_000_000, status: 'done', method: 'cash', note: 'Cọc giữ chỗ', isDemo: true })
+      const [d] = await db
+        .insert(depositContracts)
+        .values({
+          id: rng.uuid(),
+          roomId: room.id,
+          tenantId: tenant.id,
+          depositAmount: 3_000_000,
+          agreedRent: room.listPrice ?? 10_000_000,
+          expectedMoveIn: i === 0 ? addDays(today, 40) : addDays(today, 10 + i * 8),
+          status: 'pending',
+          isDemo: true,
+        })
+        .returning()
+      await db.insert(depositEntries).values({
+        depositContractId: d.id,
+        date: today,
+        type: 'collect',
+        amount: 3_000_000,
+        status: 'done',
+        method: 'cash',
+        note: 'Cọc giữ chỗ',
+        isDemo: true,
+      })
       depIds.push(d.id)
     }
     state.depositContractIds = depIds

@@ -12,7 +12,7 @@ export function createRng(seed = 20261116) {
   return {
     next,
     int: (min: number, max: number) => min + Math.floor(next() * (max - min + 1)),
-    pick: <T,>(arr: readonly T[]): T => arr[Math.floor(next() * arr.length)],
+    pick: <T>(arr: readonly T[]): T => arr[Math.floor(next() * arr.length)],
     /** uuid v4 hợp lệ nhưng xác định theo hạt giống */
     uuid: () => `${hex(8)}-${hex(4)}-4${hex(3)}-${'89ab'[Math.floor(next() * 4)]}${hex(3)}-${hex(12)}`,
   }

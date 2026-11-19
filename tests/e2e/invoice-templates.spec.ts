@@ -21,12 +21,16 @@ test('soạn mẫu hoá đơn HTML, xem nhanh, chọn cho hợp đồng hoặc k
   await expect(dialog).toBeHidden()
   await expect(page.getByText(name)).toBeVisible()
   await page.goto('/contracts/new')
-  await expect(page.getByLabel('Mẫu hóa đơn', { exact: true }).locator('option').filter({ hasText: name })).toHaveCount(1)
+  await expect(page.getByLabel('Mẫu hóa đơn', { exact: true }).locator('option').filter({ hasText: name })).toHaveCount(
+    1,
+  )
   await expect(page.getByLabel('Mẫu hóa đơn', { exact: true })).toHaveValue('')
-  await expect(page.getByLabel('Mẫu hóa đơn', { exact: true }).locator('option').first()).toContainText('Theo mặc định hệ thống')
+  await expect(page.getByLabel('Mẫu hóa đơn', { exact: true }).locator('option').first()).toContainText(
+    'Theo mặc định hệ thống',
+  )
   await page.goto('/invoices?view=draft')
   const invoice = page.locator('a[href^="/invoices/"]').filter({ hasNotText: 'Tạo' }).first()
-  test.skip(await invoice.count() === 0, 'Cần một hóa đơn demo')
+  test.skip((await invoice.count()) === 0, 'Cần một hóa đơn demo')
   await invoice.click()
   const picker = page.getByLabel('Mẫu hóa đơn kỳ này')
   const previous = await picker.inputValue()

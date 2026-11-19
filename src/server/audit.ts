@@ -29,9 +29,24 @@ export async function recordAudit(db: Pick<DB, 'insert'>, ctx: AccessContext, e:
 }
 
 /** Ghi nhiều dòng nhật ký bằng một câu lệnh (thao tác hàng loạt). */
-export async function recordAuditBatch(db: Pick<DB, 'insert'>, ctx: AccessContext, events: AuditEvent[]): Promise<void> {
+export async function recordAuditBatch(
+  db: Pick<DB, 'insert'>,
+  ctx: AccessContext,
+  events: AuditEvent[],
+): Promise<void> {
   if (!events.length) return
-  await db.insert(auditLogs).values(events.map((e) => ({ userId: ctx.userId, action: e.action, entity: e.entity, summary: e.summary, entityId: e.entityId ?? null, facilityId: e.facilityId ?? null, before: e.before ?? null, after: e.after ?? null })))
+  await db.insert(auditLogs).values(
+    events.map((e) => ({
+      userId: ctx.userId,
+      action: e.action,
+      entity: e.entity,
+      summary: e.summary,
+      entityId: e.entityId ?? null,
+      facilityId: e.facilityId ?? null,
+      before: e.before ?? null,
+      after: e.after ?? null,
+    })),
+  )
 }
 
 export type AuditFilter = { userId?: string; entity?: string; limit?: number }
@@ -42,5 +57,10 @@ export async function listAuditLogs(db: Pick<DB, 'select'>, ctx: AccessContext, 
   const conds = []
   if (f.userId) conds.push(eq(auditLogs.userId, f.userId))
   if (f.entity) conds.push(eq(auditLogs.entity, f.entity))
-  return db.select().from(auditLogs).where(and(...conds)).orderBy(desc(auditLogs.createdAt)).limit(f.limit ?? 200)
+  return db
+    .select()
+    .from(auditLogs)
+    .where(and(...conds))
+    .orderBy(desc(auditLogs.createdAt))
+    .limit(f.limit ?? 200)
 }

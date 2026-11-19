@@ -25,7 +25,10 @@ export async function listUsers(db: DB, ctx: AccessContext): Promise<UserRow[]> 
   return users.map((u) => {
     const facilityIds = uf.filter((x) => x.userId === u.id).map((x) => x.facilityId)
     return {
-      id: u.id, email: u.email, fullName: u.fullName, isActive: u.isActive,
+      id: u.id,
+      email: u.email,
+      fullName: u.fullName,
+      isActive: u.isActive,
       facilityIds,
       facilityNames: facilityIds.map((id) => facName.get(id) ?? '?'),
       permissions: up.filter((x) => x.userId === u.id).map((x) => x.permission as Permission),

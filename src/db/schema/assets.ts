@@ -11,7 +11,9 @@ export const assets = pgTable('assets', {
   condition: text('condition').notNull().default('Tốt'),
   locationKind: text('location_kind').notNull(), // room | common | warehouse
   locationId: uuid('location_id').notNull(), // room: id phòng; common/warehouse: id cơ sở
-  facilityId: uuid('facility_id').notNull().references(() => facilities.id),
+  facilityId: uuid('facility_id')
+    .notNull()
+    .references(() => facilities.id),
   status: text('status').notNull().default('in_use'), // in_use | broken | disposed
   searchText: text('search_text').notNull().default(''),
   isDemo: boolean('is_demo').notNull().default(false),
@@ -21,7 +23,9 @@ export const assets = pgTable('assets', {
 
 export const assetMoves = pgTable('asset_moves', {
   id: uuid('id').primaryKey().defaultRandom(),
-  assetId: uuid('asset_id').notNull().references(() => assets.id, { onDelete: 'cascade' }),
+  assetId: uuid('asset_id')
+    .notNull()
+    .references(() => assets.id, { onDelete: 'cascade' }),
   fromKind: text('from_kind').notNull(),
   fromId: uuid('from_id').notNull(),
   toKind: text('to_kind').notNull(),

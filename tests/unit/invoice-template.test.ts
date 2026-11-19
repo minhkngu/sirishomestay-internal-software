@@ -10,6 +10,8 @@ describe('mẫu hóa đơn', () => {
   it('bắt buộc đầy đủ phần hóa đơn không trùng và màu hợp lệ', () => {
     expect(invoiceTemplateSchema.safeParse(defaultInvoiceTemplate).success).toBe(true)
     expect(invoiceTemplateSchema.safeParse({ ...defaultInvoiceTemplate, color: 'red' }).success).toBe(false)
-    expect(invoiceTemplateSchema.safeParse({ ...defaultInvoiceTemplate, sections: ['header', 'header'] }).success).toBe(false)
+    expect(invoiceTemplateSchema.safeParse({ ...defaultInvoiceTemplate, sections: ['header', 'header'] }).success).toBe(
+      false,
+    )
   })
 })

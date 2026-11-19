@@ -10,11 +10,23 @@ import { listMeterOverview, listReadingSheet } from '@/server/meters/service'
 import { MeterList } from '@/features/meters/components/meter-list'
 import { ReadingGrid } from '@/features/meters/components/reading-grid'
 
-export default async function MetersPage({ searchParams }: { searchParams: Promise<{ facility?: string; period?: string; tab?: string }> }) {
-  return <RequirePermission perm="meters"><Meters searchParams={searchParams} /></RequirePermission>
+export default async function MetersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ facility?: string; period?: string; tab?: string }>
+}) {
+  return (
+    <RequirePermission perm="meters">
+      <Meters searchParams={searchParams} />
+    </RequirePermission>
+  )
 }
 
-async function Meters({ searchParams }: { searchParams: Promise<{ facility?: string; period?: string; tab?: string }> }) {
+async function Meters({
+  searchParams,
+}: {
+  searchParams: Promise<{ facility?: string; period?: string; tab?: string }>
+}) {
   const sp = await searchParams
   const ctx = await getAccessContext()
   const facs = await listFacilities(db, ctx)
@@ -30,9 +42,20 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
     <div className="space-y-5">
       <PageHeader title="Chỉ số" />
       <nav aria-label="Mục chỉ số" className="flex gap-2 text-sm">
-        {([['readings', 'Ghi chỉ số'], ['meters', 'Đồng hồ']] as const).map(([key, label]) => (
-          <Link key={key} href={`/meters?tab=${key}${facilityId ? `&facility=${facilityId}` : ''}${key === 'readings' ? `&period=${period}` : ''}`} aria-current={tab === key ? 'page' : undefined}
-            className={`rounded-xl border px-3 py-1.5 ${tab === key ? 'border-primary bg-primary text-primary-foreground' : 'border-border/80 bg-card text-foreground'}`}>{label}</Link>
+        {(
+          [
+            ['readings', 'Ghi chỉ số'],
+            ['meters', 'Đồng hồ'],
+          ] as const
+        ).map(([key, label]) => (
+          <Link
+            key={key}
+            href={`/meters?tab=${key}${facilityId ? `&facility=${facilityId}` : ''}${key === 'readings' ? `&period=${period}` : ''}`}
+            aria-current={tab === key ? 'page' : undefined}
+            className={`rounded-xl border px-3 py-1.5 ${tab === key ? 'border-primary bg-primary text-primary-foreground' : 'border-border/80 bg-card text-foreground'}`}
+          >
+            {label}
+          </Link>
         ))}
       </nav>
       <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-2xs">
@@ -54,16 +77,16 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
             </select>
           </div>
           {tab === 'readings' && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-muted-foreground">Kỳ ghi:</span>
-            <input
-              type="month"
-              name="period"
-              defaultValue={period}
-              aria-label="Kỳ"
-              className="h-9 rounded-xl border border-border/80 bg-card px-3 text-xs text-foreground shadow-2xs outline-none focus:border-ring"
-            />
-          </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground">Kỳ ghi:</span>
+              <input
+                type="month"
+                name="period"
+                defaultValue={period}
+                aria-label="Kỳ"
+                className="h-9 rounded-xl border border-border/80 bg-card px-3 text-xs text-foreground shadow-2xs outline-none focus:border-ring"
+              />
+            </div>
           )}
           <button
             className="h-9 rounded-xl bg-primary px-4 text-xs font-medium text-primary-foreground shadow-xs transition-colors hover:bg-[var(--primary-strong)] active:scale-95"
@@ -74,7 +97,13 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
         </Form>
       </div>
       {tab === 'meters' ? (
-        facilityId ? <MeterList rows={overview} /> : <div className="rounded-2xl border border-dashed border-border/80 bg-card/60 p-8 text-center text-xs text-muted-foreground">Chưa có cơ sở nào.</div>
+        facilityId ? (
+          <MeterList rows={overview} />
+        ) : (
+          <div className="rounded-2xl border border-dashed border-border/80 bg-card/60 p-8 text-center text-xs text-muted-foreground">
+            Chưa có cơ sở nào.
+          </div>
+        )
       ) : sheet ? (
         <ReadingGrid
           key={`${facilityId}-${period}`}

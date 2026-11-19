@@ -11,7 +11,11 @@ import { InvoiceList } from '@/features/invoices/components/invoice-list'
 
 export default async function InvoicesPage() {
   const ctx = await getAccessContext()
-  try { assertCan(ctx, 'billing') } catch { notFound() }
+  try {
+    assertCan(ctx, 'billing')
+  } catch {
+    notFound()
+  }
   // Nạp mọi hoá đơn trong quyền một lần; lọc trạng thái, kỳ, cơ sở và phân trang làm ở trình duyệt
   const [facs, invoices] = await Promise.all([listFacilities(db, ctx), listInvoices(db, ctx, {})])
   return (

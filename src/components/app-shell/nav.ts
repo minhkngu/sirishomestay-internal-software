@@ -1,5 +1,18 @@
 import {
-  AlertTriangle, BellRing, Boxes, Building2, ClipboardList, DoorOpen, FileText, FileUp, Gauge, History, Receipt, Settings, Users, UserCog,
+  AlertTriangle,
+  BellRing,
+  Boxes,
+  Building2,
+  ClipboardList,
+  DoorOpen,
+  FileText,
+  FileUp,
+  Gauge,
+  History,
+  Receipt,
+  Settings,
+  Users,
+  UserCog,
   type LucideIcon,
 } from 'lucide-react'
 import type { Permission } from '@/domain/access'

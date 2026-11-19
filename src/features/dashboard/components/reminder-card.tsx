@@ -22,9 +22,7 @@ export function ReminderCard({
           </div>
           <span
             className={`rounded-full px-2.5 py-0.5 text-xs font-bold tabular-nums ${
-              count > 0
-                ? 'bg-primary/10 text-primary border border-primary/20'
-                : 'bg-muted text-muted-foreground'
+              count > 0 ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-muted text-muted-foreground'
             }`}
           >
             {count}

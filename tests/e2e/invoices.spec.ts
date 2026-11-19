@@ -44,7 +44,8 @@ test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → 
   test.setTimeout(300_000) // luồng dài nhiều trang, môi trường thử chậm
   await login(page, /^Admin/)
   const name = `Khách luồng ${Date.now()}`
-  await page.goto('/tenants/new'); await page.waitForLoadState('networkidle')
+  await page.goto('/tenants/new')
+  await page.waitForLoadState('networkidle')
   await page.getByLabel('Họ tên', { exact: true }).fill(name)
   await page.getByLabel('Quốc tịch').fill('Mỹ')
   await page.getByLabel('Số passport').fill(`FLOW${Date.now()}`)
@@ -52,16 +53,20 @@ test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → 
   await page.getByRole('button', { name: 'Tạo khách' }).click()
   await expect(page).toHaveURL(/\/tenants\/[a-f0-9-]+$/)
 
-  await page.goto('/contracts/new?kind=deposit'); await page.waitForLoadState('networkidle')
+  await page.goto('/contracts/new?kind=deposit')
+  await page.waitForLoadState('networkidle')
   const roomOption = page.locator('#room option').filter({ hasText: 'Trống' }).first()
   const roomId = await roomOption.getAttribute('value')
   const facilityName = (await roomOption.textContent())!.split(' · ')[0].trim()
   expect(roomId).toBeTruthy()
   await page.locator('#room').selectOption(roomId!)
-  await page.locator('#tenant').selectOption({ label: new RegExp(name) as never }).catch(async () => {
-    const v = await page.locator('#tenant option').filter({ hasText: name }).first().getAttribute('value')
-    await page.locator('#tenant').selectOption(v!)
-  })
+  await page
+    .locator('#tenant')
+    .selectOption({ label: new RegExp(name) as never })
+    .catch(async () => {
+      const v = await page.locator('#tenant option').filter({ hasText: name }).first().getAttribute('value')
+      await page.locator('#tenant').selectOption(v!)
+    })
   await page.getByLabel('Tiền cọc giữ chỗ (VND)').fill('5000000')
   await page.getByLabel('Giá thuê thoả thuận (VND/tháng)').fill('9000000')
   await page.getByLabel('Ngày vào ở dự kiến').fill('2026-12-01')
@@ -93,16 +98,27 @@ test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → 
   await expect(page.getByRole('row').filter({ hasText: name })).toBeVisible()
 
   // thanh lý hợp đồng vừa tạo: hoá đơn thanh lý nháp, duyệt xong hợp đồng kết thúc
-  await page.goto('/contracts'); await page.waitForLoadState('networkidle')
+  await page.goto('/contracts')
+  await page.waitForLoadState('networkidle')
   await page.getByRole('row').filter({ hasText: name }).getByRole('button', { name: 'Thanh lý hợp đồng' }).click()
   await page.getByLabel('Ngày trả phòng').fill('2026-12-10')
-  for (const input of await page.getByText('Chỉ số tại ngày trả phòng').locator('xpath=..').locator('input[type=number]').all()) await input.fill(String(meterValue()))
+  for (const input of await page
+    .getByText('Chỉ số tại ngày trả phòng')
+    .locator('xpath=..')
+    .locator('input[type=number]')
+    .all())
+    await input.fill(String(meterValue()))
   await page.getByRole('button', { name: 'Xem trước tiền' }).click()
   await expect(page.getByText(/Hoá đơn thanh lý \(nháp\)/)).toBeVisible()
   await page.getByRole('button', { name: 'Lưu phụ lục' }).click()
   await expect(page.getByText('Đã lưu phụ lục')).toBeVisible()
   await page.goto('/invoices?view=draft')
-  await page.getByRole('row').filter({ hasText: name }).filter({ hasText: /10\/12\/2026/ }).getByRole('link').click()
+  await page
+    .getByRole('row')
+    .filter({ hasText: name })
+    .filter({ hasText: /10\/12\/2026/ })
+    .getByRole('link')
+    .click()
   await page.waitForLoadState('networkidle')
   await page.getByRole('button', { name: 'Duyệt hoá đơn' }).click()
   await expect(page.getByText(/Chưa thu|Chờ hoàn khách/).first()).toBeVisible()
@@ -129,7 +145,10 @@ test('tải hoá đơn dưới dạng PDF và ảnh', async ({ page }) => {
   expect(pdf.headers()['content-type']).toContain('application/pdf')
   expect(pdf.headers()['content-disposition'] ?? '').not.toContain('attachment')
   await dialog.getByRole('button', { name: 'Đóng' }).click()
-  for (const [label, extension] of [['Tải PDF', '.pdf'], ['Tải ảnh', '.png']] as const) {
+  for (const [label, extension] of [
+    ['Tải PDF', '.pdf'],
+    ['Tải ảnh', '.png'],
+  ] as const) {
     const download = page.waitForEvent('download')
     await page.getByRole('button', { name: label }).click()
     expect((await download).suggestedFilename()).toMatch(new RegExp(`${extension.replace('.', '\\.')}$`, 'i'))

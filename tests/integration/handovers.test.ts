@@ -13,7 +13,14 @@ import { createTestDb } from '../helpers/db'
 import type { DB } from '@/db/client'
 
 function ctxOf(perms: Permission[], facilityIds: string[] = []): AccessContext {
-  return { userId: crypto.randomUUID(), email: 'a@x.com', fullName: 'A', permissions: new Set(perms), facilityIds: new Set(facilityIds), isAdmin: perms.includes('settings') }
+  return {
+    userId: crypto.randomUUID(),
+    email: 'a@x.com',
+    fullName: 'A',
+    permissions: new Set(perms),
+    facilityIds: new Set(facilityIds),
+    isAdmin: perms.includes('settings'),
+  }
 }
 
 describe('handovers', () => {
@@ -35,14 +42,51 @@ describe('handovers', () => {
     r301 = (await db.insert(rooms).values({ facilityId: fa, code: '301' }).returning())[0].id
     r302 = (await db.insert(rooms).values({ facilityId: fa, code: '302' }).returning())[0].id
     const add = async (code: string, roomId: string, value: number, extra: Record<string, unknown> = {}) => {
-      ids[code] = (await db.insert(assets).values({ code, name: `Tài sản ${code}`, value, facilityId: fa, locationKind: 'room', locationId: roomId, ...extra }).returning())[0].id
+      ids[code] = (
+        await db
+          .insert(assets)
+          .values({
+            code,
+            name: `Tài sản ${code}`,
+            value,
+            facilityId: fa,
+            locationKind: 'room',
+            locationId: roomId,
+            ...extra,
+          })
+          .returning()
+      )[0].id
     }
-    await add('AC-301', r301, 9_000_000); await add('BED-301', r301, 4_500_000); await add('TV-301', r301, 6_000_000)
+    await add('AC-301', r301, 9_000_000)
+    await add('BED-301', r301, 4_500_000)
+    await add('TV-301', r301, 6_000_000)
     await add('AC-302', r302, 9_000_000)
     await add('OLD-301', r301, 100_000, { status: 'disposed' })
-    eMeter = (await db.insert(meters).values({ roomId: r301, utility: 'electric', serial: 'E-301', installedOn: '2025-01-01', startReading: 0 }).returning())[0].id
-    const tenant = (await createTenant(db, admin, { kind: 'vietnamese', homeFacilityId: fa, fullName: 'Khách A', phone: '0901234567', idNumber: '012345678901' })).id
-    leaseId = (await createLease(db, lan(), { roomId: r301, tenantId: tenant, startDate: '2026-10-15', endDate: '2027-10-14', monthlyRent: 9_000_000, depositAmount: 9_000_000 })).lease.id
+    eMeter = (
+      await db
+        .insert(meters)
+        .values({ roomId: r301, utility: 'electric', serial: 'E-301', installedOn: '2025-01-01', startReading: 0 })
+        .returning()
+    )[0].id
+    const tenant = (
+      await createTenant(db, admin, {
+        kind: 'vietnamese',
+        homeFacilityId: fa,
+        fullName: 'Khách A',
+        phone: '0901234567',
+        idNumber: '012345678901',
+      })
+    ).id
+    leaseId = (
+      await createLease(db, lan(), {
+        roomId: r301,
+        tenantId: tenant,
+        startDate: '2026-10-15',
+        endDate: '2027-10-14',
+        monthlyRent: 9_000_000,
+        depositAmount: 9_000_000,
+      })
+    ).lease.id
   })
 
   it('check-in lấy đúng các tài sản đang ở phòng (bỏ đã thanh lý và phòng khác); bắt đầu lại khi còn nháp thì trả về bản cũ', async () => {
@@ -67,9 +111,15 @@ describe('handovers', () => {
     const h = await startHandover(db, lan(), leaseId, 'check_out')
     const items = (await getHandover(db, lan(), h.id)).items
     const byCode = (c: string) => items.find((i) => i.assetCode === c)!
-    await saveHandover(db, lan(), h.id, { items: [{ id: byCode('AC-301').id, condition: 'Hư', damaged: true, penalty: 500_000 }], meterReadings: [] })
+    await saveHandover(db, lan(), h.id, {
+      items: [{ id: byCode('AC-301').id, condition: 'Hư', damaged: true, penalty: 500_000 }],
+      meterReadings: [],
+    })
     expect((await getHandover(db, lan(), h.id)).penaltyTotal).toBe(500_000)
-    await saveHandover(db, lan(), h.id, { items: [{ id: byCode('TV-301').id, condition: 'Mất', missing: true }], meterReadings: [] })
+    await saveHandover(db, lan(), h.id, {
+      items: [{ id: byCode('TV-301').id, condition: 'Mất', missing: true }],
+      meterReadings: [],
+    })
     const after = await getHandover(db, lan(), h.id)
     expect(after.items.find((i) => i.assetCode === 'TV-301')).toMatchObject({ missing: true, penalty: 6_000_000 })
     expect(after.penaltyTotal).toBe(6_500_000)
@@ -81,27 +131,43 @@ describe('handovers', () => {
     const rows = await db.select().from(meterReadings).where(eq(meterReadings.meterId, eMeter))
     expect(rows).toHaveLength(1)
     expect(rows[0]).toMatchObject({ value: 1200, readOn: h.date, period: h.date.slice(0, 7) })
-    expect((await getHandover(db, lan(), h.id)).readings[0]).toMatchObject({ meterId: eMeter, value: 1200, serial: 'E-301' })
+    expect((await getHandover(db, lan(), h.id)).readings[0]).toMatchObject({
+      meterId: eMeter,
+      value: 1200,
+      serial: 'E-301',
+    })
   })
 
   it('biên bản gọi đồng hồ theo tên phí gắn với hợp đồng', async () => {
-    const [fee] = await db.insert(leaseFeeSnapshots).values({ leaseId, name: 'Giặt', unit: 'lượt', quantitySource: 'meter', unitPrice: 5000 }).returning()
-    const [meter] = await db.insert(meters).values({ roomId: r301, utility: 'fee', installedOn: '2026-10-15', startReading: 0 }).returning()
+    const [fee] = await db
+      .insert(leaseFeeSnapshots)
+      .values({ leaseId, name: 'Giặt', unit: 'lượt', quantitySource: 'meter', unitPrice: 5000 })
+      .returning()
+    const [meter] = await db
+      .insert(meters)
+      .values({ roomId: r301, utility: 'fee', installedOn: '2026-10-15', startReading: 0 })
+      .returning()
     await db.insert(leaseFeeMeters).values({ leaseFeeId: fee.id, meterId: meter.id })
     const h = await startHandover(db, lan(), leaseId, 'check_in')
-    expect((await getHandover(db, lan(), h.id)).meters.find(m => m.meterId === meter.id)).toMatchObject({ label: 'Giặt' })
+    expect((await getHandover(db, lan(), h.id)).meters.find((m) => m.meterId === meter.id)).toMatchObject({
+      label: 'Giặt',
+    })
   })
 
   it('chỉ số thấp hơn chỉ số trước của đồng hồ → lỗi', async () => {
     await db.insert(meterReadings).values({ meterId: eMeter, period: '2020-01', readOn: '2020-01-31', value: 5000 })
     const h = await startHandover(db, lan(), leaseId, 'check_in')
-    await expect(saveHandover(db, lan(), h.id, { items: [], meterReadings: [{ meterId: eMeter, value: 100 }] })).rejects.toThrow('Chỉ số mới nhỏ hơn chỉ số cũ')
+    await expect(
+      saveHandover(db, lan(), h.id, { items: [], meterReadings: [{ meterId: eMeter, value: 100 }] }),
+    ).rejects.toThrow('Chỉ số mới nhỏ hơn chỉ số cũ')
   })
 
   it('biên bản đã hoàn tất thì không sửa được', async () => {
     const h = await startHandover(db, lan(), leaseId, 'check_in')
     await completeHandover(db, lan(), h.id)
-    await expect(saveHandover(db, lan(), h.id, { items: [], meterReadings: [] })).rejects.toThrow('Biên bản đã hoàn tất')
+    await expect(saveHandover(db, lan(), h.id, { items: [], meterReadings: [] })).rejects.toThrow(
+      'Biên bản đã hoàn tất',
+    )
     expect((await listHandovers(db, lan(), leaseId)).map((x) => [x.kind, x.status])).toEqual([['check_in', 'done']])
   })
 
@@ -109,22 +175,33 @@ describe('handovers', () => {
     const h = await startHandover(db, lan(), leaseId, 'check_in')
     const item = (await getHandover(db, lan(), h.id)).items[0]
     const storage = new MemoryStorage()
-    const up = await requestUpload(db, lan(), storage, { ownerType: 'handover_photo', ownerId: item.id, contentType: 'image/webp' })
+    const up = await requestUpload(db, lan(), storage, {
+      ownerType: 'handover_photo',
+      ownerId: item.id,
+      contentType: 'image/webp',
+    })
     await confirmUpload(db, lan(), up.fileId)
     expect(await listFiles(db, lan(), 'handover_photo', item.id)).toHaveLength(1)
     expect((await getHandover(db, lan(), h.id)).items.find((i) => i.id === item.id)!.photoIds).toEqual([up.fileId])
     const other = ctxOf(['tenants_contracts'], [fb])
     await expect(getHandover(db, other, h.id)).rejects.toThrow(NotFoundError)
     await expect(startHandover(db, other, leaseId, 'check_in')).rejects.toThrow(NotFoundError)
-    await expect(requestUpload(db, other, storage, { ownerType: 'handover_photo', ownerId: item.id, contentType: 'image/webp' })).rejects.toThrow(NotFoundError)
+    await expect(
+      requestUpload(db, other, storage, { ownerType: 'handover_photo', ownerId: item.id, contentType: 'image/webp' }),
+    ).rejects.toThrow(NotFoundError)
     await expect(getHandover(db, ctxOf(['billing'], [fa]), h.id)).rejects.toThrow(ForbiddenError)
-    await expect(startHandover(db, ctxOf(['meters', 'assets', 'incidents'], [fa]), leaseId, 'check_in')).rejects.toThrow(ForbiddenError)
+    await expect(
+      startHandover(db, ctxOf(['meters', 'assets', 'incidents'], [fa]), leaseId, 'check_in'),
+    ).rejects.toThrow(ForbiddenError)
   })
 
   it('lịch sử tài sản có dòng bàn giao', async () => {
     const h = await startHandover(db, lan(), leaseId, 'check_out')
     const item = (await getHandover(db, lan(), h.id)).items.find((i) => i.assetCode === 'AC-301')!
-    await saveHandover(db, lan(), h.id, { items: [{ id: item.id, condition: 'Hư', damaged: true, penalty: 500_000 }], meterReadings: [] })
+    await saveHandover(db, lan(), h.id, {
+      items: [{ id: item.id, condition: 'Hư', damaged: true, penalty: 500_000 }],
+      meterReadings: [],
+    })
     const hist = await assetHistory(db, ctxOf(['assets'], [fa]), ids['AC-301'])
     expect(hist.handovers).toHaveLength(1)
     expect(hist.handovers[0]).toMatchObject({ kind: 'check_out', condition: 'Hư', damaged: true, penalty: 500_000 })
@@ -133,7 +210,9 @@ describe('handovers', () => {
 
   it('hợp đồng không tồn tại → NotFoundError', async () => {
     await expect(startHandover(db, lan(), crypto.randomUUID(), 'check_in')).rejects.toThrow(NotFoundError)
-    await expect(saveHandover(db, lan(), crypto.randomUUID(), { items: [], meterReadings: [] })).rejects.toThrow(NotFoundError)
+    await expect(saveHandover(db, lan(), crypto.randomUUID(), { items: [], meterReadings: [] })).rejects.toThrow(
+      NotFoundError,
+    )
     expect(ValidationError).toBeDefined()
   })
 })

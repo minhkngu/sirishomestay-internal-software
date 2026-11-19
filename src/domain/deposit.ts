@@ -12,5 +12,11 @@ export function depositDiffEntry(oldAmount: number, newAmount: number, date: ISO
   if (newAmount === oldAmount) return null
   return newAmount > oldAmount
     ? { date, type: 'topup', amount: newAmount - oldAmount, status: 'pending', note: 'Thu cọc bổ sung theo phụ lục' }
-    : { date, type: 'refund', amount: oldAmount - newAmount, status: 'pending', note: 'Hoàn cọc chênh lệch theo phụ lục' }
+    : {
+        date,
+        type: 'refund',
+        amount: oldAmount - newAmount,
+        status: 'pending',
+        note: 'Hoàn cọc chênh lệch theo phụ lục',
+      }
 }

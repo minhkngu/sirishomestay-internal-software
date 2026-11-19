@@ -13,7 +13,11 @@ export type NewIncidentSP = { room?: string; asset?: string }
 export async function NewIncident({ sp, showHeading = true }: { sp: NewIncidentSP; showHeading?: boolean }) {
   const { room, asset } = sp
   const ctx = await getAccessContext()
-  try { assertCan(ctx, 'incidents') } catch { notFound() }
+  try {
+    assertCan(ctx, 'incidents')
+  } catch {
+    notFound()
+  }
   const facilities = await listFacilities(db, ctx)
   const roomFacility = room ? (await getRoomDetail(db, ctx, room).catch(() => null))?.room.facilityId : undefined
   const facilityId = roomFacility ?? facilities[0]?.id
@@ -21,7 +25,12 @@ export async function NewIncident({ sp, showHeading = true }: { sp: NewIncidentS
   return (
     <div className="space-y-4">
       {showHeading && <h1 className="text-xl font-semibold">Báo sự cố</h1>}
-      <IncidentForm roomId={room} assetId={asset} facilityId={room || asset ? undefined : facilityId} assignees={assignees} />
+      <IncidentForm
+        roomId={room}
+        assetId={asset}
+        facilityId={room || asset ? undefined : facilityId}
+        assignees={assignees}
+      />
     </div>
   )
 }

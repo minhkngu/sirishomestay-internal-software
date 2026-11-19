@@ -15,9 +15,20 @@ import type { listInvoices } from '@/server/invoices/service'
 
 type InvoiceRow = Awaited<ReturnType<typeof listInvoices>>[number]
 
-const VIEWS = [['all', 'Tất cả'], ['draft', 'Nháp'], ['unpaid', 'Chưa thu'], ['overdue', 'Quá hạn']] as const
+const VIEWS = [
+  ['all', 'Tất cả'],
+  ['draft', 'Nháp'],
+  ['unpaid', 'Chưa thu'],
+  ['overdue', 'Quá hạn'],
+] as const
 
-export function InvoiceList({ invoices, facilities }: { invoices: InvoiceRow[]; facilities: { id: string; name: string }[] }) {
+export function InvoiceList({
+  invoices,
+  facilities,
+}: {
+  invoices: InvoiceRow[]
+  facilities: { id: string; name: string }[]
+}) {
   const rawView = useListParam('view') ?? 'all'
   const view = (VIEWS.some(([k]) => k === rawView) ? rawView : 'all') as InvoiceView
   const rawPeriod = useListParam('period') ?? ''
@@ -27,7 +38,11 @@ export function InvoiceList({ invoices, facilities }: { invoices: InvoiceRow[]; 
   const names = useMemo(() => Object.fromEntries(facilities.map((f) => [f.id, f.name])), [facilities])
 
   const scoped = useMemo(
-    () => invoices.filter((i) => matchesPeriod(i.periodStart, period || null) && (selected.length === 0 || selected.includes(i.facilityId))),
+    () =>
+      invoices.filter(
+        (i) =>
+          matchesPeriod(i.periodStart, period || null) && (selected.length === 0 || selected.includes(i.facilityId)),
+      ),
     [invoices, period, selected],
   )
   const rows = useMemo(() => scoped.filter((i) => matchesInvoiceView(i.state, view)), [scoped, view])
@@ -39,7 +54,11 @@ export function InvoiceList({ invoices, facilities }: { invoices: InvoiceRow[]; 
         <ParamChips
           param="view"
           defaultValue="all"
-          items={VIEWS.map(([value, label]) => ({ value, label, count: scoped.filter((i) => matchesInvoiceView(i.state, value)).length }))}
+          items={VIEWS.map(([value, label]) => ({
+            value,
+            label,
+            count: scoped.filter((i) => matchesInvoiceView(i.state, value)).length,
+          }))}
         />
         <div className="flex flex-wrap items-center gap-2.5">
           <FacilityFilter facilities={facilities} align="right" />
@@ -59,16 +78,30 @@ export function InvoiceList({ invoices, facilities }: { invoices: InvoiceRow[]; 
           <thead className="border-b border-border/60 bg-muted/40 text-left">
             <tr>
               <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Mã</th>
-              <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Phòng</th>
+              <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                Phòng
+              </th>
               {facilities.length > 1 && (
-                <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Toà</th>
+                <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                  Toà
+                </th>
               )}
-              <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Bên thuê</th>
+              <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                Bên thuê
+              </th>
               <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Kỳ</th>
-              <th className="p-3 text-right font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Tổng</th>
-              <th className="p-3 text-right font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Đã thu</th>
-              <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Hạn</th>
-              <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Trạng thái</th>
+              <th className="p-3 text-right font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                Tổng
+              </th>
+              <th className="p-3 text-right font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                Đã thu
+              </th>
+              <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                Hạn
+              </th>
+              <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                Trạng thái
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50">
@@ -83,24 +116,32 @@ export function InvoiceList({ invoices, facilities }: { invoices: InvoiceRow[]; 
                   </Link>
                 </td>
                 <td className="p-3 font-medium text-foreground whitespace-nowrap">{i.roomCode}</td>
-                {facilities.length > 1 && <td className="p-3 text-muted-foreground whitespace-nowrap">{names[i.facilityId]}</td>}
+                {facilities.length > 1 && (
+                  <td className="p-3 text-muted-foreground whitespace-nowrap">{names[i.facilityId]}</td>
+                )}
                 <td className="p-3 font-medium text-foreground whitespace-nowrap">{i.tenantName}</td>
                 <td className="p-3 text-muted-foreground whitespace-nowrap">
                   {formatDateVN(i.periodStart)} – {formatDateVN(i.periodEnd)}
                 </td>
-                <td className="p-3 text-right font-semibold text-foreground tabular-nums whitespace-nowrap">{formatVND(i.total)}</td>
-                <td className="p-3 text-right text-muted-foreground tabular-nums whitespace-nowrap">{formatVND(i.paid)}</td>
-                <td className="p-3 text-muted-foreground whitespace-nowrap">{i.dueDate ? formatDateVN(i.dueDate) : '—'}</td>
+                <td className="p-3 text-right font-semibold text-foreground tabular-nums whitespace-nowrap">
+                  {formatVND(i.total)}
+                </td>
+                <td className="p-3 text-right text-muted-foreground tabular-nums whitespace-nowrap">
+                  {formatVND(i.paid)}
+                </td>
+                <td className="p-3 text-muted-foreground whitespace-nowrap">
+                  {i.dueDate ? formatDateVN(i.dueDate) : '—'}
+                </td>
                 <td className="p-3 whitespace-nowrap">
                   <StatusDot
                     tone={
                       i.state === 'overdue'
                         ? 'danger'
                         : i.state === 'paid' || i.state === 'refunded'
-                        ? 'ok'
-                        : i.state === 'partial' || i.state === 'refund_pending'
-                        ? 'warn'
-                        : 'muted'
+                          ? 'ok'
+                          : i.state === 'partial' || i.state === 'refund_pending'
+                            ? 'warn'
+                            : 'muted'
                     }
                   >
                     {invoiceStatusLabel(i.state)}
@@ -110,10 +151,7 @@ export function InvoiceList({ invoices, facilities }: { invoices: InvoiceRow[]; 
             ))}
             {rows.length === 0 && (
               <tr>
-                <td
-                  colSpan={facilities.length > 1 ? 9 : 8}
-                  className="p-8 text-center text-xs text-muted-foreground"
-                >
+                <td colSpan={facilities.length > 1 ? 9 : 8} className="p-8 text-center text-xs text-muted-foreground">
                   Không có hoá đơn nào
                 </td>
               </tr>

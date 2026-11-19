@@ -20,9 +20,16 @@ export const isUsableTemplate = (t: { body: string | null }): boolean => !!t.bod
 const isDocType = (v: string): v is DocType => (DOC_TYPES as readonly string[]).includes(v)
 
 /** Ai đăng nhập cũng xem được danh sách mẫu (cần để chọn mẫu khi xuất giấy tờ). */
-export async function listTemplates(db: Pick<DB, 'select'>, _ctx: AccessContext, docType?: DocType): Promise<DocTemplate[]> {
+export async function listTemplates(
+  db: Pick<DB, 'select'>,
+  _ctx: AccessContext,
+  docType?: DocType,
+): Promise<DocTemplate[]> {
   const q = db.select().from(docTemplates)
-  return (await (docType ? q.where(eq(docTemplates.docType, docType)) : q).orderBy(asc(docTemplates.docType), asc(docTemplates.createdAt))) as DocTemplate[]
+  return (await (docType ? q.where(eq(docTemplates.docType, docType)) : q).orderBy(
+    asc(docTemplates.docType),
+    asc(docTemplates.createdAt),
+  )) as DocTemplate[]
 }
 
 function checkStyle(style: unknown): TemplateStyle {
@@ -32,11 +39,19 @@ function checkStyle(style: unknown): TemplateStyle {
 function checkBody(body: string): string {
   if (!body.trim()) throw new ValidationError('Nhập nội dung mẫu', { body: 'Nhập nội dung mẫu' })
   if (body.length > MAX_BODY) throw new ValidationError('Nội dung mẫu quá dài', { body: 'Nội dung mẫu quá dài' })
-  try { renderTemplate(body, {}) } catch { throw new ValidationError('Nội dung mẫu không đọc được') }
+  try {
+    renderTemplate(body, {})
+  } catch {
+    throw new ValidationError('Nội dung mẫu không đọc được')
+  }
   return body
 }
 
-export async function createTemplate(db: DB, ctx: AccessContext, input: { docType: string; name: string; body?: string; style?: TemplateStyle }): Promise<DocTemplate> {
+export async function createTemplate(
+  db: DB,
+  ctx: AccessContext,
+  input: { docType: string; name: string; body?: string; style?: TemplateStyle },
+): Promise<DocTemplate> {
   assertCan(ctx, 'settings')
   if (!isDocType(input.docType)) throw new ValidationError('Loại giấy tờ không hợp lệ')
   const name = input.name.trim()
@@ -44,45 +59,108 @@ export async function createTemplate(db: DB, ctx: AccessContext, input: { docTyp
   const body = input.body === undefined ? null : checkBody(input.body)
   const style = input.style === undefined ? 'formal' : checkStyle(input.style)
   return db.transaction(async (tx) => {
-    const existing = body ? await tx.select({ id: docTemplates.id }).from(docTemplates).where(and(eq(docTemplates.docType, input.docType), eq(docTemplates.isDefault, true), isNotNull(docTemplates.body))) : []
-    const [t] = await tx.insert(docTemplates).values({ docType: input.docType, name, body, style, isDefault: !!body && existing.length === 0 }).returning()
-    await recordAudit(tx, ctx, { action: 'create', entity: 'doc_template', entityId: t.id, summary: `Tạo mẫu giấy tờ ${name}`, after: t })
+    const existing = body
+      ? await tx
+          .select({ id: docTemplates.id })
+          .from(docTemplates)
+          .where(
+            and(
+              eq(docTemplates.docType, input.docType),
+              eq(docTemplates.isDefault, true),
+              isNotNull(docTemplates.body),
+            ),
+          )
+      : []
+    const [t] = await tx
+      .insert(docTemplates)
+      .values({ docType: input.docType, name, body, style, isDefault: !!body && existing.length === 0 })
+      .returning()
+    await recordAudit(tx, ctx, {
+      action: 'create',
+      entity: 'doc_template',
+      entityId: t.id,
+      summary: `Tạo mẫu giấy tờ ${name}`,
+      after: t,
+    })
     return t as DocTemplate
   })
 }
 
 /** Sửa tên, nội dung (HTML) và kiểu trình bày của mẫu; mẫu đầu tiên của loại có nội dung tự thành mặc định. */
-export async function updateTemplate(db: DB, ctx: AccessContext, id: string, input: { name?: string; body?: string; style?: TemplateStyle }): Promise<DocTemplate> {
+export async function updateTemplate(
+  db: DB,
+  ctx: AccessContext,
+  id: string,
+  input: { name?: string; body?: string; style?: TemplateStyle },
+): Promise<DocTemplate> {
   assertCan(ctx, 'settings')
   const patch: Partial<typeof docTemplates.$inferInsert> = { updatedAt: new Date() }
-  if (input.name !== undefined) { const name = input.name.trim(); if (!name) throw new ValidationError('Nhập tên mẫu', { name: 'Nhập tên mẫu' }); patch.name = name }
+  if (input.name !== undefined) {
+    const name = input.name.trim()
+    if (!name) throw new ValidationError('Nhập tên mẫu', { name: 'Nhập tên mẫu' })
+    patch.name = name
+  }
   if (input.body !== undefined) patch.body = checkBody(input.body)
   if (input.style !== undefined) patch.style = checkStyle(input.style)
   return db.transaction(async (tx) => {
     const [t] = await tx.select().from(docTemplates).where(eq(docTemplates.id, id))
     if (!t) throw new NotFoundError()
     if (patch.body) {
-      const usable = await tx.select({ id: docTemplates.id }).from(docTemplates).where(and(eq(docTemplates.docType, t.docType), eq(docTemplates.isDefault, true), isNotNull(docTemplates.body)))
+      const usable = await tx
+        .select({ id: docTemplates.id })
+        .from(docTemplates)
+        .where(and(eq(docTemplates.docType, t.docType), eq(docTemplates.isDefault, true), isNotNull(docTemplates.body)))
       if (usable.length === 0) patch.isDefault = true
     }
-    if (patch.isDefault) await tx.update(docTemplates).set({ isDefault: false }).where(and(eq(docTemplates.docType, t.docType), ne(docTemplates.id, id)))
+    if (patch.isDefault)
+      await tx
+        .update(docTemplates)
+        .set({ isDefault: false })
+        .where(and(eq(docTemplates.docType, t.docType), ne(docTemplates.id, id)))
     const [after] = await tx.update(docTemplates).set(patch).where(eq(docTemplates.id, id)).returning()
-    await recordAudit(tx, ctx, { action: 'update', entity: 'doc_template', entityId: id, summary: `Sửa mẫu giấy tờ ${after.name}`, before: { ...t, body: t.body ? '(đã có)' : null }, after: { ...after, body: after.body ? '(đã có)' : null } })
+    await recordAudit(tx, ctx, {
+      action: 'update',
+      entity: 'doc_template',
+      entityId: id,
+      summary: `Sửa mẫu giấy tờ ${after.name}`,
+      before: { ...t, body: t.body ? '(đã có)' : null },
+      after: { ...after, body: after.body ? '(đã có)' : null },
+    })
     return after as DocTemplate
   })
 }
 
 /** Gắn file .docx đã tải lên (ownerType `template`, ownerId = id mẫu); mẫu đầu tiên của loại tự thành mặc định. */
-export async function attachTemplateFile(db: DB, ctx: AccessContext, templateId: string, fileId: string): Promise<DocTemplate> {
+export async function attachTemplateFile(
+  db: DB,
+  ctx: AccessContext,
+  templateId: string,
+  fileId: string,
+): Promise<DocTemplate> {
   assertCan(ctx, 'settings')
   return db.transaction(async (tx) => {
     const [t] = await tx.select().from(docTemplates).where(eq(docTemplates.id, templateId))
     if (!t) throw new NotFoundError()
     const [f] = await tx.select().from(files).where(eq(files.id, fileId))
-    if (!f || f.ownerType !== 'template' || f.ownerId !== templateId || !f.confirmedAt) throw new ValidationError('Tệp mẫu chưa được tải lên')
-    const existing = await tx.select().from(docTemplates).where(and(eq(docTemplates.docType, t.docType), eq(docTemplates.isDefault, true)))
-    const [after] = await tx.update(docTemplates).set({ fileId, isDefault: t.isDefault || existing.length === 0, updatedAt: new Date() }).where(eq(docTemplates.id, templateId)).returning()
-    await recordAudit(tx, ctx, { action: 'update', entity: 'doc_template', entityId: templateId, summary: `Tải file mẫu ${t.name}`, before: t, after })
+    if (!f || f.ownerType !== 'template' || f.ownerId !== templateId || !f.confirmedAt)
+      throw new ValidationError('Tệp mẫu chưa được tải lên')
+    const existing = await tx
+      .select()
+      .from(docTemplates)
+      .where(and(eq(docTemplates.docType, t.docType), eq(docTemplates.isDefault, true)))
+    const [after] = await tx
+      .update(docTemplates)
+      .set({ fileId, isDefault: t.isDefault || existing.length === 0, updatedAt: new Date() })
+      .where(eq(docTemplates.id, templateId))
+      .returning()
+    await recordAudit(tx, ctx, {
+      action: 'update',
+      entity: 'doc_template',
+      entityId: templateId,
+      summary: `Tải file mẫu ${t.name}`,
+      before: t,
+      after,
+    })
     return after as DocTemplate
   })
 }
@@ -92,9 +170,17 @@ export async function setDefaultTemplate(db: DB, ctx: AccessContext, id: string)
   await db.transaction(async (tx) => {
     const [t] = await tx.select().from(docTemplates).where(eq(docTemplates.id, id))
     if (!t) throw new NotFoundError()
-    await tx.update(docTemplates).set({ isDefault: false, updatedAt: new Date() }).where(eq(docTemplates.docType, t.docType))
+    await tx
+      .update(docTemplates)
+      .set({ isDefault: false, updatedAt: new Date() })
+      .where(eq(docTemplates.docType, t.docType))
     await tx.update(docTemplates).set({ isDefault: true, updatedAt: new Date() }).where(eq(docTemplates.id, id))
-    await recordAudit(tx, ctx, { action: 'update', entity: 'doc_template', entityId: id, summary: `Đặt mẫu mặc định ${t.name}` })
+    await recordAudit(tx, ctx, {
+      action: 'update',
+      entity: 'doc_template',
+      entityId: id,
+      summary: `Đặt mẫu mặc định ${t.name}`,
+    })
   })
 }
 
@@ -113,22 +199,43 @@ export async function removeTemplate(db: DB, ctx: AccessContext, storage: Storag
     }
     await tx.delete(docTemplates).where(eq(docTemplates.id, id))
     if (t.isDefault) {
-      const [next] = await tx.select().from(docTemplates).where(eq(docTemplates.docType, t.docType)).orderBy(asc(docTemplates.createdAt)).limit(1)
+      const [next] = await tx
+        .select()
+        .from(docTemplates)
+        .where(eq(docTemplates.docType, t.docType))
+        .orderBy(asc(docTemplates.createdAt))
+        .limit(1)
       if (next) await tx.update(docTemplates).set({ isDefault: true }).where(eq(docTemplates.id, next.id))
     }
-    await recordAudit(tx, ctx, { action: 'delete', entity: 'doc_template', entityId: id, summary: `Xoá mẫu giấy tờ ${t.name}`, before: t })
+    await recordAudit(tx, ctx, {
+      action: 'delete',
+      entity: 'doc_template',
+      entityId: id,
+      summary: `Xoá mẫu giấy tờ ${t.name}`,
+      before: t,
+    })
   })
   for (const k of keys) await storage.delete(k)
 }
 
 // ---------------------------------------------------------------- xuất giấy tờ
 
-export type DocLoader = (db: DB, ctx: AccessContext, entityId: string) => Promise<{ entities: DocEntities; facilityId: string; baseName: string }>
+export type DocLoader = (
+  db: DB,
+  ctx: AccessContext,
+  entityId: string,
+) => Promise<{ entities: DocEntities; facilityId: string; baseName: string }>
 const loaders: Partial<Record<DocType, DocLoader>> = {}
 
-export type PdfLoader = (db: DB, ctx: AccessContext, id: string) => Promise<{ facilityId: string; baseName: string; render: () => Promise<Uint8Array> }>
+export type PdfLoader = (
+  db: DB,
+  ctx: AccessContext,
+  id: string,
+) => Promise<{ facilityId: string; baseName: string; render: () => Promise<Uint8Array> }>
 const pdfLoaders: Partial<Record<PdfDocType, PdfLoader>> = {}
-export function registerPdfLoader(docType: PdfDocType, loader: PdfLoader) { pdfLoaders[docType] = loader }
+export function registerPdfLoader(docType: PdfDocType, loader: PdfLoader) {
+  pdfLoaders[docType] = loader
+}
 
 /** Mỗi module (hợp đồng, bàn giao, hoá đơn…) đăng ký cách tải dữ liệu thực thể để điền mẫu. */
 export function registerDocLoader(docType: DocType, loader: DocLoader) {
@@ -147,7 +254,11 @@ async function pickTemplate(db: DB, ctx: AccessContext, docType: DocType, templa
     if (!t.body) throw t.fileId ? legacy() : new ValidationError('Chưa có mẫu cho loại giấy tờ này')
     return t as DocTemplate
   }
-  const all = (await db.select().from(docTemplates).where(eq(docTemplates.docType, docType)).orderBy(asc(docTemplates.createdAt))) as DocTemplate[]
+  const all = (await db
+    .select()
+    .from(docTemplates)
+    .where(eq(docTemplates.docType, docType))
+    .orderBy(asc(docTemplates.createdAt))) as DocTemplate[]
   const usable = all.filter(isUsableTemplate)
   const pick = usable.find((t) => t.isDefault) ?? usable[0]
   if (pick) return pick
@@ -157,7 +268,9 @@ async function pickTemplate(db: DB, ctx: AccessContext, docType: DocType, templa
 
 /** Dựng nội dung giấy tờ (chưa lưu): PDF cho hoá đơn/phiếu thu; hợp đồng, phụ lục, biên bản dựng từ mẫu soạn trong app ra Word hoặc PDF. */
 async function produceDocument(
-  db: DB, ctx: AccessContext, input: { docType: DocType; entityId: string; templateId?: string; format?: ExportFormat },
+  db: DB,
+  ctx: AccessContext,
+  input: { docType: DocType; entityId: string; templateId?: string; format?: ExportFormat },
 ): Promise<Produced> {
   const isPdf = (PDF_DOC_TYPES as readonly string[]).includes(input.docType)
   const format = input.format ?? (isPdf ? 'pdf' : 'docx')
@@ -169,8 +282,17 @@ async function produceDocument(
     const loaded = await loader(db, ctx, input.entityId)
     assertCan(ctx, fileAccessPermission('export', { docType: input.docType }), loaded.facilityId)
     const pdf = await loaded.render()
-    const out = format === 'png' ? await convertPdfToPng(new Blob([new Uint8Array(pdf)])) : new Blob([new Uint8Array(pdf)], { type: 'application/pdf' })
-    return { bytes: new Uint8Array(await out.arrayBuffer()), facilityId: loaded.facilityId, baseName: loaded.baseName, warnings: [], format }
+    const out =
+      format === 'png'
+        ? await convertPdfToPng(new Blob([new Uint8Array(pdf)]))
+        : new Blob([new Uint8Array(pdf)], { type: 'application/pdf' })
+    return {
+      bytes: new Uint8Array(await out.arrayBuffer()),
+      facilityId: loaded.facilityId,
+      baseName: loaded.baseName,
+      warnings: [],
+      format,
+    }
   }
   const loader = loaders[input.docType]
   if (!loader) throw new ValidationError('Chưa hỗ trợ xuất loại giấy tờ này')
@@ -179,22 +301,34 @@ async function produceDocument(
   const template = await pickTemplate(db, ctx, input.docType, input.templateId)
   const { buildTemplateData } = await import('@/domain/template-fields')
   const { doc, warnings } = renderTemplate(template.body!, buildTemplateData(input.docType, loaded.entities))
-  const bytes = format === 'docx'
-    ? await (await import('@/server/word/build-docx')).buildDocx(doc, template.style)
-    : await (await import('@/server/pdf/template-pdf')).renderTemplatePdf(doc, template.style)
+  const bytes =
+    format === 'docx'
+      ? await (await import('@/server/word/build-docx')).buildDocx(doc, template.style)
+      : await (await import('@/server/pdf/template-pdf')).renderTemplatePdf(doc, template.style)
   return { bytes, facilityId: loaded.facilityId, baseName: loaded.baseName, warnings, format }
 }
 
 /** Xem trước giấy tờ thật bằng mẫu đã chọn, không lưu tệp. */
 export async function previewDocument(
-  db: DB, ctx: AccessContext, input: { docType: DocType; entityId: string; templateId?: string },
+  db: DB,
+  ctx: AccessContext,
+  input: { docType: DocType; entityId: string; templateId?: string },
 ): Promise<{ bytes: Uint8Array; name: string; warnings: string[] }> {
   const r = await produceDocument(db, ctx, { ...input, format: 'pdf' })
   return { bytes: r.bytes, name: `${r.baseName}.pdf`, warnings: r.warnings }
 }
 
 export async function exportDocument(
-  db: DB, ctx: AccessContext, storage: StorageAdapter, input: { docType: DocType; entityId: string; templateId?: string; format?: ExportFormat; /** Bản tự tạo khi lưu hợp đồng; được thay bằng bản mới ở lần lưu sau. */ auto?: boolean },
+  db: DB,
+  ctx: AccessContext,
+  storage: StorageAdapter,
+  input: {
+    docType: DocType
+    entityId: string
+    templateId?: string
+    format?: ExportFormat
+    /** Bản tự tạo khi lưu hợp đồng; được thay bằng bản mới ở lần lưu sau. */ auto?: boolean
+  },
 ): Promise<{ fileId: string; warnings: string[] }> {
   const { bytes, facilityId, baseName, warnings, format } = await produceDocument(db, ctx, input)
   const { ext, mime } = FORMAT_EXT[format]
@@ -204,10 +338,25 @@ export async function exportDocument(
   await storage.write(key, bytes, mime)
   await db.transaction(async (tx) => {
     await tx.insert(files).values({
-      id, storageKey: key, name: `${baseName}.${ext}`, contentType: mime, size: bytes.byteLength, ownerType: 'export', ownerId: input.entityId,
-      facilityId, uploadedBy: ctx.userId, meta: { docType: input.docType, ...(input.auto && { auto: true }) }, confirmedAt: new Date(),
+      id,
+      storageKey: key,
+      name: `${baseName}.${ext}`,
+      contentType: mime,
+      size: bytes.byteLength,
+      ownerType: 'export',
+      ownerId: input.entityId,
+      facilityId,
+      uploadedBy: ctx.userId,
+      meta: { docType: input.docType, ...(input.auto && { auto: true }) },
+      confirmedAt: new Date(),
     })
-    await recordAudit(tx, ctx, { action: 'create', entity: 'export', entityId: id, facilityId, summary: `Xuất giấy tờ ${baseName}.${ext}` })
+    await recordAudit(tx, ctx, {
+      action: 'create',
+      entity: 'export',
+      entityId: id,
+      facilityId,
+      summary: `Xuất giấy tờ ${baseName}.${ext}`,
+    })
   })
   return { fileId: id, warnings }
 }

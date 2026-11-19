@@ -15,7 +15,14 @@ const SIZE: Record<FormDialogSize, string> = {
 }
 
 /** Khung popup chung cho mọi thao tác thêm mới: tiêu đề, thân cuộn dọc, đóng bằng Esc hoặc nút đóng. */
-export function FormDialog({ title, description, open, onOpenChange, size = 'md', children }: {
+export function FormDialog({
+  title,
+  description,
+  open,
+  onOpenChange,
+  size = 'md',
+  children,
+}: {
   title: string
   description?: string
   open: boolean

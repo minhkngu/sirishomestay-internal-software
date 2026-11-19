@@ -60,9 +60,7 @@ export function StatStrip({
                 <Icon className="size-3.5" />
               </div>
             </div>
-            <div className="mt-2 text-2xl font-bold tracking-tight text-foreground tabular-nums">
-              {s.value}
-            </div>
+            <div className="mt-2 text-2xl font-bold tracking-tight text-foreground tabular-nums">{s.value}</div>
           </div>
         )
       })}

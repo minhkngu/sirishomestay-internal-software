@@ -2,27 +2,13 @@
 
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import {
-  Banknote,
-  Calendar,
-  Check,
-  CreditCard,
-  Download,
-  FileDown,
-  Plus,
-  Trash2,
-  X,
-} from 'lucide-react'
+import { Banknote, Calendar, Check, CreditCard, Download, FileDown, Plus, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { MoneyInput } from '@/components/ui/money-input'
 import { cn } from '@/lib/utils'
-import {
-  addPaymentAction,
-  exportReceiptAction,
-  removePaymentAction,
-} from '@/server/invoices/actions'
+import { addPaymentAction, exportReceiptAction, removePaymentAction } from '@/server/invoices/actions'
 
 type Pay = {
   id: string
@@ -80,7 +66,10 @@ export function PaymentDialog({
         {approved && (
           <Button
             size="sm"
-            onClick={() => { setAmount(String(remaining)); setOpen(!open) }}
+            onClick={() => {
+              setAmount(String(remaining))
+              setOpen(!open)
+            }}
             className="gap-1.5 rounded-xl font-medium text-xs shadow-2xs"
           >
             <Plus className="size-3.5" />
@@ -89,11 +78,7 @@ export function PaymentDialog({
         )}
       </div>
 
-      {!approved && (
-        <p className="text-xs text-muted-foreground">
-          Duyệt hoá đơn trước khi ghi thu khoản thanh toán.
-        </p>
-      )}
+      {!approved && <p className="text-xs text-muted-foreground">Duyệt hoá đơn trước khi ghi thu khoản thanh toán.</p>}
 
       {payments.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/70 p-6 text-center text-xs text-muted-foreground">
@@ -112,9 +97,7 @@ export function PaymentDialog({
                   <span>{formatDateVN(p.paidOn)}</span>
                 </span>
                 <span className="text-muted-foreground">·</span>
-                <span className="font-bold tabular-nums text-emerald-700">
-                  {formatVND(p.amount)}
-                </span>
+                <span className="font-bold tabular-nums text-emerald-700">{formatVND(p.amount)}</span>
                 <span className="text-muted-foreground">·</span>
                 <span className="rounded-full border border-border/80 bg-muted/60 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
                   {METHOD[p.method] ?? p.method}
@@ -150,8 +133,7 @@ export function PaymentDialog({
                   variant="ghost"
                   disabled={pending}
                   onClick={() => {
-                    if (confirm('Gỡ khoản thu này?'))
-                      run(() => removePaymentAction(p.id), 'Đã gỡ khoản thu')
+                    if (confirm('Gỡ khoản thu này?')) run(() => removePaymentAction(p.id), 'Đã gỡ khoản thu')
                   }}
                   className="h-8 gap-1 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700 text-[11px] font-medium"
                 >
@@ -178,7 +160,7 @@ export function PaymentDialog({
                   method: String(f.get('method')) as 'cash',
                   note: String(f.get('note') ?? ''),
                 }),
-              'Đã ghi thu'
+              'Đã ghi thu',
             )
           }}
         >

@@ -36,7 +36,12 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
   const active = history.find((l) => l.status === 'active')
   const terms = detail.lease?.terms
   const assigneeIds = [...new Set((roomIncidents ?? []).map((i) => i.assigneeId).filter((x): x is string => !!x))]
-  const people = assigneeIds.length ? await db.select({ id: userProfiles.id, name: userProfiles.fullName }).from(userProfiles).where(inArray(userProfiles.id, assigneeIds)) : []
+  const people = assigneeIds.length
+    ? await db
+        .select({ id: userProfiles.id, name: userProfiles.fullName })
+        .from(userProfiles)
+        .where(inArray(userProfiles.id, assigneeIds))
+    : []
   return (
     <div className="max-w-5xl space-y-6">
       <div className="space-y-2">
@@ -52,13 +57,14 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
             <span className="rounded-full border border-border/80 bg-muted/60 px-3 py-0.5 text-xs font-semibold text-foreground">
               {ROOM_STATUS_LABELS[detail.status]}
             </span>
-            {!r.isActive && <span className="rounded-full border border-dashed border-border bg-muted px-3 py-0.5 text-xs font-semibold text-muted-foreground">Ngừng sử dụng</span>}
+            {!r.isActive && (
+              <span className="rounded-full border border-dashed border-border bg-muted px-3 py-0.5 text-xs font-semibold text-muted-foreground">
+                Ngừng sử dụng
+              </span>
+            )}
           </div>
           {can(ctx, 'incidents', r.facilityId) && (
-            <Link
-              href={`/incidents/new?room=${id}`}
-              className={buttonVariants({ variant: 'outline', size: 'sm' })}
-            >
+            <Link href={`/incidents/new?room=${id}`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
               Báo sự cố phòng
             </Link>
           )}
@@ -67,26 +73,59 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
 
       <section className="rounded-2xl border border-border/80 bg-card p-4 shadow-2xs">
         <dl className="flex flex-wrap gap-x-6 gap-y-2 text-xs">
-          {([
-            ['Tầng', r.floor], ['Loại', r.roomType], ['Diện tích', r.areaM2 ? `${r.areaM2} m²` : null],
-            ['Giường', r.beds], ['Sức chứa', r.capacity ? `${r.capacity} người` : null],
-            ['Giá niêm yết', r.listPrice != null ? formatVND(r.listPrice) : null],
-          ] as [string, string | number | null][]).filter(([, v]) => v != null && v !== '').map(([k, v]) => (
-            <div key={k} className="flex gap-1.5"><dt className="text-muted-foreground">{k}</dt><dd className="font-medium text-foreground tabular-nums">{v}</dd></div>
-          ))}
+          {(
+            [
+              ['Tầng', r.floor],
+              ['Loại', r.roomType],
+              ['Diện tích', r.areaM2 ? `${r.areaM2} m²` : null],
+              ['Giường', r.beds],
+              ['Sức chứa', r.capacity ? `${r.capacity} người` : null],
+              ['Giá niêm yết', r.listPrice != null ? formatVND(r.listPrice) : null],
+            ] as [string, string | number | null][]
+          )
+            .filter(([, v]) => v != null && v !== '')
+            .map(([k, v]) => (
+              <div key={k} className="flex gap-1.5">
+                <dt className="text-muted-foreground">{k}</dt>
+                <dd className="font-medium text-foreground tabular-nums">{v}</dd>
+              </div>
+            ))}
           {detail.amenities.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5">
               <dt className="text-muted-foreground">Tiện ích</dt>
-              {detail.amenities.map((a) => <dd key={a.id} className="rounded-full bg-muted px-2 py-0.5 font-medium text-foreground">{a.name}</dd>)}
+              {detail.amenities.map((a) => (
+                <dd key={a.id} className="rounded-full bg-muted px-2 py-0.5 font-medium text-foreground">
+                  {a.name}
+                </dd>
+              ))}
             </div>
           )}
-          {r.note && <div className="flex gap-1.5"><dt className="text-muted-foreground">Ghi chú</dt><dd className="text-foreground">{r.note}</dd></div>}
+          {r.note && (
+            <div className="flex gap-1.5">
+              <dt className="text-muted-foreground">Ghi chú</dt>
+              <dd className="text-foreground">{r.note}</dd>
+            </div>
+          )}
         </dl>
         {ctx.isAdmin && (
           <div className="mt-3">
-            <RoomEditForm room={{ id: r.id, code: r.code, floor: r.floor, roomType: r.roomType, areaM2: r.areaM2, beds: r.beds, listPrice: r.listPrice, capacity: r.capacity }}
-              amenities={allAmenities.map((a) => ({ id: a.id, name: a.name, isActive: a.isActive }))} selectedIds={detail.amenities.map((a) => a.id)} />
-            <div className="mt-3 border-t border-border/60 pt-3"><RoomLifecycle id={r.id} code={r.code} isActive={r.isActive} /></div>
+            <RoomEditForm
+              room={{
+                id: r.id,
+                code: r.code,
+                floor: r.floor,
+                roomType: r.roomType,
+                areaM2: r.areaM2,
+                beds: r.beds,
+                listPrice: r.listPrice,
+                capacity: r.capacity,
+              }}
+              amenities={allAmenities.map((a) => ({ id: a.id, name: a.name, isActive: a.isActive }))}
+              selectedIds={detail.amenities.map((a) => a.id)}
+            />
+            <div className="mt-3 border-t border-border/60 pt-3">
+              <RoomLifecycle id={r.id} code={r.code} isActive={r.isActive} />
+            </div>
           </div>
         )}
       </section>
@@ -120,16 +159,31 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
               <div className="space-y-3 rounded-xl border border-border/60 bg-muted/30 p-3">
                 <div>
                   <span className="font-semibold text-foreground">Đang ở: </span>
-                  <PopupLink className="font-semibold text-primary hover:underline underline-offset-2" href={`/contracts/${active.id}`}>
+                  <PopupLink
+                    className="font-semibold text-primary hover:underline underline-offset-2"
+                    href={`/contracts/${active.id}`}
+                  >
                     {active.code}
                   </PopupLink>
                   {canViewTenantIdentity(ctx, r.facilityId) ? ` — ${active.tenantName}` : ''}
-                  <span className="text-muted-foreground"> · {formatDateVN(active.startDate)} – {formatDateVN(terms.endDate)}</span>
+                  <span className="text-muted-foreground">
+                    {' '}
+                    · {formatDateVN(active.startDate)} – {formatDateVN(terms.endDate)}
+                  </span>
                 </div>
                 <dl className="grid grid-cols-2 gap-x-6 gap-y-1.5 sm:grid-cols-3">
-                  <div><dt className="text-muted-foreground">Giá thuê</dt><dd className="font-semibold tabular-nums">{formatVND(terms.monthlyRent)}/tháng</dd></div>
-                  <div><dt className="text-muted-foreground">Tiền cọc</dt><dd className="font-semibold tabular-nums">{formatVND(terms.depositAmount)}</dd></div>
-                  <div><dt className="text-muted-foreground">Chu kỳ thu</dt><dd className="font-semibold">{terms.billingCycleMonths} tháng</dd></div>
+                  <div>
+                    <dt className="text-muted-foreground">Giá thuê</dt>
+                    <dd className="font-semibold tabular-nums">{formatVND(terms.monthlyRent)}/tháng</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Tiền cọc</dt>
+                    <dd className="font-semibold tabular-nums">{formatVND(terms.depositAmount)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Chu kỳ thu</dt>
+                    <dd className="font-semibold">{terms.billingCycleMonths} tháng</dd>
+                  </div>
                 </dl>
                 <div>
                   <div className="mb-1 font-medium text-muted-foreground">Phí dịch vụ</div>
@@ -142,9 +196,15 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
                           <span className="font-medium text-foreground">{f.name}</span>
                           <span className="tabular-nums text-muted-foreground">
                             {formatVND(f.unitPrice)}/{f.unit}
-                            {f.billing === 'monthly_fixed'
-                              ? <> × {f.quantity} = <strong className="text-foreground">{formatVND(f.unitPrice * f.quantity)}/tháng</strong></>
-                              : ' · tính theo lần phát sinh'}
+                            {f.billing === 'monthly_fixed' ? (
+                              <>
+                                {' '}
+                                × {f.quantity} ={' '}
+                                <strong className="text-foreground">{formatVND(f.unitPrice * f.quantity)}/tháng</strong>
+                              </>
+                            ) : (
+                              ' · tính theo lần phát sinh'
+                            )}
                           </span>
                         </li>
                       ))}
@@ -162,7 +222,10 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
             {deposit && (
               <p className="text-muted-foreground">
                 <span className="font-medium text-foreground">Cọc chờ: </span>
-                <PopupLink className="font-semibold text-primary hover:underline underline-offset-2" href={`/contracts/${deposit.id}`}>
+                <PopupLink
+                  className="font-semibold text-primary hover:underline underline-offset-2"
+                  href={`/contracts/${deposit.id}`}
+                >
                   vào ở dự kiến {formatDateVN(deposit.expectedMoveIn)}
                 </PopupLink>
               </p>
@@ -192,16 +255,36 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
       {roomAssets && (
         <section className="space-y-2 rounded-lg border bg-card p-4">
           <h2 className="font-medium">Tài sản trong phòng ({roomAssets.length})</h2>
-          <ul className="space-y-1 text-sm">{roomAssets.map((a) => <li key={a.id}><Link className="underline" href={`/assets/${a.id}`}>{a.code}</Link> — {a.name} ({a.condition})</li>)}</ul>
+          <ul className="space-y-1 text-sm">
+            {roomAssets.map((a) => (
+              <li key={a.id}>
+                <Link className="underline" href={`/assets/${a.id}`}>
+                  {a.code}
+                </Link>{' '}
+                — {a.name} ({a.condition})
+              </li>
+            ))}
+          </ul>
         </section>
       )}
       {roomIncidents && (
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold tracking-tight text-foreground">Sự cố của phòng ({roomIncidents.filter((i) => i.status !== 'cancelled').length})</h2>
-          <RoomIncidentList items={roomIncidents.filter((i) => i.status !== 'cancelled').map((i) => ({
-            id: i.id, title: i.title, status: i.status, priority: i.priority, cost: i.cost,
-            createdAt: i.createdAt.toISOString(), assigneeName: people.find((p) => p.id === i.assigneeId)?.name ?? null,
-          }))} />
+          <h2 className="text-sm font-semibold tracking-tight text-foreground">
+            Sự cố của phòng ({roomIncidents.filter((i) => i.status !== 'cancelled').length})
+          </h2>
+          <RoomIncidentList
+            items={roomIncidents
+              .filter((i) => i.status !== 'cancelled')
+              .map((i) => ({
+                id: i.id,
+                title: i.title,
+                status: i.status,
+                priority: i.priority,
+                cost: i.cost,
+                createdAt: i.createdAt.toISOString(),
+                assigneeName: people.find((p) => p.id === i.assigneeId)?.name ?? null,
+              }))}
+          />
         </section>
       )}
     </div>

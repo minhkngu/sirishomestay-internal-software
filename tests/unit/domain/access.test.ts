@@ -1,7 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import {
-  can, assertCan, facilityScope, canViewTenantIdentity, maskId, NotFoundError, ForbiddenError, PERMISSIONS, PERMISSION_LABELS,
-  type AccessContext, type Permission,
+  can,
+  assertCan,
+  facilityScope,
+  canViewTenantIdentity,
+  maskId,
+  NotFoundError,
+  ForbiddenError,
+  PERMISSIONS,
+  PERMISSION_LABELS,
+  type AccessContext,
+  type Permission,
 } from '@/domain/access'
 
 const A = 'facility-a'
@@ -9,8 +18,12 @@ const B = 'facility-b'
 
 function ctx(perms: Permission[], facilities: string[]): AccessContext {
   return {
-    userId: 'u1', email: 'u@x.com', fullName: 'U',
-    permissions: new Set(perms), facilityIds: new Set(facilities), isAdmin: perms.includes('settings'),
+    userId: 'u1',
+    email: 'u@x.com',
+    fullName: 'U',
+    permissions: new Set(perms),
+    facilityIds: new Set(facilities),
+    isAdmin: perms.includes('settings'),
   }
 }
 

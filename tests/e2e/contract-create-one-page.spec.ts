@@ -17,7 +17,10 @@ async function openFormWithRooms(page: Page, count = 1): Promise<string[]> {
   await page.getByRole('button', { name: /^Admin/ }).click()
   await expect(page.getByRole('heading', { name: 'Nhắc việc' })).toBeVisible()
   await page.goto('/facilities')
-  await page.getByRole('link', { name: /Thảo Điền/ }).first().click()
+  await page
+    .getByRole('link', { name: /Thảo Điền/ })
+    .first()
+    .click()
   await page.getByRole('button', { name: 'Tạo nhanh nhiều phòng' }).click()
   const prefix = `E2E${Date.now()}${Math.floor(Math.random() * 1000)}-`
   await page.getByLabel('Tiền tố mã (tuỳ chọn)').fill(prefix)
@@ -72,7 +75,9 @@ test('xử lý tài sản chỉ có di chuyển và thanh lý, đổi phòng xó
   await expect(page.getByRole('link', { name: assetCode, exact: true })).toBeVisible()
   await page.goto('/contracts/new')
   const rooms = page.locator('#room option[value]:not([value=""])')
-  await page.locator('#room').selectOption((await page.locator('#room option').filter({ hasText: roomCode }).getAttribute('value'))!)
+  await page
+    .locator('#room')
+    .selectOption((await page.locator('#room option').filter({ hasText: roomCode }).getAttribute('value'))!)
   await expect(page.getByRole('button', { name: 'Xử lý tài sản' }).first()).toBeVisible()
   const first = page.getByRole('button', { name: 'Xử lý tài sản' }).first()
   await first.click()
@@ -106,9 +111,12 @@ test('xử lý tài sản chỉ có di chuyển và thanh lý, đổi phòng xó
   await page.getByRole('button', { name: 'Thanh lý', exact: true }).click()
   await expect(page.getByText(/· Thanh lý$/)).toBeVisible()
   const current = await page.locator('#room').inputValue()
-  for (let i = 0; i < await rooms.count(); i++) {
+  for (let i = 0; i < (await rooms.count()); i++) {
     const value = await rooms.nth(i).getAttribute('value')
-    if (value && value !== current) { await page.locator('#room').selectOption(value); break }
+    if (value && value !== current) {
+      await page.locator('#room').selectOption(value)
+      break
+    }
   }
   await expect(page.getByText(/· Thanh lý$/)).toHaveCount(0)
 })
@@ -120,7 +128,9 @@ test('tạo hợp đồng với tiền thực nhận, ghi chú và tài sản m�
   let selectedTemplateName = ''
   if (await templates.count()) {
     selectedTemplate = await templates.locator('option').last().getAttribute('value')
-    selectedTemplateName = ((await templates.locator('option').last().textContent()) ?? '').replace(/ \(mặc định\)$/, '').trim()
+    selectedTemplateName = ((await templates.locator('option').last().textContent()) ?? '')
+      .replace(/ \(mặc định\)$/, '')
+      .trim()
     await templates.selectOption(selectedTemplate!)
   }
   const room = roomOption(page, tempRoom)
@@ -142,7 +152,9 @@ test('tạo hợp đồng với tiền thực nhận, ghi chú và tài sản m�
   await page.getByLabel(`Tình trạng ${assetName}`).fill('Trầy nhẹ')
   const canvas = createCanvas(8, 8)
   canvas.getContext('2d').fillRect(0, 0, 8, 8)
-  await page.getByLabel(`Ảnh ${assetName}`).setInputFiles({ name: 'ban.png', mimeType: 'image/png', buffer: canvas.toBuffer('image/png') })
+  await page
+    .getByLabel(`Ảnh ${assetName}`)
+    .setInputFiles({ name: 'ban.png', mimeType: 'image/png', buffer: canvas.toBuffer('image/png') })
   await expect(page.getByAltText(`Ảnh ${assetName} 1`)).toBeVisible()
   await fillMeterReadings(page)
   await page.getByRole('button', { name: 'Tạo hợp đồng thuê' }).click()
@@ -151,7 +163,9 @@ test('tạo hợp đồng với tiền thực nhận, ghi chú và tài sản m�
   if (selectedTemplate) {
     // mẫu đã chọn được lưu: mở popup sửa hợp đồng thì đúng mẫu đó đang được chọn
     await page.getByRole('button', { name: 'Sửa hợp đồng' }).first().click()
-    await expect(page.getByRole('radio', { name: new RegExp(selectedTemplateName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) })).toBeChecked({ timeout: 60_000 })
+    await expect(
+      page.getByRole('radio', { name: new RegExp(selectedTemplateName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }),
+    ).toBeChecked({ timeout: 60_000 })
     await page.keyboard.press('Escape')
   }
   await expect(page.getByText(/· Nháp/).first()).toBeVisible()
@@ -197,7 +211,7 @@ test('phí chỉ hiện khi mặc định hoặc được thêm và không có l
   await expect(page.getByText('Tính nước theo đồng hồ')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Thêm phí dịch vụ' })).toBeVisible()
   const company = page.locator('#tenant option').filter({ hasText: 'Công ty' }).first()
-  test.skip(await company.count() === 0, 'Cần công ty demo')
+  test.skip((await company.count()) === 0, 'Cần công ty demo')
   await page.locator('#tenant').selectOption((await company.getAttribute('value'))!)
   await expect(page.getByText(/\(bên ký\)/)).toBeVisible()
 })
@@ -210,7 +224,7 @@ test('công ty ký và tạo đồng hồ cho phí riêng', async ({ page }) => 
   const roomCode = (await room.textContent())!.split(' · ')[1].split(' (')[0]
   await page.locator('#room').selectOption(roomId)
   const company = page.locator('#tenant option').filter({ hasText: 'Công ty' }).first()
-  test.skip(await company.count() === 0, 'Cần công ty demo')
+  test.skip((await company.count()) === 0, 'Cần công ty demo')
   const companyName = (await company.textContent())!.trim()
   await page.locator('#tenant').selectOption((await company.getAttribute('value'))!)
   await expect(page.getByText(/\(bên ký\)/)).toBeVisible()

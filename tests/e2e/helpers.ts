@@ -9,7 +9,8 @@ export const meterValue = () => Math.floor(Date.now() / 1000)
 /** Phí mặc định theo đồng hồ (vd. Điện) được tự thêm vào form hợp đồng và đòi chỉ số ban đầu: điền cho mọi ô còn trống. */
 export async function fillMeterReadings(page: Page) {
   const inputs = page.getByLabel(/^Chỉ số ban đầu /)
-  for (let i = 0; i < await inputs.count(); i++) if (!(await inputs.nth(i).inputValue())) await inputs.nth(i).fill(String(meterValue()))
+  for (let i = 0; i < (await inputs.count()); i++)
+    if (!(await inputs.nth(i).inputValue())) await inputs.nth(i).fill(String(meterValue()))
 }
 
 /** Đăng nhập Admin rồi tạo một phòng tạm mã duy nhất ở Thảo Điền; trả về mã phòng. */
@@ -18,7 +19,10 @@ export async function createTempRoom(page: Page): Promise<string> {
   await page.getByRole('button', { name: /^Admin/ }).click()
   await expect(page.getByRole('heading', { name: 'Nhắc việc' })).toBeVisible()
   await page.goto('/facilities')
-  await page.getByRole('link', { name: /Thảo Điền/ }).first().click()
+  await page
+    .getByRole('link', { name: /Thảo Điền/ })
+    .first()
+    .click()
   await page.getByRole('button', { name: 'Tạo nhanh nhiều phòng' }).click()
   const prefix = `E2E${Date.now()}${Math.floor(Math.random() * 1000)}-`
   await page.getByLabel('Tiền tố mã (tuỳ chọn)').fill(prefix)

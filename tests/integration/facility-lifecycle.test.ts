@@ -1,13 +1,26 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { leases, meters, tenants } from '@/db'
-import { createFacility, deleteFacility, getFacility, listFacilities, setFacilityActive } from '@/server/facilities/service'
+import {
+  createFacility,
+  deleteFacility,
+  getFacility,
+  listFacilities,
+  setFacilityActive,
+} from '@/server/facilities/service'
 import { createRoom, deleteRoom, getRoom, setRoomActive } from '@/server/rooms/service'
 import { ValidationError } from '@/domain/errors'
 import { ForbiddenError, NotFoundError, type AccessContext } from '@/domain/access'
 import { createTestDb } from '../helpers/db'
 import type { DB } from '@/db/client'
 
-const admin: AccessContext = { userId: crypto.randomUUID(), email: 'a@x.com', fullName: 'A', permissions: new Set(['settings']), facilityIds: new Set(), isAdmin: true }
+const admin: AccessContext = {
+  userId: crypto.randomUUID(),
+  email: 'a@x.com',
+  fullName: 'A',
+  permissions: new Set(['settings']),
+  facilityIds: new Set(),
+  isAdmin: true,
+}
 
 describe('ngừng và xoá cơ sở, phòng', () => {
   let db: DB
@@ -18,8 +31,25 @@ describe('ngừng và xoá cơ sở, phòng', () => {
   })
 
   async function rentRoom(roomId: string) {
-    const [t] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: fid, fullName: 'Khách', phone: '+84901234567', idNumber: '012345678901' }).returning()
-    await db.insert(leases).values({ code: 'HD1', roomId, tenantId: t.id, startDate: '2026-01-01', endDate: '2027-12-31', monthlyRent: 1, depositAmount: 1 })
+    const [t] = await db
+      .insert(tenants)
+      .values({
+        kind: 'vietnamese',
+        homeFacilityId: fid,
+        fullName: 'Khách',
+        phone: '+84901234567',
+        idNumber: '012345678901',
+      })
+      .returning()
+    await db.insert(leases).values({
+      code: 'HD1',
+      roomId,
+      tenantId: t.id,
+      startDate: '2026-01-01',
+      endDate: '2027-12-31',
+      monthlyRent: 1,
+      depositAmount: 1,
+    })
   }
 
   it('ngừng phòng không có hợp đồng, dùng lại được', async () => {
@@ -44,7 +74,10 @@ describe('ngừng và xoá cơ sở, phòng', () => {
     const r = await createRoom(db, admin, { facilityId: fid, code: '101' })
     const other = await createRoom(db, admin, { facilityId: fid, code: '102' })
     await rentRoom(r.id)
-    await db.insert(meters).values([{ roomId: r.id, utility: 'electric', installedOn: '2026-01-01' }, { roomId: other.id, utility: 'electric', installedOn: '2026-01-01' }])
+    await db.insert(meters).values([
+      { roomId: r.id, utility: 'electric', installedOn: '2026-01-01' },
+      { roomId: other.id, utility: 'electric', installedOn: '2026-01-01' },
+    ])
     await deleteRoom(db, admin, r.id)
     await expect(getRoom(db, admin, r.id)).rejects.toBeInstanceOf(NotFoundError)
     expect(await db.select().from(leases)).toHaveLength(0)

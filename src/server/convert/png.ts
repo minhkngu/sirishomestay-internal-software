@@ -21,13 +21,20 @@ export async function convertPdfToPng(pdf: Blob): Promise<Blob> {
         return { canvas, context: canvas.getContext('2d') }
       }
       reset(pair: { canvas: Canvas }, width: number, height: number) {
-        pair.canvas.width = width; pair.canvas.height = height
+        pair.canvas.width = width
+        pair.canvas.height = height
       }
       destroy(pair: { canvas: Canvas | null; context: unknown }) {
-        if (pair.canvas) { pair.canvas.width = 0; pair.canvas.height = 0 }
-        pair.canvas = null; pair.context = null
+        if (pair.canvas) {
+          pair.canvas.width = 0
+          pair.canvas.height = 0
+        }
+        pair.canvas = null
+        pair.context = null
       }
-      getNoAlphaContext(canvas: Canvas) { return canvas.getContext('2d', { alpha: false }) }
+      getNoAlphaContext(canvas: Canvas) {
+        return canvas.getContext('2d', { alpha: false })
+      }
     }
     const g = globalThis as { pdfjsWorker?: unknown }
     g.pdfjsWorker ??= await import('pdfjs-dist/legacy/build/pdf.worker.mjs')
@@ -37,11 +44,21 @@ export async function convertPdfToPng(pdf: Blob): Promise<Blob> {
     try {
       const page = await doc.getPage(1)
       const viewport = page.getViewport({ scale: PNG_SCALE })
-      const { canvas, context } = (doc.canvasFactory as { create(w: number, h: number): { canvas: { toBuffer(mime: 'image/png'): Buffer }; context: unknown } })
-        .create(Math.ceil(viewport.width), Math.ceil(viewport.height))
-      await page.render({ canvas: null, canvasContext: context as CanvasRenderingContext2D, viewport, background: '#ffffff' }).promise
+      const { canvas, context } = (
+        doc.canvasFactory as {
+          create(w: number, h: number): { canvas: { toBuffer(mime: 'image/png'): Buffer }; context: unknown }
+        }
+      ).create(Math.ceil(viewport.width), Math.ceil(viewport.height))
+      await page.render({
+        canvas: null,
+        canvasContext: context as CanvasRenderingContext2D,
+        viewport,
+        background: '#ffffff',
+      }).promise
       return new Blob([new Uint8Array(canvas.toBuffer('image/png'))], { type: 'image/png' })
-    } finally { await task.destroy() }
+    } finally {
+      await task.destroy()
+    }
   } catch (e) {
     console.error('convertPdfToPng', e)
     throw new ValidationError(PNG_ERROR)

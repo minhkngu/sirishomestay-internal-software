@@ -3,7 +3,12 @@
 import imageCompression from 'browser-image-compression'
 
 async function toBlob(file: File, maxSide: number, quality: number): Promise<Blob> {
-  const opts = { maxWidthOrHeight: maxSide, initialQuality: quality, useWebWorker: true, fileType: 'image/webp' as const }
+  const opts = {
+    maxWidthOrHeight: maxSide,
+    initialQuality: quality,
+    useWebWorker: true,
+    fileType: 'image/webp' as const,
+  }
   try {
     return await imageCompression(file, opts)
   } catch {

@@ -11,7 +11,15 @@ import { createFeeTypeAction, createFeeUnitAction, restoreFeeTypeAction } from '
 
 type FacilityOption = { id: string; name: string }
 type UnitOption = { id: string; name: string }
-type FeeRow = { id: string; name: string; unitId: string; defaultPrice: number; billing: string; quantityFrom: string; isActive: boolean }
+type FeeRow = {
+  id: string
+  name: string
+  unitId: string
+  defaultPrice: number
+  billing: string
+  quantityFrom: string
+  isActive: boolean
+}
 
 type Props = {
   facilities: FacilityOption[]
@@ -39,22 +47,55 @@ export function FeeSettings({ facilities, units, feeTypes, prices, defaults }: P
           <h2 className="font-semibold">Phí dịch vụ</h2>
           <span className="text-sm text-muted-foreground">Đơn vị tính:</span>
           <div className="flex flex-wrap items-center gap-1">
-            {units.map((u) => <span key={u.id} className="rounded-full border px-2 py-0.5 text-xs">{u.name}</span>)}
+            {units.map((u) => (
+              <span key={u.id} className="rounded-full border px-2 py-0.5 text-xs">
+                {u.name}
+              </span>
+            ))}
             {units.length === 0 && <span className="text-sm text-muted-foreground">chưa có</span>}
           </div>
-          <Button type="button" variant="ghost" size="sm" aria-haspopup="dialog" onClick={() => setShowUnit(true)}>+ Thêm đơn vị</Button>
-          <Button type="button" variant="outline" className="ml-auto" aria-haspopup="dialog" onClick={() => setAdding(true)}>+ Thêm loại phí</Button>
+          <Button type="button" variant="ghost" size="sm" aria-haspopup="dialog" onClick={() => setShowUnit(true)}>
+            + Thêm đơn vị
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="ml-auto"
+            aria-haspopup="dialog"
+            onClick={() => setAdding(true)}
+          >
+            + Thêm loại phí
+          </Button>
         </div>
         <Msg error={null} ok={unitRun.ok} />
-        <FormDialog open={showUnit} onOpenChange={(o) => { setShowUnit(o); if (!o) setUnitName('') }} title="Thêm đơn vị tính" size="sm">
+        <FormDialog
+          open={showUnit}
+          onOpenChange={(o) => {
+            setShowUnit(o)
+            if (!o) setUnitName('')
+          }}
+          title="Thêm đơn vị tính"
+          size="sm"
+        >
           <div className="flex flex-wrap items-center gap-2">
             <Input placeholder="Tên đơn vị mới" value={unitName} onChange={(e) => setUnitName(e.target.value)} />
-            <Button type="button" size="sm" disabled={unitRun.pending || unitName.trim() === ''}
-              onClick={() => unitRun.run(async () => {
-                const result = await createFeeUnitAction({ name: unitName })
-                if (result.ok) { setUnitName(''); setShowUnit(false) }
-                return result
-              }, 'Đã thêm đơn vị')}>Lưu đơn vị</Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={unitRun.pending || unitName.trim() === ''}
+              onClick={() =>
+                unitRun.run(async () => {
+                  const result = await createFeeUnitAction({ name: unitName })
+                  if (result.ok) {
+                    setUnitName('')
+                    setShowUnit(false)
+                  }
+                  return result
+                }, 'Đã thêm đơn vị')
+              }
+            >
+              Lưu đơn vị
+            </Button>
             <Msg error={unitRun.error} ok={null} />
           </div>
         </FormDialog>
@@ -62,23 +103,34 @@ export function FeeSettings({ facilities, units, feeTypes, prices, defaults }: P
 
       <Msg error={null} ok={createRun.ok} />
       <FormDialog open={adding} onOpenChange={setAdding} title="Thêm loại phí" size="md">
-        <FeeTypeForm units={units} allowNewUnit pending={createRun.pending} error={createRun.error} submitLabel="Tạo loại phí"
+        <FeeTypeForm
+          units={units}
+          allowNewUnit
+          pending={createRun.pending}
+          error={createRun.error}
+          submitLabel="Tạo loại phí"
           onCancel={() => setAdding(false)}
-          onSubmit={(values) => createRun.run(async () => {
-            const result = await createFeeTypeAction(values)
-            if (result.ok) setAdding(false)
-            return result
-          }, 'Đã thêm loại phí')} />
+          onSubmit={(values) =>
+            createRun.run(async () => {
+              const result = await createFeeTypeAction(values)
+              if (result.ok) setAdding(false)
+              return result
+            }, 'Đã thêm loại phí')
+          }
+        />
       </FormDialog>
 
       <div className="space-y-3">
         {active.map((fee) => (
-          <FeeTypeCard key={fee.id} fee={fee}
+          <FeeTypeCard
+            key={fee.id}
+            fee={fee}
             unitName={unitNameById.get(fee.unitId) ?? ''}
             units={units}
             facilities={facilities}
             defaultFacilityIds={facilities.filter((f) => defaults[f.id]?.includes(fee.id)).map((f) => f.id)}
-            prices={prices[fee.id] ?? {}} />
+            prices={prices[fee.id] ?? {}}
+          />
         ))}
       </div>
 
@@ -88,9 +140,17 @@ export function FeeSettings({ facilities, units, feeTypes, prices, defaults }: P
           <div className="space-y-2 pt-3">
             {archived.map((fee) => (
               <div key={fee.id} className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-sm">{fee.name} <span className="text-muted-foreground">({unitNameById.get(fee.unitId) ?? '—'})</span></span>
-                <Button size="sm" variant="outline" disabled={archiveRun.pending}
-                  onClick={() => archiveRun.run(() => restoreFeeTypeAction(fee.id), 'Đã khôi phục')}>Khôi phục</Button>
+                <span className="text-sm">
+                  {fee.name} <span className="text-muted-foreground">({unitNameById.get(fee.unitId) ?? '—'})</span>
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={archiveRun.pending}
+                  onClick={() => archiveRun.run(() => restoreFeeTypeAction(fee.id), 'Đã khôi phục')}
+                >
+                  Khôi phục
+                </Button>
               </div>
             ))}
             <Msg error={archiveRun.error} ok={archiveRun.ok} />

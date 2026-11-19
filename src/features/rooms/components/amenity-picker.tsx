@@ -3,8 +3,19 @@
 export type AmenityOption = { id: string; name: string }
 
 /** Nhóm ô chọn tiện ích của phòng; không có tiện ích nào thì nhắc thêm ở Cài đặt. */
-export function AmenityPicker({ options, value, onChange, idPrefix }: { options: AmenityOption[]; value: string[]; onChange: (ids: string[]) => void; idPrefix: string }) {
-  if (options.length === 0) return <p className="text-xs text-muted-foreground">Chưa có tiện ích. Thêm ở Cài đặt → Tiện ích.</p>
+export function AmenityPicker({
+  options,
+  value,
+  onChange,
+  idPrefix,
+}: {
+  options: AmenityOption[]
+  value: string[]
+  onChange: (ids: string[]) => void
+  idPrefix: string
+}) {
+  if (options.length === 0)
+    return <p className="text-xs text-muted-foreground">Chưa có tiện ích. Thêm ở Cài đặt → Tiện ích.</p>
   return (
     <fieldset className="space-y-1">
       <legend className="text-sm font-medium">Tiện ích</legend>

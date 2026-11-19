@@ -8,7 +8,8 @@ export function fieldGroups(docType: DocType): FieldGroups {
   const fields: Item[] = []
   const loops: FieldGroups['loops'] = []
   for (const f of TEMPLATE_FIELDS[docType]) {
-    if (f.loop) loops.push({ key: f.key, label: f.label, fields: f.loop.fields.map((x) => ({ key: x.key, label: x.label })) })
+    if (f.loop)
+      loops.push({ key: f.key, label: f.label, fields: f.loop.fields.map((x) => ({ key: x.key, label: x.label })) })
     else fields.push({ key: f.key, label: f.label })
   }
   return { fields, loops }

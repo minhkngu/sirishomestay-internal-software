@@ -8,7 +8,14 @@ import type { DB } from '@/db/client'
 import { eq } from 'drizzle-orm'
 
 function ctxOf(perms: Permission[], facilityIds: string[] = []): AccessContext {
-  return { userId: crypto.randomUUID(), email: 'a@x.com', fullName: 'A', permissions: new Set(perms), facilityIds: new Set(facilityIds), isAdmin: perms.includes('settings') }
+  return {
+    userId: crypto.randomUUID(),
+    email: 'a@x.com',
+    fullName: 'A',
+    permissions: new Set(perms),
+    facilityIds: new Set(facilityIds),
+    isAdmin: perms.includes('settings'),
+  }
 }
 
 describe('meters', () => {
@@ -22,10 +29,14 @@ describe('meters', () => {
   const hung = () => ctxOf(['meters'], [fa])
 
   async function addMeter(roomId: string, utility: 'electric' | 'water', key: string, startReading = 0) {
-    const [row] = await db.insert(meters).values({ roomId, utility, serial: key, installedOn: '2025-01-01', startReading }).returning()
+    const [row] = await db
+      .insert(meters)
+      .values({ roomId, utility, serial: key, installedOn: '2025-01-01', startReading })
+      .returning()
     m[key] = row.id
   }
-  const read = (key: string, period: string, readOn: string, value: number) => db.insert(meterReadings).values({ meterId: m[key], period, readOn, value })
+  const read = (key: string, period: string, readOn: string, value: number) =>
+    db.insert(meterReadings).values({ meterId: m[key], period, readOn, value })
 
   beforeEach(async () => {
     db = await createTestDb()
@@ -34,12 +45,20 @@ describe('meters', () => {
     r101 = (await db.insert(rooms).values({ facilityId: fa, code: '101', floor: '1' }).returning())[0].id
     r102 = (await db.insert(rooms).values({ facilityId: fa, code: '102', floor: '1' }).returning())[0].id
     r201 = (await db.insert(rooms).values({ facilityId: fa, code: '201', floor: '2' }).returning())[0].id
-    for (const [room, k] of [[r101, '101'], [r102, '102'], [r201, '201']] as const) {
+    for (const [room, k] of [
+      [r101, '101'],
+      [r102, '102'],
+      [r201, '201'],
+    ] as const) {
       await addMeter(room, 'electric', `E${k}`)
       await addMeter(room, 'water', `W${k}`)
     }
-    await read('E101', '2026-09', '2026-09-30', 1000); await read('E102', '2026-09', '2026-09-30', 500); await read('E201', '2026-09', '2026-09-30', 1200)
-    await read('W101', '2026-09', '2026-09-30', 100); await read('W102', '2026-09', '2026-09-30', 50); await read('W201', '2026-09', '2026-09-30', 80)
+    await read('E101', '2026-09', '2026-09-30', 1000)
+    await read('E102', '2026-09', '2026-09-30', 500)
+    await read('E201', '2026-09', '2026-09-30', 1200)
+    await read('W101', '2026-09', '2026-09-30', 100)
+    await read('W102', '2026-09', '2026-09-30', 50)
+    await read('W201', '2026-09', '2026-09-30', 80)
   })
 
   it('bảng ghi: mỗi phòng có chỉ số kỳ trước, chỉ số kỳ này, tiêu thụ và tiến độ', async () => {
@@ -79,24 +98,40 @@ describe('meters', () => {
 
   it('thay đồng hồ: cũ cuối 1260, mới đầu 0, nhập 45 → tiêu thụ 105', async () => {
     await db.update(meterReadings).set({ value: 1200 }).where(eq(meterReadings.meterId, m.E101)) // chỉ số cuối kỳ trước của đồng hồ cũ
-    await replaceMeter(db, hung(), r101, 'electric', { removedOn: '2026-10-20', finalReading: 1260, newSerial: 'E101-B', startReading: 0 })
+    await replaceMeter(db, hung(), r101, 'electric', {
+      removedOn: '2026-10-20',
+      finalReading: 1260,
+      newSerial: 'E101-B',
+      startReading: 0,
+    })
     const all = await db.select().from(meters).where(eq(meters.roomId, r101))
     expect(all.filter((x) => x.utility === 'electric')).toHaveLength(2)
     const newMeter = all.find((x) => x.serial === 'E101-B')!
     await saveReadings(db, hung(), '2026-10', [{ meterId: newMeter.id, value: 45, readOn: '2026-10-31' }])
     const sheet = await listReadingSheet(db, hung(), fa, '2026-10')
-    expect(sheet.rows[0].electric).toMatchObject({ meterId: newMeter.id, previous: 0, current: 45, usage: 105, replaced: true })
+    expect(sheet.rows[0].electric).toMatchObject({
+      meterId: newMeter.id,
+      previous: 0,
+      current: 45,
+      usage: 105,
+      replaced: true,
+    })
   })
 
   it('thay đồng hồ với chỉ số cuối nhỏ hơn chỉ số đã ghi → lỗi', async () => {
-    await expect(replaceMeter(db, hung(), r101, 'electric', { removedOn: '2026-10-20', finalReading: 900, startReading: 0 })).rejects.toThrow(ValidationError)
+    await expect(
+      replaceMeter(db, hung(), r101, 'electric', { removedOn: '2026-10-20', finalReading: 900, startReading: 0 }),
+    ).rejects.toThrow(ValidationError)
   })
 
   it('cảnh báo tiêu thụ bất thường (> 2× trung bình 3 kỳ)', async () => {
     await read('E101', '2026-08', '2026-08-31', 900)
     await read('E101', '2026-07', '2026-07-31', 800)
     await read('E101', '2026-06', '2026-06-30', 700) // 100/kỳ
-    await saveReadings(db, hung(), '2026-10', [{ meterId: m.E101, value: 1400, readOn: '2026-10-31' }, { meterId: m.E102, value: 520, readOn: '2026-10-31' }])
+    await saveReadings(db, hung(), '2026-10', [
+      { meterId: m.E101, value: 1400, readOn: '2026-10-31' },
+      { meterId: m.E102, value: 520, readOn: '2026-10-31' },
+    ])
     const sheet = await listReadingSheet(db, hung(), fa, '2026-10')
     expect(sheet.rows[0].electric?.abnormal).toBe(true) // 400 > 2 × 100
     expect(sheet.rows[1].electric?.abnormal).toBe(false)
@@ -105,8 +140,16 @@ describe('meters', () => {
   it('người cơ sở khác → NotFoundError; thiếu nhóm quyền → ForbiddenError', async () => {
     await expect(listReadingSheet(db, ctxOf(['meters'], [fb]), fa, '2026-10')).rejects.toThrow(NotFoundError)
     await expect(listReadingSheet(db, ctxOf(['billing'], [fa]), fa, '2026-10')).rejects.toThrow(ForbiddenError)
-    await expect(saveReadings(db, ctxOf(['meters'], [fb]), '2026-10', [{ meterId: m.E101, value: 1100, readOn: '2026-10-31' }])).rejects.toThrow(NotFoundError)
-    await expect(replaceMeter(db, ctxOf(['meters'], [fb]), r101, 'electric', { removedOn: '2026-10-20', finalReading: 1260, startReading: 0 })).rejects.toThrow(NotFoundError)
+    await expect(
+      saveReadings(db, ctxOf(['meters'], [fb]), '2026-10', [{ meterId: m.E101, value: 1100, readOn: '2026-10-31' }]),
+    ).rejects.toThrow(NotFoundError)
+    await expect(
+      replaceMeter(db, ctxOf(['meters'], [fb]), r101, 'electric', {
+        removedOn: '2026-10-20',
+        finalReading: 1260,
+        startReading: 0,
+      }),
+    ).rejects.toThrow(NotFoundError)
   })
 
   it('kỳ không hợp lệ → lỗi dữ liệu', async () => {
@@ -117,22 +160,32 @@ describe('meters', () => {
     await read('E101', '2026-10', '2026-10-31', 1100)
     const rows = await listMeterOverview(db, hung(), fa)
     expect(rows).toHaveLength(6)
-    expect(rows.map(r => r.roomCode)).toEqual(['101', '101', '102', '102', '201', '201'])
-    const e101 = rows.find(r => r.meterId === m.E101)!
-    expect(e101).toMatchObject({ roomId: r101, floor: '1', feeName: 'Điện', unit: 'kWh', leaseCode: null, serial: 'E101', startReading: 0, installedOn: '2025-01-01', removedOn: null })
-    expect(e101.readings.map(x => x.value)).toEqual([1100, 1000])
-    expect(rows.find(r => r.meterId === m.W101)).toMatchObject({ feeName: 'Nước', unit: 'm³' })
+    expect(rows.map((r) => r.roomCode)).toEqual(['101', '101', '102', '102', '201', '201'])
+    const e101 = rows.find((r) => r.meterId === m.E101)!
+    expect(e101).toMatchObject({
+      roomId: r101,
+      floor: '1',
+      feeName: 'Điện',
+      unit: 'kWh',
+      leaseCode: null,
+      serial: 'E101',
+      startReading: 0,
+      installedOn: '2025-01-01',
+      removedOn: null,
+    })
+    expect(e101.readings.map((x) => x.value)).toEqual([1100, 1000])
+    expect(rows.find((r) => r.meterId === m.W101)).toMatchObject({ feeName: 'Nước', unit: 'm³' })
   })
 
   it('đồng hồ đã gỡ xếp sau đồng hồ đang dùng của cùng phòng', async () => {
     await db.update(meters).set({ removedOn: '2026-01-01' }).where(eq(meters.id, m.E101))
-    const rows = (await listMeterOverview(db, hung(), fa)).filter(r => r.roomId === r101)
-    expect(rows.map(r => r.meterId)).toEqual([m.W101, m.E101])
+    const rows = (await listMeterOverview(db, hung(), fa)).filter((r) => r.roomId === r101)
+    expect(rows.map((r) => r.meterId)).toEqual([m.W101, m.E101])
   })
 
   it('không liệt kê đồng hồ của phòng đã ẩn', async () => {
     await db.update(rooms).set({ isActive: false }).where(eq(rooms.id, r201))
-    expect((await listMeterOverview(db, hung(), fa)).map(r => r.roomCode)).toEqual(['101', '101', '102', '102'])
+    expect((await listMeterOverview(db, hung(), fa)).map((r) => r.roomCode)).toEqual(['101', '101', '102', '102'])
   })
 
   it('người ngoài phạm vi cơ sở bị từ chối, người thiếu quyền meters bị từ chối', async () => {

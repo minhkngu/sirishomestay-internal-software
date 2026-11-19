@@ -21,9 +21,14 @@ export function meterUsage(
   for (const m of meters) {
     const mine = readings.filter((r) => r.meterId === m.id).sort((a, b) => (a.readOn < b.readOn ? -1 : 1))
     // chỉ số phải không giảm theo thời gian trên cùng đồng hồ
-    const chain = [m.startReading, ...mine.map((r) => r.value), ...(m.removedOn && m.finalReading != null ? [m.finalReading] : [])]
+    const chain = [
+      m.startReading,
+      ...mine.map((r) => r.value),
+      ...(m.removedOn && m.finalReading != null ? [m.finalReading] : []),
+    ]
     for (let i = 1; i < chain.length; i++) {
-      if (chain[i] < chain[i - 1]) throw new ValidationError('Chỉ số mới nhỏ hơn chỉ số cũ', { value: 'Chỉ số mới nhỏ hơn chỉ số cũ' })
+      if (chain[i] < chain[i - 1])
+        throw new ValidationError('Chỉ số mới nhỏ hơn chỉ số cũ', { value: 'Chỉ số mới nhỏ hơn chỉ số cũ' })
     }
 
     if (m.installedOn > periodEnd) continue
