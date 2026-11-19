@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { FileUpload } from '@/modules/platform/ui'
 import { formatDateVN } from '@/domain/dates'
-import { exportAddendumAction, setAddendumSignStatusAction } from '@/server/addenda/actions'
+import { exportAddendumAction, setAddendumSignStatusAction } from '@/modules/leasing/actions'
 
 const TYPE: Record<string, string> = {
   extension: 'Gia hạn',

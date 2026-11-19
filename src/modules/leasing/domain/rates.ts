@@ -1,5 +1,5 @@
-import { ValidationError } from './errors'
-import type { ISODate, Utility, UtilityRate } from './types'
+import { ValidationError } from '@/domain/errors'
+import type { ISODate, Utility, UtilityRate } from '@/domain/types'
 
 /** Đơn giá có `effectiveFrom` lớn nhất mà ≤ ngày bắt đầu kỳ. */
 export function rateFor(rates: UtilityRate[], facilityId: string, utility: Utility, periodStart: ISODate): number {

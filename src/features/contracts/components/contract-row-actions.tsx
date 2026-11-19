@@ -6,12 +6,8 @@ import { ArrowLeftRight, CalendarPlus, FilePenLine, RotateCcw, Trash2, UserRound
 import { Button } from '@/components/ui/button'
 import { IconTip, IconTipGroup } from '@/components/ui/tooltip'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import {
-  quickContractDataAction,
-  previewContractRestoreAction,
-  restoreContractAction,
-} from '@/server/contracts/actions'
-import { createAssignmentAction } from '@/server/addenda/actions'
+import { quickContractDataAction, previewContractRestoreAction, restoreContractAction } from '@/modules/leasing/actions'
+import { createAssignmentAction } from '@/modules/leasing/actions'
 import { ContractEditActions, type RenderCreateFee, type RenderCreatePerson } from './contract-edit-actions'
 import { ExtensionDialog } from './extension-dialog'
 import { TerminationWizard } from './termination-wizard'

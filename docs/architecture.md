@@ -23,7 +23,7 @@ Muốn biết một mảng đang ở đâu: xem bảng dưới. **Mỗi PR chuy�
 | 2 | `documents` | Đã chuyển | `src/modules/documents/` | 17 |
 | 3 | `assets` | Đã chuyển | `src/modules/assets/` | 18 |
 | 3 | `meters` | Đã chuyển | `src/modules/meters/` | 19 |
-| 4 | `leasing` | Chưa chuyển | `src/server/{contracts,addenda,handovers,charges,invoices,incidents}`, `src/features/{contracts,deposits,handovers,charges,invoices,incidents}` | 20–21 |
+| 4 | `leasing` | Server đã chuyển (Task 20); UI còn ở `src/features` tới Task 21 | `src/modules/leasing/` (server, domain); `src/features/{contracts,deposits,handovers,charges,invoices,incidents}` | 20–21 |
 | 5 | `import` | Chưa chuyển | `src/server/import`, `src/features/import` | 21 |
 | 5 | `dashboard` | Chưa chuyển | `src/server/dashboard`, `src/features/dashboard` | 21 |
 

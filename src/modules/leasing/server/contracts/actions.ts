@@ -172,7 +172,7 @@ export async function quickContractDataAction(kind: 'lease' | 'deposit', id: str
     const { getLease, getDepositContract } = await import('./service')
     const { listRooms } = await import('@/modules/facilities')
     const { searchTenants, displayName } = await import('@/modules/tenants')
-    const { addendumFormData } = await import('@/server/addenda/service')
+    const { addendumFormData } = await import('../addenda/service')
     const { listLeaseOccupants } = await import('./service')
     const contract = kind === 'lease' ? await getLease(db, ctx, id) : await getDepositContract(db, ctx, id)
     const [allRooms, allTenants, form] = await Promise.all([

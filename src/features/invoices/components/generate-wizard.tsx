@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
-import { createDraftsAction, previewBatchAction } from '@/server/invoices/actions'
+import { createDraftsAction, previewBatchAction } from '@/modules/leasing/actions'
 
 type Line = { type: string; description: string; amount: number }
 type Row = {

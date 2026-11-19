@@ -11,7 +11,7 @@ import {
   listDepositEntries,
   markDepositDone,
   addDepositEntry,
-} from '@/server/charges/service'
+} from '@/modules/leasing/server/charges/service'
 import { createTestDb } from '../helpers/db'
 import type { DB } from '@/db/client'
 

@@ -91,7 +91,7 @@ describe('đăng ký resolver và loader', () => {
 
   it('templates/service.ts không nạp invoices bằng import động', () => {
     expect(read(join(ROOT, 'src/modules/documents/server/templates/service.ts'))).not.toContain(
-      "import('@/server/invoices",
+      "import('@/modules/leasing",
     )
   })
 
@@ -102,20 +102,20 @@ describe('đăng ký resolver và loader', () => {
         .filter((f) => pattern.test(read(f)))
         .map(rel)
 
-    it('src/server/rooms không import @/server/invoices', () => {
-      expect(offenders('src/server/rooms', /@\/server\/invoices/)).toEqual([])
+    it('src/server/rooms không import @/modules/leasing', () => {
+      expect(offenders('src/server/rooms', /@\/modules\/leasing/)).toEqual([])
     })
 
-    it('src/modules/assets/server không import @/server/incidents', () => {
-      expect(offenders('src/modules/assets/server', /@\/server\/incidents/)).toEqual([])
+    it('src/modules/assets/server không import @/modules/leasing', () => {
+      expect(offenders('src/modules/assets/server', /@\/modules\/leasing/)).toEqual([])
     })
 
     it('src/modules/documents/server/invoice-templates không ghi bảng invoices, leases', () => {
       expect(offenders('src/modules/documents/server/invoice-templates', /\.update\((invoices|leases)\b/)).toEqual([])
     })
 
-    it('src/modules/documents/server/invoice-templates không import @/server/invoices', () => {
-      expect(offenders('src/modules/documents/server/invoice-templates', /@\/server\/invoices/)).toEqual([])
+    it('src/modules/documents/server/invoice-templates không import @/modules/leasing', () => {
+      expect(offenders('src/modules/documents/server/invoice-templates', /@\/modules\/leasing/)).toEqual([])
     })
   })
 })

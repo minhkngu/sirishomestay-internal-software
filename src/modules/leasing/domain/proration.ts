@@ -1,5 +1,5 @@
-import { addDays, daysInMonth, diffDays } from './dates'
-import type { ISODate, Proration } from './types'
+import { addDays, daysInMonth, diffDays } from '@/domain/dates'
+import type { ISODate, Proration } from '@/domain/types'
 
 const round4 = (n: number) => Math.round(n * 10000) / 10000
 

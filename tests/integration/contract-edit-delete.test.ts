@@ -27,7 +27,7 @@ import {
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'
-import * as contracts from '@/server/contracts/service'
+import * as contracts from '@/modules/leasing/server/contracts/service'
 import { saveUserAccess } from '@/modules/users/server/users/service'
 import { MemoryStorage } from '@/modules/platform/server/storage/memory'
 import { confirmUpload } from '@/modules/platform/server/files/service'

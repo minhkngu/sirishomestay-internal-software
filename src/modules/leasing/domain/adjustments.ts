@@ -1,7 +1,7 @@
-import { addDays, formatDateVN } from './dates'
+import { addDays, formatDateVN } from '@/domain/dates'
 import { contractTermsAt } from './contract-terms'
 import { prorate } from './proration'
-import type { Addendum, ContractFee, Invoice, ISODate, Lease, Proration } from './types'
+import type { Addendum, ContractFee, Invoice, ISODate, Lease, Proration } from '@/domain/types'
 
 export type AdjustmentDraft = { description: string; amount: number; sourceKey: string }
 

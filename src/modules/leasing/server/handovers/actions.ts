@@ -45,7 +45,7 @@ export async function completeHandoverAction(id: string) {
       try {
         const [h] = await db.select({ leaseId: handovers.leaseId }).from(handovers).where(eq(handovers.id, id))
         if (!h?.leaseId) return
-        const { syncContractDocuments } = await import('@/server/contracts/documents')
+        const { syncContractDocuments } = await import('../contracts/documents')
         await syncContractDocuments(db, ctx, getStorage(), h.leaseId)
       } catch {
         /* tạo lại ở lần lưu sau */

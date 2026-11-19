@@ -9,7 +9,7 @@ import { useFacilitySelection, useListParam, usePager } from '@/components/list/
 import { formatDateVN } from '@/domain/dates'
 import { matchesContractView, type ContractView } from '@/domain/list-filters'
 import { formatVND } from '@/domain/money'
-import type { DepositListItem, LeaseListItem } from '@/server/contracts/service'
+import type { DepositListItem, LeaseListItem } from '@/modules/leasing'
 import type { ReactNode } from 'react'
 
 const VIEWS = [

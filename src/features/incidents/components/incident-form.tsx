@@ -3,7 +3,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { createIncidentAction } from '@/server/incidents/actions'
+import { createIncidentAction } from '@/modules/leasing/actions'
 
 export function IncidentForm({
   roomId,

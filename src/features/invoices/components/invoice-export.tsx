@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { exportDocumentAction } from '@/modules/documents/actions'
-import { selectInvoiceTemplateAction } from '@/server/invoices/actions'
+import { selectInvoiceTemplateAction } from '@/modules/leasing/actions'
 
 import { Download, Eye, FileImage } from 'lucide-react'
 

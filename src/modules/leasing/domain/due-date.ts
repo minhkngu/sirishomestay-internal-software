@@ -1,5 +1,5 @@
-import { addDays, daysInMonth } from './dates'
-import type { DueRule, ISODate } from './types'
+import { addDays, daysInMonth } from '@/domain/dates'
+import type { DueRule, ISODate } from '@/domain/types'
 
 export function computeDueDate(rule: DueRule, approvedOn: ISODate): ISODate {
   if (rule.kind === 'days_after_approval') return addDays(approvedOn, rule.days)

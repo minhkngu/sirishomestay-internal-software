@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { MoneyInput } from '@/components/ui/money-input'
 import { Label } from '@/components/ui/label'
-import { createDepositContractAction } from '@/server/contracts/actions'
+import { createDepositContractAction } from '@/modules/leasing/actions'
 
 export type RoomOption = { id: string; facilityId: string; label: string; listPrice?: number | null }
 export type TenantOption = { id: string; name: string; kind: 'foreign' | 'vietnamese' | 'company' }

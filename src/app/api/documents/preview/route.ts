@@ -1,6 +1,4 @@
 import '@/modules/registrations'
-import '@/server/contracts/service'
-import '@/server/handovers/service'
 import { NextResponse } from 'next/server'
 import { db } from '@/db/client'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'

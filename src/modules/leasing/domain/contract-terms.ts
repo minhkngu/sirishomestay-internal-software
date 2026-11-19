@@ -1,5 +1,5 @@
-import { addDays } from './dates'
-import type { Addendum, ISODate, Lease, LeaseTerms } from './types'
+import { addDays } from '@/domain/dates'
+import type { Addendum, ISODate, Lease, LeaseTerms } from '@/domain/types'
 
 /** Điều khoản tại một ngày = hợp đồng gốc + các phụ lục có hiệu lực ≤ ngày đó, áp theo thứ tự ngày. */
 export function contractTermsAt(lease: Lease, addenda: Addendum[], date: ISODate): LeaseTerms {

@@ -28,15 +28,15 @@ import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { resolveFeePrice } from '@/domain/fee-price'
 import { listFeeTypePrices } from '@/modules/facilities'
-import { midPeriodAdjustments } from '@/domain/adjustments'
-import { contractTermsAt } from '@/domain/contract-terms'
+import { midPeriodAdjustments } from '../../domain/adjustments'
+import { contractTermsAt } from '../../domain/contract-terms'
 import { addDays, todayVN } from '@/domain/dates'
 import { depositBalance, depositDiffEntry } from '@/domain/deposit'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import type { DocEntities } from '@/domain/template-fields'
-import { buildTerminationInvoice } from '@/domain/liquidation'
+import { buildTerminationInvoice } from '../../domain/liquidation'
 import { meterUsage } from '@/domain/meters'
-import { rateFor } from '@/domain/rates'
+import { rateFor } from '../../domain/rates'
 import type {
   ContractFee,
   DepositEntry,
@@ -51,13 +51,9 @@ import type {
   UtilityRate,
 } from '@/domain/types'
 import { recordAudit } from '@/modules/platform'
-import {
-  captureContractVersion,
-  recordTerminationHandover,
-  recordTerminationReadings,
-} from '@/server/contracts/history'
+import { captureContractVersion, recordTerminationHandover, recordTerminationReadings } from '../contracts/history'
 import { registerExportOwnerResolver, registerOwnerResolver } from '@/modules/platform'
-import { leaseData, loadAddenda, nextInvoiceCode } from '@/server/invoices/service'
+import { leaseData, loadAddenda, nextInvoiceCode } from '../invoices/service'
 import { getSettings } from '@/modules/platform'
 import type { StorageAdapter } from '@/modules/platform'
 import { exportDocument, registerDocLoader } from '@/modules/documents'

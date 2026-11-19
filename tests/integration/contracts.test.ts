@@ -24,10 +24,10 @@ import {
 } from '@/db'
 import { assetHistory } from '@/modules/assets/server/assets/service'
 import { listMeterOverview, listReadingSheet } from '@/modules/meters'
-import { leaseData } from '@/server/invoices/service'
+import { leaseData } from '@/modules/leasing/server/invoices/service'
 import { listFeeTypes, updateFeeType, archiveFeeType } from '@/modules/facilities/server/fees/service'
 import { createTenant } from '@/modules/tenants/server/tenants/service'
-import { listRoomsWithStatus } from '@/server/contracts/room-view'
+import { listRoomsWithStatus } from '@/modules/leasing/server/contracts/room-view'
 import {
   type LeaseFeeInput,
   createDepositContract,
@@ -40,7 +40,7 @@ import {
   listLeases,
   setSignStatus,
   exportContract,
-} from '@/server/contracts/service'
+} from '@/modules/leasing/server/contracts/service'
 import { MemoryStorage } from '@/modules/platform/server/storage/memory'
 import { FORMAT_EXT } from '@/modules/documents/server/convert'
 import PizZip from 'pizzip'
@@ -138,7 +138,7 @@ describe('contracts', () => {
         confirmedAt: new Date(),
       })
       .returning()
-    const { setSignStatus } = await import('@/server/contracts/service')
+    const { setSignStatus } = await import('@/modules/leasing/server/contracts/service')
     await setSignStatus(db, lan(), 'lease', lease.id, 'signed', file.id)
     expect(await db.select().from(invoices).where(eq(invoices.leaseId, lease.id))).toHaveLength(0)
   })

@@ -6,7 +6,7 @@ import { formatVND } from '@/domain/money'
 import { DEPOSIT_ENTRY_LABELS, runningDepositBalances } from '@/domain/deposit'
 import type { DepositEntryStatus, DepositEntryType } from '@/domain/statuses'
 import { MoneyInput } from '@/components/ui/money-input'
-import { addDepositEntryAction, markDepositDoneAction } from '@/server/charges/actions'
+import { addDepositEntryAction, markDepositDoneAction } from '@/modules/leasing/actions'
 
 type Entry = { id: string; date: string; type: DepositEntryType; amount: number; status: DepositEntryStatus }
 export function DepositLedger({ entries, canEdit, leaseId }: { entries: Entry[]; canEdit: boolean; leaseId?: string }) {

@@ -2,7 +2,7 @@
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { FormDialog } from '@/components/form-dialog'
-import { addOneOffAction, removeOneOffAction } from '@/server/charges/actions'
+import { addOneOffAction, removeOneOffAction } from '@/modules/leasing/actions'
 import { formatVND } from '@/domain/money'
 import { MoneyInput } from '@/components/ui/money-input'
 

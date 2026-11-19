@@ -32,9 +32,9 @@ import {
   createTermination,
   createTransfer,
   previewAddendum,
-} from '@/server/addenda/service'
-import { saveHandover, startHandover } from '@/server/handovers/service'
-import { approveInvoice, getInvoiceDetail } from '@/server/invoices/service'
+} from '@/modules/leasing/server/addenda/service'
+import { saveHandover, startHandover } from '@/modules/leasing/server/handovers/service'
+import { approveInvoice, getInvoiceDetail } from '@/modules/leasing/server/invoices/service'
 import { createTestDb } from '../helpers/db'
 
 const context = (permissions: Permission[], facilityId: string): AccessContext => ({
@@ -347,7 +347,7 @@ describe('phụ lục hợp đồng', () => {
         .insert(assets)
         .values({ code: 'TV1', name: 'TV', value: 500000, locationKind: 'room', locationId: roomId, facilityId })
       const h = await startHandover(db, ctx(), leaseId, 'check_out')
-      const d = await (await import('@/server/handovers/service')).getHandover(db, ctx(), h.id)
+      const d = await (await import('@/modules/leasing/server/handovers/service')).getHandover(db, ctx(), h.id)
       await saveHandover(db, ctx(), h.id, { items: [{ id: d.items[0].id, penalty: 500000 }], meterReadings: [] })
       return createTermination(db, ctx(), leaseId, {
         endDate: '2026-11-20',
@@ -398,7 +398,7 @@ describe('phụ lục hợp đồng', () => {
     ).rejects.toThrow(ForbiddenError)
   })
   it('sau khi duyệt thanh lý: phòng về Trống, hoặc Đã cọc nếu có cọc chờ', async () => {
-    const { getRoomDetail } = await import('@/server/contracts/room-view')
+    const { getRoomDetail } = await import('@/modules/leasing/server/contracts/room-view')
     const { depositContracts } = await import('@/db')
     const r = await createTermination(db, ctx(), leaseId, {
       endDate: '2026-12-10',

@@ -14,7 +14,7 @@ import {
   setRoomActive,
   createRoomsBulk,
 } from '@/modules/facilities/server/rooms/service'
-import { getRoomDetail, listRoomsWithStatus } from '@/server/contracts/room-view'
+import { getRoomDetail, listRoomsWithStatus } from '@/modules/leasing/server/contracts/room-view'
 import { createAmenity, updateAmenity } from '@/modules/facilities/server/amenities/service'
 import { ValidationError } from '@/domain/errors'
 import { ForbiddenError, NotFoundError, type AccessContext, type Permission } from '@/domain/access'

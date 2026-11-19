@@ -4,8 +4,8 @@ import { facilities, files, handovers, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
 import { createTestDb } from '../helpers/db'
-import * as contracts from '@/server/contracts/service'
-import { syncContractDocuments } from '@/server/contracts/documents'
+import * as contracts from '@/modules/leasing/server/contracts/service'
+import { syncContractDocuments } from '@/modules/leasing/server/contracts/documents'
 import { MemoryStorage } from '@/modules/platform/server/storage/memory'
 import { addHtmlTemplate } from '../helpers/templates'
 
@@ -78,7 +78,7 @@ describe('bản PDF tự lưu của hợp đồng và biên bản bàn giao', ()
   })
 
   it('có biên bản bàn giao thì tạo thêm bản PDF cho biên bản; thiếu mẫu thì tự dùng mẫu mặc định', async () => {
-    const { startHandover } = await import('@/server/handovers/service')
+    const { startHandover } = await import('@/modules/leasing/server/handovers/service')
     const h = await startHandover(db, admin, leaseId, 'check_in')
     expect((await syncContractDocuments(db, admin, storage, leaseId)).warnings).toEqual([])
     expect(await autoFiles(h.id)).toHaveLength(1)

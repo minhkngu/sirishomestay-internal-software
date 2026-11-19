@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { createTerminationAction } from '@/server/addenda/actions'
+import { createTerminationAction } from '@/modules/leasing/actions'
 import { AddendumShell, Field, inputCls, ReadingInputs, toReadings, type MeterOption } from './addendum-shell'
 import { MoneyInput } from '@/components/ui/money-input'
 

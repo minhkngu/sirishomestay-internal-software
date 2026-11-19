@@ -2,8 +2,14 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { assets, facilities, leaseFeeMeters, leaseFeeSnapshots, meterReadings, meters, rooms } from '@/db'
 import { createTenant } from '@/modules/tenants/server/tenants/service'
-import { createLease } from '@/server/contracts/service'
-import { startHandover, getHandover, saveHandover, completeHandover, listHandovers } from '@/server/handovers/service'
+import { createLease } from '@/modules/leasing/server/contracts/service'
+import {
+  startHandover,
+  getHandover,
+  saveHandover,
+  completeHandover,
+  listHandovers,
+} from '@/modules/leasing/server/handovers/service'
 import { assetHistory, setAssetStatus } from '@/modules/assets/server/assets/service'
 import { requestUpload, confirmUpload, listFiles } from '@/modules/platform/server/files/service'
 import { MemoryStorage } from '@/modules/platform/server/storage/memory'

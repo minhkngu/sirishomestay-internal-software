@@ -2,7 +2,7 @@
 
 import { useState, useTransition, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
-import { exportContractAction } from '@/server/contracts/actions'
+import { exportContractAction } from '@/modules/leasing/actions'
 
 export type TemplateOption = { id: string; name: string; isDefault: boolean }
 

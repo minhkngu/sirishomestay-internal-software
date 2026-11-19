@@ -10,7 +10,7 @@ import { todayVN } from '@/domain/dates'
 import { getAccessContext } from '@/modules/platform'
 import { getSettings } from '@/modules/platform'
 import { countPendingContractFiles } from '@/modules/platform'
-import { listDepositContracts, listLeases } from '@/server/contracts/service'
+import { listDepositContracts, listLeases } from '@/modules/leasing'
 import { ContractListView } from './contract-actions'
 
 export default async function ContractsPage() {

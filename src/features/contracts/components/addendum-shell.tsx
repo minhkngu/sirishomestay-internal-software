@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { FormDialog } from '@/components/form-dialog'
 import { Button } from '@/components/ui/button'
 import { formatVND } from '@/domain/money'
-import { previewAddendumAction } from '@/server/addenda/actions'
+import { previewAddendumAction } from '@/modules/leasing/actions'
 
 type Preview = {
   adjustments: { description: string; amount: number; target: string; invoiceCode: string | null }[]

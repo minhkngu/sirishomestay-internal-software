@@ -1,4 +1,4 @@
-import { addDays, daysInMonth, formatDateVN } from './dates'
+import { addDays, daysInMonth, formatDateVN } from '@/domain/dates'
 import { prorateFraction } from './proration'
 import type {
   ForfeitInput,
@@ -10,7 +10,7 @@ import type {
   PendingAdjustment,
   Proration,
   Utility,
-} from './types'
+} from '@/domain/types'
 
 export type TerminationInput = {
   terms: LeaseTerms

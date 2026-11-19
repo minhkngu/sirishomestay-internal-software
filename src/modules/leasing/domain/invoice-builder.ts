@@ -1,7 +1,7 @@
 import { contractTermsAt, termSegments } from './contract-terms'
-import { addDays, daysInMonth, formatDateVN } from './dates'
-import { ValidationError } from './errors'
-import { meterUsage } from './meters'
+import { addDays, daysInMonth, formatDateVN } from '@/domain/dates'
+import { ValidationError } from '@/domain/errors'
+import { meterUsage } from '@/domain/meters'
 import { fullMonthCoefficient, prorateFraction } from './proration'
 import { rateFor } from './rates'
 import type {
@@ -17,7 +17,7 @@ import type {
   Proration,
   UtilityRate,
   Utility,
-} from './types'
+} from '@/domain/types'
 
 const round4 = (n: number) => Math.round(n * 10000) / 10000
 const lastDayOf = (ym: string) => `${ym}-${String(daysInMonth(ym)).padStart(2, '0')}`

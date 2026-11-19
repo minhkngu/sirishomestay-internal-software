@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { MoneyInput } from '@/components/ui/money-input'
-import { addPaymentAction, exportReceiptAction, removePaymentAction } from '@/server/invoices/actions'
+import { addPaymentAction, exportReceiptAction, removePaymentAction } from '@/modules/leasing/actions'
 
 type Pay = {
   id: string

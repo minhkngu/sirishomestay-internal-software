@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { facilities, rooms, tenants, leases, depositContracts, depositEntries } from '@/db'
-import { listRoomsWithStatus, getRoomDetail } from '@/server/contracts/room-view'
+import { listRoomsWithStatus, getRoomDetail } from '@/modules/leasing/server/contracts/room-view'
 import { createTestDb } from '../helpers/db'
 import type { AccessContext, Permission } from '@/domain/access'
 

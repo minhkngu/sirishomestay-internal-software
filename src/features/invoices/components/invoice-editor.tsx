@@ -14,7 +14,7 @@ import {
   deleteInvoiceAction,
   setPeriodAction,
   updateLinesAction,
-} from '@/server/invoices/actions'
+} from '@/modules/leasing/actions'
 
 const TYPES: [string, string][] = [
   ['rent', 'Tiền phòng'],

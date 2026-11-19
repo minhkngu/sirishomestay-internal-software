@@ -24,11 +24,11 @@ import {
 } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
-import { computeDueDate } from '@/domain/due-date'
+import { computeDueDate } from '../../domain/due-date'
 import { todayVN } from '@/domain/dates'
 import { NotFoundError, ValidationError } from '@/domain/errors'
-import { midPeriodAdjustments } from '@/domain/adjustments'
-import { buildMonthlyInvoice, nextBillingPeriod, settlementState } from '@/domain/invoice-builder'
+import { midPeriodAdjustments } from '../../domain/adjustments'
+import { buildMonthlyInvoice, nextBillingPeriod, settlementState } from '../../domain/invoice-builder'
 import type {
   Addendum,
   ContractFee,
@@ -43,7 +43,7 @@ import type {
   Proration,
   UtilityRate,
 } from '@/domain/types'
-import { finalizeTermination } from '@/server/addenda/finalize'
+import { finalizeTermination } from '../addenda/finalize'
 import { recordAudit, recordAuditBatch } from '@/modules/platform'
 import { registerExportOwnerResolver } from '@/modules/platform'
 import { getSettings } from '@/modules/platform'

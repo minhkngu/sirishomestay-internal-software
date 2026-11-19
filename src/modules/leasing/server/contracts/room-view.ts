@@ -6,9 +6,9 @@ import { roomStatus, type RoomStatus } from '@/domain/room-status'
 import { depositBalance } from '@/domain/deposit'
 import type { DepositEntry, LeaseTerms } from '@/domain/types'
 import { todayVN } from '@/domain/dates'
-import { contractTermsAt } from '@/domain/contract-terms'
+import { contractTermsAt } from '../../domain/contract-terms'
 import { getSettings } from '@/modules/platform'
-import { leaseData, loadAddenda } from '@/server/invoices/service'
+import { leaseData, loadAddenda } from '../invoices/service'
 import { getRoom, listRooms, roomAmenitiesOf, type Room } from '@/modules/facilities'
 
 export type RoomWithStatus = Room & {

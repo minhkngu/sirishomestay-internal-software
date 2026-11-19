@@ -2,10 +2,10 @@ import { expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { addenda, facilities, files, leaseOccupants, leases, rooms, tenants } from '@/db'
 import { createTestDb } from '../helpers/db'
-import { createLease } from '@/server/contracts/service'
-import { addendumFormData, createAssignment, setAddendumSignStatus } from '@/server/addenda/service'
+import { createLease } from '@/modules/leasing/server/contracts/service'
+import { addendumFormData, createAssignment, setAddendumSignStatus } from '@/modules/leasing/server/addenda/service'
 import type { AccessContext } from '@/domain/access'
-import { previewContractRestore, restoreContract } from '@/server/contracts/restore'
+import { previewContractRestore, restoreContract } from '@/modules/leasing/server/contracts/restore'
 import { MemoryStorage } from '@/modules/platform/server/storage/memory'
 
 it('chuyển nhượng đổi người đứng tên và người ở, giữ nguyên PDF đã ký', async () => {

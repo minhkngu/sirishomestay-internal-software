@@ -11,7 +11,7 @@ import { formatDateVN } from '@/domain/dates'
 import { matchesInvoiceView, matchesPeriod, type InvoiceView } from '@/domain/list-filters'
 import { formatVND } from '@/domain/money'
 import { invoiceStatusLabel } from './invoice-status'
-import type { listInvoices } from '@/server/invoices/service'
+import type { listInvoices } from '@/modules/leasing'
 
 type InvoiceRow = Awaited<ReturnType<typeof listInvoices>>[number]
 

@@ -14,10 +14,10 @@ import { FormDialog } from '@/components/form-dialog'
 import { formatVND } from '@/domain/money'
 import { todayVN } from '@/domain/dates'
 import { formatPhoneDisplay } from '@/domain/phone'
-import { createOccupantChangeAction } from '@/server/addenda/actions'
+import { createOccupantChangeAction } from '@/modules/leasing/actions'
 import { createFeeTypeAction } from '@/modules/facilities/actions'
 import { createTenantAction } from '@/modules/tenants/actions'
-import { addDepositEntryAction, markDepositDoneAction } from '@/server/charges/actions'
+import { addDepositEntryAction, markDepositDoneAction } from '@/modules/leasing/actions'
 import { uploadOne } from '@/modules/platform/ui'
 import { PdfBlobDialog } from '@/components/pdf-blob-dialog'
 import { EditAssets, assetsDraftChanged, emptyAssetsDraft, type AssetRow } from './edit-assets'
@@ -30,7 +30,7 @@ import {
   updateLeaseAction,
   updateLeaseAssetsAction,
   refreshContractDocumentsAction,
-} from '@/server/contracts/actions'
+} from '@/modules/leasing/actions'
 
 type Common = { id: string; roomId: string; tenantId: string; depositAmount: number; signStatus: string }
 type Contract =

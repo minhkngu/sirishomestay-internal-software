@@ -3,7 +3,7 @@ import { db } from '@/db/client'
 import { assertCan, facilityScope } from '@/domain/access'
 import { todayVN } from '@/domain/dates'
 import { GenerateWizard } from '@/features/invoices/components/generate-wizard'
-import { listLeases } from '@/server/contracts/service'
+import { listLeases } from '@/modules/leasing'
 import { listFacilities } from '@/modules/facilities'
 import { getAccessContext } from '@/modules/platform'
 

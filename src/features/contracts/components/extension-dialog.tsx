@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { createExtensionAction } from '@/server/addenda/actions'
+import { createExtensionAction } from '@/modules/leasing/actions'
 import { AddendumShell, Field, inputCls, TargetSelect } from './addendum-shell'
 import { MoneyInput } from '@/components/ui/money-input'
 

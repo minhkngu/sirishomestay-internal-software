@@ -3,11 +3,11 @@ import { facilities, rooms, tenants, leases, invoices, assets, incidents } from 
 import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
 import { searchTenants } from '@/modules/tenants/server/tenants/service'
-import { listLeases } from '@/server/contracts/service'
-import { listInvoices } from '@/server/invoices/service'
+import { listLeases } from '@/modules/leasing/server/contracts/service'
+import { listInvoices } from '@/modules/leasing/server/invoices/service'
 import { listAssets } from '@/modules/assets/server/assets/service'
-import { listIncidents } from '@/server/incidents/service'
-import { listRoomsWithStatus } from '@/server/contracts/room-view'
+import { listIncidents } from '@/modules/leasing/server/incidents/service'
+import { listRoomsWithStatus } from '@/modules/leasing/server/contracts/room-view'
 import { createTestDb } from '../helpers/db'
 let db: DB, ids: string[], ctx: AccessContext, admin: AccessContext
 beforeEach(async () => {

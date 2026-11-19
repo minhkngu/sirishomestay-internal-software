@@ -10,8 +10,8 @@ import {
   deleteContract,
   updateDepositContract,
   updateLease,
-} from '@/server/contracts/service'
-import { createExtension, createTermination } from '@/server/addenda/service'
+} from '@/modules/leasing/server/contracts/service'
+import { createExtension, createTermination } from '@/modules/leasing/server/addenda/service'
 import { MemoryStorage } from '@/modules/platform/server/storage/memory'
 
 describe('lịch sử hợp đồng', () => {
