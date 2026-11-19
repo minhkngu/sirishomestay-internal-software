@@ -5,7 +5,7 @@ import { FileUpload } from '@/modules/platform/ui'
 import { orNotFound } from '@/lib/or-not-found'
 import { listFiles } from '@/modules/platform'
 import { getIncident } from '@/server/incidents/service'
-import { roomCodesByIds } from '@/server/rooms/service'
+import { roomCodesByIds } from '@/modules/facilities'
 import { getAccessContext } from '@/modules/platform'
 import { userNamesByIds } from '@/modules/users'
 

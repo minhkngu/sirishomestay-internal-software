@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Msg, useRun } from '@/features/settings/components/use-run'
-import { createAmenityAction, updateAmenityAction } from '@/server/amenities/actions'
+import { Msg, useRun } from '@/components/use-run'
+import { createAmenityAction, updateAmenityAction } from '../server/amenities/actions'
 
 export type AmenityRow = { id: string; name: string; isActive: boolean }
 

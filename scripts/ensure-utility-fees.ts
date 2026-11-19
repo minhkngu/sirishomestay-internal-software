@@ -2,7 +2,7 @@ import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import * as schema from '../src/db'
 import type { DB } from '../src/db/client'
-import { ensureUtilityFeeTypes } from '../src/server/fees/service'
+import { ensureUtilityFeeTypes } from '../src/modules/facilities/server/fees/service'
 
 try {
   process.loadEnvFile('.env.local')

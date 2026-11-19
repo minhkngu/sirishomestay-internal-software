@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Button } from '@/components/ui/button'
-import { deleteFacilityAction, setFacilityActiveAction } from '@/server/facilities/actions'
+import { deleteFacilityAction, setFacilityActiveAction } from '../server/facilities/actions'
 
 /** Ngừng/dùng lại và xoá cơ sở (kèm các phòng bên trong). Xoá hẳn kèm toàn bộ dữ liệu đi kèm. */
 export function FacilityLifecycle({ id, name, isActive }: { id: string; name: string; isActive: boolean }) {

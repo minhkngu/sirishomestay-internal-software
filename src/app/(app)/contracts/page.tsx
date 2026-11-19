@@ -1,5 +1,5 @@
 import { PageHeader } from '@/components/list/page-header'
-import { listFacilities } from '@/server/facilities/service'
+import { listFacilities } from '@/modules/facilities'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { buttonVariants } from '@/components/ui/button'

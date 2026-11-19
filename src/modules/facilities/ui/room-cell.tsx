@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
-import { hasTenant } from '@/domain/room-occupancy'
+import { hasTenant } from '../domain/room-occupancy'
 import { ROOM_STATUS_LABELS, type RoomStatus } from '@/domain/room-status'
 import { cn } from '@/lib/utils'
 import { RoomQuickActions, type RoomManage } from './room-quick-actions'

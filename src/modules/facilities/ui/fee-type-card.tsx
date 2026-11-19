@@ -2,13 +2,13 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { billingLabel, feeApplicationSummary, quantityLabel } from '@/features/settings/components/fee-options'
+import { billingLabel, feeApplicationSummary, quantityLabel } from './fee-options'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { FeeFacilitiesDialog } from '@/features/settings/components/fee-facilities-dialog'
-import { FeeTypeForm } from '@/features/settings/components/fee-type-form'
-import { Msg, useRun } from '@/features/settings/components/use-run'
+import { FeeFacilitiesDialog } from './fee-facilities-dialog'
+import { FeeTypeForm } from './fee-type-form'
+import { Msg, useRun } from '@/components/use-run'
 import { formatVND } from '@/domain/money'
-import { archiveFeeTypeAction, updateFeeTypeAction } from '@/server/fees/actions'
+import { archiveFeeTypeAction, updateFeeTypeAction } from '../server/fees/actions'
 
 type FacilityOption = { id: string; name: string }
 

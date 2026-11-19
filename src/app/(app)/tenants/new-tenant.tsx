@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import { db } from '@/db/client'
 import { assertCan } from '@/domain/access'
 import { getAccessContext } from '@/modules/platform'
-import { listFacilities } from '@/server/facilities/service'
+import { listFacilities } from '@/modules/facilities'
 import { TenantForm } from '@/modules/tenants/ui'
 
 /** Nội dung trang thêm khách; dùng cho cả trang đầy đủ lẫn popup. */

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { MoneyInput } from '@/components/ui/money-input'
-import { BILLING_OPTIONS, QUANTITY_OPTIONS } from '@/features/settings/components/fee-options'
+import { BILLING_OPTIONS, QUANTITY_OPTIONS } from './fee-options'
 
 type UnitOption = { id: string; name: string }
 

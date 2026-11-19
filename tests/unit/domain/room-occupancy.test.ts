@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { hasTenant, vacancySummary } from '@/domain/room-occupancy'
+import { hasTenant, vacancySummary } from '@/modules/facilities/domain/room-occupancy'
 
 describe('hasTenant', () => {
   it('đúng cho phòng đang có khách', () => {

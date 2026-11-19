@@ -1,9 +1,21 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { facilities, rooms, roomAmenities } from '@/db'
-import { listFacilities, getFacility, createFacility, updateFacility } from '@/server/facilities/service'
-import { getRoom, listRooms, createRoom, updateRoom, setRoomActive, createRoomsBulk } from '@/server/rooms/service'
+import {
+  listFacilities,
+  getFacility,
+  createFacility,
+  updateFacility,
+} from '@/modules/facilities/server/facilities/service'
+import {
+  getRoom,
+  listRooms,
+  createRoom,
+  updateRoom,
+  setRoomActive,
+  createRoomsBulk,
+} from '@/modules/facilities/server/rooms/service'
 import { getRoomDetail, listRoomsWithStatus } from '@/server/contracts/room-view'
-import { createAmenity, updateAmenity } from '@/server/amenities/service'
+import { createAmenity, updateAmenity } from '@/modules/facilities/server/amenities/service'
 import { ValidationError } from '@/domain/errors'
 import { ForbiddenError, NotFoundError, type AccessContext, type Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'

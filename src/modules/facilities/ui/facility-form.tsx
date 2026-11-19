@@ -6,7 +6,7 @@ import { FormDialog } from '@/components/form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { createFacilityAction, updateFacilityAction } from '@/server/facilities/actions'
+import { createFacilityAction, updateFacilityAction } from '../server/facilities/actions'
 import { BankAccountFields, emptyBankAccount } from '@/components/bank-account/bank-account-fields'
 import type { BankAccount } from '@/domain/types'
 

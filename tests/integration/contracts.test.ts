@@ -25,7 +25,7 @@ import {
 import { assetHistory } from '@/server/assets/service'
 import { listMeterOverview, listReadingSheet } from '@/server/meters/service'
 import { leaseData } from '@/server/invoices/service'
-import { listFeeTypes, updateFeeType, archiveFeeType } from '@/server/fees/service'
+import { listFeeTypes, updateFeeType, archiveFeeType } from '@/modules/facilities/server/fees/service'
 import { createTenant } from '@/modules/tenants/server/tenants/service'
 import { listRoomsWithStatus } from '@/server/contracts/room-view'
 import {

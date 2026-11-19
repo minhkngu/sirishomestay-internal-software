@@ -1,4 +1,4 @@
-import type { RoomStatus } from './room-status'
+import type { RoomStatus } from '@/domain/room-status'
 
 /** Phòng đang có khách thuê (hợp đồng hiệu lực). Phòng mới cọc chưa có khách. */
 export function hasTenant(status: RoomStatus): boolean {

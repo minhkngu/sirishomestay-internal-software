@@ -4,7 +4,7 @@ import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
 import { assetLocationLabel } from '@/server/assets/service'
 import { listRoomMeterOptions } from '@/server/meters/service'
-import { roomCodesByIds } from '@/server/rooms/service'
+import { roomCodesByIds } from '@/modules/facilities/server/rooms/service'
 import { userNamesByIds } from '@/modules/users'
 import { createTestDb } from '../helpers/db'
 

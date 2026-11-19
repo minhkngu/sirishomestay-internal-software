@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 import { EmptyState } from '@/components/list/empty-state'
 import { FacilityFilter } from '@/components/list/facility-filter'
 import { useFacilitySelection } from '@/components/list/use-list-params'
-import { vacancySummary } from '@/domain/room-occupancy'
+import { vacancySummary } from '../domain/room-occupancy'
 import { RoomCell, type CellRoom } from './room-cell'
 
 export type GridRoom = CellRoom & { facilityId: string; floor: string | null }

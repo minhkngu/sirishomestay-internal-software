@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { FeeTypeForm, type FeeFormValues } from '@/features/settings/components/fee-type-form'
+import { FeeTypeForm, type FeeFormValues } from '@/modules/facilities/ui'
 
 /** Form loại phí mới ngay trong popup sửa hợp đồng (giống "Thêm loại phí" ở Cài đặt); chỉ trả bản nháp, loại phí được tạo khi lưu hợp đồng. */
 export function CreateFeeType({

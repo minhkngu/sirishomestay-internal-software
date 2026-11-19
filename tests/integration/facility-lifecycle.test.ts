@@ -6,8 +6,8 @@ import {
   getFacility,
   listFacilities,
   setFacilityActive,
-} from '@/server/facilities/service'
-import { createRoom, deleteRoom, getRoom, setRoomActive } from '@/server/rooms/service'
+} from '@/modules/facilities/server/facilities/service'
+import { createRoom, deleteRoom, getRoom, setRoomActive } from '@/modules/facilities/server/rooms/service'
 import { ValidationError } from '@/domain/errors'
 import { ForbiddenError, NotFoundError, type AccessContext } from '@/domain/access'
 import { createTestDb } from '../helpers/db'

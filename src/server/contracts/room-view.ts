@@ -9,7 +9,7 @@ import { todayVN } from '@/domain/dates'
 import { contractTermsAt } from '@/domain/contract-terms'
 import { getSettings } from '@/modules/platform'
 import { leaseData, loadAddenda } from '@/server/invoices/service'
-import { getRoom, listRooms, roomAmenitiesOf, type Room } from '@/server/rooms/service'
+import { getRoom, listRooms, roomAmenitiesOf, type Room } from '@/modules/facilities'
 
 export type RoomWithStatus = Room & {
   status: RoomStatus
