@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { MoneyInput } from '@/components/ui/money-input'
 import { Label } from '@/components/ui/label'
 import { deleteRoomAction, setRoomActiveAction, updateRoomAction } from '@/server/rooms/actions'
 
@@ -62,7 +63,9 @@ export function RoomQuickActions({ id, code, isActive, manage }: { id: string; c
             {FIELDS.map(([k, label]) => (
               <div key={k} className="space-y-1">
                 <Label htmlFor={`rq-${id}-${k}`}>{label}</Label>
-                <Input id={`rq-${id}-${k}`} value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} />
+                {k === 'listPrice'
+                  ? <MoneyInput id={`rq-${id}-${k}`} value={v[k]} onValueChange={(value) => setV({ ...v, [k]: value })} />
+                  : <Input id={`rq-${id}-${k}`} value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} />}
               </div>
             ))}
             {err && <p role="alert" className="text-sm text-destructive">{err}</p>}

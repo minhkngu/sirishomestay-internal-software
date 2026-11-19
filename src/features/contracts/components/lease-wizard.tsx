@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useRef, useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { MoneyInput } from '@/components/ui/money-input'
 import { Label } from '@/components/ui/label'
 import { addDays } from '@/domain/dates'
 import { resolveFeePrice } from '@/domain/fee-price'
@@ -149,9 +150,9 @@ export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAsse
           <div className="space-y-1"><Label htmlFor="start">Ngày bắt đầu</Label><Input id="start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />{fieldError('startDate')}</div>
           <div className="space-y-1"><Label htmlFor="end">Ngày kết thúc</Label><Input id="end" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
             {fieldError('endDate')}{startDate && <button type="button" className="text-xs underline" onClick={() => { const [y, m, d] = startDate.split('-').map(Number); setEndDate(addDays(`${y + 1}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`, -1)) }}>+12 tháng</button>}</div>
-          <div className="space-y-1 sm:col-span-2"><Label htmlFor="rent">Giá thuê tháng (VND)</Label><Input id="rent" inputMode="numeric" value={rent} onChange={(e) => setRent(e.target.value)} />{fieldError('monthlyRent')}</div>
-          <div className="space-y-1"><Label htmlFor="deposit">Tiền cọc (VND)</Label><Input id="deposit" inputMode="numeric" value={deposit} onChange={(e) => setDeposit(e.target.value)} />{fieldError('depositAmount')}</div>
-          <div className="space-y-1"><Label htmlFor="received">Tiền đã cọc (VND)</Label><Input id="received" inputMode="numeric" value={received} onChange={e => setReceived(e.target.value)} />{fieldError('receivedDeposit')}<p className="text-sm text-muted-foreground">Còn thiếu: {formatVND(Math.max(0, Number(deposit) - Number(received)))}</p></div>
+          <div className="space-y-1 sm:col-span-2"><Label htmlFor="rent">Giá thuê tháng (VND)</Label><MoneyInput id="rent" value={rent} onValueChange={setRent} />{fieldError('monthlyRent')}</div>
+          <div className="space-y-1"><Label htmlFor="deposit">Tiền cọc (VND)</Label><MoneyInput id="deposit" value={deposit} onValueChange={setDeposit} />{fieldError('depositAmount')}</div>
+          <div className="space-y-1"><Label htmlFor="received">Tiền đã cọc (VND)</Label><MoneyInput id="received" value={received} onValueChange={setReceived} />{fieldError('receivedDeposit')}<p className="text-sm text-muted-foreground">Còn thiếu: {formatVND(Math.max(0, Number(deposit) - Number(received)))}</p></div>
         </div>
       <LeaseFees feeTypes={feeTypes} roomMeters={roomMeters} roomId={roomId} fees={fees} onChange={setFees} onAddCommon={id => { const fee = feeTypes.find(f => f.id === id); if (fee) setFees(previous => [...previous, makeFee(fee, rooms.find(r => r.id === roomId)?.facilityId)]) }} />
       {fieldError('fees')}

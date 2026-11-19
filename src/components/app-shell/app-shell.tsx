@@ -22,7 +22,7 @@ export function AppShell({ children, hrefs, userName, logoutAction }: Props) {
           <div className="flex size-5.5 items-center justify-center rounded-lg bg-primary/15 text-[11px] font-bold text-primary">
             {(userName || 'U')[0].toUpperCase()}
           </div>
-          <span className="text-xs font-medium text-foreground">{userName}</span>
+          <span className="hidden text-xs font-medium text-foreground sm:inline">{userName}</span>
         </div>
         <form action={logoutAction}>
           <button

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { MoneyInput } from '@/components/ui/money-input'
 import { BILLING_OPTIONS, QUANTITY_OPTIONS } from '@/features/settings/components/fee-options'
 
 type UnitOption = { id: string; name: string }
@@ -83,7 +84,7 @@ export function FeeTypeForm({ units, initial, allowNewUnit = false, pending, err
         {unitError && <p className="text-sm text-destructive">{unitError}</p>}
       </div>
       <div className="space-y-1">
-        <Input aria-label="Đơn giá mặc định" placeholder="Đơn giá mặc định" inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value)} aria-invalid={Boolean(priceError)} />
+        <MoneyInput aria-label="Đơn giá mặc định" placeholder="Đơn giá mặc định" value={price} onValueChange={setPrice} aria-invalid={Boolean(priceError)} />
         {priceError && <p className="text-sm text-destructive">{priceError}</p>}
       </div>
       <select aria-label="Kiểu phí" className="h-9 w-full rounded-lg border bg-card px-2 text-sm" value={billing} onChange={(e) => setBilling(e.target.value)}>

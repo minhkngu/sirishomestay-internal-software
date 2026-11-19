@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { MoneyInput } from '@/components/ui/money-input'
 import { Label } from '@/components/ui/label'
 import { updateRoomAction } from '@/server/rooms/actions'
 import { AmenityPicker } from './amenity-picker'
@@ -35,7 +36,9 @@ export function RoomEditForm({ room, amenities, selectedIds }: Props) {
       {([['code', 'Mã phòng'], ['floor', 'Tầng'], ['roomType', 'Loại phòng'], ['areaM2', 'Diện tích (m²)'], ['beds', 'Số giường'], ['listPrice', 'Giá niêm yết (VND)'], ['capacity', 'Sức chứa']] as const).map(([k, label]) => (
         <div key={k} className="space-y-1">
           <Label htmlFor={`e-${k}`}>{label}</Label>
-          <Input id={`e-${k}`} value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} />
+          {k === 'listPrice'
+            ? <MoneyInput id={`e-${k}`} value={v[k]} onValueChange={(value) => setV({ ...v, [k]: value })} />
+            : <Input id={`e-${k}`} value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} />}
         </div>
       ))}
       <AmenityPicker idPrefix="e-am" options={options} value={picked} onChange={setPicked} />

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { MoneyInput } from '@/components/ui/money-input'
 import { Label } from '@/components/ui/label'
 import { createRoomAction, createRoomsBulkAction } from '@/server/rooms/actions'
 import { AmenityPicker, type AmenityOption } from './amenity-picker'
@@ -52,7 +53,9 @@ export function RoomPanels({ amenities, facilities, facilityId }: Props) {
           {([['code', 'Mã phòng'], ['floor', 'Tầng'], ['roomType', 'Loại phòng'], ['areaM2', 'Diện tích (m²)'], ['beds', 'Số giường'], ['listPrice', 'Giá niêm yết (VND)'], ['capacity', 'Sức chứa']] as const).map(([k, label]) => (
             <div key={k} className="space-y-1">
               <Label htmlFor={`r-${k}`}>{label}</Label>
-              <Input id={`r-${k}`} value={one[k]} onChange={(e) => setOne({ ...one, [k]: e.target.value })} />
+              {k === 'listPrice'
+                ? <MoneyInput id={`r-${k}`} value={one[k]} onValueChange={(value) => setOne({ ...one, [k]: value })} />
+                : <Input id={`r-${k}`} value={one[k]} onChange={(e) => setOne({ ...one, [k]: e.target.value })} />}
             </div>
           ))}
           <AmenityPicker idPrefix="r-am" options={amenities} value={oneAmenities} onChange={setOneAmenities} />
@@ -77,7 +80,9 @@ export function RoomPanels({ amenities, facilities, facilityId }: Props) {
           {([['prefix', 'Tiền tố mã (tuỳ chọn)'], ['floor', 'Tầng'], ['from', 'Từ số'], ['to', 'Đến số'], ['areaM2', 'Diện tích (m²)'], ['beds', 'Số giường'], ['listPrice', 'Giá niêm yết (VND)']] as const).map(([k, label]) => (
             <div key={k} className="space-y-1">
               <Label htmlFor={`b-${k}`}>{label}</Label>
-              <Input id={`b-${k}`} value={bulk[k]} onChange={(e) => setBulk({ ...bulk, [k]: e.target.value })} />
+              {k === 'listPrice'
+                ? <MoneyInput id={`b-${k}`} value={bulk[k]} onValueChange={(value) => setBulk({ ...bulk, [k]: value })} />
+                : <Input id={`b-${k}`} value={bulk[k]} onChange={(e) => setBulk({ ...bulk, [k]: e.target.value })} />}
             </div>
           ))}
           <AmenityPicker idPrefix="b-am" options={amenities} value={bulkAmenities} onChange={setBulkAmenities} />
