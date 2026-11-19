@@ -109,7 +109,6 @@ export function AssetTable({
             {STATE_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
-        <span className="ml-auto hidden text-xs tabular-nums text-muted-foreground sm:inline">{shown.length} tài sản</span>
       </div>
 
       <div className="space-y-3">

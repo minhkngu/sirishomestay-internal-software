@@ -45,7 +45,6 @@ export function StockTable({ facilities, rows, facilityId, location, onFacilityC
           <Input aria-label="Tìm vật tư" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm vật tư, vị trí…" className="h-9 pl-9" />
         </div>
         <LocationFilters facilities={facilities} facilityId={facilityId} location={location} onFacilityChange={onFacilityChange} onLocationChange={onLocationChange} />
-        <span className="ml-auto hidden text-xs tabular-nums text-muted-foreground sm:inline">{shown.length} dòng</span>
         <div className="flex gap-2 sm:ml-auto">
           <Button variant="outline" size="sm" className="h-9" onClick={() => setAddOpen(true)}>Thêm vật tư</Button>
           <Button size="sm" className="h-9" onClick={() => setMoveOpen(true)}><PackagePlus className="size-4" />Cập nhật kho</Button>
