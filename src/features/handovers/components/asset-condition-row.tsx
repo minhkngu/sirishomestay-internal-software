@@ -93,8 +93,8 @@ export function AssetConditionRow({
       )}
       <div className="flex flex-wrap items-center gap-2">
         {item.photoIds.map((id) => (
-          // eslint-disable-next-line @next/next/no-img-element
           <a key={id} href={`/api/files/${id}`} target="_blank" rel="noreferrer">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={`/api/files/${id}?thumb=1`} alt="Ảnh" className="size-14 rounded border object-cover" />
           </a>
         ))}
