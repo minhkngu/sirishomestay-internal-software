@@ -10,11 +10,15 @@ import { ValidationError } from '@/domain/errors'
 import { getAccessContext } from '@/server/session'
 import { getStorage } from '@/server/storage'
 import { restoreDefaultTemplates } from './defaults'
-import { attachTemplateFile, createTemplate, exportDocument, previewDocument, removeTemplate, setDefaultTemplate } from './service'
+import { attachTemplateFile, createTemplate, updateTemplate, exportDocument, previewDocument, removeTemplate, setDefaultTemplate } from './service'
 
-export async function createTemplateAction(input: { docType: string; name: string }) {
+export async function createTemplateAction(input: { docType: string; name: string; body?: string; style?: TemplateStyle }) {
   const ctx = await getAccessContext()
   return toActionResult(async () => { const t = await createTemplate(db, ctx, input); revalidatePath('/templates'); return { id: t.id } })
+}
+export async function updateTemplateAction(id: string, input: { name?: string; body?: string; style?: TemplateStyle }) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => { await updateTemplate(db, ctx, id, input); revalidatePath('/templates'); return {} })
 }
 export async function attachTemplateFileAction(templateId: string, fileId: string) {
   const ctx = await getAccessContext()
