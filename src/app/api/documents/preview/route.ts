@@ -8,7 +8,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { loadAccessContext } from '@/server/session'
 import { previewDocument } from '@/server/templates/service'
 
-const ALLOWED = ['lease', 'handover_check_in', 'handover_check_out'] as const
+const ALLOWED = ['lease', 'deposit_contract', 'handover_check_in', 'handover_check_out'] as const
 
 /** Xem PDF của hợp đồng thuê hoặc biên bản bàn giao dựng từ mẫu hiện tại (chưa lưu tệp); trình duyệt tự có nút tải. */
 export async function GET(req: Request) {

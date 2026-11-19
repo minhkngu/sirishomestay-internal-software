@@ -17,8 +17,7 @@ import { createFeeTypeAction } from '@/server/fees/actions'
 import { createTenantAction } from '@/server/tenants/actions'
 import { addDepositEntryAction, markDepositDoneAction } from '@/server/charges/actions'
 import { uploadOne } from '@/components/file-upload'
-import { openBlankTab, showBase64 } from '@/lib/open-base64'
-import { previewDocumentAction } from '@/server/templates/actions'
+import { PdfViewButton } from '@/components/pdf-view-button'
 import { EditAssets, assetsDraftChanged, emptyAssetsDraft, type AssetRow } from './edit-assets'
 import { EditDocuments, docsDraftChanged, emptyDocsDraft, type DepositRow } from './edit-documents'
 import { deleteContractAction, retryContractFileCleanupAction, setSignStatusAction, updateDepositContractAction, updateLeaseAction, updateLeaseAssetsAction, refreshContractDocumentsAction } from '@/server/contracts/actions'
@@ -68,16 +67,6 @@ export function ContractEditActions({ contract, canDelete, rooms, tenants, mode,
   const [meterId, setMeterId] = useState('')
   const defaultContractTemplate = templates?.contract.find(t => t.id === templates.contractId)?.id ?? templates?.contract.find(t => t.isDefault)?.id ?? templates?.contract[0]?.id ?? ''
   const [contractTpl, setContractTpl] = useState(defaultContractTemplate)
-  const [previewing, setPreviewing] = useState(false)
-  /** PDF của hợp đồng đã lưu bằng mẫu đang chọn (thay đổi chưa lưu không có trong bản xem trước). */
-  async function previewContract() {
-    const tab = openBlankTab()
-    setPreviewing(true)
-    const r = await previewDocumentAction({ docType: contract.kind === 'lease' ? 'lease' : 'deposit_contract', entityId: contract.id, templateId: contractTpl || undefined })
-    setPreviewing(false)
-    if (!r.ok) { tab?.close(); toast.error(r.error); return }
-    showBase64(tab, r.data)
-  }
   const [invoiceTpl, setInvoiceTpl] = useState(templates?.invoiceId ?? '')
   const editOccupants = contract.kind === 'lease' && occupants !== undefined && !!people
   const initialIds = (occupants ?? []).filter(o => !o.isCompany).map(o => o.id).sort().join(',')
@@ -201,7 +190,7 @@ export function ContractEditActions({ contract, canDelete, rooms, tenants, mode,
       </div>
       {contract.kind === 'lease' && <div className="space-y-1"><Label htmlFor="edit-note">Ghi chú</Label><textarea id="edit-note" value={note} onChange={e => setNote(e.target.value)} className="min-h-20 w-full rounded-lg border bg-background p-2 text-sm" /></div>}
       {templates && <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1"><Label htmlFor="edit-contract-tpl">Mẫu hợp đồng</Label><select id="edit-contract-tpl" value={contractTpl} onChange={e => setContractTpl(e.target.value)} className="h-9 w-full rounded-lg border bg-background px-2 text-sm">{templates.contract.length === 0 && <option value="">Mẫu mặc định của hệ thống</option>}{templates.contract.map(t => <option key={t.id} value={t.id}>{t.name}{t.isDefault ? ' (mặc định)' : ''}</option>)}</select><Button type="button" variant="outline" size="sm" disabled={previewing} onClick={() => previewContract()}>{previewing ? 'Đang dựng PDF…' : 'Xem trước PDF'}</Button></div>
+        <div className="space-y-1"><Label htmlFor="edit-contract-tpl">Mẫu hợp đồng</Label><select id="edit-contract-tpl" value={contractTpl} onChange={e => setContractTpl(e.target.value)} className="h-9 w-full rounded-lg border bg-background px-2 text-sm">{templates.contract.length === 0 && <option value="">Mẫu mặc định của hệ thống</option>}{templates.contract.map(t => <option key={t.id} value={t.id}>{t.name}{t.isDefault ? ' (mặc định)' : ''}</option>)}</select><PdfViewButton key={contractTpl} href={`/api/documents/preview?docType=${contract.kind === 'lease' ? 'lease' : 'deposit_contract'}&id=${contract.id}${contractTpl ? `&templateId=${contractTpl}` : ''}`} title="Xem trước mẫu hợp đồng" className="inline-flex h-8 items-center rounded-lg border border-border bg-card px-3 text-xs font-medium shadow-2xs hover:bg-muted/70">Xem trước mẫu</PdfViewButton></div>
         <div className="space-y-1"><Label htmlFor="edit-invoice-tpl">Mẫu hoá đơn</Label><select id="edit-invoice-tpl" value={invoiceTpl} onChange={e => setInvoiceTpl(e.target.value)} className="h-9 w-full rounded-lg border bg-background px-2 text-sm"><option value="">Theo mặc định hệ thống</option>{templates.invoice.map(t => <option key={t.id} value={t.id}>{t.name}{t.isDefault ? ' (mặc định)' : ''}</option>)}</select></div>
       </div>}
       {editOccupants && (
