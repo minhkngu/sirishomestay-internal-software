@@ -63,7 +63,7 @@ export function AssetTable({
   const facName = useMemo(() => new Map(facilities.map((f) => [f.id, f.name] as const)), [facilities])
 
   const where = (a: AssetRow) => {
-    const sub = facName.get(a.facilityId) ?? ''
+    const sub = facName.get(a.facilityId) ?? 'Không rõ toà'
     if (a.locationKind === 'room') return { top: roomCode.get(a.locationId) ?? 'Phòng', sub }
     if (a.locationKind === 'warehouse') return { top: 'Kho', sub }
     if (a.locationKind === 'common') return { top: 'Khu chung', sub }

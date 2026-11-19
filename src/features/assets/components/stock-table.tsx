@@ -22,7 +22,7 @@ export function StockTable({ facilities, rows, facilityId, location, onFacilityC
   const roomCode = useMemo(() => new Map(facilities.flatMap((f) => f.rooms.map((r) => [r.id, `Phòng ${r.code}`] as const))), [facilities])
 
   const where = (r: StockRow) => {
-    const sub = facName.get(r.facilityId) ?? ''
+    const sub = facName.get(r.facilityId) ?? 'Không rõ toà'
     if (r.locationKind === 'room') return { top: roomCode.get(r.locationId ?? '') ?? 'Phòng', sub }
     if (r.locationKind === 'warehouse') return { top: 'Kho', sub }
     if (r.locationKind === 'common') return { top: 'Khu chung', sub }
