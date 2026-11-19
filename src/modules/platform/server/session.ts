@@ -1,5 +1,5 @@
 import { cache } from 'react'
-import { readUserId } from './auth-user'
+import { readUserId } from '@/lib/supabase/auth-user'
 import { eq } from 'drizzle-orm'
 import { userProfiles, userFacilities, userPermissions } from '@/db'
 import type { DB } from '@/db/client'

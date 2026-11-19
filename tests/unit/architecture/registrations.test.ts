@@ -60,7 +60,7 @@ describe('đăng ký resolver và loader', () => {
   })
 
   it("mọi actions.ts có 'use server' import registrations", () => {
-    const isUseServer = (code: string) => /^\s*(['"])use server\1/.test(code)
+    const isUseServer = (code: string) => /^(?:\s|\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)*(['"])use server\1/.test(code)
     const bad = [...walk(join(ROOT, 'src/server')), ...walk(join(ROOT, 'src/modules'))]
       .filter((f) => /(\\|\/)actions\.ts$/.test(f))
       .filter((f) => isUseServer(read(f)))

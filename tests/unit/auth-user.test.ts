@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { readUserId } from '@/modules/platform'
+import { readUserId } from '@/lib/supabase/auth-user'
 
 describe('readUserId', () => {
   const client = (r: unknown) => ({
