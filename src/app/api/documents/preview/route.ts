@@ -1,4 +1,4 @@
-import '@/server/files/register'
+import '@/server/registrations'
 import '@/server/contracts/service'
 import '@/server/handovers/service'
 import { NextResponse } from 'next/server'

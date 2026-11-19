@@ -355,7 +355,6 @@ async function produceDocument(
   const format = input.format ?? (isPdf ? 'pdf' : 'docx')
   assertFormatAllowed(input.docType, format)
   if (isPdf) {
-    if (!pdfLoaders[input.docType as PdfDocType]) await import('@/server/invoices/service')
     const loader = pdfLoaders[input.docType as PdfDocType]
     if (!loader) throw new ValidationError('Chưa hỗ trợ xuất loại giấy tờ này')
     const loaded = await loader(db, ctx, input.entityId)

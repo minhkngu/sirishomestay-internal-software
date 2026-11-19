@@ -1,4 +1,4 @@
-import '@/server/files/register'
+import '@/server/registrations'
 import { NextResponse } from 'next/server'
 import { db } from '@/db/client'
 import { ForbiddenError, NotFoundError } from '@/domain/errors'
