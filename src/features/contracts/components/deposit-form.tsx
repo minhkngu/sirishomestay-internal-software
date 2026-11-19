@@ -1,6 +1,6 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { goToContract } from './go-to-contract'
 import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,7 +11,6 @@ export type RoomOption = { id: string; facilityId: string; label: string; listPr
 export type TenantOption = { id: string; name: string; kind: 'foreign' | 'vietnamese' | 'company' }
 
 export function DepositForm({ rooms, tenants, initialRoomId, initialTenantId }: { rooms: RoomOption[]; tenants: TenantOption[]; initialRoomId?: string; initialTenantId?: string }) {
-  const router = useRouter()
   const [pending, start] = useTransition()
   const [roomId, setRoomId] = useState(initialRoomId ?? '')
   const [tenantId, setTenantId] = useState(initialTenantId ?? '')
@@ -33,8 +32,8 @@ export function DepositForm({ rooms, tenants, initialRoomId, initialTenantId }: 
     start(async () => {
       const r = await createDepositContractAction({ roomId, tenantId, depositAmount: Number(deposit), agreedRent: Number(rent), expectedMoveIn: moveIn, collected })
       if (!r.ok) { setError(r.error); return }
-      if (r.data.warnings.length) { setWarnings(r.data.warnings); setTimeout(() => router.push(`/contracts/${r.data.id}`), 1500); return }
-      router.push(`/contracts/${r.data.id}`)
+      if (r.data.warnings.length) { setWarnings(r.data.warnings); setTimeout(() => goToContract(r.data.id), 1500); return }
+      goToContract(r.data.id)
     })
   }
 

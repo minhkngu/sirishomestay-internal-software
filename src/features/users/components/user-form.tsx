@@ -34,6 +34,7 @@ export function UserForm({ facilities, user }: Props) {
         const r = await updateUser(user.id, { fullName, facilityIds, permissions, isActive })
         if (!r.ok) { setError(r.error); setFieldErrors(r.fieldErrors ?? {}); return }
         router.push('/users')
+        router.refresh()
       } else {
         const r = await createUser({ email, fullName, facilityIds, permissions })
         if (!r.ok) { setError(r.error); setFieldErrors(r.fieldErrors ?? {}); return }
@@ -56,7 +57,7 @@ export function UserForm({ facilities, user }: Props) {
       <div className="max-w-md space-y-3 rounded-md border bg-card p-4">
         <p className="font-medium">Mật khẩu tạm (chỉ hiện một lần — hãy gửi cho nhân viên):</p>
         <code className="block rounded bg-muted p-2 text-lg">{password}</code>
-        <Button onClick={() => router.push('/users')}>Xong</Button>
+        <Button onClick={() => { router.push('/users'); router.refresh() }}>Xong</Button>
       </div>
     )
   }

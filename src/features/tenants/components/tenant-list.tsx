@@ -13,10 +13,12 @@ export function TenantList({
   tenants,
   facilities,
   visaWarningDays,
+  roomsByTenant,
 }: {
   tenants: Tenant[]
   facilities: { id: string; name: string }[]
   visaWarningDays: number
+  roomsByTenant: Record<string, { code: string; facilityId: string }[]>
 }) {
   const q = useListParam('q') ?? ''
   const rawKind = useListParam('kind') ?? ''
@@ -45,7 +47,7 @@ export function TenantList({
           <TenantSearch />
         </div>
       </div>
-      <TenantTable tenants={pageRows} facilityNames={names} visaWarningDays={visaWarningDays} />
+      <TenantTable tenants={pageRows} facilityNames={names} visaWarningDays={visaWarningDays} roomsByTenant={roomsByTenant} />
       <Pager {...pager} />
     </>
   )

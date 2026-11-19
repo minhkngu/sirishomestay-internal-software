@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeftRight, CalendarPlus, FilePenLine, RotateCcw, Trash2, UserRoundPlus, CircleStop } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -8,7 +8,7 @@ import { IconTip, IconTipGroup } from '@/components/ui/tooltip'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { quickContractDataAction, previewContractRestoreAction, restoreContractAction } from '@/server/contracts/actions'
 import { createAssignmentAction } from '@/server/addenda/actions'
-import { ContractEditActions } from './contract-edit-actions'
+import { ContractEditActions, type RenderCreateFee, type RenderCreatePerson } from './contract-edit-actions'
 import { ExtensionDialog } from './extension-dialog'
 import { TerminationWizard } from './termination-wizard'
 import { TransferWizard } from './transfer-wizard'
@@ -26,7 +26,7 @@ const ACTIONS = [
   { key: 'restore', label: 'Khôi phục hợp đồng', icon: RotateCcw },
 ] as const
 
-export function ContractRowActions({ id, kind, active, canDelete, redirectAfterDelete }: { id: string; kind: 'lease' | 'deposit'; active: boolean; canDelete: boolean; redirectAfterDelete?: string }) {
+export function ContractRowActions({ id, kind, active, canDelete, redirectAfterDelete, renderCreatePerson, renderCreateFee }: { id: string; kind: 'lease' | 'deposit'; active: boolean; canDelete: boolean; redirectAfterDelete?: string; /** Các mục sửa kèm theo (phí phát sinh, mẫu hoá đơn, giấy tờ, sổ cọc...) do tầng route cấp vì chúng thuộc nhiều tính năng. */ renderCreatePerson?: RenderCreatePerson; renderCreateFee?: RenderCreateFee }) {
   const router = useRouter()
   const [action, setAction] = useState<Action | null>(null)
   const [data, setData] = useState<Data | null>(null)
@@ -35,7 +35,10 @@ export function ContractRowActions({ id, kind, active, canDelete, redirectAfterD
   const [recipient, setRecipient] = useState('')
   const [date, setDate] = useState('')
   const [pending, start] = useTransition()
-  const close = () => { setAction(null); setData(null); setPreview(null); setError(''); router.refresh() }
+  // Nạp dữ liệu từ lúc rê chuột/focus vào biểu tượng để popup có nội dung ngay khi bấm
+  const prefetched = useRef<ReturnType<typeof quickContractDataAction> | null>(null)
+  const prefetch = () => { prefetched.current ??= quickContractDataAction(kind, id) }
+  const close = () => { prefetched.current = null; setAction(null); setData(null); setPreview(null); setError(''); router.refresh() }
   const open = (next: Action) => {
     setAction(next); setData(null); setPreview(null); setError(''); setRecipient(''); setDate('')
     start(async () => {
@@ -43,22 +46,22 @@ export function ContractRowActions({ id, kind, active, canDelete, redirectAfterD
         const result = await previewContractRestoreAction(kind, id)
         if (result.ok) setPreview(result.data); else setError(result.error)
       } else {
-        const result = await quickContractDataAction(kind, id)
+        const result = await (prefetched.current ?? quickContractDataAction(kind, id)); prefetched.current = null
         if (result.ok) { setData(result.data); setDate(result.data.form?.today ?? '') } else setError(result.error)
       }
     })
   }
   const label = ACTIONS.find(item => item.key === action)?.label ?? ''
   return <>
-    <IconTipGroup><div className="flex flex-wrap items-center gap-0.5">
-      {ACTIONS.filter(item => (item.key !== 'delete' || canDelete) && (!['termination', 'assignment', 'extension', 'transfer'].includes(item.key) || (kind === 'lease' && active))).map(item => <IconTip key={item.key} label={item.label}><Button type="button" variant="ghost" size="icon-sm" aria-label={item.label} onClick={() => open(item.key)}><item.icon className="size-4" /></Button></IconTip>)}
+    <IconTipGroup><div className="grid grid-flow-col grid-rows-2 justify-start gap-0.5">
+      {ACTIONS.filter(item => (item.key !== 'delete' || canDelete) && (!['termination', 'assignment', 'extension', 'transfer'].includes(item.key) || (kind === 'lease' && active))).map(item => <IconTip key={item.key} label={item.label}><Button type="button" variant="ghost" size="icon-sm" aria-label={item.label} onPointerEnter={item.key === 'edit' ? prefetch : undefined} onFocus={item.key === 'edit' ? prefetch : undefined} onClick={() => open(item.key)}><item.icon className="size-4" /></Button></IconTip>)}
     </div></IconTipGroup>
     <Dialog open={action !== null} onOpenChange={open => { if (!open) close() }}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className={`max-h-[94vh] overflow-y-auto ${action === 'edit' ? 'sm:max-w-3xl' : 'sm:max-w-2xl'}`}>
         <DialogHeader><DialogTitle>{label}</DialogTitle><DialogDescription>Hợp đồng và dữ liệu liên quan sẽ được kiểm tra trước khi lưu.</DialogDescription></DialogHeader>
-        {pending && !data && !preview && <p>Đang tải…</p>}
+        {pending && !data && !preview && !error && <div className="space-y-3" aria-busy="true"><div className="h-4 w-1/2 animate-pulse rounded bg-muted" /><div className="h-40 animate-pulse rounded-xl bg-muted" /><div className="h-24 animate-pulse rounded-xl bg-muted" /></div>}
         {error && <p role="alert" className="text-destructive">{error}</p>}
-        {data && (action === 'edit' || action === 'delete') && <ContractEditActions contract={data.contract} canDelete={canDelete} rooms={data.rooms} tenants={data.tenants} mode={action} onCompleted={action === 'delete' && redirectAfterDelete ? () => router.replace(redirectAfterDelete) : close} />}
+        {data && (action === 'edit' || action === 'delete') && <ContractEditActions assets={data.assetData} documents={{ signedFileId: data.extras?.signedFileId ?? null, entries: data.extras?.depositEntries ?? [], canEditDeposit: data.extras?.billing ?? false }} facility={data.facility} renderCreatePerson={renderCreatePerson} renderCreateFee={renderCreateFee} contract={data.contract} canDelete={canDelete} rooms={data.rooms} tenants={data.tenants} occupants={kind === 'lease' ? data.occupants : undefined} people={kind === 'lease' && data.form ? data.people : undefined} feeData={kind === 'lease' ? data.feeData : undefined} templates={data.extras ? { contract: data.extras.contractTemplates, contractId: data.extras.contractTemplateId, invoice: data.extras.invoiceTemplates, invoiceId: data.extras.invoiceTemplateId } : undefined} mode={action} onCompleted={action === 'delete' && redirectAfterDelete ? () => router.replace(redirectAfterDelete) : close} />}
         {data?.form && action === 'extension' && <ExtensionDialog leaseId={id} endDate={data.form.endDate} today={data.form.today} defaultOpen onCompleted={close} />}
         {data?.form && action === 'transfer' && <TransferWizard leaseId={id} currentRoomId={data.form.currentRoomId} freeRooms={data.form.freeRooms} meters={data.form.meters} today={data.form.today} defaultOpen onCompleted={close} />}
         {data?.form && action === 'termination' && <TerminationWizard leaseId={id} meters={data.form.meters.filter(m => m.roomId === data.form!.currentRoomId)} today={data.form.today} defaultOpen onCompleted={close} />}

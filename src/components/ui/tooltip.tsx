@@ -24,4 +24,22 @@ function IconTip({ label, children }: { label: string; children: ReactElement })
   )
 }
 
-export { IconTip, IconTipGroup }
+/** Thẻ hiện ngay khi rê chuột hoặc focus, chứa nội dung tuỳ ý (danh sách, nhiều dòng). */
+function HoverTip({ content, children }: { content: ReactNode; children: ReactElement }) {
+  return (
+    <TooltipPrimitive.Provider delay={0} closeDelay={80}>
+      <TooltipPrimitive.Root>
+        <TooltipPrimitive.Trigger render={children} />
+        <TooltipPrimitive.Portal>
+          <TooltipPrimitive.Positioner side="bottom" align="start" sideOffset={6} className="isolate z-50">
+            <TooltipPrimitive.Popup className="min-w-52 rounded-xl border border-border/80 bg-popover p-1.5 text-xs text-popover-foreground shadow-lg">
+              {content}
+            </TooltipPrimitive.Popup>
+          </TooltipPrimitive.Positioner>
+        </TooltipPrimitive.Portal>
+      </TooltipPrimitive.Root>
+    </TooltipPrimitive.Provider>
+  )
+}
+
+export { HoverTip, IconTip, IconTipGroup }

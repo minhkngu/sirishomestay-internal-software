@@ -15,7 +15,7 @@ export default async function FacilityPage({ params }: { params: Promise<{ id: s
   const { id } = await params
   const ctx = await getAccessContext()
   const facility = await orNotFound(getFacility(db, ctx, id))
-  const [rooms, amenities] = await Promise.all([listRoomsWithStatus(db, ctx, { facilityId: id, includeInactive: ctx.isAdmin }), ctx.isAdmin ? listAmenities(db, ctx) : Promise.resolve([])])
+  const [rooms, amenities] = await Promise.all([listRoomsWithStatus(db, ctx, { facilityId: id, includeInactive: true }), ctx.isAdmin ? listAmenities(db, ctx) : Promise.resolve([])])
   const live = rooms.filter((r) => r.isActive)
   const count = (s: RoomStatus) => live.filter((r) => r.status === s).length
   const occupied = count('occupied') + count('ending_soon') + count('occupied_with_next')

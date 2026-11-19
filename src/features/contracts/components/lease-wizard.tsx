@@ -1,13 +1,13 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { goToContract } from './go-to-contract'
 import { useRef, useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { addDays } from '@/domain/dates'
 import { resolveFeePrice } from '@/domain/fee-price'
-import { formatVND } from '@/domain/money'
+import { formatVND, MAX_MONEY } from '@/domain/money'
 import { convertDepositToLeaseAction, createLeaseAction } from '@/server/contracts/actions'
 import { replaceSigner } from '../contract-occupants'
 import { assetEntry, buildHandoverPhotoTasks, uploadLeasePhotos, type PendingPhoto } from '../lease-photo-retry'
@@ -27,8 +27,9 @@ type Props = {
 }
 
 
+const TOO_BIG = `Số tiền quá lớn, tối đa ${MAX_MONEY.toLocaleString('vi-VN')} VND`
+
 export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAssets, moveTargets, feeDefaults, roomMeters, rooms, tenants, feeTypes, initial = {}, defaults }: Props) {
-  const router = useRouter()
   const [pending, start] = useTransition()
   const [received, setReceived] = useState(String(initial.receivedDeposit ?? 0))
   const [note, setNote] = useState('')
@@ -60,6 +61,9 @@ export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAsse
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const fieldError = (name: string) => fieldErrors[name] ? <p role="alert" className="text-sm text-destructive">{fieldErrors[name]}</p> : null
 
+  // Cảnh báo ngay khi gõ, không đợi bấm tạo
+  const warnBig = (v: string) => Number(v) > MAX_MONEY ? <p role="alert" className="text-sm text-destructive">{TOO_BIG}</p> : null
+
   const individuals = tenants.filter((t) => t.kind !== 'company' && !occupantIds.includes(t.id))
   const tenant = tenants.find((t) => t.id === tenantId)
   const handoverAssets = [
@@ -77,7 +81,7 @@ export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAsse
       return uploadOne(photo.file, photo.ownerType, photo.ownerId)
     })
     setFailedPhotos(failed)
-    if (failed.length === 0) router.push(`/contracts/${id}`)
+    if (failed.length === 0) goToContract(id)
   }
 
   function submit() {
@@ -90,7 +94,9 @@ export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAsse
     if (!startDate) errors.startDate = 'Chọn ngày bắt đầu'
     if (!endDate || endDate < startDate) errors.endDate = 'Ngày kết thúc phải sau ngày bắt đầu'
     if (!rent || !Number.isSafeInteger(Number(rent)) || Number(rent) < 0) errors.monthlyRent = 'Nhập giá thuê hợp lệ'
+    else if (Number(rent) > MAX_MONEY) errors.monthlyRent = TOO_BIG
     if (!deposit || !Number.isSafeInteger(Number(deposit)) || Number(deposit) < 0) errors.depositAmount = 'Nhập tiền cọc hợp lệ'
+    else if (Number(deposit) > MAX_MONEY) errors.depositAmount = TOO_BIG
     if (!Number.isSafeInteger(Number(received)) || Number(received) < (initial.receivedDeposit ?? 0) || Number(received) > Number(deposit)) errors.receivedDeposit = 'Tiền thực nhận phải từ cọc kế thừa đến tiền cọc'
     if (handoverAssets.some(asset => !(assetEntry(assetConditions, asset.code) ?? asset.condition).trim())) errors.handover = 'Nhập tình trạng cho từng tài sản bàn giao'
     for (const fee of fees) {
@@ -149,8 +155,8 @@ export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAsse
           <div className="space-y-1"><Label htmlFor="start">Ngày bắt đầu</Label><Input id="start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />{fieldError('startDate')}</div>
           <div className="space-y-1"><Label htmlFor="end">Ngày kết thúc</Label><Input id="end" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
             {fieldError('endDate')}{startDate && <button type="button" className="text-xs underline" onClick={() => { const [y, m, d] = startDate.split('-').map(Number); setEndDate(addDays(`${y + 1}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`, -1)) }}>+12 tháng</button>}</div>
-          <div className="space-y-1 sm:col-span-2"><Label htmlFor="rent">Giá thuê tháng (VND)</Label><Input id="rent" inputMode="numeric" value={rent} onChange={(e) => setRent(e.target.value)} />{fieldError('monthlyRent')}</div>
-          <div className="space-y-1"><Label htmlFor="deposit">Tiền cọc (VND)</Label><Input id="deposit" inputMode="numeric" value={deposit} onChange={(e) => setDeposit(e.target.value)} />{fieldError('depositAmount')}</div>
+          <div className="space-y-1 sm:col-span-2"><Label htmlFor="rent">Giá thuê tháng (VND)</Label><Input id="rent" inputMode="numeric" value={rent} onChange={(e) => setRent(e.target.value)} />{fieldError('monthlyRent') ?? warnBig(rent)}</div>
+          <div className="space-y-1"><Label htmlFor="deposit">Tiền cọc (VND)</Label><Input id="deposit" inputMode="numeric" value={deposit} onChange={(e) => setDeposit(e.target.value)} />{fieldError('depositAmount') ?? warnBig(deposit)}</div>
           <div className="space-y-1"><Label htmlFor="received">Tiền đã cọc (VND)</Label><Input id="received" inputMode="numeric" value={received} onChange={e => setReceived(e.target.value)} />{fieldError('receivedDeposit')}<p className="text-sm text-muted-foreground">Còn thiếu: {formatVND(Math.max(0, Number(deposit) - Number(received)))}</p></div>
         </div>
       <LeaseFees feeTypes={feeTypes} roomMeters={roomMeters} roomId={roomId} fees={fees} onChange={setFees} onAddCommon={id => { const fee = feeTypes.find(f => f.id === id); if (fee) setFees(previous => [...previous, makeFee(fee, rooms.find(r => r.id === roomId)?.facilityId)]) }} />
@@ -183,7 +189,7 @@ export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAsse
         </dl>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
-      {createdId && failedPhotos.length > 0 ? <div className="space-y-2"><p className="text-destructive">Hợp đồng đã tạo. Chưa tải được: {failedPhotos.map(f => f.file.name).join(', ')}</p><Button disabled={pending} onClick={() => start(async () => uploadPhotos(createdId, failedPhotos))}>Thử tải lại ảnh lỗi</Button> <Button variant="outline" onClick={() => router.push(`/contracts/${createdId}`)}>Tiếp tục đến hợp đồng</Button></div> : <Button disabled={pending || !!createdId} onClick={submit}>Tạo hợp đồng thuê</Button>}
+      {createdId && failedPhotos.length > 0 ? <div className="space-y-2"><p className="text-destructive">Hợp đồng đã tạo. Chưa tải được: {failedPhotos.map(f => f.file.name).join(', ')}</p><Button disabled={pending} onClick={() => start(async () => uploadPhotos(createdId, failedPhotos))}>Thử tải lại ảnh lỗi</Button> <Button variant="outline" onClick={() => goToContract(createdId)}>Tiếp tục đến hợp đồng</Button></div> : <Button disabled={pending || !!createdId} onClick={submit}>Tạo hợp đồng thuê</Button>}
     </div>
   )
 }

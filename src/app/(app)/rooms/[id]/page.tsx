@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { PopupLink } from '@/components/popup-link'
 import { buttonVariants } from '@/components/ui/button'
 import { db } from '@/db/client'
 import { can, canViewTenantIdentity } from '@/domain/access'
@@ -119,9 +120,9 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
               <div className="space-y-3 rounded-xl border border-border/60 bg-muted/30 p-3">
                 <div>
                   <span className="font-semibold text-foreground">Đang ở: </span>
-                  <Link className="font-semibold text-primary hover:underline underline-offset-2" href={`/contracts/${active.id}`}>
+                  <PopupLink className="font-semibold text-primary hover:underline underline-offset-2" href={`/contracts/${active.id}`}>
                     {active.code}
-                  </Link>
+                  </PopupLink>
                   {canViewTenantIdentity(ctx, r.facilityId) ? ` — ${active.tenantName}` : ''}
                   <span className="text-muted-foreground"> · {formatDateVN(active.startDate)} – {formatDateVN(terms.endDate)}</span>
                 </div>
@@ -161,9 +162,9 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
             {deposit && (
               <p className="text-muted-foreground">
                 <span className="font-medium text-foreground">Cọc chờ: </span>
-                <Link className="font-semibold text-primary hover:underline underline-offset-2" href={`/contracts/${deposit.id}`}>
+                <PopupLink className="font-semibold text-primary hover:underline underline-offset-2" href={`/contracts/${deposit.id}`}>
                   vào ở dự kiến {formatDateVN(deposit.expectedMoveIn)}
-                </Link>
+                </PopupLink>
               </p>
             )}
             {history.filter((l) => l.status === 'ended').length > 0 && (
@@ -176,9 +177,9 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
                     .filter((l) => l.status === 'ended')
                     .map((l) => (
                       <li key={l.id}>
-                        <Link className="text-primary hover:underline" href={`/contracts/${l.id}`}>
+                        <PopupLink className="text-primary hover:underline" href={`/contracts/${l.id}`}>
                           {l.code}
-                        </Link>{' '}
+                        </PopupLink>{' '}
                         ({formatDateVN(l.startDate)} – {formatDateVN(l.endDate)})
                       </li>
                     ))}

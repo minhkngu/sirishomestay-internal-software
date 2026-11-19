@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { FormDialog } from '@/components/form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { FeeTypeCard } from '@/features/settings/components/fee-type-card'
@@ -41,24 +42,26 @@ export function FeeSettings({ facilities, units, feeTypes, prices, defaults }: P
             {units.map((u) => <span key={u.id} className="rounded-full border px-2 py-0.5 text-xs">{u.name}</span>)}
             {units.length === 0 && <span className="text-sm text-muted-foreground">chưa có</span>}
           </div>
-          <Button type="button" variant="ghost" size="sm" aria-expanded={showUnit} onClick={() => setShowUnit(!showUnit)}>+ Thêm đơn vị</Button>
-          <Button type="button" variant="outline" className="ml-auto" aria-expanded={adding} onClick={() => setAdding(!adding)}>+ Thêm loại phí</Button>
+          <Button type="button" variant="ghost" size="sm" aria-haspopup="dialog" onClick={() => setShowUnit(true)}>+ Thêm đơn vị</Button>
+          <Button type="button" variant="outline" className="ml-auto" aria-haspopup="dialog" onClick={() => setAdding(true)}>+ Thêm loại phí</Button>
         </div>
-        {showUnit && (
+        <Msg error={null} ok={unitRun.ok} />
+        <FormDialog open={showUnit} onOpenChange={(o) => { setShowUnit(o); if (!o) setUnitName('') }} title="Thêm đơn vị tính" size="sm">
           <div className="flex flex-wrap items-center gap-2">
             <Input placeholder="Tên đơn vị mới" value={unitName} onChange={(e) => setUnitName(e.target.value)} />
             <Button type="button" size="sm" disabled={unitRun.pending || unitName.trim() === ''}
               onClick={() => unitRun.run(async () => {
                 const result = await createFeeUnitAction({ name: unitName })
-                if (result.ok) setUnitName('')
+                if (result.ok) { setUnitName(''); setShowUnit(false) }
                 return result
               }, 'Đã thêm đơn vị')}>Lưu đơn vị</Button>
-            <Msg error={unitRun.error} ok={unitRun.ok} />
+            <Msg error={unitRun.error} ok={null} />
           </div>
-        )}
+        </FormDialog>
       </div>
 
-      {adding && (
+      <Msg error={null} ok={createRun.ok} />
+      <FormDialog open={adding} onOpenChange={setAdding} title="Thêm loại phí" size="md">
         <FeeTypeForm units={units} allowNewUnit pending={createRun.pending} error={createRun.error} submitLabel="Tạo loại phí"
           onCancel={() => setAdding(false)}
           onSubmit={(values) => createRun.run(async () => {
@@ -66,7 +69,7 @@ export function FeeSettings({ facilities, units, feeTypes, prices, defaults }: P
             if (result.ok) setAdding(false)
             return result
           }, 'Đã thêm loại phí')} />
-      )}
+      </FormDialog>
 
       <div className="space-y-3">
         {active.map((fee) => (

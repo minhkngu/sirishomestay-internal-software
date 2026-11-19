@@ -2,6 +2,7 @@
 import { useRouter } from 'next/navigation'
 import { useState, useTransition, type ReactNode } from 'react'
 import { toast } from 'sonner'
+import { FormDialog } from '@/components/form-dialog'
 import { Button } from '@/components/ui/button'
 import { formatVND } from '@/domain/money'
 import { previewAddendumAction } from '@/server/addenda/actions'
@@ -11,7 +12,7 @@ type Result = { ok: true; data: unknown } | { ok: false; error: string }
 export type MeterOption = { meterId: string; roomId: string; utility: 'electric' | 'water'; serial: string | null }
 
 /** Khung dùng chung của các wizard phụ lục: nhập → "Xem trước tiền" → lưu. Đổi dữ liệu nhập thì phải xem trước lại. */
-export function AddendumShell({ label, kind, leaseId, input, create, children, defaultOpen = false, onCompleted }: { label: string; kind: 'occupants' | 'extension' | 'transfer' | 'termination'; leaseId: string; input: unknown; create: (leaseId: string, input: unknown) => Promise<Result>; children: ReactNode; defaultOpen?: boolean; onCompleted?: () => void }) {
+export function AddendumShell({ label, kind, leaseId, input, create, children, defaultOpen = false, onCompleted, simple = false }: { label: string; kind: 'occupants' | 'extension' | 'transfer' | 'termination'; leaseId: string; input: unknown; create: (leaseId: string, input: unknown) => Promise<Result>; children: ReactNode; defaultOpen?: boolean; onCompleted?: () => void; /** Chỉ cần nút Lưu: bỏ bước "Xem trước tiền" bắt buộc (dùng khi việc thêm bớt không cần duyệt số tiền). */ simple?: boolean }) {
   const router = useRouter()
   const [open, setOpen] = useState(defaultOpen)
   const [pending, start] = useTransition()
@@ -20,14 +21,12 @@ export function AddendumShell({ label, kind, leaseId, input, create, children, d
   const fresh = preview?.key === key ? preview.data : null
   const doPreview = () => start(async () => { const r = await previewAddendumAction(kind, leaseId, input); if (!r.ok) toast.error(r.error); else setPreview({ key, data: r.data as Preview }) })
   const save = () => start(async () => { const r = await create(leaseId, input); if (!r.ok) toast.error(r.error); else { toast.success('Đã lưu phụ lục'); setOpen(false); setPreview(null); router.refresh(); onCompleted?.() } })
-  if (!open) return <Button variant="outline" size="sm" onClick={() => setOpen(true)}>{label}</Button>
-  return (
-    <section className="max-w-xl space-y-3 rounded-lg border bg-card p-4">
-      <h3 className="font-medium">{label}</h3>
+  const content = (
+    <>
       <div className="grid gap-2 text-sm">{children}</div>
       <div className="flex gap-2">
-        <Button size="sm" variant="outline" disabled={pending} onClick={doPreview}>Xem trước tiền</Button>
-        <Button size="sm" disabled={pending || !fresh} onClick={save}>Lưu phụ lục</Button>
+        {!simple && <Button size="sm" variant="outline" disabled={pending} onClick={doPreview}>Xem trước tiền</Button>}
+        <Button size="sm" disabled={pending || (!simple && !fresh)} onClick={save}>{simple ? 'Lưu' : 'Lưu phụ lục'}</Button>
         {!defaultOpen && <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Đóng</Button>}
       </div>
       {fresh && (
@@ -38,7 +37,22 @@ export function AddendumShell({ label, kind, leaseId, input, create, children, d
           {!fresh.adjustments.length && !fresh.depositEntry && !fresh.invoice && <p className="text-muted-foreground">Không phát sinh khoản tiền nào</p>}
         </div>
       )}
+    </>
+  )
+  // Trang wizard (defaultOpen) hiện thẳng trong trang; còn lại mở popup, không đẩy nội dung trang
+  if (defaultOpen) return (
+    <section className="max-w-xl space-y-3 rounded-lg border bg-card p-4">
+      <h3 className="font-medium">{label}</h3>
+      {content}
     </section>
+  )
+  return (
+    <>
+      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>{label}</Button>
+      <FormDialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setPreview(null) }} title={label} size="md">
+        <div className="space-y-3">{content}</div>
+      </FormDialog>
+    </>
   )
 }
 export const Field = ({ label, children }: { label: string; children: ReactNode }) => <label className="grid gap-1">{label}{children}</label>

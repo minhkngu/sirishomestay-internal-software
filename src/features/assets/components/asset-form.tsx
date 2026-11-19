@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
+import { FormDialog } from '@/components/form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { createAssetAction } from '@/server/assets/actions'
@@ -15,9 +16,12 @@ export function AssetForm({ facilities }: { facilities: TreeFacility[] }) {
   const [error, setError] = useState<string | null>(null)
   const fac = facilities.find((f) => f.id === v.facilityId)
 
-  if (!open) return <Button onClick={() => setOpen(true)}>Thêm tài sản</Button>
+  const close = () => { setOpen(false); setError(null) }
   return (
-    <div className="grid max-w-xl gap-2 rounded-md border bg-card p-3 sm:grid-cols-2">
+    <>
+    <Button onClick={() => setOpen(true)}>Thêm tài sản</Button>
+    <FormDialog open={open} onOpenChange={(o) => { if (!o) close() }} title="Thêm tài sản">
+    <div className="grid gap-2 sm:grid-cols-2">
       <Input aria-label="Mã tài sản" placeholder="Mã tài sản" value={v.code} onChange={(e) => setV({ ...v, code: e.target.value })} />
       <Input aria-label="Tên tài sản" placeholder="Tên tài sản" value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} />
       <Input aria-label="Loại" placeholder="Loại (điện lạnh, nội thất…)" value={v.category} onChange={(e) => setV({ ...v, category: e.target.value })} />
@@ -33,10 +37,12 @@ export function AssetForm({ facilities }: { facilities: TreeFacility[] }) {
           setError(null)
           const [kind, id] = v.where.split(':')
           const r = await createAssetAction({ code: v.code, name: v.name, category: v.category, value: Number(v.value) || 0, condition: v.condition, facilityId: v.facilityId, location: { kind, id } })
-          if (!r.ok) setError(r.fieldErrors?.code ?? r.error); else { setOpen(false); router.refresh() }
+          if (!r.ok) setError(r.fieldErrors?.code ?? r.error); else { close(); router.refresh() }
         })}>Lưu</Button>
-        <Button variant="outline" onClick={() => setOpen(false)}>Huỷ</Button>
+        <Button variant="outline" onClick={close}>Huỷ</Button>
       </div>
     </div>
+    </FormDialog>
+    </>
   )
 }

@@ -32,15 +32,23 @@ const FIELDS: Record<Kind, Field[]> = {
   ],
 }
 
+export type CreatedTenant = { id: string; name: string; idNumber: string | null; phone: string | null; isCompany: boolean; draft?: Record<string, unknown> }
+
 type Props = {
   facilities: { id: string; name: string }[]
+  /** Dùng trong popup tạo nhanh: tạo xong gọi hàm này thay vì chuyển sang trang khách. */
+  onCreated?: (tenant: CreatedTenant) => void
+  /** Không tạo ngay: chỉ trả bản nháp qua onCreated để nơi gọi tạo khi lưu. */
+  deferCreate?: boolean
+  /** Chỉ cho chọn các loại khách này (mặc định cả ba). */
+  kinds?: Kind[]
   tenant?: { id: string; kind: Kind; homeFacilityId: string; note: string } & Record<string, string | null>
 }
 
-export function TenantForm({ facilities, tenant }: Props) {
+export function TenantForm({ facilities, tenant, onCreated, kinds, deferCreate }: Props) {
   const router = useRouter()
   const [pending, start] = useTransition()
-  const [kind, setKind] = useState<Kind>(tenant?.kind ?? 'foreign')
+  const [kind, setKind] = useState<Kind>(tenant?.kind ?? kinds?.[0] ?? 'foreign')
   const [homeFacilityId, setHome] = useState(tenant?.homeFacilityId ?? facilities[0]?.id ?? '')
   const [note, setNote] = useState(tenant?.note ?? '')
   const [values, setValues] = useState<Record<string, string>>(() => {
@@ -55,8 +63,17 @@ export function TenantForm({ facilities, tenant }: Props) {
     setError(null); setFe({})
     start(async () => {
       const payload = { kind, homeFacilityId, note, ...Object.fromEntries(FIELDS[kind].map((f) => [f.key, values[f.key] ?? ''])) }
+      if (deferCreate && onCreated && !tenant) {
+        onCreated({ id: `draft-${crypto.randomUUID()}`, name: values.fullName || values.companyName || '', idNumber: values.idNumber || values.passportNumber || values.taxCode || null, phone: values.phone || null, isCompany: kind === 'company', draft: payload })
+        return
+      }
       const r = tenant ? await updateTenantAction(tenant.id, payload) : await createTenantAction(payload)
       if (!r.ok) { setError(r.error); setFe(r.fieldErrors ?? {}); return }
+      if (onCreated && !tenant) {
+        const id = (r.data as { id: string }).id
+        onCreated({ id, name: values.fullName || values.companyName || '', idNumber: values.idNumber || values.passportNumber || values.taxCode || null, phone: values.phone || null, isCompany: kind === 'company' })
+        return
+      }
       router.push(`/tenants/${r.data.id}`)
       router.refresh()
     })
@@ -65,7 +82,7 @@ export function TenantForm({ facilities, tenant }: Props) {
   return (
     <div className="max-w-2xl space-y-4 rounded-lg border bg-card p-4 sm:p-6">
       <div className="flex flex-wrap gap-2" role="tablist">
-        {(Object.keys(KIND_LABELS) as Kind[]).map((k) => (
+        {(kinds ?? (Object.keys(KIND_LABELS) as Kind[])).map((k) => (
           <button key={k} type="button" role="tab" aria-selected={kind === k} onClick={() => setKind(k)}
             className={cn('min-w-36 flex-1 rounded-lg border px-4 py-3 text-base font-medium', kind === k && 'bg-[var(--primary-strong)] text-primary-foreground')}>
             {KIND_LABELS[k]}
