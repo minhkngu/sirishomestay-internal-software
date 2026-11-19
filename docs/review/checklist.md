@@ -65,7 +65,7 @@ Mỗi phụ lục có bước **Xem trước tiền** — xem trước không l�
 ## 12. Mẫu Word / PDF / ảnh
 - [ ] Mẫu giấy tờ: tải mẫu, "Thử xuất với dữ liệu mẫu". Ghi chú: ______
 - [ ] Xuất Word: hợp đồng, phụ lục và biên bản. → Dữ liệu và định dạng tiền/ngày đúng. Ghi chú: ______
-- [ ] Xuất PDF hoá đơn, phiếu thu và ảnh hoá đơn: dữ liệu, chỉ số điện nước và QR đúng; không cần Gotenberg. PDF hợp đồng, phụ lục, biên bản cần `GOTENBERG_URL`; chưa cấu hình phải báo rõ. Ghi chú: ______
+- [ ] Xuất PDF hoá đơn, phiếu thu và ảnh hoá đơn: dữ liệu, chỉ số điện nước và QR đúng; không cần dịch vụ ngoài. PDF và Word của hợp đồng, phụ lục, biên bản dựng từ mẫu HTML trong app (Cài đặt → Mẫu giấy tờ): mở "Xem trước PDF" của cả hai kiểu, kiểm dấu tiếng Việt, bảng người ở/phí/tài sản, chỗ ký. Ghi chú: ______
 
 ## 13. Nhập Excel
 - [ ] Nhập → "Tải file mẫu" từng loại (khách, phòng, hợp đồng, số dư cọc, công nợ, chỉ số, tài sản). Ghi chú: ______

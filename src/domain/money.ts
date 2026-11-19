@@ -58,3 +58,6 @@ export function numberToVietnameseWords(n: number): string {
   const sentence = `${negative ? 'âm ' : ''}${words.join(' ')} đồng`
   return sentence.charAt(0).toUpperCase() + sentence.slice(1)
 }
+
+/** Cột tiền trong DB là số nguyên 32 bit: lớn hơn mức này thì không lưu được. */
+export const MAX_MONEY = 2_147_483_647

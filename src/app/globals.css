@@ -161,3 +161,24 @@
 .btn-tactile:active:not(:disabled) {
   transform: scale(0.985);
 }
+/* Hộp soạn mẫu giấy tờ: chip chỗ điền, khối tóm tắt, ngắt trang */
+.template-editor { font-size: 0.9rem; line-height: 1.55; }
+.template-editor h1 { font-size: 1.4rem; font-weight: 700; margin: 0.5rem 0; }
+.template-editor h2 { font-size: 1.15rem; font-weight: 600; margin: 0.5rem 0; }
+.template-editor h3 { font-size: 1rem; font-weight: 600; margin: 0.4rem 0; }
+.template-editor p { margin: 0.3rem 0; }
+.template-editor ul { list-style: disc; padding-left: 1.4rem; }
+.template-editor ol { list-style: decimal; padding-left: 1.4rem; }
+.template-editor table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; }
+.template-editor td, .template-editor th { border: 1px solid var(--border); padding: 0.25rem 0.5rem; vertical-align: top; }
+.template-editor th { background: var(--muted); font-weight: 600; text-align: left; }
+.template-editor tr[data-loop] td { background: color-mix(in oklab, var(--primary) 6%, transparent); }
+.template-editor tr[data-loop] td:first-child { box-shadow: inset 3px 0 0 var(--primary); }
+.template-editor .field-chip { display: inline-block; border: 1px solid var(--border); border-radius: 999px; background: var(--muted); padding: 0 0.5rem; font-size: 0.8rem; cursor: grab; }
+.template-editor .field-chip.ProseMirror-selectednode { outline: 2px solid var(--primary); }
+.template-editor .summary-block { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; border-block: 1px solid var(--border); padding: 0.5rem 0; margin: 0.5rem 0; }
+.template-editor .summary-item::before { content: attr(data-label); display: block; font-size: 0.7rem; color: var(--muted-foreground); }
+.template-editor hr.page-break { border: 0; border-top: 2px dashed var(--border); margin: 1rem 0; position: relative; }
+.template-editor hr.page-break::after { content: 'Ngắt trang'; position: absolute; top: -0.65rem; left: 50%; transform: translateX(-50%); background: var(--card); padding: 0 0.5rem; font-size: 0.7rem; color: var(--muted-foreground); }
+.template-editor .qr-block { width: 6rem; height: 6rem; display: flex; align-items: center; justify-content: center; text-align: center; border: 1px dashed var(--border); border-radius: 0.5rem; font-size: 0.7rem; color: var(--muted-foreground); margin: 0.5rem 0; }
+.template-editor .qr-block.ProseMirror-selectednode { outline: 2px solid var(--primary); }

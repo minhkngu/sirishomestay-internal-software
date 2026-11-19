@@ -12,7 +12,7 @@ import { todayVN } from '@/domain/dates'
 import { getAccessContext } from '@/server/session'
 import { getSettings } from '@/server/settings/service'
 import { listDepositContracts, listLeases } from '@/server/contracts/service'
-import { ContractList } from '@/features/contracts/components/contract-list'
+import { ContractListView } from './contract-actions'
 
 export default async function ContractsPage() {
   const ctx = await getAccessContext()
@@ -43,7 +43,7 @@ export default async function ContractsPage() {
           </div>
         }
       />
-      <ContractList
+      <ContractListView
         leases={leases}
         deposits={deposits}
         facilities={facs.map((f) => ({ id: f.id, name: f.name }))}

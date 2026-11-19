@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import Link from 'next/link'
+import { PopupLink } from '@/components/popup-link'
 import { FacilityFilter } from '@/components/list/facility-filter'
 import { Pager } from '@/components/list/pager'
 import { ParamChips } from '@/components/list/param-chips'
@@ -10,7 +10,7 @@ import { formatDateVN } from '@/domain/dates'
 import { matchesContractView, type ContractView } from '@/domain/list-filters'
 import { formatVND } from '@/domain/money'
 import type { DepositListItem, LeaseListItem } from '@/server/contracts/service'
-import { ContractRowActions } from './contract-row-actions'
+import type { ReactNode } from 'react'
 
 const VIEWS = [['active', 'Đang hiệu lực'], ['expiring', 'Sắp hết hạn'], ['unsigned', 'Chưa ký'], ['ended', 'Đã kết thúc'], ['deposits', 'Cọc chờ']] as const
 const SIGN = { draft: 'Nháp', exported: 'Đã xuất', signed: 'Đã ký' } as const
@@ -22,6 +22,7 @@ export function ContractList({
   today,
   warningDays,
   deleteFacilityIds,
+  renderActions,
 }: {
   leases: LeaseListItem[]
   deposits: DepositListItem[]
@@ -29,6 +30,8 @@ export function ContractList({
   today: string
   warningDays: number
   deleteFacilityIds: string[]
+  /** Cột thao tác của từng dòng; do tầng route cấp để dùng chung một popup sửa với trang chi tiết. */
+  renderActions: (row: { id: string; kind: 'lease' | 'deposit'; active: boolean; canDelete: boolean }) => ReactNode
 }) {
   const rawView = useListParam('view') ?? 'active'
   const view = VIEWS.some(([k]) => k === rawView) ? rawView : 'active'
@@ -61,14 +64,15 @@ export function ContractList({
     <>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <ParamChips param="view" defaultValue="active" items={VIEWS.map(([value, label]) => ({ value, label }))} />
-        <FacilityFilter facilities={facilities} />
+        <FacilityFilter facilities={facilities} align="right" />
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-border/80 bg-card shadow-2xs">
-        <table className="w-full text-xs">
+        <table className="w-full min-w-max text-xs">
           <thead className="border-b border-border/60 bg-muted/40 text-left">
             <tr>
-              <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground">Mã</th>
+              <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Mã</th>
+              <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground">Thao tác</th>
               <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground">Phòng</th>
               {facilities.length > 1 && (
                 <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground">Toà</th>
@@ -77,20 +81,20 @@ export function ContractList({
               <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground">Thời hạn</th>
               <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground">Giá thuê</th>
               <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground">Ký</th>
-              <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50">
             {shown.leases.map((l) => (
               <tr key={l.id} className="transition-colors hover:bg-muted/30">
                 <td className="p-3">
-                  <Link
+                  <PopupLink
                     className="font-semibold text-primary hover:underline underline-offset-2"
                     href={`/contracts/${l.id}`}
                   >
                     {l.code}
-                  </Link>
+                  </PopupLink>
                 </td>
+                <td className="p-3">{renderActions({ id: l.id, kind: 'lease', active: l.status === 'active', canDelete: deleteFacilityIds.includes(l.facilityId) })}</td>
                 <td className="p-3 font-medium text-foreground">{l.roomCode}</td>
                 {facilities.length > 1 && <td className="p-3 text-muted-foreground">{names[l.facilityId]}</td>}
                 <td className="p-3 font-medium text-foreground">{l.tenantName}</td>
@@ -111,19 +115,19 @@ export function ContractList({
                     {SIGN[l.signStatus as keyof typeof SIGN]}
                   </span>
                 </td>
-                <td className="p-3"><ContractRowActions id={l.id} kind="lease" active={l.status === 'active'} canDelete={deleteFacilityIds.includes(l.facilityId)} /></td>
               </tr>
             ))}
             {shown.deposits.map((c) => (
               <tr key={c.id} className="transition-colors hover:bg-muted/30">
                 <td className="p-3">
-                  <Link
+                  <PopupLink
                     className="font-semibold text-primary hover:underline underline-offset-2"
                     href={`/contracts/${c.id}`}
                   >
                     Cọc {c.roomCode}
-                  </Link>
+                  </PopupLink>
                 </td>
+                <td className="p-3">{renderActions({ id: c.id, kind: 'deposit', active: false, canDelete: deleteFacilityIds.includes(c.facilityId) })}</td>
                 <td className="p-3 font-medium text-foreground">{c.roomCode}</td>
                 {facilities.length > 1 && <td className="p-3 text-muted-foreground">{names[c.facilityId]}</td>}
                 <td className="p-3 font-medium text-foreground">{c.tenantName}</td>
@@ -134,7 +138,6 @@ export function ContractList({
                     {SIGN[c.signStatus as keyof typeof SIGN]}
                   </span>
                 </td>
-                <td className="p-3"><ContractRowActions id={c.id} kind="deposit" active={false} canDelete={deleteFacilityIds.includes(c.facilityId)} /></td>
               </tr>
             ))}
             {shown.leases.length + shown.deposits.length === 0 && (

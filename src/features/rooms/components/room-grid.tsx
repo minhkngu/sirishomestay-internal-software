@@ -15,7 +15,7 @@ export function RoomGrid({ rooms, facilities }: { rooms: GridRoom[]; facilities:
   const allowed = useMemo(() => facilities.map((f) => f.id), [facilities])
   const selected = useFacilitySelection(allowed)
   const shown = useMemo(() => rooms.filter((r) => selected.length === 0 || selected.includes(r.facilityId)), [rooms, selected])
-  const { vacant, total } = vacancySummary(shown)
+  const { vacant, total } = vacancySummary(shown.filter((r) => r.isActive !== false))
   const groups = facilities
     .map((f) => ({ facility: f, rooms: shown.filter((r) => r.facilityId === f.id) }))
     .filter((g) => g.rooms.length > 0)
@@ -29,6 +29,7 @@ export function RoomGrid({ rooms, facilities }: { rooms: GridRoom[]; facilities:
           <span className="flex items-center gap-1"><span className="size-3 rounded border border-emerald-300 bg-emerald-50" />Có khách</span>
           <span className="flex items-center gap-1"><span className="size-3 rounded border border-sky-300 bg-sky-50" />Đã cọc</span>
           <span className="flex items-center gap-1"><span className="size-3 rounded border border-border bg-muted/60" />Không có khách</span>
+          <span className="flex items-center gap-1"><span className="size-3 rounded border border-dashed border-border bg-muted/30 opacity-60" />Ngừng sử dụng</span>
         </span>
       </div>
       {groups.length === 0 ? (

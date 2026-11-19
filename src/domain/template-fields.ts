@@ -10,6 +10,10 @@ export const DOC_TYPES = [
 ] as const
 export type DocType = (typeof DOC_TYPES)[number]
 
+/** Tám loại giấy tờ soạn từ mẫu trong app (hoá đơn, phiếu thu dựng PDF riêng). */
+export type TemplateDocType = Exclude<DocType, PdfDocType>
+export const TEMPLATE_DOC_TYPES: readonly TemplateDocType[] = DOC_TYPES.filter((t): t is TemplateDocType => !(PDF_DOC_TYPES as readonly string[]).includes(t))
+
 export const DOC_TYPE_LABELS: Record<DocType, string> = {
   deposit_contract: 'Hợp đồng đặt cọc',
   lease: 'Hợp đồng thuê',
@@ -72,6 +76,9 @@ const INVOICE: Field[] = [
   f('ma_hoa_don', 'Mã hoá đơn', 'TD-HD-202612-0001'), f('ky', 'Kỳ hoá đơn', '01/12/2026 – 31/12/2026'),
   f('ngay_lap', 'Ngày lập', '01/12/2026'), f('han_thanh_toan', 'Hạn thanh toán', '08/12/2026'),
   f('tong_tien', 'Tổng tiền', '9.380.000'), f('tong_tien_bang_chu', 'Tổng tiền bằng chữ', 'Chín triệu ba trăm tám mươi nghìn đồng'),
+  f('ngan_hang', 'Ngân hàng nhận tiền', 'Vietcombank'), f('so_tai_khoan', 'Số tài khoản nhận tiền', '0123456789'),
+  f('chu_tai_khoan', 'Chủ tài khoản', 'CONG TY SIRIS'), f('noi_dung_ck', 'Nội dung chuyển khoản', 'TD-HD-202612-0001'),
+  f('da_thanh_toan', 'Đã thanh toán', '0'), f('con_lai', 'Còn phải trả', '9.380.000'),
   INVOICE_LINES,
 ]
 
@@ -135,7 +142,7 @@ export type DocEntities = {
   deposit?: { depositAmount: number; agreedRent: number; expectedMoveIn: string }
   addendum?: { effectiveDate: string; newEndDate?: string | null; newMonthlyRent?: number | null; newDepositAmount?: number | null; newRoomCode?: string | null }
   fees?: { name: string; unit: string; quantity: number; unitPrice: number }[]
-  invoice?: { code: string; periodStart: string; periodEnd: string; dueDate?: string | null; lines: { description: string; quantity: number; unitPrice: number; amount: number }[] }
+  invoice?: { code: string; periodStart: string; periodEnd: string; dueDate?: string | null; paid?: number; bank?: { bankName: string; accountNumber: string; accountName: string } | null; lines: { description: string; quantity: number; unitPrice: number; amount: number }[] }
   handover?: { date: string; items: { code: string; name: string; condition: string; penalty?: number }[]; readings: { kind: 'electric' | 'water' | 'fee'; label?: string; serial: string; value: number }[] }
   payment?: { code: string; paidOn: string; amount: number; method: string; receivedBy: string }
 }
@@ -193,6 +200,12 @@ export function buildTemplateData(docType: DocType, e: DocEntities): Record<stri
     han_thanh_toan: d(e.invoice?.dueDate),
     tong_tien: m(invoiceTotal),
     tong_tien_bang_chu: w(invoiceTotal),
+    ngan_hang: e.invoice?.bank?.bankName ?? '',
+    so_tai_khoan: e.invoice?.bank?.accountNumber ?? '',
+    chu_tai_khoan: e.invoice?.bank?.accountName ?? '',
+    noi_dung_ck: e.invoice?.code ?? '',
+    da_thanh_toan: m(e.invoice?.paid ?? 0),
+    con_lai: m(invoiceTotal == null ? null : invoiceTotal - (e.invoice?.paid ?? 0)),
     tien_hoan_khach: m(refund),
     tien_khach_tra_them: m(invoiceTotal != null && invoiceTotal > 0 ? invoiceTotal : 0),
     dong: (e.invoice?.lines ?? []).map((l) => ({ mo_ta: l.description, so_luong: l.quantity, don_gia: formatVND(l.unitPrice), thanh_tien: formatVND(l.amount) })),

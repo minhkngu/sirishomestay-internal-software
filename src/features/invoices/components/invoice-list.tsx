@@ -42,7 +42,7 @@ export function InvoiceList({ invoices, facilities }: { invoices: InvoiceRow[]; 
           items={VIEWS.map(([value, label]) => ({ value, label, count: scoped.filter((i) => matchesInvoiceView(i.state, value)).length }))}
         />
         <div className="flex flex-wrap items-center gap-2.5">
-          <FacilityFilter facilities={facilities} />
+          <FacilityFilter facilities={facilities} align="right" />
           <input
             type="month"
             value={period}

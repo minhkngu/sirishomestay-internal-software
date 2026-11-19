@@ -11,7 +11,7 @@ export default async function RoomsPage() {
   const ctx = await getAccessContext()
   // Nạp mọi phòng trong quyền một lần; lọc theo toà làm ở trình duyệt
   const [facs, rooms, amenities] = await Promise.all([
-    listFacilities(db, ctx), listRoomsWithStatus(db, ctx, {}), ctx.isAdmin ? listAmenities(db, ctx) : Promise.resolve([]),
+    listFacilities(db, ctx), listRoomsWithStatus(db, ctx, { includeInactive: true }), ctx.isAdmin ? listAmenities(db, ctx) : Promise.resolve([]),
   ])
   const facilities = facs.map((f) => ({ id: f.id, name: f.name }))
   return (
@@ -23,7 +23,8 @@ export default async function RoomsPage() {
         rooms={rooms.map((r) => ({
           id: r.id, code: r.code, status: r.status, facilityId: r.facilityId, floor: r.floor,
           tenantName: r.tenantName, monthlyRent: r.monthlyRent, depositBalance: r.depositBalance, leaseEndDate: r.leaseEndDate,
-          ...(ctx.isAdmin && { isActive: r.isActive, manage: { floor: r.floor, roomType: r.roomType, areaM2: r.areaM2, beds: r.beds, listPrice: r.listPrice, capacity: r.capacity } }),
+          isActive: r.isActive,
+          ...(ctx.isAdmin && { manage: { floor: r.floor, roomType: r.roomType, areaM2: r.areaM2, beds: r.beds, listPrice: r.listPrice, capacity: r.capacity } }),
         }))}
       />
     </div>

@@ -7,11 +7,7 @@ import { auditLogs, files, invoices } from '@/db'
 import { eq } from 'drizzle-orm'
 import { addOneOff } from '@/server/charges/service'
 import { saveInvoiceFeeQuantities, exportReceipt, addPayment, approveInvoice, createDrafts, deleteInvoice, invoiceStatus, listInvoices, previewBatch, removePayment, setPeriod, tenantBalance, updateLines } from '@/server/invoices/service'
-import { DOCX_MIME } from '@/lib/docx'
 import { MemoryStorage } from '@/server/storage/memory'
-import { attachTemplateFile, createTemplate } from '@/server/templates/service'
-import { confirmUpload, requestUpload } from '@/server/files/service'
-import { buildSampleTemplate } from '../../scripts/build-sample-templates'
 import { createTestDb } from '../helpers/db'
 
 
@@ -183,12 +179,6 @@ describe('hoá đơn và thu tiền', () => {
     const [row] = await createDrafts(db, ctx, { facilityId, period: '2026-12' })
     await approveInvoice(db, ctx, row.id, { dueDate: '2027-01-05' })
     const pay = await addPayment(db, ctx, row.id, { paidOn: '2026-12-21', amount: 1000000, method: 'cash' })
-    const admin: AccessContext = { ...ctx, permissions: new Set(['settings']), isAdmin: true }
-    const t = await createTemplate(db, admin, { docType: 'receipt', name: 'Phiếu thu' })
-    const up = await requestUpload(db, admin, storage, { ownerType: 'template', ownerId: t.id, contentType: DOCX_MIME, name: 'pt.docx' })
-    const [f] = await db.select().from(files).where(eq(files.id, up.fileId))
-    await storage.write(f.storageKey, await buildSampleTemplate('receipt'), DOCX_MIME)
-    await confirmUpload(db, admin, up.fileId); await attachTemplateFile(db, admin, t.id, up.fileId)
     const r = await exportReceipt(db, ctx, storage, pay.id)
     const [out] = await db.select().from(files).where(eq(files.id, r.fileId))
     expect(out.meta).toMatchObject({ docType: 'receipt' }); expect(out.ownerId).toBe(pay.id)

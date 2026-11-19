@@ -1,14 +1,14 @@
 # Siris — quản lý khách thuê dài hạn
 
 ## What this is
-Web nội bộ cho nhân viên Siris quản lý cơ sở, phòng, khách thuê, hợp đồng, bàn giao, công tơ, phí, tài sản; nhắc việc (visa), nhập dữ liệu từ Excel, xuất hợp đồng từ mẫu .docx. Phân quyền theo nhóm quyền và cơ sở. Giao diện và tài liệu bằng tiếng Việt.
+Web nội bộ cho nhân viên Siris quản lý cơ sở, phòng, khách thuê, hợp đồng, bàn giao, công tơ, phí, tài sản; nhắc việc (visa), nhập dữ liệu từ Excel, soạn mẫu hợp đồng, phụ lục, biên bản trong app và xuất PDF, Word. Phân quyền theo nhóm quyền và cơ sở. Giao diện và tài liệu bằng tiếng Việt.
 
 ## Stack
 - Next.js 16 App Router (đọc `node_modules/next/dist/docs/` trước khi viết code — xem AGENTS.md), React 19, TypeScript
 - Tailwind v4 + shadcn/ui (`@base-ui/react`), react-hook-form + zod, TanStack Query
 - Drizzle ORM + Postgres (Supabase), Supabase Auth (`@supabase/ssr`)
-- Lưu file: Cloudflare R2 / Supabase Storage (`STORAGE_DRIVER`); docxtemplater, exceljs
-- Hoá đơn và phiếu thu dựng PDF trong app bằng `@react-pdf/renderer`, mã QR bằng `qrcode`; Gotenberg dùng chuyển PDF hợp đồng, phụ lục và biên bản.
+- Lưu file: Cloudflare R2 / Supabase Storage (`STORAGE_DRIVER`); exceljs, `docx` (xuất Word)
+- PDF dựng ngay trong app bằng `@react-pdf/renderer` (hoá đơn, phiếu thu, và hợp đồng, phụ lục, biên bản từ mẫu HTML soạn bằng TipTap), Word bằng `docx`, mã QR bằng `qrcode`; không dùng dịch vụ ngoài.
 - Vitest + PGlite (unit/integration), Playwright (e2e); triển khai Vercel
 
 ## Commands
@@ -76,3 +76,4 @@ Web nội bộ cho nhân viên Siris quản lý cơ sở, phòng, khách thuê, 
 - Test ở `tests/unit`, `tests/integration` (PGlite, không cần Docker), `tests/e2e`.
 - Commit, comment, chuỗi giao diện viết tiếng Việt; commit theo dạng `feat:` / `fix:` / `docs:` / `perf:`.
 - Thiết kế ở `docs/superpowers/specs/`, kế hoạch ở `docs/superpowers/plans/`.
+- Thao tác "thêm mới" luôn hiện popup, không điều hướng sang trang mới. Form cần dữ liệu từ server: làm trang `src/app/(app)/<mục>/new/page.tsx` với thân trang tách thành component dùng chung (`new-<mục>.tsx`), rồi thêm route chặn `src/app/(app)/@modal/(.)<mục>/new/page.tsx` bọc thân đó bằng `RouteModal` (`src/components/route-modal.tsx`). Form tự chứa: bọc bằng `FormDialog` (`src/components/form-dialog.tsx`). Liên kết "thêm" dùng `Link`, không dùng `<a>` (trừ khi cố ý tải trang đầy đủ). Sau khi tạo: `router.refresh()` để danh sách phía sau cập nhật. Phải kiểm tra: bấm từ danh sách ra popup, F5 hoặc mở thẳng ra trang đầy đủ, Esc quay về đúng URL cũ. Chi tiết: `docs/superpowers/specs/2026-11-19-popup-cho-thao-tac-them-moi-design.md`.

@@ -4,7 +4,7 @@ import { formatDateVN } from '@/domain/dates'
 import { orNotFound } from '@/lib/or-not-found'
 import { getAccessContext } from '@/server/session'
 import { getHandover, listHandovers } from '@/server/handovers/service'
-import { listTemplates } from '@/server/templates/service'
+import { isUsableTemplate, listTemplates } from '@/server/templates/service'
 import { HandoverForm } from '@/features/handovers/components/handover-form'
 
 export default async function HandoverPage({ params }: { params: Promise<{ id: string }> }) {
@@ -22,7 +22,7 @@ async function Handover({ params }: { params: Promise<{ id: string }> }) {
     const ci = all.find((x) => x.kind === 'check_in')
     if (ci) for (const i of (await getHandover(db, ctx, ci.id)).items) checkInConditions[i.assetCode] = i.condition
   }
-  const templates = (await listTemplates(db, ctx, h.kind === 'check_in' ? 'handover_check_in' : 'handover_check_out')).filter((t) => t.fileId)
+  const templates = (await listTemplates(db, ctx, h.kind === 'check_in' ? 'handover_check_in' : 'handover_check_out')).filter(isUsableTemplate)
   const readByMeter = new Map(h.readings.map((r) => [r.meterId, r.value]))
   return (
     <div className="space-y-4">

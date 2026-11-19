@@ -20,7 +20,7 @@ export function SignStatus({ kind, id, status, signedFileId }: { kind: 'lease' |
     })
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-wrap items-center gap-2">
       {status === 'signed' && signedFileId && <a className="text-sm underline" href={`/api/files/${signedFileId}`}>Xem bản đã ký</a>}
       {(status !== 'signed' || !signedFileId) && (pending
         ? <p className="text-sm text-muted-foreground">Đang lưu bản đã ký…</p>

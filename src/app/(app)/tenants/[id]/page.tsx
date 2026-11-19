@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { PopupLink } from '@/components/popup-link'
 import { ArrowLeft, ArrowRight, FilePlus, FileText, Home, Plus, ShieldCheck, User } from 'lucide-react'
 import { db } from '@/db/client'
 import { ForbiddenError } from '@/domain/access'
@@ -135,12 +136,12 @@ export default async function TenantPage({ params }: { params: Promise<{ id: str
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <Link
+                        <PopupLink
                           href={`/contracts/${c.id}`}
                           className="font-semibold text-sm text-foreground hover:text-primary transition-colors hover:underline underline-offset-2"
                         >
                           {c.code}
-                        </Link>
+                        </PopupLink>
                         <span className="rounded-full border border-border/80 bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-foreground">
                           Phòng {c.roomCode}
                         </span>
@@ -162,12 +163,12 @@ export default async function TenantPage({ params }: { params: Promise<{ id: str
                     >
                       {isActive ? 'Đang hiệu lực' : 'Đã kết thúc'}
                     </span>
-                    <Link
+                    <PopupLink
                       href={`/contracts/${c.id}`}
                       className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                     >
                       <ArrowRight className="size-4" />
-                    </Link>
+                    </PopupLink>
                   </div>
                 </div>
               )

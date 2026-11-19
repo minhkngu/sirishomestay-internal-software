@@ -2,6 +2,8 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
+import { toast } from 'sonner'
+import { FormDialog } from '@/components/form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { MoneyInput } from '@/components/ui/money-input'
@@ -23,13 +25,16 @@ export function RoomPanels({ amenities, facilities, facilityId }: Props) {
   const [mode, setMode] = useState<'none' | 'one' | 'bulk'>('none')
   const [pending, start] = useTransition()
   const [err, setErr] = useState<string | null>(null)
-  const [msg, setMsg] = useState<string | null>(null)
   const [picked, setPicked] = useState(facilities[0]?.id ?? '')
   const [one, setOne] = useState({ code: '', floor: '', roomType: '', areaM2: '', beds: '', listPrice: '', capacity: '' })
   const [bulk, setBulk] = useState({ prefix: '', floor: '', from: '', to: '', areaM2: '', beds: '', listPrice: '' })
   const [oneAmenities, setOneAmenities] = useState<string[]>([])
   const [bulkAmenities, setBulkAmenities] = useState<string[]>([])
   const target = facilityId ?? picked
+  const emptyOne = { code: '', floor: '', roomType: '', areaM2: '', beds: '', listPrice: '', capacity: '' }
+  const emptyBulk = { prefix: '', floor: '', from: '', to: '', areaM2: '', beds: '', listPrice: '' }
+  // Đóng popup (Esc, nút đóng, Huỷ) thì bỏ dữ liệu nhập dở và lỗi cũ
+  const closeDialog = () => { setMode('none'); setErr(null); setOne(emptyOne); setBulk(emptyBulk); setOneAmenities([]); setBulkAmenities([]) }
 
   const facilityField = facilityId ? null : (
     <div className="space-y-1">
@@ -46,9 +51,8 @@ export function RoomPanels({ amenities, facilities, facilityId }: Props) {
         <Button onClick={() => setMode('one')}>Thêm phòng</Button>
         <Button variant="outline" onClick={() => setMode('bulk')}>Tạo nhanh nhiều phòng</Button>
       </div>
-      {msg && <p className="text-sm text-green-700">{msg}</p>}
-      {mode === 'one' && (
-        <div className="max-w-md space-y-3 rounded-md border bg-card p-4">
+      <FormDialog open={mode === 'one'} onOpenChange={(open) => { if (!open) closeDialog() }} title="Thêm phòng">
+        <div className="space-y-3">
           {facilityField}
           {([['code', 'Mã phòng'], ['floor', 'Tầng'], ['roomType', 'Loại phòng'], ['areaM2', 'Diện tích (m²)'], ['beds', 'Số giường'], ['listPrice', 'Giá niêm yết (VND)'], ['capacity', 'Sức chứa']] as const).map(([k, label]) => (
             <div key={k} className="space-y-1">
@@ -62,20 +66,20 @@ export function RoomPanels({ amenities, facilities, facilityId }: Props) {
           {err && <p className="text-sm text-destructive">{err}</p>}
           <div className="flex gap-2">
             <Button disabled={pending || !target} onClick={() => start(async () => {
-              setErr(null); setMsg(null)
+              setErr(null)
               const r = await createRoomAction({
                 facilityId: target, code: one.code, floor: one.floor || null, roomType: one.roomType || null,
                 areaM2: num(one.areaM2), beds: num(one.beds), listPrice: num(one.listPrice), capacity: num(one.capacity), amenityIds: oneAmenities,
               })
               if (!r.ok) { setErr(r.fieldErrors?.code ?? r.fieldErrors?.amenityIds ?? r.error); return }
-              setOne({ code: '', floor: '', roomType: '', areaM2: '', beds: '', listPrice: '', capacity: '' }); setOneAmenities([]); setMode('none'); router.refresh()
+              closeDialog(); router.refresh()
             })}>Lưu</Button>
-            <Button variant="outline" onClick={() => setMode('none')}>Huỷ</Button>
+            <Button variant="outline" onClick={closeDialog}>Huỷ</Button>
           </div>
         </div>
-      )}
-      {mode === 'bulk' && (
-        <div className="max-w-md space-y-3 rounded-md border bg-card p-4">
+      </FormDialog>
+      <FormDialog open={mode === 'bulk'} onOpenChange={(open) => { if (!open) closeDialog() }} title="Tạo nhanh nhiều phòng">
+        <div className="space-y-3">
           {facilityField}
           {([['prefix', 'Tiền tố mã (tuỳ chọn)'], ['floor', 'Tầng'], ['from', 'Từ số'], ['to', 'Đến số'], ['areaM2', 'Diện tích (m²)'], ['beds', 'Số giường'], ['listPrice', 'Giá niêm yết (VND)']] as const).map(([k, label]) => (
             <div key={k} className="space-y-1">
@@ -89,19 +93,19 @@ export function RoomPanels({ amenities, facilities, facilityId }: Props) {
           {err && <p className="text-sm text-destructive">{err}</p>}
           <div className="flex gap-2">
             <Button disabled={pending || !target} onClick={() => start(async () => {
-              setErr(null); setMsg(null)
+              setErr(null)
               const r = await createRoomsBulkAction(target, {
                 prefix: bulk.prefix || undefined, floor: bulk.floor, from: Number(bulk.from), to: Number(bulk.to),
                 areaM2: num(bulk.areaM2), beds: num(bulk.beds), listPrice: num(bulk.listPrice), amenityIds: bulkAmenities,
               })
               if (!r.ok) { setErr(r.error); return }
-              setMsg(`Đã tạo ${r.data.created} phòng${r.data.skipped.length ? `, bỏ qua (đã có): ${r.data.skipped.join(', ')}` : ''}`)
-              setMode('none'); router.refresh()
+              toast.success(`Đã tạo ${r.data.created} phòng${r.data.skipped.length ? `, bỏ qua (đã có): ${r.data.skipped.join(', ')}` : ''}`)
+              closeDialog(); router.refresh()
             })}>Tạo</Button>
-            <Button variant="outline" onClick={() => setMode('none')}>Huỷ</Button>
+            <Button variant="outline" onClick={closeDialog}>Huỷ</Button>
           </div>
         </div>
-      )}
+      </FormDialog>
     </div>
   )
 }

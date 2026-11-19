@@ -2,16 +2,15 @@
 
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
-import { InvoiceTemplateManager } from './invoice-template-manager'
+import { InvoiceTemplatesManager } from './invoice-templates-manager'
 import { TemplatesManager } from './templates-manager'
-import type { InvoiceTemplateConfig } from '@/domain/invoice-template'
 
-type InvoiceTemplate = { id: string; name: string; isDefault: boolean; isSystem: boolean; config: InvoiceTemplateConfig }
-type WordTemplate = { id: string; docType: string; name: string; hasFile: boolean; isDefault: boolean }
+type InvoiceTemplate = { id: string; name: string; isDefault: boolean; isSystem: boolean; hasBody: boolean; style: 'formal' | 'modern'; body: string | null }
+type WordTemplate = { id: string; docType: string; name: string; hasFile: boolean; hasBody: boolean; isDefault: boolean; style: 'formal' | 'modern'; body: string | null }
 
 const TABS = [
   { id: 'invoice', label: 'Mẫu hóa đơn' },
-  { id: 'word', label: 'Mẫu Word' },
+  { id: 'word', label: 'Hợp đồng và biên bản' },
 ] as const
 
 export function TemplatesView({ invoiceTemplates, wordTemplates }: { invoiceTemplates: InvoiceTemplate[]; wordTemplates: WordTemplate[] }) {
@@ -20,7 +19,7 @@ export function TemplatesView({ invoiceTemplates, wordTemplates }: { invoiceTemp
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-semibold tracking-tight text-foreground">Mẫu giấy tờ</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Quản lý mẫu hóa đơn PDF và mẫu Word cho hợp đồng, bàn giao, phiếu thu.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Quản lý mẫu hóa đơn PDF, và mẫu hợp đồng, phụ lục, biên bản soạn ngay trong app (xuất PDF và Word).</p>
       </div>
 
       <div className="flex gap-6 border-b border-border/70" role="tablist" aria-label="Mẫu giấy tờ">
@@ -46,7 +45,7 @@ export function TemplatesView({ invoiceTemplates, wordTemplates }: { invoiceTemp
         })}
       </div>
 
-      {tab === 'invoice' ? <InvoiceTemplateManager templates={invoiceTemplates} /> : <TemplatesManager templates={wordTemplates} />}
+      {tab === 'invoice' ? <InvoiceTemplatesManager templates={invoiceTemplates} /> : <TemplatesManager templates={wordTemplates} />}
     </div>
   )
 }

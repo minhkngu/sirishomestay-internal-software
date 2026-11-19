@@ -1,153 +1,79 @@
 'use client'
 
-import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus } from 'lucide-react'
-import { FileUpload } from '@/components/file-upload'
+import { useState, useTransition } from 'react'
+import { ConfirmDialog } from '@/components/confirm-dialog'
+import { PdfBlobDialog } from '@/components/pdf-blob-dialog'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogFooter, DialogTitle } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { DOC_TYPES, PDF_DOC_TYPES, DOC_TYPE_LABELS, TEMPLATE_FIELDS, type DocType } from '@/domain/template-fields'
-import { attachTemplateFileAction, createTemplateAction, removeTemplateAction, setDefaultTemplateAction, trialExportAction } from '@/server/templates/actions'
+import { type TemplateStyle } from '@/domain/doc-template'
+import { DOC_TYPE_LABELS, TEMPLATE_DOC_TYPES, type DocType } from '@/domain/template-fields'
+import { createTemplateAction, previewTemplateAction, removeTemplateAction, restoreDefaultTemplatesAction, setDefaultTemplateAction, updateTemplateAction } from '@/server/templates/actions'
+import { STYLE_LABEL, TemplateDialog, type TemplateOps } from './template-dialog'
 
-type Tpl = { id: string; docType: string; name: string; hasFile: boolean; isDefault: boolean }
+type Tpl = { id: string; docType: string; name: string; hasFile: boolean; hasBody: boolean; isDefault: boolean; style: TemplateStyle; body: string | null }
 
-const DOCX = '.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-
-function FieldTable({ docType }: { docType: DocType }) {
-  const [copied, setCopied] = useState('')
-  const copy = (text: string) => { void navigator.clipboard?.writeText(text); setCopied(text) }
-  return (
-    <div className="overflow-x-auto rounded-xl border border-border/70">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-border/60 text-left text-[13px] font-medium text-muted-foreground">
-            <th className="px-3 py-2.5">Chỗ điền</th>
-            <th className="px-3 py-2.5">Ý nghĩa</th>
-            <th className="px-3 py-2.5">Ví dụ</th>
-          </tr>
-        </thead>
-        <tbody>
-          {TEMPLATE_FIELDS[docType].map((f) => (
-            <tr key={f.key} className="border-b border-border/50 align-top last:border-0">
-              <td className="whitespace-nowrap px-3 py-2">
-                <code className="rounded bg-muted/60 px-1.5 py-0.5 text-xs">{f.loop ? `{#${f.key}}…{/${f.key}}` : `{${f.key}}`}</code>{' '}
-                <button type="button" className="text-xs text-primary underline-offset-2 hover:underline" onClick={() => copy(f.loop ? `{#${f.key}}` : `{${f.key}}`)}>
-                  {copied === (f.loop ? `{#${f.key}}` : `{${f.key}}`) ? 'Đã sao chép' : 'Sao chép'}
-                </button>
-              </td>
-              <td className="px-3 py-2">
-                {f.label}
-                {f.loop && <div className="mt-1 text-xs text-muted-foreground">Trong vòng lặp dùng: {f.loop.fields.map((x) => `{${x.key}}`).join(' ')}</div>}
-              </td>
-              <td className="px-3 py-2 text-muted-foreground">{f.example}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
+const contractOps = (docType: DocType): TemplateOps => ({
+  preview: (body, style) => previewTemplateAction({ docType, body, style, format: 'pdf' }),
+  save: (id, input) => id ? updateTemplateAction(id, input) : createTemplateAction({ docType, ...input }),
+})
 
 export function TemplatesManager({ templates }: { templates: Tpl[] }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
-  const [fields, setFields] = useState<DocType | null>(null)
-  const [add, setAdd] = useState<{ docType: DocType; name: string } | null>(null)
+  const [editing, setEditing] = useState<{ docType: DocType; template: Tpl | null } | null>(null)
+  const [pdf, setPdf] = useState<{ base64: string; title: string } | null>(null)
+  const [viewing, setViewing] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<Tpl | null>(null)
+
+  async function view(t: Tpl) {
+    setError(null); setViewing(t.id)
+    const r = await previewTemplateAction({ docType: t.docType as DocType, body: t.body ?? '', style: t.style, format: 'pdf' })
+    setViewing(null)
+    if (!r.ok) { setError(r.error ?? 'Không dựng được bản xem trước'); return }
+    setPdf({ base64: r.data.base64, title: t.name })
+  }
 
   const act = (fn: () => Promise<{ ok: boolean; error?: string }>) =>
     start(async () => { setError(null); setMsg(null); const r = await fn(); if (!r.ok) setError(r.error ?? 'Có lỗi'); else router.refresh() })
 
-  async function trial(id: string) {
-    setError(null); setMsg(null)
-    const r = await trialExportAction(id)
-    if (!r.ok) { setError(r.error); return }
-    const bytes = Uint8Array.from(atob(r.data.base64), (c) => c.charCodeAt(0))
-    const url = URL.createObjectURL(new Blob([bytes], { type: r.data.mime }))
-    const a = document.createElement('a'); a.href = url; a.download = r.data.name; a.click(); URL.revokeObjectURL(url)
-    setMsg(r.data.warnings.length ? `Đã xuất. Chỗ điền thiếu dữ liệu: ${r.data.warnings.join(', ')}` : 'Đã xuất file thử')
-  }
-
-  const wordTypes = DOC_TYPES.filter((dt) => !(PDF_DOC_TYPES as readonly string[]).includes(dt))
-
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">Soạn mẫu trong Word, đặt chỗ điền dạng <code className="rounded bg-muted/60 px-1 py-0.5 text-xs">{'{ten_truong}'}</code>, rồi tải file .docx lên đây.</p>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="outline" disabled={pending} onClick={() => start(async () => { setError(null); const r = await restoreDefaultTemplatesAction(); if (!r.ok) setError(r.error ?? 'Có lỗi'); else { setMsg(r.data.created ? `Đã tạo ${r.data.created} mẫu mặc định` : 'Các mẫu mặc định đều đã có'); router.refresh() } })}>Khôi phục mẫu mặc định</Button>
+        <span className="text-xs text-muted-foreground">Chỉ tạo mẫu còn thiếu, không ghi đè mẫu đã sửa.</span>
+      </div>
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      {msg && <p className="text-sm text-green-700">{msg}</p>}
-
-      <div className="grid items-start gap-3 xl:grid-cols-2">
-      {wordTypes.map((dt) => {
+      {msg && <p role="status" className="text-sm text-green-700">{msg}</p>}
+      {TEMPLATE_DOC_TYPES.map((dt) => {
         const list = templates.filter((t) => t.docType === dt)
         return (
-          <section key={dt} className="overflow-hidden rounded-2xl border border-border/70 bg-card">
-            <div className="flex flex-wrap items-start justify-between gap-2 border-b border-border/60 px-4 py-3">
-              <div>
-                <h2 className="text-sm font-semibold text-foreground">{DOC_TYPE_LABELS[dt]}</h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {list.length === 0 ? 'Chưa có mẫu' : `${list.length} mẫu`}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={() => setFields(dt)}>Chỗ điền</Button>
-                <Button variant="outline" size="sm" onClick={() => setAdd({ docType: dt, name: '' })}><Plus className="size-3.5" />Thêm mẫu</Button>
-              </div>
+          <section key={dt} className="space-y-3 rounded-lg border bg-card p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-medium">{DOC_TYPE_LABELS[dt]}</h2>
+              <Button size="sm" onClick={() => setEditing({ docType: dt, template: null })}>Soạn mẫu mới</Button>
             </div>
-            <ul className="divide-y divide-border/50">
+            <ul className="space-y-2">
               {list.map((t) => (
-                <li key={t.id} className="flex flex-wrap items-center gap-2 px-4 py-2.5">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-foreground">{t.name}</div>
-                    <div className="text-xs text-muted-foreground">{t.hasFile ? 'Đã có file .docx' : 'Chưa tải file'}</div>
-                  </div>
-                  {t.isDefault && <span className="rounded-full border border-emerald-200/80 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800">Mặc định</span>}
-                  {!t.hasFile && (
-                    <FileUpload ownerType="template" ownerId={t.id} accept={DOCX} label="Tải file .docx" onUploaded={(fileId) => act(() => attachTemplateFileAction(t.id, fileId))} />
-                  )}
-                  {t.hasFile && !t.isDefault && <Button size="sm" variant="outline" disabled={pending} onClick={() => act(() => setDefaultTemplateAction(t.id))}>Đặt mặc định</Button>}
-                  {t.hasFile && <Button size="sm" variant="outline" disabled={pending} onClick={() => trial(t.id)}>Thử xuất</Button>}
-                  <button type="button" className="text-xs text-destructive underline-offset-2 hover:underline" onClick={() => { if (window.confirm('Xoá mẫu này?')) act(() => removeTemplateAction(t.id)) }}>Xoá</button>
+                <li key={t.id} className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="font-medium">{t.name}</span>
+                  {t.hasBody ? <span className="rounded bg-muted px-2 py-0.5 text-xs">{STYLE_LABEL[t.style]}</span> : <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-900">Mẫu Word cũ, cần soạn lại</span>}
+                  {t.isDefault && t.hasBody && <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-900">Mặc định</span>}
+                  {t.hasBody && <Button size="sm" variant="outline" disabled={viewing === t.id} onClick={() => view(t)}>{viewing === t.id ? 'Đang dựng…' : 'Xem'}</Button>}
+                  <Button size="sm" variant="outline" onClick={() => setEditing({ docType: dt, template: t })}>{t.hasBody ? 'Sửa' : 'Soạn lại'}</Button>
+                  {t.hasBody && !t.isDefault && <Button size="sm" variant="outline" disabled={pending} onClick={() => act(() => setDefaultTemplateAction(t.id))}>Đặt mặc định</Button>}
+                  <button type="button" className="text-destructive underline" onClick={() => setDeleting(t)}>Xoá</button>
                 </li>
               ))}
-              {list.length === 0 && (
-                <li className="px-4 py-6 text-center text-sm text-muted-foreground">Chưa có mẫu Word cho loại giấy tờ này.</li>
-              )}
+              {list.length === 0 && <li className="text-sm text-muted-foreground">Chưa có mẫu nào. Khi xuất giấy tờ, hệ thống tự tạo mẫu mặc định.</li>}
             </ul>
           </section>
         )
       })}
-      </div>
-
-      <Dialog open={!!add} onOpenChange={(open) => { if (!open) setAdd(null) }}>
-        {add && (
-          <DialogContent className="sm:max-w-md">
-            <DialogTitle>Thêm mẫu Word</DialogTitle>
-            <p className="text-sm text-muted-foreground">Loại giấy tờ: {DOC_TYPE_LABELS[add.docType]}</p>
-            <div className="grid gap-1.5">
-              <Label htmlFor="word-template-name">Tên mẫu</Label>
-              <Input id="word-template-name" aria-label={`Tên mẫu ${DOC_TYPE_LABELS[add.docType]}`} value={add.name} onChange={(e) => setAdd({ ...add, name: e.target.value })} placeholder="Bản song ngữ" />
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setAdd(null)}>Huỷ</Button>
-              <Button disabled={pending || !add.name.trim()} onClick={() => act(async () => { const r = await createTemplateAction({ docType: add.docType, name: add.name }); if (r.ok) setAdd(null); return r })}>Thêm mẫu</Button>
-            </DialogFooter>
-          </DialogContent>
-        )}
-      </Dialog>
-
-      <Dialog open={!!fields} onOpenChange={(open) => { if (!open) setFields(null) }}>
-        {fields && (
-          <DialogContent className="w-[min(95vw,860px)] max-w-none sm:max-w-none">
-            <DialogTitle>Chỗ điền — {DOC_TYPE_LABELS[fields]}</DialogTitle>
-            <div className="max-h-[70vh] overflow-auto">
-              <FieldTable docType={fields} />
-            </div>
-          </DialogContent>
-        )}
-      </Dialog>
+      {pdf && <PdfBlobDialog base64={pdf.base64} title={pdf.title} onClose={() => setPdf(null)} />}
+      <ConfirmDialog open={deleting !== null} onOpenChange={(o) => { if (!o) setDeleting(null) }} title="Xoá mẫu này?" description={deleting?.name} confirmLabel="Xoá" destructive onConfirm={() => { if (deleting) act(() => removeTemplateAction(deleting.id)) }} />
+      {editing && <TemplateDialog key={editing.template?.id ?? `new-${editing.docType}`} docType={editing.docType} label={DOC_TYPE_LABELS[editing.docType]} ops={contractOps(editing.docType)} template={editing.template} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); router.refresh() }} />}
     </div>
   )
 }

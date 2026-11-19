@@ -1,26 +1,19 @@
 import { eq } from 'drizzle-orm'
-import { docTemplates, files } from '@/db'
-import { DOC_TYPES, DOC_TYPE_LABELS } from '@/domain/template-fields'
-import { DOCX_MIME } from '@/lib/docx'
-import { buildSampleTemplate } from '../build-sample-templates'
+import { docTemplates } from '@/db'
+import { TEMPLATE_DOC_TYPES } from '@/domain/template-fields'
+import { DEFAULT_TEMPLATES } from '@/server/templates/defaults'
 import type { SeedModule } from './types'
 
-/** Mẫu Word mẫu (sinh bằng thư viện docx) cho đủ 10 loại giấy tờ, mỗi loại một mẫu mặc định. */
+/** Mười sáu mẫu giấy tờ mặc định (tám loại × hai kiểu); kiểu Trang trọng là mẫu mặc định của từng loại. */
 export const templateSeed: SeedModule = {
   name: 'templates',
   async isSeeded({ db }) { return (await db.select({ id: docTemplates.id }).from(docTemplates).where(eq(docTemplates.isDemo, true)).limit(1)).length > 0 },
-  async run({ db, rng, storage }) {
-    for (const docType of DOC_TYPES) {
-      const templateId = rng.uuid()
-      const fileId = rng.uuid()
-      const key = `template/${templateId}/${fileId}.docx`
-      const bytes = new Uint8Array(await buildSampleTemplate(docType))
-      await storage.write(key, bytes, DOCX_MIME)
-      await db.insert(files).values({
-        id: fileId, storageKey: key, name: `${docType}.docx`, contentType: DOCX_MIME, size: bytes.byteLength,
-        ownerType: 'template', ownerId: templateId, confirmedAt: new Date(), isDemo: true,
-      })
-      await db.insert(docTemplates).values({ id: templateId, docType, name: `${DOC_TYPE_LABELS[docType]} (mẫu)`, fileId, isDefault: true, isDemo: true })
+  async run({ db, rng }) {
+    for (const docType of TEMPLATE_DOC_TYPES) {
+      for (const style of ['formal', 'modern'] as const) {
+        const { name, html } = DEFAULT_TEMPLATES[docType][style]
+        await db.insert(docTemplates).values({ id: rng.uuid(), docType, name, body: html, style, isDefault: style === 'formal', isDemo: true })
+      }
     }
   },
 }

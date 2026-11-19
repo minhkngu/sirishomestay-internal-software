@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { PopupLink } from '@/components/popup-link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, Calendar, FileText, Home, User } from 'lucide-react'
 import { db } from '@/db/client'
@@ -64,12 +65,12 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                   <FileText className="size-3.5 text-muted-foreground" />
                   <span>
                     Hợp đồng{' '}
-                    <Link
+                    <PopupLink
                       className="font-medium text-primary hover:underline underline-offset-2"
                       href={`/contracts/${inv.leaseId}`}
                     >
                       {d.leaseCode}
-                    </Link>
+                    </PopupLink>
                   </span>
                 </span>
               </div>

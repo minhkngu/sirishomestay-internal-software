@@ -6,9 +6,12 @@ import { setListParams, useFacilitySelection } from './use-list-params'
 
 export function FacilityFilter({
   facilities,
+  align = 'left',
   onChange,
 }: {
   facilities: { id: string; name: string }[]
+  /** `right` khi bộ lọc nằm sát mép phải, để khung chọn mở vào trong thay vì tràn ra ngoài màn hình. */
+  align?: 'left' | 'right'
   onChange?: (ids: string[]) => void
 }) {
   const allowed = useMemo(() => facilities.map((f) => f.id), [facilities])
@@ -50,7 +53,7 @@ export function FacilityFilter({
         <span className="whitespace-nowrap">{checked.length ? `Toà (${checked.length})` : 'Tất cả toà'}</span>
         <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
       </summary>
-      <div className="absolute left-0 z-20 mt-1.5 min-w-56 space-y-2.5 rounded-2xl border border-border/80 bg-popover p-3.5 shadow-lg">
+      <div className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} z-20 mt-1.5 min-w-56 space-y-2.5 rounded-2xl border border-border/80 bg-popover p-3.5 shadow-lg`}>
         <div className="flex items-center justify-between border-b border-border/50 pb-2">
           <span className="text-xs font-semibold text-foreground">Chọn cơ sở</span>
           <button

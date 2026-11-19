@@ -12,11 +12,11 @@ export default async function UserPage({ params }: { params: Promise<{ id: strin
   const ctx = await getAccessContext()
   try { assertCan(ctx, 'settings') } catch { notFound() }
   const facs = await db.select({ id: facilities.id, name: facilities.name }).from(facilities).orderBy(asc(facilities.name))
-  const user = id === 'new' ? undefined : (await listUsers(db, ctx)).find((u) => u.id === id)
-  if (id !== 'new' && !user) notFound()
+  const user = (await listUsers(db, ctx)).find((u) => u.id === id)
+  if (!user) notFound()
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">{user ? user.fullName : 'Thêm người dùng'}</h1>
+      <h1 className="text-xl font-semibold">{user.fullName}</h1>
       <UserForm facilities={facs} user={user} />
     </div>
   )

@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { facilities, rooms, userProfiles, userPermissions, userFacilities, feeTypes, feeUnits, utilityRates, tenants, docTemplates, files, leases, depositContracts, depositEntries, leaseOccupants, assets, meters, meterReadings, handovers, handoverItems, stockItems, stockLevels, stockMoves } from '@/db'
 import { runSeed, type AuthAdmin } from '../../scripts/seed'
 import { addDays } from '@/domain/dates'
-import { DOC_TYPES } from '@/domain/template-fields'
+import { TEMPLATE_DOC_TYPES } from '@/domain/template-fields'
 import { createTestDb } from '../helpers/db'
 
 function fakeAuth(): AuthAdmin {
@@ -68,13 +68,17 @@ describe('runSeed', () => {
     expect(all.filter((t) => t.kind !== 'company').every((t) => /^\+\d{8,15}$/.test(t.phone!))).toBe(true)
   })
 
-  it('nạp mẫu Word cho mỗi loại giấy tờ, mỗi loại một mẫu mặc định có file', async () => {
+  it('nạp mười sáu mẫu giấy tờ HTML: tám loại, mỗi loại hai kiểu, kiểu Trang trọng là mặc định', async () => {
     const db = await seededDb()
     const t = await db.select().from(docTemplates)
-    expect(t).toHaveLength(DOC_TYPES.length)
-    expect(t.every((x) => x.isDefault && x.fileId && x.isDemo)).toBe(true)
-    expect(new Set(t.map((x) => x.docType))).toEqual(new Set(DOC_TYPES))
-    expect((await db.select().from(files)).every((f) => f.ownerType === 'template' && f.confirmedAt)).toBe(true)
+    expect(t).toHaveLength(TEMPLATE_DOC_TYPES.length * 2)
+    expect(t.every((x) => x.body && !x.fileId && x.isDemo)).toBe(true)
+    expect(new Set(t.map((x) => x.docType))).toEqual(new Set(TEMPLATE_DOC_TYPES))
+    for (const docType of TEMPLATE_DOC_TYPES) {
+      const own = t.filter((x) => x.docType === docType)
+      expect(own.map((x) => x.style).sort()).toEqual(['formal', 'modern'])
+      expect(own.filter((x) => x.isDefault).map((x) => x.style)).toEqual(['formal'])
+    }
   })
 
   it('nạp ~26 hợp đồng thuê (vài cái sắp hết hạn, 2 cái chưa ký) và 3 hợp đồng cọc chờ', async () => {

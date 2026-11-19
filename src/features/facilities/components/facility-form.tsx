@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
+import { FormDialog } from '@/components/form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -17,9 +18,12 @@ export function NewFacilityButton() {
   const [err, setErr] = useState<string | null>(null)
   const [fe, setFe] = useState<Record<string, string>>({})
 
-  if (!open) return <Button onClick={() => setOpen(true)}>Thêm cơ sở</Button>
+  const close = () => { setOpen(false); setErr(null); setFe({}); setV({ code: '', name: '', address: '' }) }
   return (
-    <div className="w-full max-w-md space-y-3 rounded-md border bg-card p-4">
+    <>
+    <Button onClick={() => setOpen(true)}>Thêm cơ sở</Button>
+    <FormDialog open={open} onOpenChange={(o) => { if (!o) close() }} title="Thêm cơ sở" size="sm">
+    <div className="space-y-3">
       {(['code', 'name', 'address'] as const).map((k) => (
         <div key={k} className="space-y-1">
           <Label htmlFor={`f-${k}`}>{{ code: 'Mã cơ sở', name: 'Tên cơ sở', address: 'Địa chỉ' }[k]}</Label>
@@ -33,11 +37,13 @@ export function NewFacilityButton() {
           setErr(null); setFe({})
           const r = await createFacilityAction(v)
           if (!r.ok) { setErr(r.error); setFe(r.fieldErrors ?? {}); return }
-          setOpen(false); setV({ code: '', name: '', address: '' }); router.refresh()
+          close(); router.refresh()
         })}>Lưu</Button>
-        <Button variant="outline" onClick={() => setOpen(false)}>Huỷ</Button>
+        <Button variant="outline" onClick={close}>Huỷ</Button>
       </div>
     </div>
+    </FormDialog>
+    </>
   )
 }
 
