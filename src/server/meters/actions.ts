@@ -5,7 +5,7 @@ import '@/modules/registrations'
 import { revalidatePath } from 'next/cache'
 import { db } from '@/db/client'
 import { toActionResult } from '@/lib/action-result'
-import { getAccessContext } from '@/server/session'
+import { getAccessContext } from '@/modules/platform'
 import { replaceMeter, saveReadings, type ReadingInput } from './service'
 
 export async function saveReadingsAction(period: string, rows: ReadingInput[]) {

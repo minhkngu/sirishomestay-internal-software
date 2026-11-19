@@ -5,7 +5,7 @@ import { assertCan, facilityScope, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { todayVN } from '@/domain/dates'
 import { depositBalance } from '@/domain/deposit'
-import { recordAudit } from '@/server/audit'
+import { recordAudit } from '@/modules/platform'
 import { captureContractVersion } from './history'
 import { loadRoom, loadTenant, toDomainEntry, checkMoney, checkDate, type DepositContract } from './shared'
 

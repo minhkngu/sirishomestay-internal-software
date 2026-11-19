@@ -1,0 +1,10 @@
+// Cổng phía server của module platform: chỉ những gì nơi ngoài module đang dùng.
+export { getAccessContext, loadAccessContext } from './server/session'
+export { readUserId } from './server/auth-user'
+export { recordAudit, recordAuditBatch, listAuditLogs } from './server/audit'
+export { fileAccessPermission, registerOwnerResolver, registerExportOwnerResolver } from './server/files/owners'
+export { countPendingContractFiles, deleteFile, getDownloadUrl, listFiles } from './server/files/service'
+export { getSettings, type Settings } from './server/settings/service'
+export { bankAccountSchema } from './server/settings/schemas'
+export { getStorage, type StorageAdapter } from './server/storage'
+export { RequirePermission } from './server/require-permission'

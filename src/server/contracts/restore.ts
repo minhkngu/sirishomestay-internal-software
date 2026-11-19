@@ -23,8 +23,8 @@ import type { DB } from '@/db/client'
 import { assertCan, can, facilityKey, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { todayVN } from '@/domain/dates'
-import { recordAudit } from '@/server/audit'
-import type { StorageAdapter } from '@/server/storage/types'
+import { recordAudit } from '@/modules/platform'
+import type { StorageAdapter } from '@/modules/platform'
 
 type Kind = 'lease' | 'deposit'
 type Snapshot = {

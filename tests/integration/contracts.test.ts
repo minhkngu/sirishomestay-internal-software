@@ -41,7 +41,7 @@ import {
   setSignStatus,
   exportContract,
 } from '@/server/contracts/service'
-import { MemoryStorage } from '@/server/storage/memory'
+import { MemoryStorage } from '@/modules/platform/server/storage/memory'
 import { FORMAT_EXT } from '@/server/convert'
 import PizZip from 'pizzip'
 import { removeTemplate } from '@/server/templates/service'

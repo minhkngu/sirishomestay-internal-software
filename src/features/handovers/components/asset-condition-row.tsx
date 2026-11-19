@@ -1,6 +1,6 @@
 'use client'
 
-import { FileUpload } from '@/components/file-upload'
+import { FileUpload } from '@/modules/platform/ui'
 import { formatVND } from '@/domain/money'
 import { MoneyInput } from '@/components/ui/money-input'
 import { cn } from '@/lib/utils'

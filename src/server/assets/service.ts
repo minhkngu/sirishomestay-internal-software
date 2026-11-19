@@ -5,7 +5,7 @@ import type { DB } from '@/db/client'
 import { assertCan, can, facilityScope, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { buildSearchText, removeDiacritics } from '@/domain/text'
-import { recordAudit } from '@/server/audit'
+import { recordAudit } from '@/modules/platform'
 
 export type Asset = typeof assets.$inferSelect
 export type LocationKind = 'room' | 'common' | 'warehouse' | 'unassigned'

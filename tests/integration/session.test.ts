@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { facilities, userProfiles, userFacilities, userPermissions } from '@/db'
-import { loadAccessContext } from '@/server/session'
+import { loadAccessContext } from '@/modules/platform'
 import { createTestDb } from '../helpers/db'
 import type { DB } from '@/db/client'
 

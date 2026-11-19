@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { bankAccountSchema } from '@/server/settings/schemas'
+import { bankAccountSchema } from '@/modules/platform'
 
 export const facilityInput = z.object({
   code: z.string().trim().min(1, 'Nhập mã cơ sở').max(20),

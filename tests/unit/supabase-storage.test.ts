@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 const remove = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: () => ({ storage: { from: () => ({ remove }) } }) }))
-import { SupabaseStorage } from '@/server/storage/supabase'
+import { SupabaseStorage } from '@/modules/platform/server/storage/supabase'
 
 describe('SupabaseStorage.delete', () => {
   it('báo lỗi khi kho lưu trữ từ chối xoá', async () => {

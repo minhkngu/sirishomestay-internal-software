@@ -3,7 +3,7 @@ import { invoiceTemplates, invoices, leases, rooms } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
-import { recordAudit } from '@/server/audit'
+import { recordAudit } from '@/modules/platform'
 
 export async function selectInvoiceTemplate(db: DB, ctx: AccessContext, invoiceId: string, templateId: string | null) {
   await db.transaction(async (tx0) => {

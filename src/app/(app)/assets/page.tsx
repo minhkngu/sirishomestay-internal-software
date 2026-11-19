@@ -1,6 +1,6 @@
 import { db } from '@/db/client'
-import { RequirePermission } from '@/components/require-permission'
-import { getAccessContext } from '@/server/session'
+import { RequirePermission } from '@/modules/platform'
+import { getAccessContext } from '@/modules/platform'
 import { listFacilities } from '@/server/facilities/service'
 import { listRooms } from '@/server/rooms/service'
 import { listAssets } from '@/server/assets/service'

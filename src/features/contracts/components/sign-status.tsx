@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
-import { FileUpload } from '@/components/file-upload'
+import { FileUpload } from '@/modules/platform/ui'
 import { setSignStatusAction } from '@/server/contracts/actions'
 
 /** Tải lên bản đã ký thì hợp đồng chuyển sang "Đã ký"; đã ký mà chưa có tệp (dữ liệu cũ) vẫn cho bổ sung bản scan. */

@@ -6,7 +6,7 @@ import { buttonVariants } from '@/components/ui/button'
 import { db } from '@/db/client'
 import { assertCan } from '@/domain/access'
 import { listInvoices } from '@/server/invoices/service'
-import { getAccessContext } from '@/server/session'
+import { getAccessContext } from '@/modules/platform'
 import { InvoiceList } from '@/features/invoices/components/invoice-list'
 
 export default async function InvoicesPage() {

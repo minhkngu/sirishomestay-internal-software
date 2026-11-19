@@ -2,7 +2,7 @@ import '@/modules/registrations'
 import { AppShell } from '@/components/app-shell/app-shell'
 import { NAV_ITEMS } from '@/components/app-shell/nav'
 import { can } from '@/domain/access'
-import { getAccessContext } from '@/server/session'
+import { getAccessContext } from '@/modules/platform'
 import { logout } from '../login/actions'
 
 export default async function AppLayout({ children, modal }: { children: React.ReactNode; modal: React.ReactNode }) {

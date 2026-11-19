@@ -1,6 +1,6 @@
 import { PageHeader } from '@/components/list/page-header'
 import { db } from '@/db/client'
-import { getAccessContext } from '@/server/session'
+import { getAccessContext } from '@/modules/platform'
 import { listAmenities } from '@/server/amenities/service'
 import { listFacilities } from '@/server/facilities/service'
 import { listRoomsWithStatus } from '@/server/contracts/room-view'

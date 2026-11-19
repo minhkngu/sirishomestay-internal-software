@@ -5,7 +5,7 @@ import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { todayVN } from '@/domain/dates'
 import { NotFoundError, ValidationError } from '@/domain/errors'
-import { recordAudit } from '@/server/audit'
+import { recordAudit } from '@/modules/platform'
 import { getFacility } from '@/server/facilities/service'
 
 export type FeeType = typeof feeTypes.$inferSelect

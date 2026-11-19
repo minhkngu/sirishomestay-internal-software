@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { readUserId } from '@/server/auth-user'
+import { readUserId } from '@/modules/platform'
 
 describe('readUserId', () => {
   const client = (r: unknown) => ({

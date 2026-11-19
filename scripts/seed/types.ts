@@ -1,5 +1,5 @@
 import type { DB } from '@/db/client'
-import type { StorageAdapter } from '@/server/storage/types'
+import type { StorageAdapter } from '@/modules/platform'
 import type { Rng } from './rng'
 
 /** Phần Supabase Auth Admin mà seed cần (tách ra để test bằng bản giả). */

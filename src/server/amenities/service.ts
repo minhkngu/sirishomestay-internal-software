@@ -3,7 +3,7 @@ import { amenities } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, NotFoundError, type AccessContext } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
-import { recordAudit } from '@/server/audit'
+import { recordAudit } from '@/modules/platform'
 import { amenityInput, amenityUpdateInput } from './schemas'
 
 export type Amenity = typeof amenities.$inferSelect

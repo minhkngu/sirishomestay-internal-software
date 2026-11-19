@@ -1,6 +1,6 @@
 import { db } from '@/db/client'
-import { RequirePermission } from '@/components/require-permission'
-import { getAccessContext } from '@/server/session'
+import { RequirePermission } from '@/modules/platform'
+import { getAccessContext } from '@/modules/platform'
 import { listTemplates } from '@/server/templates/service'
 import { listInvoiceTemplates } from '@/server/invoice-templates/service'
 import { TemplatesView } from '@/features/templates/components/templates-view'

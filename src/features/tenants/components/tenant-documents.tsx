@@ -2,8 +2,8 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
-import { FileUpload } from '@/components/file-upload'
-import { deleteFileAction } from '@/server/files/actions'
+import { FileUpload } from '@/modules/platform/ui'
+import { deleteFileAction } from '@/modules/platform/actions'
 
 type Doc = { id: string; name: string }
 

@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { getAccessContext } from '@/server/session'
+import { getAccessContext } from '@/modules/platform'
 import { ImportWizard } from '@/features/import/components/import-wizard'
 
 export default async function ImportPage() {

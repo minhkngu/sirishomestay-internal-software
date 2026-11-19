@@ -8,8 +8,8 @@ import { after } from 'next/server'
 import { handovers } from '@/db'
 import { db } from '@/db/client'
 import { toActionResult } from '@/lib/action-result'
-import { getAccessContext } from '@/server/session'
-import { getStorage } from '@/server/storage'
+import { getAccessContext } from '@/modules/platform'
+import { getStorage } from '@/modules/platform'
 import {
   completeHandover,
   exportHandover,

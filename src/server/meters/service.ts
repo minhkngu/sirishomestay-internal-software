@@ -6,7 +6,7 @@ import { daysInMonth } from '@/domain/dates'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { meterUsage } from '@/domain/meters'
 import type { Meter, MeterReading, Utility } from '@/domain/types'
-import { recordAudit } from '@/server/audit'
+import { recordAudit } from '@/modules/platform'
 
 const PERIOD_RE = /^\d{4}-(0[1-9]|1[0-2])$/
 const DECREASE = 'Chỉ số mới nhỏ hơn chỉ số cũ'

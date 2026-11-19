@@ -17,9 +17,9 @@ import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { todayVN } from '@/domain/dates'
-import { recordAudit } from '@/server/audit'
-import { registerExportOwnerResolver, registerOwnerResolver } from '@/server/files/owners'
-import type { StorageAdapter } from '@/server/storage/types'
+import { recordAudit } from '@/modules/platform'
+import { registerExportOwnerResolver, registerOwnerResolver } from '@/modules/platform'
+import type { StorageAdapter } from '@/modules/platform'
 import { exportDocument, registerDocLoader } from '@/server/templates/service'
 
 export type Handover = typeof handovers.$inferSelect

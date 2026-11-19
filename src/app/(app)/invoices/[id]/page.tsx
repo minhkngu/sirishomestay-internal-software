@@ -12,7 +12,7 @@ import { InvoiceExport } from '@/features/invoices/components/invoice-export'
 import { InvoiceStatus } from '@/features/invoices/components/invoice-status'
 import { PaymentDialog } from '@/features/invoices/components/payment-dialog'
 import { getInvoiceDetail, tenantBalance } from '@/server/invoices/service'
-import { getAccessContext } from '@/server/session'
+import { getAccessContext } from '@/modules/platform'
 import { listInvoiceTemplates } from '@/server/invoice-templates/service'
 
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {

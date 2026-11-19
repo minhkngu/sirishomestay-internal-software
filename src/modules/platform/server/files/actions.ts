@@ -5,8 +5,8 @@ import '@/modules/registrations'
 import { revalidatePath } from 'next/cache'
 import { db } from '@/db/client'
 import { toActionResult } from '@/lib/action-result'
-import { getAccessContext } from '@/server/session'
-import { getStorage } from '@/server/storage'
+import { getAccessContext } from '../session'
+import { getStorage } from '../storage'
 import { confirmUpload, deleteFile, requestUpload, type UploadRequest } from './service'
 
 export async function requestUploadAction(req: UploadRequest) {

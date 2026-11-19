@@ -5,7 +5,7 @@ import { todayVN } from '@/domain/dates'
 import { GenerateWizard } from '@/features/invoices/components/generate-wizard'
 import { listLeases } from '@/server/contracts/service'
 import { listFacilities } from '@/server/facilities/service'
-import { getAccessContext } from '@/server/session'
+import { getAccessContext } from '@/modules/platform'
 
 export default async function GenerateInvoicesPage() {
   const ctx = await getAccessContext()

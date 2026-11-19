@@ -4,8 +4,8 @@ import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { compressImage } from '@/lib/image'
-import { confirmUploadAction, requestUploadAction } from '@/server/files/actions'
-import type { OwnerType } from '@/server/files/owners'
+import { confirmUploadAction, requestUploadAction } from '../server/files/actions'
+import type { OwnerType } from '../server/files/owners'
 
 type Props = {
   ownerType: OwnerType

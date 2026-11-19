@@ -5,10 +5,10 @@ import { assertCan, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { DOC_TYPES, PDF_DOC_TYPES, type PdfDocType, type DocEntities, type DocType } from '@/domain/template-fields'
 import { renderTemplate, type TemplateStyle } from '@/domain/doc-template'
-import { recordAudit } from '@/server/audit'
-import { fileAccessPermission } from '@/server/files/owners'
+import { recordAudit } from '@/modules/platform'
+import { fileAccessPermission } from '@/modules/platform'
 import { assertFormatAllowed, convertPdfToPng, FORMAT_EXT, type ExportFormat } from '@/server/convert'
-import type { StorageAdapter } from '@/server/storage/types'
+import type { StorageAdapter } from '@/modules/platform'
 
 export type DocTemplate = Omit<typeof docTemplates.$inferSelect, 'style'> & { style: TemplateStyle }
 

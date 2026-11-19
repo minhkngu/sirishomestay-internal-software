@@ -11,7 +11,7 @@ import {
   exportDocument,
   registerDocLoader,
 } from '@/server/templates/service'
-import { MemoryStorage } from '@/server/storage/memory'
+import { MemoryStorage } from '@/modules/platform/server/storage/memory'
 import { ForbiddenError, NotFoundError } from '@/domain/errors'
 import type { AccessContext, Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'

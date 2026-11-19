@@ -3,7 +3,7 @@ import { userProfiles, userFacilities, userPermissions } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext, type Permission } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
-import { recordAudit } from '@/server/audit'
+import { recordAudit } from '@/modules/platform'
 
 export type UserAccessInput = {
   fullName: string

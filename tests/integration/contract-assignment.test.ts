@@ -6,7 +6,7 @@ import { createLease } from '@/server/contracts/service'
 import { addendumFormData, createAssignment, setAddendumSignStatus } from '@/server/addenda/service'
 import type { AccessContext } from '@/domain/access'
 import { previewContractRestore, restoreContract } from '@/server/contracts/restore'
-import { MemoryStorage } from '@/server/storage/memory'
+import { MemoryStorage } from '@/modules/platform/server/storage/memory'
 
 it('chuyển nhượng đổi người đứng tên và người ở, giữ nguyên PDF đã ký', async () => {
   const db = await createTestDb()

@@ -4,7 +4,7 @@ import { assertCan } from '@/domain/access'
 import { IncidentForm } from '@/features/incidents/components/incident-form'
 import { listAssignees } from '@/server/incidents/service'
 import { getRoomDetail } from '@/server/contracts/room-view'
-import { getAccessContext } from '@/server/session'
+import { getAccessContext } from '@/modules/platform'
 import { listFacilities } from '@/server/facilities/service'
 
 export type NewIncidentSP = { room?: string; asset?: string }
