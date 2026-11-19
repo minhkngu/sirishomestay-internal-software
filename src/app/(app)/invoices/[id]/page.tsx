@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { PopupLink } from '@/components/popup-link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, Calendar, FileText, Home, User } from 'lucide-react'
+import { ArrowLeft, Calendar, FileText, User } from 'lucide-react'
 import { db } from '@/db/client'
 import { NotFoundError } from '@/domain/errors'
 import { formatDateVN, todayVN } from '@/domain/dates'

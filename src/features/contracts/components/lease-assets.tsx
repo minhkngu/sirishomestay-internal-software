@@ -47,6 +47,7 @@ function PhotoPreview({
   }, [file])
   return (
     <div className="relative">
+      {/* eslint-disable-next-line @next/next/no-img-element -- xem trước ảnh vừa chọn bằng data URL, next/image không xử lý được */}
       {url && <img src={url} alt={`Ảnh ${name} ${index + 1}`} className="size-16 rounded border object-cover" />}
       <button
         type="button"

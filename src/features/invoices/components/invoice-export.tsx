@@ -31,7 +31,7 @@ export function InvoiceExport({
       })
       if (!r.ok) toast.error(r.error)
       else if (preview) setPreviewUrl(`/api/files/${r.data.fileId}?inline=1`)
-      else window.location.href = `/api/files/${r.data.fileId}`
+      else window.location.assign(new URL(`/api/files/${r.data.fileId}`, window.location.origin))
     })
   return (
     <div className="flex flex-wrap items-center gap-2.5">

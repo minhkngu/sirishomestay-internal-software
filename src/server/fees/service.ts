@@ -48,7 +48,7 @@ function parse<T>(schema: z.ZodType<T>, input: unknown): T {
 }
 
 // Đọc loại phí/đơn vị: ai đăng nhập cũng xem được (không nhạy cảm, cần cho wizard hợp đồng, hoá đơn…)
-export async function listFeeUnits(db: Pick<DB, 'select'>, _ctx: AccessContext): Promise<FeeUnit[]> {
+export async function listFeeUnits(db: Pick<DB, 'select'>): Promise<FeeUnit[]> {
   return db.select().from(feeUnits).orderBy(asc(feeUnits.name))
 }
 

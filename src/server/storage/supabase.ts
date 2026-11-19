@@ -8,7 +8,7 @@ export class SupabaseStorage implements StorageAdapter {
   private bucket() {
     return supabaseAdmin().storage.from(BUCKET)
   }
-  async createUploadUrl(key: string, _contentType: string) {
+  async createUploadUrl(key: string) {
     const { data, error } = await this.bucket().createSignedUploadUrl(key)
     if (error || !data) throw new Error(`Không tạo được URL tải lên: ${error?.message}`)
     return data.signedUrl

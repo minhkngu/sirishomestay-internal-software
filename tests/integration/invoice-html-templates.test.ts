@@ -12,7 +12,6 @@ import {
   createInvoiceTemplate,
   previewInvoiceTemplateById,
   previewInvoiceTemplateHtml,
-  resolveInvoiceTemplate,
   setDefaultInvoiceTemplate,
   updateInvoiceTemplate,
 } from '@/server/invoice-templates/service'

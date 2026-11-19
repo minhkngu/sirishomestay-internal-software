@@ -2,12 +2,11 @@
 
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { Banknote, Calendar, Check, CreditCard, Download, FileDown, Plus, Trash2, X } from 'lucide-react'
+import { Banknote, Calendar, Check, FileDown, Plus, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { MoneyInput } from '@/components/ui/money-input'
-import { cn } from '@/lib/utils'
 import { addPaymentAction, exportReceiptAction, removePaymentAction } from '@/server/invoices/actions'
 
 type Pay = {
@@ -119,7 +118,7 @@ export function PaymentDialog({
                     start(async () => {
                       const r = await exportReceiptAction(p.id)
                       if (!r.ok) toast.error(r.error)
-                      else window.location.href = `/api/files/${r.data.fileId}`
+                      else window.location.assign(new URL(`/api/files/${r.data.fileId}`, window.location.origin))
                     })
                   }
                   className="h-8 gap-1 rounded-lg border-border/80 text-[11px] font-medium hover:bg-muted"

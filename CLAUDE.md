@@ -16,6 +16,7 @@ Web nội bộ cho nhân viên Siris quản lý cơ sở, phòng, khách thuê, 
 - Dev: `npm run dev`; dữ liệu mẫu: `npm run db:seed` (nạp thêm dần, không dùng `--reset` trừ khi cần)
 - Build: `npm run build`
 - Lint: `npm run lint` (kèm `eslint-plugin-boundaries` kiểm tra quy tắc import ở mục Architecture)
+- Typecheck: `npm run typecheck`
 - Test: `npm test`
 - E2E: `E2E_BASE_URL=<môi trường thử có NEXT_PUBLIC_DEMO_MODE=1> npm run test:e2e`; kiểm tra trước bằng `node scripts/e2e-preflight.mjs`
 - Migration: sửa `src/db/schema/`, rồi `npm run db:generate` (không sửa tay file trong `drizzle/`)

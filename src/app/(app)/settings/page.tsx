@@ -20,7 +20,7 @@ async function Settings({ ctx }: { ctx: Awaited<ReturnType<typeof getAccessConte
   const [settings, facilities, units, feeTypes, prices, defaults, amenities] = await Promise.all([
     getSettings(db),
     listFacilities(db, ctx),
-    listFeeUnits(db, ctx),
+    listFeeUnits(db),
     listFeeTypes(db, ctx, { includeArchived: true }),
     listFeeTypePrices(db, ctx),
     listFeeDefaults(db, ctx),

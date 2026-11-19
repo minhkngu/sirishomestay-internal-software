@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { ArrowRight, User } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { demoLogin } from './actions'
 
 export function DemoQuickLogin({ accounts }: { accounts: { email: string; name: string; summary: string }[] }) {

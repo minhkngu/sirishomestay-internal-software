@@ -14,6 +14,6 @@ export function useGoToContract() {
     if (inModal) {
       router.replace(`/contracts/${id}`)
       router.refresh()
-    } else window.location.assign(`/contracts/${id}`)
+    } else window.location.assign(new URL(`/contracts/${id}`, window.location.origin))
   }
 }

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { PopupLink } from '@/components/popup-link'
-import { ArrowLeft, ArrowRight, FilePlus, FileText, Home, Plus, ShieldCheck, User } from 'lucide-react'
+import { ArrowLeft, ArrowRight, FilePlus, FileText, Home, Plus } from 'lucide-react'
 import { db } from '@/db/client'
 import { ForbiddenError } from '@/domain/access'
 import { getAccessContext } from '@/server/session'

@@ -31,7 +31,6 @@ describe('assets', () => {
   let fb: string
   let r301: string
   let r302: string
-  let rB: string
   const admin = ctxOf(['settings'])
   const hung = () => ctxOf(['assets'], [fb])
   const lan = () => ctxOf(['assets'], [fa])
@@ -41,7 +40,7 @@ describe('assets', () => {
     fa = (await db.insert(facilities).values({ code: 'TD', name: 'Thảo Điền' }).returning())[0].id
     fb = (await db.insert(facilities).values({ code: 'BT', name: 'Bình Thạnh' }).returning())[0].id
     r301 = (await db.insert(rooms).values({ facilityId: fb, code: '301' }).returning())[0].id
-    rB = (await db.insert(rooms).values({ facilityId: fb, code: '302' }).returning())[0].id
+    await db.insert(rooms).values({ facilityId: fb, code: '302' })
     r302 = (await db.insert(rooms).values({ facilityId: fa, code: '101' }).returning())[0].id
   })
   const mk = (code: string, over: Record<string, unknown> = {}) =>

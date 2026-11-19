@@ -40,7 +40,7 @@ export function AddendaList({
                   const r = await exportAddendumAction(a.id)
                   if (!r.ok) toast.error(r.error)
                   else {
-                    window.location.href = `/api/files/${r.data.fileId}`
+                    window.location.assign(new URL(`/api/files/${r.data.fileId}`, window.location.origin))
                     router.refresh()
                   }
                 })

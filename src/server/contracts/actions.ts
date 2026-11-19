@@ -265,7 +265,7 @@ export async function quickContractDataAction(kind: 'lease' | 'deposit', id: str
             const [types, prices, units] = await Promise.all([
               listFeeTypes(db, ctx),
               listFeeTypePrices(db, ctx),
-              listFeeUnits(db, ctx),
+              listFeeUnits(db),
             ])
             const unitName = new Map(units.map((u) => [u.id, u.name]))
             const { meters, leaseFeeMeters, leaseFeeSnapshots, leases } = await import('@/db')
