@@ -21,7 +21,7 @@ export function ExportMenu({ kind, id, templates, selectedTemplateId, templateSl
   const [msg, setMsg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const doExport = (format: 'docx' | 'pdf') =>
+  const doExport = (format: 'docx') =>
     start(async () => {
       setError(null); setMsg(null)
       const r = await exportContractAction(kind, id, templateId || undefined, format)
@@ -46,7 +46,6 @@ export function ExportMenu({ kind, id, templates, selectedTemplateId, templateSl
         {templates.length > 0 && (
           <>
             <Button size="sm" disabled={pending} onClick={() => doExport('docx')}>Xuất Word</Button>
-            <Button size="sm" variant="outline" disabled={pending} onClick={() => doExport('pdf')}>Xuất PDF</Button>
           </>
         )}
         {actionSlot}

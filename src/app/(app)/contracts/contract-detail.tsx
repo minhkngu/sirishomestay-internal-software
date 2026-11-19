@@ -122,7 +122,8 @@ function Ledger({ entries }: { entries: Entry[] }) {
   )
 }
 
-function DocRow({ d }: { d: { id: string; label: string; name: string; date: string } }) {
+function DocRow({ d }: { d: { id: string; label: string; name: string; date: string; previewHref?: string } }) {
+  if (d.previewHref) return <li className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-xs"><span><span className="font-medium text-foreground">{d.label}</span> <span className="text-muted-foreground">· {d.name}</span></span><a className="font-medium text-primary hover:underline" href={d.previewHref} target="_blank" rel="noreferrer">Xem PDF</a></li>
   return <li className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-xs">
     <span><span className="font-medium text-foreground">{d.label}</span> <span className="text-muted-foreground">· {d.name}{d.date ? ` · ${d.date}` : ''}</span></span>
     <span className="flex gap-3"><a className="font-medium text-primary hover:underline" href={`/api/files/${d.id}?inline=1`} target="_blank" rel="noreferrer">Xem trước</a><a className="font-medium text-primary hover:underline" href={`/api/files/${d.id}`}>Tải xuống</a></span>
@@ -359,7 +360,7 @@ export default async function ContractDetail({ id }: { id: string }) {
             <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Hợp đồng</div>
             <ul className="divide-y divide-border/50 rounded-lg border border-border/60">
               {savedDocs.filter(d => d.group === 'Hợp đồng').map(d => <DocRow key={d.id} d={d} />)}
-              {!savedDocs.some(d => d.group === 'Hợp đồng' && d.label.includes('PDF')) && <li className="px-3 py-1.5 text-xs text-muted-foreground">Chưa có bản PDF. Bấm &ldquo;Xuất PDF&rdquo; ở trên để lưu bản PDF của hợp đồng.</li>}
+              {!savedDocs.some(d => d.group === 'Hợp đồng' && d.label.includes('PDF')) && <DocRow d={{ id: 'lease-preview', label: 'Hợp đồng · bản PDF', name: 'dựng từ mẫu, sẽ được lưu khi bấm Lưu thay đổi', date: '', previewHref: `/api/documents/preview?docType=lease&id=${lease.id}${lease.contractTemplateId ? `&templateId=${lease.contractTemplateId}` : ''}` }} />}
             </ul>
           </div>
           <div className="space-y-1">
@@ -380,6 +381,7 @@ export default async function ContractDetail({ id }: { id: string }) {
                   <span><span className="font-medium text-foreground">{h.kind === 'check_in' ? 'Biên bản check-in' : 'Biên bản check-out'}</span> <span className="text-muted-foreground">· {formatDateVN(h.date)} · {h.status === 'done' ? 'Đã hoàn tất' : 'Nháp'}</span></span>
                   <span className="flex items-center gap-3"><Link href={`/handovers/${h.id}`} className="font-medium text-primary hover:underline">Xem biên bản</Link><HandoverExportButton id={h.id} /></span>
                 </div>
+                {!files.some(f => f.contentType === 'application/pdf') && <div className="flex flex-wrap items-center justify-between gap-2 pl-4 text-muted-foreground"><span>Bản PDF · dựng từ mẫu, sẽ được lưu khi bấm Lưu thay đổi</span><a className="font-medium text-primary hover:underline" href={`/api/documents/preview?docType=${h.kind === 'check_in' ? 'handover_check_in' : 'handover_check_out'}&id=${h.id}`} target="_blank" rel="noreferrer">Xem PDF</a></div>}
                 {files.map(f => <div key={f.id} className="flex flex-wrap items-center justify-between gap-2 pl-4 text-muted-foreground"><span>{f.name} · {fileDate(f)}</span><span className="flex gap-3"><a className="font-medium text-primary hover:underline" href={`/api/files/${f.id}?inline=1`} target="_blank" rel="noreferrer">Xem trước</a><a className="font-medium text-primary hover:underline" href={`/api/files/${f.id}`}>Tải xuống</a></span></div>)}
               </li>)}
               {handoverFiles.length === 0 && <li className="px-3 py-1.5 text-xs text-muted-foreground">Chưa có biên bản bàn giao nào. Bấm Check-in hoặc Check-out để tạo.</li>}
