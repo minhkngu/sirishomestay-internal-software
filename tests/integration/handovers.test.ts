@@ -4,7 +4,7 @@ import { assets, facilities, leaseFeeMeters, leaseFeeSnapshots, meterReadings, m
 import { createTenant } from '@/modules/tenants/server/tenants/service'
 import { createLease } from '@/server/contracts/service'
 import { startHandover, getHandover, saveHandover, completeHandover, listHandovers } from '@/server/handovers/service'
-import { assetHistory, setAssetStatus } from '@/server/assets/service'
+import { assetHistory, setAssetStatus } from '@/modules/assets/server/assets/service'
 import { requestUpload, confirmUpload, listFiles } from '@/modules/platform/server/files/service'
 import { MemoryStorage } from '@/modules/platform/server/storage/memory'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'

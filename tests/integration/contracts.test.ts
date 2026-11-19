@@ -22,7 +22,7 @@ import {
   leases,
   rooms,
 } from '@/db'
-import { assetHistory } from '@/server/assets/service'
+import { assetHistory } from '@/modules/assets/server/assets/service'
 import { listMeterOverview, listReadingSheet } from '@/server/meters/service'
 import { leaseData } from '@/server/invoices/service'
 import { listFeeTypes, updateFeeType, archiveFeeType } from '@/modules/facilities/server/fees/service'

@@ -8,7 +8,7 @@ import {
   moveAssets,
   assetHistory,
   setAssetStatus,
-} from '@/server/assets/service'
+} from '@/modules/assets/server/assets/service'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import type { AccessContext, Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'

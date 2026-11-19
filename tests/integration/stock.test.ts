@@ -1,7 +1,13 @@
 import { it, expect } from 'vitest'
 import { facilities, rooms, stockMoves } from '@/db'
 import { createTestDb } from '../helpers/db'
-import { createStockItem, receiveStock, moveStock, consumeStock, listStock } from '@/server/stock/service'
+import {
+  createStockItem,
+  receiveStock,
+  moveStock,
+  consumeStock,
+  listStock,
+} from '@/modules/assets/server/stock/service'
 import type { AccessContext } from '@/domain/access'
 
 it('nhập, chuyển vật tư trong cơ sở và từ chối chuyển quá số lượng hoặc khác cơ sở', async () => {

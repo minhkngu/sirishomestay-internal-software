@@ -106,8 +106,8 @@ describe('đăng ký resolver và loader', () => {
       expect(offenders('src/server/rooms', /@\/server\/invoices/)).toEqual([])
     })
 
-    it('src/server/assets không import @/server/incidents', () => {
-      expect(offenders('src/server/assets', /@\/server\/incidents/)).toEqual([])
+    it('src/modules/assets/server không import @/server/incidents', () => {
+      expect(offenders('src/modules/assets/server', /@\/server\/incidents/)).toEqual([])
     })
 
     it('src/modules/documents/server/invoice-templates không ghi bảng invoices, leases', () => {
