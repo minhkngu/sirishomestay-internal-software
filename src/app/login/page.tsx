@@ -1,4 +1,5 @@
 import { db } from '@/db/client'
+import { publicEnv } from '@/lib/env'
 import { listDemoAccounts } from '@/server/users/service'
 import { PERMISSION_LABELS } from '@/domain/access'
 import { Building2 } from 'lucide-react'
@@ -8,7 +9,7 @@ import { DemoQuickLogin } from './demo-quick-login'
 export const dynamic = 'force-dynamic'
 
 export default async function LoginPage() {
-  const demo = process.env.NEXT_PUBLIC_DEMO_MODE === '1'
+  const demo = publicEnv.demoMode
   const accounts = demo ? await listDemoAccounts(db) : []
   return (
     <main className="relative flex min-h-screen w-full flex-col justify-center items-center bg-gradient-to-b from-[#F4FAF6] via-background to-[#EDF5F1] px-4 py-12">
