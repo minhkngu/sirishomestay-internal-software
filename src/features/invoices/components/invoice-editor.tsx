@@ -52,6 +52,8 @@ type Line = {
   meta: Record<string, unknown> | null
 }
 
+type EditorLine = Line & { unitPriceText: string }
+
 type Props = {
   id: string
   status: string
@@ -67,7 +69,7 @@ type Props = {
 export function InvoiceEditor(p: Props) {
   const router = useRouter()
   const [pending, start] = useTransition()
-  const [lines, setLines] = useState<Line[]>(p.lines)
+  const [lines, setLines] = useState<EditorLine[]>(p.lines.map((l) => ({ ...l, unitPriceText: String(l.unitPrice) })))
   const [period, setPeriod] = useState({
     start: p.start,
     end: p.end,
@@ -88,7 +90,7 @@ export function InvoiceEditor(p: Props) {
       }
     })
 
-  const set = (i: number, patch: Partial<Line>) =>
+  const set = (i: number, patch: Partial<EditorLine>) =>
     setLines(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)))
 
   const approved = p.status === 'approved'
@@ -259,9 +261,9 @@ export function InvoiceEditor(p: Props) {
                   <td className="p-2.5">
                     <MoneyInput
                       allowNegative
-                      value={String(l.unitPrice)}
+                      value={l.unitPriceText}
                       disabled={typeof l.meta?.leaseFeeId === 'string'}
-                      onValueChange={(value) => set(i, { unitPrice: value === '' || value === '-' ? 0 : Number(value) })}
+                      onValueChange={(value) => set(i, { unitPriceText: value, unitPrice: value === '' || value === '-' ? 0 : Number(value) })}
                       className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
                     />
                   </td>
@@ -303,7 +305,7 @@ export function InvoiceEditor(p: Props) {
             onClick={() =>
               setLines([
                 ...lines,
-                { type: 'adjustment', description: '', quantity: 1, unitPrice: 0, meta: null },
+                { type: 'adjustment', description: '', quantity: 1, unitPrice: 0, unitPriceText: '', meta: null },
               ])
             }
             className="gap-1.5 rounded-xl border-border/80 font-medium text-xs"
@@ -314,7 +316,7 @@ export function InvoiceEditor(p: Props) {
           <Button
             size="sm"
             disabled={pending}
-            onClick={() => run(() => updateLinesAction(p.id, lines), 'Đã lưu các dòng')}
+            onClick={() => run(() => updateLinesAction(p.id, lines.map((l) => ({ type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta: l.meta }))), 'Đã lưu các dòng')}
             className="gap-1.5 rounded-xl font-medium text-xs shadow-2xs"
           >
             <Check className="size-3.5" />
