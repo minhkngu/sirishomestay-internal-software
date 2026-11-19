@@ -22,15 +22,15 @@ function TemplateDialog({ docType, template, onClose, onSaved }: { docType: DocT
   const [initial] = useState(() => template?.body ?? sampleTemplateHtml(docType))
   const [html, setHtml] = useState(initial)
   const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState<'pdf' | 'docx' | 'save' | null>(null)
+  const [busy, setBusy] = useState<'pdf' | 'save' | null>(null)
 
-  async function preview(format: 'pdf' | 'docx') {
-    setError(null); setBusy(format)
-    const tab = format === 'pdf' ? openBlankTab() : null
-    const r = await previewTemplateAction({ docType, body: html, style, format })
+  async function preview() {
+    setError(null); setBusy('pdf')
+    const tab = openBlankTab()
+    const r = await previewTemplateAction({ docType, body: html, style, format: 'pdf' })
     setBusy(null)
     if (!r.ok) { tab?.close(); setError(r.error ?? 'Không dựng được bản xem trước'); return }
-    showBase64(tab, r.data, { download: format === 'docx' })
+    showBase64(tab, r.data)
     if (r.data.warnings.length) setError(`Chỗ điền không có dữ liệu mẫu: ${r.data.warnings.join(', ')}`)
   }
   async function save() {
@@ -57,8 +57,7 @@ function TemplateDialog({ docType, template, onClose, onSaved }: { docType: DocT
         <TemplateEditor docType={docType} initialHtml={initial} onChange={setHtml} />
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <div className="flex flex-wrap justify-end gap-2">
-          <Button type="button" variant="outline" disabled={!!busy} onClick={() => preview('pdf')}>{busy === 'pdf' ? 'Đang dựng PDF…' : 'Xem trước PDF'}</Button>
-          <Button type="button" variant="outline" disabled={!!busy} onClick={() => preview('docx')}>{busy === 'docx' ? 'Đang dựng Word…' : 'Tải Word thử'}</Button>
+          <Button type="button" variant="outline" disabled={!!busy} onClick={() => preview()}>{busy === 'pdf' ? 'Đang dựng PDF…' : 'Xem trước PDF'}</Button>
           <Button type="button" variant="ghost" onClick={onClose}>Huỷ</Button>
           <Button type="button" disabled={!!busy} onClick={save}>{busy === 'save' ? 'Đang lưu…' : 'Lưu'}</Button>
         </div>
