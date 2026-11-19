@@ -117,8 +117,10 @@ test('tạo hợp đồng với tiền thực nhận, ghi chú và tài sản m�
   const [tempRoom] = await openFormWithRooms(page)
   const templates = page.locator('#contract-template')
   let selectedTemplate: string | null = null
+  let selectedTemplateName = ''
   if (await templates.count()) {
     selectedTemplate = await templates.locator('option').last().getAttribute('value')
+    selectedTemplateName = ((await templates.locator('option').last().textContent()) ?? '').replace(/ \(mặc định\)$/, '').trim()
     await templates.selectOption(selectedTemplate!)
   }
   const room = roomOption(page, tempRoom)
@@ -147,12 +149,15 @@ test('tạo hợp đồng với tiền thực nhận, ghi chú và tài sản m�
   await expect(page).toHaveURL(/\/contracts\/[a-f0-9-]+$/, { timeout: 60_000 })
   await expect(page.getByText('Ghi chú kiểm thử')).toBeVisible()
   if (selectedTemplate) {
-    await expect(page.getByLabel('Chọn mẫu')).toHaveValue(selectedTemplate)
+    // mẫu đã chọn được lưu: mở popup sửa hợp đồng thì đúng mẫu đó đang được chọn
+    await page.getByRole('button', { name: 'Sửa hợp đồng' }).first().click()
+    await expect(page.getByRole('radio', { name: new RegExp(selectedTemplateName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) })).toBeChecked({ timeout: 60_000 })
+    await page.keyboard.press('Escape')
   }
-  await expect(page.getByText('Nháp', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText(/· Nháp/).first()).toBeVisible()
   await expect(page.getByText(/3\.000\.000/).first()).toBeVisible()
   await expect(page.getByText(/6\.000\.000/).first()).toBeVisible()
-  await page.getByRole('link', { name: 'Xem biên bản' }).first().click()
+  await page.getByRole('link', { name: 'Biên bản check-in' }).first().click()
   const asset = page.getByRole('listitem').filter({ hasText: assetName })
   await expect(asset.getByText('Tình trạng đang ghi: Trầy nhẹ')).toBeVisible()
   await expect(asset.getByRole('img', { name: 'Ảnh' })).toBeVisible()
