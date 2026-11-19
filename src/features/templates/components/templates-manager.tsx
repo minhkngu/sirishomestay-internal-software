@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import { PdfBlobDialog } from '@/components/pdf-blob-dialog'
 import { FormDialog } from '@/components/form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,7 +11,6 @@ import { Label } from '@/components/ui/label'
 import { sampleTemplateHtml, type TemplateStyle } from '@/domain/doc-template'
 import { DOC_TYPE_LABELS, TEMPLATE_DOC_TYPES, type DocType } from '@/domain/template-fields'
 import { createTemplateAction, previewTemplateAction, removeTemplateAction, restoreDefaultTemplatesAction, setDefaultTemplateAction, updateTemplateAction } from '@/server/templates/actions'
-import { PdfBlobDialog } from './pdf-blob-dialog'
 import { TemplateEditor } from './template-editor'
 
 type Tpl = { id: string; docType: string; name: string; hasFile: boolean; hasBody: boolean; isDefault: boolean; style: TemplateStyle; body: string | null }

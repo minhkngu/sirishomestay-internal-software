@@ -1,6 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { eq } from 'drizzle-orm'
+import { docTemplates } from '@/db'
 import { db } from '@/db/client'
 import { toActionResult } from '@/lib/action-result'
 import { renderTemplate, type TemplateStyle } from '@/domain/doc-template'
@@ -61,6 +63,19 @@ export async function previewTemplateAction(input: { docType: DocType; body: str
       ? await (await import('@/server/word/build-docx')).buildDocx(doc, input.style)
       : await (await import('@/server/pdf/template-pdf')).renderTemplatePdf(doc, input.style)
     return { base64: toBase64(bytes), name: `thu-${input.docType}.${input.format}`, mime: MIME[input.format], warnings }
+  })
+}
+
+/** Xem nhanh một mẫu đã lưu với dữ liệu mẫu, không cần dữ liệu hợp đồng; dùng để chọn mẫu. */
+export async function previewTemplateByIdAction(templateId: string) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => {
+    if (!ctx) throw new ValidationError('Cần đăng nhập')
+    const [t] = await db.select().from(docTemplates).where(eq(docTemplates.id, templateId))
+    if (!t?.body) throw new ValidationError('Mẫu này chưa có nội dung để xem')
+    const { doc } = renderTemplate(t.body, sampleDataFor(t.docType as DocType))
+    const bytes = await (await import('@/server/pdf/template-pdf')).renderTemplatePdf(doc, t.style as TemplateStyle)
+    return { base64: toBase64(bytes), name: `${t.name}.pdf`, mime: MIME.pdf, warnings: [] as string[] }
   })
 }
 

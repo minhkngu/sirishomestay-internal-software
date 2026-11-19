@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { MoneyInput } from '@/components/ui/money-input'
 import { Label } from '@/components/ui/label'
+import { previewTemplateByIdAction } from '@/server/templates/actions'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { FormDialog } from '@/components/form-dialog'
 import { formatVND } from '@/domain/money'
@@ -17,7 +18,7 @@ import { createFeeTypeAction } from '@/server/fees/actions'
 import { createTenantAction } from '@/server/tenants/actions'
 import { addDepositEntryAction, markDepositDoneAction } from '@/server/charges/actions'
 import { uploadOne } from '@/components/file-upload'
-import { PdfViewButton } from '@/components/pdf-view-button'
+import { PdfBlobDialog } from '@/components/pdf-blob-dialog'
 import { EditAssets, assetsDraftChanged, emptyAssetsDraft, type AssetRow } from './edit-assets'
 import { EditDocuments, docsDraftChanged, emptyDocsDraft, type DepositRow } from './edit-documents'
 import { deleteContractAction, retryContractFileCleanupAction, setSignStatusAction, updateDepositContractAction, updateLeaseAction, updateLeaseAssetsAction, refreshContractDocumentsAction } from '@/server/contracts/actions'
@@ -67,6 +68,16 @@ export function ContractEditActions({ contract, canDelete, rooms, tenants, mode,
   const [meterId, setMeterId] = useState('')
   const defaultContractTemplate = templates?.contract.find(t => t.id === templates.contractId)?.id ?? templates?.contract.find(t => t.isDefault)?.id ?? templates?.contract[0]?.id ?? ''
   const [contractTpl, setContractTpl] = useState(defaultContractTemplate)
+  const [tplPdf, setTplPdf] = useState<{ base64: string; title: string } | null>(null)
+  const [previewingTpl, setPreviewingTpl] = useState(false)
+  /** Xem nhanh mẫu đang chọn với dữ liệu mẫu, không cần dữ liệu hợp đồng. */
+  async function previewTemplate() {
+    setPreviewingTpl(true)
+    const r = await previewTemplateByIdAction(contractTpl)
+    setPreviewingTpl(false)
+    if (!r.ok) { toast.error(r.error); return }
+    setTplPdf({ base64: r.data.base64, title: templates?.contract.find(t => t.id === contractTpl)?.name ?? 'Xem nhanh mẫu' })
+  }
   const [invoiceTpl, setInvoiceTpl] = useState(templates?.invoiceId ?? '')
   const editOccupants = contract.kind === 'lease' && occupants !== undefined && !!people
   const initialIds = (occupants ?? []).filter(o => !o.isCompany).map(o => o.id).sort().join(',')
@@ -190,7 +201,7 @@ export function ContractEditActions({ contract, canDelete, rooms, tenants, mode,
       </div>
       {contract.kind === 'lease' && <div className="space-y-1"><Label htmlFor="edit-note">Ghi chú</Label><textarea id="edit-note" value={note} onChange={e => setNote(e.target.value)} className="min-h-20 w-full rounded-lg border bg-background p-2 text-sm" /></div>}
       {templates && <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1"><Label htmlFor="edit-contract-tpl">Mẫu hợp đồng</Label><select id="edit-contract-tpl" value={contractTpl} onChange={e => setContractTpl(e.target.value)} className="h-9 w-full rounded-lg border bg-background px-2 text-sm">{templates.contract.length === 0 && <option value="">Mẫu mặc định của hệ thống</option>}{templates.contract.map(t => <option key={t.id} value={t.id}>{t.name}{t.isDefault ? ' (mặc định)' : ''}</option>)}</select><PdfViewButton key={contractTpl} href={`/api/documents/preview?docType=${contract.kind === 'lease' ? 'lease' : 'deposit_contract'}&id=${contract.id}${contractTpl ? `&templateId=${contractTpl}` : ''}`} title="Xem trước mẫu hợp đồng" className="inline-flex h-8 items-center rounded-lg border border-border bg-card px-3 text-xs font-medium shadow-2xs hover:bg-muted/70">Xem trước mẫu</PdfViewButton></div>
+        <div className="space-y-1"><Label htmlFor="edit-contract-tpl">Mẫu hợp đồng</Label><select id="edit-contract-tpl" value={contractTpl} onChange={e => setContractTpl(e.target.value)} className="h-9 w-full rounded-lg border bg-background px-2 text-sm">{templates.contract.length === 0 && <option value="">Mẫu mặc định của hệ thống</option>}{templates.contract.map(t => <option key={t.id} value={t.id}>{t.name}{t.isDefault ? ' (mặc định)' : ''}</option>)}</select><Button type="button" variant="outline" size="sm" disabled={!contractTpl || previewingTpl} onClick={previewTemplate}>{previewingTpl ? 'Đang dựng…' : 'Xem nhanh mẫu'}</Button></div>
         <div className="space-y-1"><Label htmlFor="edit-invoice-tpl">Mẫu hoá đơn</Label><select id="edit-invoice-tpl" value={invoiceTpl} onChange={e => setInvoiceTpl(e.target.value)} className="h-9 w-full rounded-lg border bg-background px-2 text-sm"><option value="">Theo mặc định hệ thống</option>{templates.invoice.map(t => <option key={t.id} value={t.id}>{t.name}{t.isDefault ? ' (mặc định)' : ''}</option>)}</select></div>
       </div>}
       {editOccupants && (
@@ -284,6 +295,7 @@ export function ContractEditActions({ contract, canDelete, rooms, tenants, mode,
           </ul>
         </div>}
     </FormDialog>
+    {tplPdf && <PdfBlobDialog base64={tplPdf.base64} title={tplPdf.title} onClose={() => setTplPdf(null)} />}
     <ConfirmDialog open={confirmingSave} onOpenChange={setConfirmingSave} title="Lưu thay đổi hợp đồng đã ký?" description="Hợp đồng đã ký. Hãy kiểm tra lại bản đã ký trước khi lưu." confirmLabel="Lưu thay đổi" onConfirm={doSave} />
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {editing && <div className="sticky bottom-0 -mx-1 flex flex-wrap items-center gap-3 border-t bg-background px-1 pt-3">
