@@ -15,7 +15,7 @@ import { getRoomDetail } from '@/server/contracts/room-view'
 import { listAssets } from '@/server/assets/service'
 import { RoomIncidentList } from '@/features/rooms/components/room-incident-list'
 import { listIncidents } from '@/server/incidents/service'
-import { userNamesByIds } from '@/server/users/queries'
+import { userNamesByIds } from '@/modules/users'
 import { getPendingDepositContract, listLeases } from '@/server/contracts/service'
 
 export default async function RoomPage({ params }: { params: Promise<{ id: string }> }) {

@@ -7,7 +7,7 @@ import { listFiles } from '@/modules/platform'
 import { getIncident } from '@/server/incidents/service'
 import { roomCodesByIds } from '@/server/rooms/service'
 import { getAccessContext } from '@/modules/platform'
-import { userNamesByIds } from '@/server/users/queries'
+import { userNamesByIds } from '@/modules/users'
 
 const STATUS: Record<string, string> = { new: 'Mới', in_progress: 'Đang xử lý', done: 'Xong', cancelled: 'Đã huỷ' }
 export default async function IncidentPage({ params }: { params: Promise<{ id: string }> }) {

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { facilities, userProfiles, auditLogs } from '@/db'
-import { saveUserAccess, listDemoAccounts } from '@/server/users/service'
+import { saveUserAccess, listDemoAccounts } from '@/modules/users/server/users/service'
 import { loadAccessContext } from '@/modules/platform'
 import { ForbiddenError, type AccessContext, type Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'
