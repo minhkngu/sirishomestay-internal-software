@@ -102,8 +102,9 @@ describe('đăng ký resolver và loader', () => {
         .filter((f) => pattern.test(read(f)))
         .map(rel)
 
-    it('src/server/rooms không import @/modules/leasing', () => {
-      expect(offenders('src/server/rooms', /@\/modules\/leasing/)).toEqual([])
+    it('src/modules/facilities/server không import @/modules/leasing', () => {
+      expect(filesIn('src/modules/facilities/server').length).toBeGreaterThan(0)
+      expect(offenders('src/modules/facilities/server', /@\/modules\/leasing/)).toEqual([])
     })
 
     it('src/modules/assets/server không import @/modules/leasing', () => {

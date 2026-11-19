@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { availableMeters, meterFeeError, resolveMeterIds } from '@/features/contracts/lease-fee-meters'
-import type { FeeDraft, RoomFeeMeter } from '@/features/contracts/components/lease-fees'
+import { availableMeters, meterFeeError, resolveMeterIds } from '@/modules/leasing/ui/contracts/lease-fee-meters'
+import type { FeeDraft, RoomFeeMeter } from '@/modules/leasing/ui/contracts/lease-fees'
 
 const meter = (over: Partial<RoomFeeMeter>): RoomFeeMeter => ({
   id: 'm1',

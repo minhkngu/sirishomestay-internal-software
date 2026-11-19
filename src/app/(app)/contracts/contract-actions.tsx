@@ -1,9 +1,8 @@
 'use client'
 
 import type { ComponentProps } from 'react'
-import { ContractList } from '@/features/contracts/components/contract-list'
-import { ContractRowActions } from '@/features/contracts/components/contract-row-actions'
-import type { RenderCreateFee, RenderCreatePerson } from '@/features/contracts/components/contract-edit-actions'
+import { ContractList, ContractRowActions } from '@/modules/leasing/ui'
+import type { RenderCreateFee, RenderCreatePerson } from '@/modules/leasing/ui'
 import { TenantForm } from '@/modules/tenants/ui'
 import { CreateFeeType } from './create-fee-type'
 

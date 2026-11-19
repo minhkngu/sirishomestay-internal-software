@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { buildHandoverPhotoTasks, uploadLeasePhotos } from '@/features/contracts/lease-photo-retry'
+import { buildHandoverPhotoTasks, uploadLeasePhotos } from '@/modules/leasing/ui/contracts/lease-photo-retry'
 
 describe('uploadLeasePhotos', () => {
   it('chỉ thử lại ảnh lỗi và dùng lại ID hợp đồng', async () => {

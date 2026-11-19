@@ -7,7 +7,7 @@ import { db } from '@/db/client'
 import { assertCan } from '@/domain/access'
 import { listInvoices } from '@/modules/leasing'
 import { getAccessContext } from '@/modules/platform'
-import { InvoiceList } from '@/features/invoices/components/invoice-list'
+import { InvoiceList } from '@/modules/leasing/ui'
 
 export default async function InvoicesPage() {
   const ctx = await getAccessContext()
