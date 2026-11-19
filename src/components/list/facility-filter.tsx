@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { Building, ChevronDown } from 'lucide-react'
 import { setListParams, useFacilitySelection } from './use-list-params'
 
@@ -11,13 +11,37 @@ export function FacilityFilter({
 }) {
   const allowed = useMemo(() => facilities.map((f) => f.id), [facilities])
   const checked = useFacilitySelection(allowed)
+  const detailsRef = useRef<HTMLDetailsElement>(null)
+
+  useEffect(() => {
+    function closeOnOutsidePress(event: PointerEvent) {
+      const details = detailsRef.current
+      if (!details?.open) return
+      if (event.target instanceof Node && details.contains(event.target)) return
+      details.open = false
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      const details = detailsRef.current
+      if (!details?.open || event.key !== 'Escape') return
+      details.open = false
+      details.querySelector('summary')?.focus()
+    }
+
+    document.addEventListener('pointerdown', closeOnOutsidePress, true)
+    document.addEventListener('keydown', closeOnEscape, true)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePress, true)
+      document.removeEventListener('keydown', closeOnEscape, true)
+    }
+  }, [])
 
   function update(ids: string[]) {
     setListParams({ toa: ids.join(',') || null })
   }
 
   return (
-    <details className="relative inline-block font-sans">
+    <details ref={detailsRef} className="relative inline-block font-sans">
       <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-xl border border-border/80 bg-card px-3 py-1.5 text-xs font-medium text-foreground shadow-2xs transition-all hover:bg-muted/60 active:scale-95 whitespace-nowrap">
         <Building className="size-3.5 text-muted-foreground" />
         <span>{checked.length ? `Toà (${checked.length})` : 'Tất cả toà'}</span>
