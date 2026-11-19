@@ -1,11 +1,27 @@
 import { describe, it, expect } from 'vitest'
-import { formatVND, numberToVietnameseWords } from '@/domain/money'
+import { formatVND, numberToVietnameseWords, parseMoneyInput } from '@/domain/money'
 
 describe('formatVND', () => {
   it('dùng dấu chấm phân tách hàng nghìn', () => {
     expect(formatVND(1500000)).toBe('1.500.000')
     expect(formatVND(0)).toBe('0')
     expect(formatVND(-2500)).toBe('-2.500')
+  })
+})
+
+describe('parseMoneyInput', () => {
+  it('bỏ dấu phân cách và phần lẻ', () => {
+    expect(parseMoneyInput('15000000')).toBe('15000000')
+    expect(parseMoneyInput('15.000.000')).toBe('15000000')
+    expect(parseMoneyInput('15,000,000')).toBe('15000000')
+    expect(parseMoneyInput('15.000.000,50')).toBe('15000000')
+    expect(parseMoneyInput(' 1 500 000 ')).toBe('1500000')
+  })
+  it('giữ dấu âm và chuỗi rỗng', () => {
+    expect(parseMoneyInput('-1.500.000')).toBe('-1500000')
+    expect(parseMoneyInput('')).toBe('')
+    expect(parseMoneyInput('-')).toBe('-')
+    expect(parseMoneyInput('abc')).toBe('')
   })
 })
 

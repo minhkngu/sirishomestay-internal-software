@@ -4,6 +4,20 @@ export function formatVND(n: number): string {
   return sign + Math.abs(Math.trunc(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 }
 
+/** "15.000.000,50" → "15000000"; "-1.500.000" → "-1500000"; giữ "" và "-" đang gõ dở. */
+export function parseMoneyInput(text: string): string {
+  const trimmed = text.replace(/\s/g, '')
+  const negative = trimmed.startsWith('-')
+  const body = negative ? trimmed.slice(1) : trimmed
+  if (body === '') return negative ? '-' : ''
+  // Phần lẻ của VND (nếu có) bị cắt bỏ: dấu . hoặc , cuối cùng đứng trước 1–2 chữ số.
+  const fraction = body.match(/[.,]\d{1,2}$/)
+  const integerPart = fraction ? body.slice(0, -fraction[0].length) : body
+  const digits = integerPart.replace(/\D/g, '')
+  if (!digits) return negative ? '-' : ''
+  return (negative ? '-' : '') + digits
+}
+
 const DIGITS = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín']
 
 /** Đọc nhóm 3 chữ số (0–999). `full` = có đứng sau nhóm lớn hơn → đọc "không trăm" / "linh". */
