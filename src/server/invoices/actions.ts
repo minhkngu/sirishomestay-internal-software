@@ -1,5 +1,7 @@
 'use server'
 
+import '@/server/registrations'
+
 import { revalidatePath } from 'next/cache'
 import { db } from '@/db/client'
 import type { DueRule, Proration } from '@/domain/types'

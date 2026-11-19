@@ -47,7 +47,7 @@ import { finalizeTermination } from '@/server/addenda/finalize'
 import { recordAudit, recordAuditBatch } from '@/server/audit'
 import { registerExportOwnerResolver } from '@/server/files/owners'
 import { getSettings } from '@/server/settings/service'
-import { registerPdfLoader } from '@/server/templates/service'
+import { exportDocument, registerPdfLoader } from '@/server/templates/service'
 import { resolveBankAccount } from '@/domain/vietqr'
 import { renderInvoiceFromTemplate, renderInvoicePdf, renderReceiptPdf } from '@/server/pdf'
 import { resolveInvoiceTemplate } from '@/server/invoice-templates/service'
@@ -887,12 +887,11 @@ export async function tenantBalance(db: DB, ctx: AccessContext, tenantId: string
 export async function exportReceipt(
   db: DB,
   ctx: AccessContext,
-  storage: Parameters<typeof import('@/server/templates/service').exportDocument>[2],
+  storage: Parameters<typeof exportDocument>[2],
   paymentId: string,
   templateId?: string,
   format?: 'docx' | 'pdf' | 'png',
 ) {
-  const { exportDocument } = await import('@/server/templates/service')
   return exportDocument(db, ctx, storage, { docType: 'receipt', entityId: paymentId, templateId, format })
 }
 const METHOD_LABEL = { cash: 'Tiền mặt', transfer: 'Chuyển khoản', other: 'Khác' } as const
