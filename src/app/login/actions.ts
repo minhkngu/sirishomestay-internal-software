@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { db } from '@/db/client'
+import { getServerEnv, publicEnv } from '@/lib/env'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import type { ActionResult } from '@/lib/action-result'
 import { listDemoAccounts } from '@/server/users/service'
@@ -21,12 +22,12 @@ export async function login(_prev: ActionResult | null, formData: FormData): Pro
 
 /** Đăng nhập nhanh bằng tài khoản mẫu — chỉ khi bật demo mode và đúng là tài khoản is_demo. */
 export async function demoLogin(email: string): Promise<ActionResult> {
-  if (process.env.NEXT_PUBLIC_DEMO_MODE !== '1' || !process.env.DEMO_PASSWORD)
-    return { ok: false, error: 'Không bật chế độ thử' }
+  const demoPassword = getServerEnv().demoPassword
+  if (!publicEnv.demoMode || !demoPassword) return { ok: false, error: 'Không bật chế độ thử' }
   const account = (await listDemoAccounts(db)).find((a) => a.email === email)
   if (!account) return { ok: false, error: 'Không có tài khoản mẫu này' }
   const supabase = await createSupabaseServerClient()
-  const { error } = await supabase.auth.signInWithPassword({ email, password: process.env.DEMO_PASSWORD })
+  const { error } = await supabase.auth.signInWithPassword({ email, password: demoPassword })
   if (error) return { ok: false, error: 'Đăng nhập thử thất bại' }
   redirect('/')
 }
