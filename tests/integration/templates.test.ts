@@ -131,14 +131,17 @@ describe('templates', () => {
       expect((await db.select().from(files)).length).toBe(before)
     })
 
-    it('mẫu Word cũ bị từ chối rõ ràng, cả khi chọn trực tiếp và khi là mẫu duy nhất', async () => {
+    it('mẫu Word cũ: chọn trực tiếp thì bị từ chối rõ ràng; khi chỉ còn mẫu cũ thì tự dùng mẫu mặc định', async () => {
       const legacy = await addLegacyTemplate(db, admin, 'lease')
-      await expect(exportDocument(db, admin, storage, { docType: 'lease', entityId: crypto.randomUUID() })).rejects.toThrow('Mẫu Word cũ không còn dùng được')
       await expect(exportDocument(db, admin, storage, { docType: 'lease', entityId: crypto.randomUUID(), templateId: legacy.id })).rejects.toThrow('Mẫu Word cũ không còn dùng được')
+      const r = await exportDocument(db, admin, storage, { docType: 'lease', entityId: crypto.randomUUID(), format: 'pdf' })
+      expect(r.fileId).toBeTruthy()
     })
 
-    it('chưa có mẫu → lỗi tiếng Việt', async () => {
-      await expect(exportDocument(db, admin, storage, { docType: 'lease', entityId: crypto.randomUUID() })).rejects.toThrow('Chưa có mẫu cho loại giấy tờ này')
+    it('chưa có mẫu nào → tự tạo mẫu mặc định và xuất được', async () => {
+      const r = await exportDocument(db, admin, storage, { docType: 'lease', entityId: crypto.randomUUID() })
+      expect(r.fileId).toBeTruthy()
+      expect((await listTemplates(db, admin, 'lease')).filter(isUsableTemplate)).toHaveLength(2)
     })
 
     it('cơ sở khác → NotFoundError; thiếu nhóm quyền → ForbiddenError', async () => {

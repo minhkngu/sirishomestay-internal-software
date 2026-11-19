@@ -36,15 +36,15 @@ describe('bản PDF tự lưu của hợp đồng và biên bản bàn giao', ()
     expect((await db.select().from(files).where(and(eq(files.ownerType, 'export'), eq(files.ownerId, leaseId)))).length).toBe(2)
   })
 
-  it('có biên bản bàn giao thì tạo thêm bản PDF cho biên bản; thiếu mẫu chỉ cảnh báo', async () => {
+  it('có biên bản bàn giao thì tạo thêm bản PDF cho biên bản; thiếu mẫu thì tự dùng mẫu mặc định', async () => {
     const { startHandover } = await import('@/server/handovers/service')
     const h = await startHandover(db, admin, leaseId, 'check_in')
     expect((await syncContractDocuments(db, admin, storage, leaseId)).warnings).toEqual([])
     expect(await autoFiles(h.id)).toHaveLength(1)
     const out = await startHandover(db, admin, leaseId, 'check_out')
     const r = await syncContractDocuments(db, admin, storage, leaseId)
-    expect(r.warnings.join(' ')).toContain('biên bản check-out')
-    expect(await autoFiles(out.id)).toHaveLength(0)
+    expect(r.warnings).toEqual([])
+    expect(await autoFiles(out.id)).toHaveLength(1)
     expect((await db.select().from(handovers)).length).toBe(2)
   })
 })

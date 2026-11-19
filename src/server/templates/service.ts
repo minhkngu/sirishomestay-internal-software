@@ -137,8 +137,8 @@ export function registerDocLoader(docType: DocType, loader: DocLoader) {
 
 type Produced = { bytes: Uint8Array; facilityId: string; baseName: string; warnings: string[]; format: ExportFormat }
 
-/** Chọn mẫu để xuất: theo `templateId`, không có thì mẫu mặc định có nội dung, không có nữa thì mẫu có nội dung đầu tiên. */
-async function pickTemplate(db: DB, docType: DocType, templateId?: string): Promise<DocTemplate> {
+/** Chọn mẫu để xuất: theo `templateId`, không có thì mẫu mặc định có nội dung, không có nữa thì mẫu có nội dung đầu tiên, vẫn không có thì tạo bộ mẫu mặc định. */
+async function pickTemplate(db: DB, ctx: AccessContext, docType: DocType, templateId?: string): Promise<DocTemplate> {
   const legacy = () => new ValidationError('Mẫu Word cũ không còn dùng được, hãy soạn lại mẫu trong Cài đặt')
   if (templateId) {
     const [t] = await db.select().from(docTemplates).where(eq(docTemplates.id, templateId))
@@ -151,7 +151,8 @@ async function pickTemplate(db: DB, docType: DocType, templateId?: string): Prom
   const usable = all.filter(isUsableTemplate)
   const pick = usable.find((t) => t.isDefault) ?? usable[0]
   if (pick) return pick
-  throw all.some((t) => t.fileId) ? legacy() : new ValidationError('Chưa có mẫu cho loại giấy tờ này')
+  // chưa có mẫu dùng được (kể cả chỉ còn mẫu Word cũ): tự tạo mẫu mặc định rồi dùng
+  return (await import('./defaults')).ensureDefaultTemplate(db, ctx, docType)
 }
 
 /** Dựng nội dung giấy tờ (chưa lưu): PDF cho hoá đơn/phiếu thu; hợp đồng, phụ lục, biên bản dựng từ mẫu soạn trong app ra Word hoặc PDF. */
@@ -175,7 +176,7 @@ async function produceDocument(
   if (!loader) throw new ValidationError('Chưa hỗ trợ xuất loại giấy tờ này')
   const loaded = await loader(db, ctx, input.entityId)
   assertCan(ctx, fileAccessPermission('export', { docType: input.docType }), loaded.facilityId)
-  const template = await pickTemplate(db, input.docType, input.templateId)
+  const template = await pickTemplate(db, ctx, input.docType, input.templateId)
   const { buildTemplateData } = await import('@/domain/template-fields')
   const { doc, warnings } = renderTemplate(template.body!, buildTemplateData(input.docType, loaded.entities))
   const bytes = format === 'docx'

@@ -10,6 +10,10 @@ export const DOC_TYPES = [
 ] as const
 export type DocType = (typeof DOC_TYPES)[number]
 
+/** Tám loại giấy tờ soạn từ mẫu trong app (hoá đơn, phiếu thu dựng PDF riêng). */
+export type TemplateDocType = Exclude<DocType, PdfDocType>
+export const TEMPLATE_DOC_TYPES: readonly TemplateDocType[] = DOC_TYPES.filter((t): t is TemplateDocType => !(PDF_DOC_TYPES as readonly string[]).includes(t))
+
 export const DOC_TYPE_LABELS: Record<DocType, string> = {
   deposit_contract: 'Hợp đồng đặt cọc',
   lease: 'Hợp đồng thuê',

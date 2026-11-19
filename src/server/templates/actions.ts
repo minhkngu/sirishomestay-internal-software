@@ -9,6 +9,7 @@ import { assertCan } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
 import { getAccessContext } from '@/server/session'
 import { getStorage } from '@/server/storage'
+import { restoreDefaultTemplates } from './defaults'
 import { attachTemplateFile, createTemplate, exportDocument, previewDocument, removeTemplate, setDefaultTemplate } from './service'
 
 export async function createTemplateAction(input: { docType: string; name: string }) {
@@ -26,6 +27,12 @@ export async function setDefaultTemplateAction(id: string) {
 export async function removeTemplateAction(id: string) {
   const ctx = await getAccessContext()
   return toActionResult(async () => { await removeTemplate(db, ctx, getStorage(), id); revalidatePath('/templates'); return {} })
+}
+
+/** Tạo lại các mẫu mặc định còn thiếu (không ghi đè mẫu đã sửa). */
+export async function restoreDefaultTemplatesAction() {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => { const created = await restoreDefaultTemplates(db, ctx); revalidatePath('/templates'); return { created } })
 }
 
 /** Xuất giấy tờ thật (file lưu lại, tải qua /api/files/<id>). */
