@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { moveAssetsAction } from '@/server/assets/actions'
-import type { TreeFacility } from './location-tree'
+import type { TreeFacility } from './location-types'
 
 /** Chọn nơi đến (cùng cơ sở với các món đang chọn) + lý do → chuyển. */
 export function MoveDialog({ facility, count, assetIds, onDone, onCancel }: { facility: TreeFacility; count: number; assetIds: string[]; onDone: () => void; onCancel: () => void }) {
@@ -24,7 +24,7 @@ export function MoveDialog({ facility, count, assetIds, onDone, onCancel }: { fa
   }
 
   return (
-    <div role="dialog" aria-label="Chuyển tài sản" className="fixed inset-x-0 bottom-0 z-50 space-y-3 rounded-t-xl border bg-background p-4 shadow-lg md:inset-auto md:bottom-6 md:right-6 md:w-96 md:rounded-xl">
+    <div role="dialog" aria-label="Chuyển tài sản" className="fixed inset-x-0 bottom-0 z-50 space-y-3 rounded-t-xl border border-border/80 bg-background p-4 md:inset-auto md:bottom-6 md:right-6 md:w-96 md:rounded-xl">
       <h2 className="font-medium">Chuyển {count} tài sản</h2>
       <select aria-label="Nơi đến" value={dest} onChange={(e) => setDest(e.target.value)} className="h-9 w-full rounded-lg border px-2 text-sm">
         <option value="">— chọn nơi đến —</option>

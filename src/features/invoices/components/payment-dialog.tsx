@@ -16,6 +16,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
+import { MoneyInput } from '@/components/ui/money-input'
 import { cn } from '@/lib/utils'
 import {
   addPaymentAction,
@@ -53,6 +54,7 @@ export function PaymentDialog({
 }) {
   const [pending, start] = useTransition()
   const [open, setOpen] = useState(false)
+  const [amount, setAmount] = useState(String(remaining))
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>, ok: string) =>
     start(async () => {
@@ -78,7 +80,7 @@ export function PaymentDialog({
         {approved && (
           <Button
             size="sm"
-            onClick={() => setOpen(!open)}
+            onClick={() => { setAmount(String(remaining)); setOpen(!open) }}
             className="gap-1.5 rounded-xl font-medium text-xs shadow-2xs"
           >
             <Plus className="size-3.5" />
@@ -210,13 +212,13 @@ export function PaymentDialog({
               <label htmlFor="pay-amount" className="block text-xs font-medium text-foreground">
                 Số tiền
               </label>
-              <input
+              <MoneyInput
                 id="pay-amount"
-                type="number"
                 name="amount"
-                step="1"
                 required
-                defaultValue={remaining}
+                allowNegative
+                value={amount}
+                onValueChange={setAmount}
                 className="h-9 w-full rounded-xl border border-border/80 bg-background px-3 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
               />
             </div>

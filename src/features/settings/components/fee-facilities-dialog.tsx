@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { MoneyInput } from '@/components/ui/money-input'
 import {
   buildFeeFacilityItems, FACILITY_SEARCH_MIN, filterFacilitiesByName, type FeeFacilityDraft,
 } from '@/features/settings/components/fee-options'
@@ -78,14 +79,13 @@ export function FeeFacilitiesDialog({ fee, facilities, selected, prices, onSelec
                           </label>
                         </td>
                         <td className="p-2">
-                          <Input
+                          <MoneyInput
                             aria-label={`Giá riêng ${fee.name} tại ${f.name}`}
-                            inputMode="numeric"
                             className="w-full min-w-48"
                             disabled={!row.on || saving}
                             placeholder={`Theo giá chung ${formatVND(fee.defaultPrice)}`}
                             value={row.price}
-                            onChange={(e) => setDraft({ ...draft, [f.id]: { ...row, price: e.target.value } })}
+                            onValueChange={(price) => setDraft({ ...draft, [f.id]: { ...row, price } })}
                           />
                         </td>
                       </tr>

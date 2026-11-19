@@ -1,33 +1,104 @@
 'use client'
 
-import { useMemo } from 'react'
-import { FacilityFilter } from '@/components/list/facility-filter'
-import { useFacilitySelection } from '@/components/list/use-list-params'
-import { AssetTable, type AssetRow } from './asset-table'
-import type { TreeFacility } from './location-tree'
+import { useMemo, useState } from 'react'
+import { formatVND } from '@/domain/money'
+import { cn } from '@/lib/utils'
+import { AssetForm } from './asset-form'
+import { AssetTable, assetState, type AssetRow } from './asset-table'
+import type { TreeFacility } from './location-types'
 import { StockTable, type StockRow } from './stock-table'
 
+const TABS = [
+  { id: 'assets', label: 'Tài sản' },
+  { id: 'stock', label: 'Vật tư' },
+] as const
+
+function SummaryCell({ label, value, suffix, tone, className }: { label: string; value: string; suffix?: string; tone?: 'attention'; className?: string }) {
+  return (
+    <div className={cn('px-4 py-3.5', className)}>
+      <p className="text-[13px] font-medium text-muted-foreground">{label}</p>
+      <p className={cn('mt-1 text-xl font-semibold tracking-tight tabular-nums sm:text-2xl', tone === 'attention' && 'text-rose-700')}>
+        {value}
+        {suffix && <span className="ml-1 align-baseline text-sm font-normal text-muted-foreground">{suffix}</span>}
+      </p>
+    </div>
+  )
+}
+
 export function AssetsView({
-  facilities,
   tree,
   assets,
   stock,
 }: {
-  facilities: { id: string; name: string }[]
   tree: TreeFacility[]
   assets: AssetRow[]
   stock: StockRow[]
 }) {
-  const allowed = useMemo(() => facilities.map((f) => f.id), [facilities])
-  const selected = useFacilitySelection(allowed)
-  const inScope = (facilityId: string) => selected.length === 0 || selected.includes(facilityId)
-  const shownAssets = useMemo(() => assets.filter((a) => inScope(a.facilityId)), [assets, selected]) // eslint-disable-line react-hooks/exhaustive-deps
-  const shownStock = useMemo(() => stock.filter((r) => inScope(r.facilityId)), [stock, selected]) // eslint-disable-line react-hooks/exhaustive-deps
+  const [facilityId, setFacility] = useState('')
+  const [location, setLocation] = useState('')
+
+  const shownAssets = useMemo(() => {
+    const match = (kind: string, id: string) => {
+      if (!location) return true
+      if (location === 'warehouse' || location === 'common' || location === 'unassigned') return kind === location
+      return kind === 'room' && id === location
+    }
+    return assets.filter((a) => (!facilityId || a.facilityId === facilityId) && match(a.locationKind, a.locationId))
+  }, [assets, facilityId, location])
+  const shownStock = useMemo(() => {
+    const match = (kind: string | null, id: string | null) => {
+      if (!location) return true
+      if (location === 'warehouse' || location === 'common' || location === 'unassigned') return kind === location || (location === 'unassigned' && kind === null)
+      return kind === 'room' && id === location
+    }
+    return stock.filter((r) => (!facilityId || r.facilityId === facilityId) && match(r.locationKind, r.locationId))
+  }, [stock, facilityId, location])
+
+  const totalValue = shownAssets.reduce((sum, a) => sum + a.value, 0)
+  const attention = shownAssets.filter((a) => ['Hỏng', 'Trầy xước', 'Hư'].includes(assetState(a))).length
+  const [tab, setTab] = useState<(typeof TABS)[number]['id']>('assets')
+
   return (
-    <>
-      <FacilityFilter facilities={facilities} />
-      <StockTable facilities={tree} rows={shownStock} />
-      <AssetTable facilities={tree} assets={shownAssets} />
-    </>
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">Tài sản</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Theo dõi tài sản và vật tư theo từng vị trí.</p>
+        </div>
+        {tab === 'assets' && <AssetForm facilities={tree} />}
+      </div>
+
+      <div className="grid grid-cols-2 overflow-hidden rounded-2xl border border-border/70 bg-card lg:grid-cols-4">
+        <SummaryCell label="Tài sản" value={String(shownAssets.length)} className="border-b border-border/60 lg:border-b-0 lg:border-r" />
+        <SummaryCell label="Tổng giá trị" value={formatVND(totalValue)} suffix="₫" className="border-b border-l border-border/60 lg:border-b-0 lg:border-l-0 lg:border-r" />
+        <SummaryCell label="Cần chú ý" value={String(attention)} suffix="món" tone={attention > 0 ? 'attention' : undefined} className="border-b border-border/60 lg:border-b-0 lg:border-r" />
+        <SummaryCell label="Vật tư" value={String(shownStock.length)} suffix="dòng" className="border-l border-border/60 lg:border-l-0" />
+      </div>
+
+      <div className="flex gap-6 border-b border-border/70" role="tablist" aria-label="Tài sản và vật tư">
+        {TABS.map((t) => {
+          const active = tab === t.id
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(t.id)}
+              className={cn(
+                '-mb-px flex items-baseline gap-2 border-b-2 px-0.5 pb-2.5 text-sm transition-colors',
+                active ? 'border-primary font-medium text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {t.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {tab === 'assets'
+        ? <AssetTable assets={shownAssets} facilities={tree} facilityId={facilityId} location={location} onFacilityChange={(value) => { setFacility(value); setLocation('') }} onLocationChange={setLocation} />
+        : <StockTable facilities={tree} rows={shownStock} facilityId={facilityId} location={location} onFacilityChange={(value) => { setFacility(value); setLocation('') }} onLocationChange={setLocation} />}
+    </div>
   )
 }

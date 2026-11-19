@@ -242,7 +242,8 @@ test('công ty ký và tạo đồng hồ cho phí riêng', async ({ page }) => 
   await createDrafts.click()
   await expect(page).toHaveURL(/view=draft/)
   // Danh sách phân trang 15 dòng; hoá đơn nháp từ các lần chạy trước nhiều nên mở rộng tối đa
-  await page.getByLabel('Số dòng').selectOption('100')
+  await page.getByLabel('Số dòng').click()
+  await page.getByRole('option', { name: '100' }).click()
   const invoiceRow = page.getByRole('row').filter({ hasText: companyName }).filter({ hasText: roomCode }).first()
   await invoiceRow.getByRole('link').click()
   await page.getByLabel('Số lượng Phí thử nhập kỳ').fill('3')

@@ -4,6 +4,7 @@ import { goToContract } from './go-to-contract'
 import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { MoneyInput } from '@/components/ui/money-input'
 import { Label } from '@/components/ui/label'
 import { createDepositContractAction } from '@/server/contracts/actions'
 
@@ -43,8 +44,8 @@ export function DepositForm({ rooms, tenants, initialRoomId, initialTenantId }: 
         <select id="room" value={roomId} onChange={(e) => pickRoom(e.target.value)} className="h-8 w-full rounded-lg border px-2 text-sm"><option value="">— chọn phòng —</option>{rooms.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}</select></div>
       <div className="space-y-1"><Label htmlFor="tenant">Bên thuê</Label>
         <select id="tenant" value={tenantId} onChange={(e) => setTenantId(e.target.value)} className="h-8 w-full rounded-lg border px-2 text-sm"><option value="">— chọn khách —</option>{tenants.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-      <div className="space-y-1"><Label htmlFor="deposit">Tiền cọc giữ chỗ (VND)</Label><Input id="deposit" inputMode="numeric" value={deposit} onChange={(e) => setDeposit(e.target.value)} /></div>
-      <div className="space-y-1"><Label htmlFor="rent">Giá thuê thoả thuận (VND/tháng)</Label><Input id="rent" inputMode="numeric" value={rent} onChange={(e) => setRent(e.target.value)} /></div>
+      <div className="space-y-1"><Label htmlFor="deposit">Tiền cọc giữ chỗ (VND)</Label><MoneyInput id="deposit" value={deposit} onValueChange={setDeposit} /></div>
+      <div className="space-y-1"><Label htmlFor="rent">Giá thuê thoả thuận (VND/tháng)</Label><MoneyInput id="rent" value={rent} onValueChange={setRent} /></div>
       <div className="space-y-1"><Label htmlFor="movein">Ngày vào ở dự kiến</Label><Input id="movein" type="date" value={moveIn} onChange={(e) => setMoveIn(e.target.value)} /></div>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={collected} onChange={(e) => setCollected(e.target.checked)} /> Đã thu tiền cọc</label>
       {warnings.map((w) => <p key={w} className="rounded bg-amber-100 p-2 text-sm text-amber-900">Cảnh báo: {w}</p>)}
