@@ -197,6 +197,13 @@
       "when": 1795076530883,
       "tag": "0027_purple_sprite",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1795098715977,
+      "tag": "0028_sparkling_jean_grey",
+      "breakpoints": true
     }
   ]
 }

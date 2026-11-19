@@ -4,71 +4,18 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { PdfBlobDialog } from '@/components/pdf-blob-dialog'
-import { FormDialog } from '@/components/form-dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { sampleTemplateHtml, type TemplateStyle } from '@/domain/doc-template'
+import { type TemplateStyle } from '@/domain/doc-template'
 import { DOC_TYPE_LABELS, TEMPLATE_DOC_TYPES, type DocType } from '@/domain/template-fields'
 import { createTemplateAction, previewTemplateAction, removeTemplateAction, restoreDefaultTemplatesAction, setDefaultTemplateAction, updateTemplateAction } from '@/server/templates/actions'
-import { TemplateEditor } from './template-editor'
+import { STYLE_LABEL, TemplateDialog, type TemplateOps } from './template-dialog'
 
 type Tpl = { id: string; docType: string; name: string; hasFile: boolean; hasBody: boolean; isDefault: boolean; style: TemplateStyle; body: string | null }
 
-const STYLE_LABEL: Record<TemplateStyle, string> = { formal: 'Trang trọng', modern: 'Hiện đại' }
-
-function TemplateDialog({ docType, template, onClose, onSaved }: { docType: DocType; template: Tpl | null; onClose: () => void; onSaved: () => void }) {
-  const [name, setName] = useState(template?.name ?? '')
-  const [style, setStyle] = useState<TemplateStyle>(template?.style ?? 'formal')
-  const [initial] = useState(() => template?.body ?? sampleTemplateHtml(docType))
-  const [html, setHtml] = useState(initial)
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState<'pdf' | 'save' | null>(null)
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
-
-  async function preview() {
-    setError(null); setBusy('pdf')
-    const r = await previewTemplateAction({ docType, body: html, style, format: 'pdf' })
-    setBusy(null)
-    if (!r.ok) { setError(r.error ?? 'Không dựng được bản xem trước'); return }
-    setPdfUrl(r.data.base64)
-    if (r.data.warnings.length) setError(`Chỗ điền không có dữ liệu mẫu: ${r.data.warnings.join(', ')}`)
-  }
-  async function save() {
-    setError(null); setBusy('save')
-    const r = template ? await updateTemplateAction(template.id, { name, body: html, style }) : await createTemplateAction({ docType, name, body: html, style })
-    setBusy(null)
-    if (!r.ok) { setError(r.error ?? 'Không lưu được mẫu'); return }
-    onSaved()
-  }
-
-  return (
-    <>
-    {pdfUrl && <PdfBlobDialog base64={pdfUrl} title="Xem trước mẫu" onClose={() => setPdfUrl(null)} />}
-    <FormDialog open onOpenChange={(o) => { if (!o) onClose() }} size="xl" title={template ? `Sửa mẫu: ${DOC_TYPE_LABELS[docType]}` : `Soạn mẫu mới: ${DOC_TYPE_LABELS[docType]}`} description="Gõ nội dung, bấm hoặc kéo chỗ điền vào đúng vị trí; xem trước PDF trước khi lưu.">
-      <div className="space-y-3 pb-1">
-        {template && !template.hasBody && <p className="rounded-md bg-amber-50 p-2 text-sm text-amber-900">Mẫu Word cũ không dùng được nữa. Đây là mẫu khởi đầu, hãy soạn lại rồi lưu.</p>}
-        <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-          <div className="space-y-1"><Label htmlFor="tpl-name">Tên mẫu</Label><Input id="tpl-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="vd. Bản song ngữ" /></div>
-          <fieldset className="space-y-1">
-            <legend className="text-sm font-medium">Kiểu trình bày</legend>
-            <div className="flex gap-1">
-              {(['formal', 'modern'] as const).map((s) => <Button key={s} type="button" variant={style === s ? 'default' : 'outline'} aria-pressed={style === s} onClick={() => setStyle(s)}>{STYLE_LABEL[s]}</Button>)}
-            </div>
-          </fieldset>
-        </div>
-        <TemplateEditor docType={docType} initialHtml={initial} onChange={setHtml} />
-        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button type="button" variant="outline" disabled={!!busy} onClick={() => preview()}>{busy === 'pdf' ? 'Đang dựng PDF…' : 'Xem trước PDF'}</Button>
-          <Button type="button" variant="ghost" onClick={onClose}>Huỷ</Button>
-          <Button type="button" disabled={!!busy} onClick={save}>{busy === 'save' ? 'Đang lưu…' : 'Lưu'}</Button>
-        </div>
-      </div>
-    </FormDialog>
-    </>
-  )
-}
+const contractOps = (docType: DocType): TemplateOps => ({
+  preview: (body, style) => previewTemplateAction({ docType, body, style, format: 'pdf' }),
+  save: (id, input) => id ? updateTemplateAction(id, input) : createTemplateAction({ docType, ...input }),
+})
 
 export function TemplatesManager({ templates }: { templates: Tpl[] }) {
   const router = useRouter()
@@ -126,7 +73,7 @@ export function TemplatesManager({ templates }: { templates: Tpl[] }) {
       })}
       {pdf && <PdfBlobDialog base64={pdf.base64} title={pdf.title} onClose={() => setPdf(null)} />}
       <ConfirmDialog open={deleting !== null} onOpenChange={(o) => { if (!o) setDeleting(null) }} title="Xoá mẫu này?" description={deleting?.name} confirmLabel="Xoá" destructive onConfirm={() => { if (deleting) act(() => removeTemplateAction(deleting.id)) }} />
-      {editing && <TemplateDialog key={editing.template?.id ?? `new-${editing.docType}`} docType={editing.docType} template={editing.template} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); router.refresh() }} />}
+      {editing && <TemplateDialog key={editing.template?.id ?? `new-${editing.docType}`} docType={editing.docType} label={DOC_TYPE_LABELS[editing.docType]} ops={contractOps(editing.docType)} template={editing.template} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); router.refresh() }} />}
     </div>
   )
 }

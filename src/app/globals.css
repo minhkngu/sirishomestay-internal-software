@@ -180,3 +180,5 @@
 .template-editor .summary-item::before { content: attr(data-label); display: block; font-size: 0.7rem; color: var(--muted-foreground); }
 .template-editor hr.page-break { border: 0; border-top: 2px dashed var(--border); margin: 1rem 0; position: relative; }
 .template-editor hr.page-break::after { content: 'Ngắt trang'; position: absolute; top: -0.65rem; left: 50%; transform: translateX(-50%); background: var(--card); padding: 0 0.5rem; font-size: 0.7rem; color: var(--muted-foreground); }
+.template-editor .qr-block { width: 6rem; height: 6rem; display: flex; align-items: center; justify-content: center; text-align: center; border: 1px dashed var(--border); border-radius: 0.5rem; font-size: 0.7rem; color: var(--muted-foreground); margin: 0.5rem 0; }
+.template-editor .qr-block.ProseMirror-selectednode { outline: 2px solid var(--primary); }

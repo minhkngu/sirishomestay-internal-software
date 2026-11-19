@@ -2,11 +2,10 @@
 
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
-import { InvoiceTemplateManager } from './invoice-template-manager'
+import { InvoiceTemplatesManager } from './invoice-templates-manager'
 import { TemplatesManager } from './templates-manager'
-import type { InvoiceTemplateConfig } from '@/domain/invoice-template'
 
-type InvoiceTemplate = { id: string; name: string; isDefault: boolean; isSystem: boolean; config: InvoiceTemplateConfig }
+type InvoiceTemplate = { id: string; name: string; isDefault: boolean; isSystem: boolean; hasBody: boolean; style: 'formal' | 'modern'; body: string | null }
 type WordTemplate = { id: string; docType: string; name: string; hasFile: boolean; hasBody: boolean; isDefault: boolean; style: 'formal' | 'modern'; body: string | null }
 
 const TABS = [
@@ -46,7 +45,7 @@ export function TemplatesView({ invoiceTemplates, wordTemplates }: { invoiceTemp
         })}
       </div>
 
-      {tab === 'invoice' ? <InvoiceTemplateManager templates={invoiceTemplates} /> : <TemplatesManager templates={wordTemplates} />}
+      {tab === 'invoice' ? <InvoiceTemplatesManager templates={invoiceTemplates} /> : <TemplatesManager templates={wordTemplates} />}
     </div>
   )
 }

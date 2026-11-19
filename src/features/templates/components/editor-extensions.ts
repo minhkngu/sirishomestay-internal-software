@@ -27,6 +27,16 @@ export const PageBreak = Node.create({
   renderHTML() { return ['hr', { 'data-page-break': '', class: 'page-break' }] },
 })
 
+/** Mã QR thanh toán của hoá đơn: `<div data-role="qr">`; khi xuất PDF được thay bằng mã QR thật. */
+export const QrBlock = Node.create({
+  name: 'qrBlock',
+  group: 'block',
+  atom: true,
+  selectable: true,
+  parseHTML() { return [{ tag: 'div[data-role="qr"]', priority: 200 }] },
+  renderHTML() { return ['div', { 'data-role': 'qr', class: 'qr-block' }, 'Mã QR thanh toán'] },
+})
+
 /** Khối tóm tắt của kiểu Hiện đại: `<div data-role="summary"><div data-label="Phòng">…</div>…</div>`. */
 export const SummaryItem = Node.create({
   name: 'summaryItem',
@@ -61,6 +71,6 @@ export function editorExtensions() {
     StarterKit.configure({ heading: { levels: [1, 2, 3] }, horizontalRule: false, code: false, codeBlock: false, blockquote: false, strike: false, link: false }),
     TextAlign.configure({ types: ['heading', 'paragraph'] }),
     Table, LoopRow, TableHeader, TableCell,
-    FieldChip, PageBreak, Summary, SummaryItem,
+    FieldChip, PageBreak, QrBlock, Summary, SummaryItem,
   ]
 }

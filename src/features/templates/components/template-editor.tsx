@@ -39,7 +39,7 @@ function Tool({ label, active, disabled, onClick, children }: { label: string; a
   )
 }
 
-function Toolbar({ editor, groups }: { editor: Editor; groups: FieldGroups }) {
+function Toolbar({ editor, groups, qr }: { editor: Editor; groups: FieldGroups; qr: boolean }) {
   const run = () => editor.chain().focus()
   const inTable = editor.isActive('table')
   const rowLoop = inTable ? (editor.getAttributes('tableRow').loop as string | null) ?? '' : ''
@@ -62,6 +62,7 @@ function Toolbar({ editor, groups }: { editor: Editor; groups: FieldGroups }) {
       <Tool label="Xoá hàng" disabled={!inTable} onClick={() => run().deleteRow().run()}>− Hàng</Tool>
       <Tool label="Thêm cột" disabled={!inTable} onClick={() => run().addColumnAfter().run()}>+ Cột</Tool>
       <Tool label="Xoá bảng" disabled={!inTable} onClick={() => run().deleteTable().run()}>Xoá bảng</Tool>
+      {qr && <Tool label="Chèn mã QR thanh toán" onClick={() => run().insertContent({ type: 'qrBlock' }).run()}>Mã QR</Tool>}
       <Tool label="Ngắt trang" onClick={() => run().insertContent({ type: 'pageBreak' }).run()}>Ngắt trang</Tool>
       {groups.loops.length > 0 && (
         <label className="ml-1 flex items-center gap-1 text-xs text-muted-foreground">
@@ -134,7 +135,7 @@ export function TemplateEditor({ docType, initialHtml, onChange }: { docType: Do
   return (
     <div className="grid gap-3 lg:grid-cols-[1fr_16rem]">
       <div className="min-w-0 overflow-hidden rounded-md border bg-card">
-        {editor && <Toolbar editor={editor} groups={groups} />}
+        {editor && <Toolbar editor={editor} groups={groups} qr={docType.startsWith('invoice')} />}
         <EditorContent editor={editor} />
         {notice && <p role="status" className="border-t bg-amber-50 px-3 py-1.5 text-sm text-amber-900">{notice}</p>}
       </div>

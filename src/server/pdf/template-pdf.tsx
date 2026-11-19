@@ -1,4 +1,4 @@
-import { Document, Page, StyleSheet, Text, View, renderToBuffer } from '@react-pdf/renderer'
+import { Document, Image, Page, StyleSheet, Text, View, renderToBuffer } from '@react-pdf/renderer'
 import type { Align, DocBlock, Inline, TemplateStyle } from '@/domain/doc-template'
 import './fonts'
 
@@ -51,8 +51,9 @@ function Summary({ block, style }: { block: Extract<DocBlock, { type: 'summary' 
   </View>
 }
 
-function Block({ block, style }: { block: DocBlock; style: TemplateStyle }) {
+function Block({ block, style, qr }: { block: DocBlock; style: TemplateStyle; qr?: string | null }) {
   const modern = style === 'modern'
+  if (block.type === 'qr') return qr ? <View wrap={false} style={{ marginVertical: 6 }}><Image src={qr} style={{ width: 96, height: 96 }} /></View> : <View />
   if (block.type === 'heading') {
     const size = block.level === 1 ? (modern ? 20 : 15) : block.level === 2 ? 12.5 : 11
     const align = block.align ?? (modern ? 'left' : block.level === 1 ? 'center' : 'left')
@@ -69,9 +70,9 @@ function Block({ block, style }: { block: DocBlock; style: TemplateStyle }) {
 }
 
 /** Dựng PDF từ cây tài liệu: A4, lề 2 cm, chữ 10,5 pt, phông Be Vietnam Pro; bảng không cắt giữa một hàng. */
-export async function renderTemplatePdf(doc: DocBlock[], style: TemplateStyle): Promise<Uint8Array> {
+export async function renderTemplatePdf(doc: DocBlock[], style: TemplateStyle, options: { qr?: string | null } = {}): Promise<Uint8Array> {
   return new Uint8Array(await renderToBuffer(<Document><Page size="A4" style={s.page}>
-    {doc.map((block, i) => <Block key={i} block={block} style={style} />)}
+    {doc.map((block, i) => <Block key={i} block={block} style={style} qr={options.qr} />)}
     <View style={s.footer} fixed><Text render={({ pageNumber, totalPages }) => `Trang ${pageNumber} / ${totalPages}`} /></View>
   </Page></Document>))
 }

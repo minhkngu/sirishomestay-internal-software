@@ -15,7 +15,7 @@ import { registerExportOwnerResolver } from '@/server/files/owners'
 import { getSettings } from '@/server/settings/service'
 import { registerPdfLoader } from '@/server/templates/service'
 import { resolveBankAccount } from '@/domain/vietqr'
-import { renderInvoicePdf, renderReceiptPdf } from '@/server/pdf'
+import { renderInvoiceFromTemplate, renderInvoicePdf, renderReceiptPdf } from '@/server/pdf'
 import { resolveInvoiceTemplate } from '@/server/invoice-templates/service'
 
 const batchSchema = z.object({ facilityId: z.uuid(), period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) })
@@ -342,7 +342,7 @@ for (const [docType, kind] of [['invoice_monthly', 'monthly'], ['invoice_termina
     const [row] = await db.select({ tenant: tenants, facility: facilities }).from(leases).innerJoin(tenants, eq(tenants.id, leases.tenantId)).innerJoin(facilities, eq(facilities.id, d.invoice.facilityId)).where(eq(leases.id, d.invoice.leaseId))
     const settings = await getSettings(db)
     const template = await resolveInvoiceTemplate(db, id)
-    return { facilityId: d.invoice.facilityId, baseName: d.invoice.code, render: () => renderInvoicePdf({ kind, code: d.invoice.code, issueDate: d.invoice.issueDate, periodStart: d.invoice.periodStart, periodEnd: d.invoice.periodEnd, dueDate: d.invoice.dueDate, facility: { name: row.facility.name, address: row.facility.address }, room: d.roomCode, tenant: { name: row.tenant.fullName || row.tenant.companyName || '', phone: row.tenant.phone }, lines: d.lines.map(pdfLine), total: d.total, paid: d.paid, bank: resolveBankAccount(row.facility.bankAccount, settings.bankAccount) }, template.config) }
+    return { facilityId: d.invoice.facilityId, baseName: d.invoice.code, render: () => { const data = { kind, code: d.invoice.code, issueDate: d.invoice.issueDate, periodStart: d.invoice.periodStart, periodEnd: d.invoice.periodEnd, dueDate: d.invoice.dueDate, facility: { name: row.facility.name, address: row.facility.address }, room: d.roomCode, tenant: { name: row.tenant.fullName || row.tenant.companyName || '', phone: row.tenant.phone, kind: row.tenant.kind, idDocument: row.tenant.kind === 'foreign' ? row.tenant.passportNumber : row.tenant.idNumber, taxCode: row.tenant.taxCode, email: row.tenant.email }, lines: d.lines.map(pdfLine), total: d.total, paid: d.paid, bank: resolveBankAccount(row.facility.bankAccount, settings.bankAccount)  }; return template.html ? renderInvoiceFromTemplate(data, template.html) : renderInvoicePdf(data, template.config) } }
   })
 }
 // Bản xuất hoá đơn / phiếu thu: tìm cơ sở theo hoá đơn hoặc khoản thu gốc

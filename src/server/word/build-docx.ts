@@ -71,6 +71,7 @@ export async function buildDocx(doc: DocBlock[], style: TemplateStyle): Promise<
     else if (b.type === 'list') for (const item of b.items) children.push(new Paragraph({ children: runs(item), numbering: { reference: b.ordered ? 'ordered' : 'bullet', level: 0 }, spacing: { line: LINE, after: 40 } }))
     else if (b.type === 'table') { children.push(table(b, style), para([], { after: 80 })) }
     else if (b.type === 'summary') { children.push(summary(b, style), para([], { after: 80 })) }
+    else if (b.type === 'qr') continue
     else children.push(new Paragraph({ children: [new PageBreak()] }))
   }
   const document = new Document({

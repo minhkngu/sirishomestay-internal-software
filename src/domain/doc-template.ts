@@ -11,6 +11,8 @@ export type DocBlock =
   | { type: 'table'; rows: { cells: { inlines: Inline[]; header?: boolean }[] }[] }
   | { type: 'summary'; cells: { label: string; value: Inline[] }[] }
   | { type: 'pageBreak' }
+  /** Mã QR thanh toán của hoá đơn; chỉ hiện khi hoá đơn còn tiền phải trả và có tài khoản nhận. */
+  | { type: 'qr' }
 
 type Fmt = { bold?: boolean; italic?: boolean; underline?: boolean }
 type Ctx = { data: Record<string, unknown>; warnings: string[] }
@@ -116,6 +118,7 @@ function blocksOf(nodes: Node[], scope: Scope, ctx: Ctx): DocBlock[] {
     else if (tag === 'ul' || tag === 'ol') out.push({ type: 'list', ordered: tag === 'ol', items: node.querySelectorAll('li').map(li => inlinesOf(li.childNodes, scope, ctx)) })
     else if (tag === 'table') out.push(tableBlock(node, scope, ctx))
     else if (tag === 'hr') { if (node.hasAttribute('data-page-break')) out.push({ type: 'pageBreak' }) }
+    else if (node.getAttribute('data-role') === 'qr') out.push({ type: 'qr' })
     else if (node.getAttribute('data-role') === 'summary') {
       out.push({ type: 'summary', cells: node.childNodes.filter((n): n is HTMLElement => n instanceof HTMLElement).map(c => ({ label: c.getAttribute('data-label') ?? '', value: inlinesOf(c.childNodes, scope, ctx) })) })
     } else out.push(...blocksOf(node.childNodes, scope, ctx))

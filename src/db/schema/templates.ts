@@ -18,6 +18,10 @@ export const docTemplates = pgTable('doc_templates', {
 
 export const invoiceTemplates = pgTable('invoice_templates', {
   id: uuid('id').primaryKey().defaultRandom(), name: text('name').notNull(), config: jsonb('config').notNull(),
+  /** Nội dung mẫu soạn trong app (HTML); mẫu chỉ có `config` là mẫu cũ dựng theo khối. */
+  body: text('body'),
+  /** Kiểu trình bày khi xuất: 'formal' hoặc 'modern'. */
+  style: text('style').notNull().default('formal'),
   isDefault: boolean('is_default').notNull().default(false), isSystem: boolean('is_system').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [uniqueIndex('invoice_templates_one_default').on(t.isDefault).where(sql`${t.isDefault}`)]).enableRLS()
