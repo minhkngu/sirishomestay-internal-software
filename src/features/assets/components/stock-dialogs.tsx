@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { createStockAction, stockMoveAction } from '@/server/stock/actions'
 import type { Location } from '@/server/assets/service'
-import type { TreeFacility } from './location-tree'
+import type { TreeFacility } from './location-types'
 import type { StockRow } from './stock-table'
 
 const toLocation = (value: string): Location => {

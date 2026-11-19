@@ -2,18 +2,18 @@
 
 import { useMemo, useState } from 'react'
 import { PackagePlus, Search } from 'lucide-react'
-import { FacilityFilter } from '@/components/list/facility-filter'
 import { Pager } from '@/components/list/pager'
 import { usePager } from '@/components/list/use-list-params'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { removeDiacritics } from '@/domain/text'
-import type { TreeFacility } from './location-tree'
+import { LocationFilter } from './location-filter'
+import type { Selected, TreeFacility } from './location-types'
 import { AddStockItemDialog, StockMoveDialog } from './stock-dialogs'
 
 export type StockRow = { itemId: string; name: string; unit: string; category: string; facilityId: string; locationKind: string | null; locationId: string | null; quantity: number | null }
 
-export function StockTable({ facilities, rows }: { facilities: TreeFacility[]; rows: StockRow[] }) {
+export function StockTable({ facilities, rows, location, onLocationChange }: { facilities: TreeFacility[]; rows: StockRow[]; location: Selected; onLocationChange: (value: Selected) => void }) {
   const [q, setQ] = useState('')
   const [addOpen, setAddOpen] = useState(false)
   const [moveOpen, setMoveOpen] = useState(false)
@@ -35,7 +35,8 @@ export function StockTable({ facilities, rows }: { facilities: TreeFacility[]; r
     const haystack = `${r.name} ${r.category} ${r.unit} ${loc.top} ${loc.sub}`
     return removeDiacritics(haystack).toLowerCase().includes(removeDiacritics(q).toLowerCase().trim())
   })
-  const { pageRows, pager } = usePager(shown, 'stock', q)
+  const locationKey = location.kind === 'all' ? 'all' : `${location.kind}:${location.id}`
+  const { pageRows, pager } = usePager(shown, 'stock', `${locationKey}|${q}`)
 
   return (
     <div className="space-y-3">
@@ -44,7 +45,7 @@ export function StockTable({ facilities, rows }: { facilities: TreeFacility[]; r
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70" />
           <Input aria-label="Tìm vật tư" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm vật tư, vị trí…" className="h-9 pl-9" />
         </div>
-        <FacilityFilter facilities={facilities.map((f) => ({ id: f.id, name: f.name }))} />
+        <LocationFilter facilities={facilities} value={location} onChange={onLocationChange} />
         <span className="ml-auto hidden text-xs tabular-nums text-muted-foreground sm:inline">{shown.length} dòng</span>
         <div className="flex gap-2 sm:ml-auto">
           <Button variant="outline" size="sm" className="h-9" onClick={() => setAddOpen(true)}>Thêm vật tư</Button>

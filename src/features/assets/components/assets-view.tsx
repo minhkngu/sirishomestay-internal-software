@@ -1,12 +1,11 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useFacilitySelection } from '@/components/list/use-list-params'
 import { formatVND } from '@/domain/money'
 import { cn } from '@/lib/utils'
 import { AssetForm } from './asset-form'
 import { AssetTable, assetState, type AssetRow } from './asset-table'
-import type { TreeFacility } from './location-tree'
+import type { Selected, TreeFacility } from './location-types'
 import { StockTable, type StockRow } from './stock-table'
 
 const TABS = [
@@ -27,21 +26,26 @@ function SummaryCell({ label, value, suffix, tone, className }: { label: string;
 }
 
 export function AssetsView({
-  facilities,
   tree,
   assets,
   stock,
 }: {
-  facilities: { id: string; name: string }[]
   tree: TreeFacility[]
   assets: AssetRow[]
   stock: StockRow[]
 }) {
-  const allowed = useMemo(() => facilities.map((f) => f.id), [facilities])
-  const selected = useFacilitySelection(allowed)
-  const inScope = (facilityId: string) => selected.length === 0 || selected.includes(facilityId)
-  const shownAssets = useMemo(() => assets.filter((a) => inScope(a.facilityId)), [assets, selected]) // eslint-disable-line react-hooks/exhaustive-deps
-  const shownStock = useMemo(() => stock.filter((r) => inScope(r.facilityId)), [stock, selected]) // eslint-disable-line react-hooks/exhaustive-deps
+  const [location, setLocation] = useState<Selected>({ kind: 'all' })
+
+  const shownAssets = useMemo(() => assets.filter((a) => {
+    if (location.kind === 'all') return true
+    if (location.kind === 'facility') return a.facilityId === location.id
+    return a.locationKind === location.kind && a.locationId === location.id
+  }), [assets, location])
+  const shownStock = useMemo(() => stock.filter((r) => {
+    if (location.kind === 'all') return true
+    if (location.kind === 'facility') return r.facilityId === location.id
+    return r.locationKind === location.kind && r.locationId === location.id
+  }), [stock, location])
 
   const totalValue = shownAssets.reduce((sum, a) => sum + a.value, 0)
   const attention = shownAssets.filter((a) => ['Hỏng', 'Trầy xước', 'Hư'].includes(assetState(a))).length
@@ -54,7 +58,7 @@ export function AssetsView({
           <h1 className="text-xl font-semibold tracking-tight text-foreground">Tài sản</h1>
           <p className="mt-1 text-sm text-muted-foreground">Theo dõi tài sản và vật tư theo từng vị trí.</p>
         </div>
-        {tab === "assets" && <AssetForm facilities={tree} />}
+        {tab === 'assets' && <AssetForm facilities={tree} />}
       </div>
 
       <div className="grid grid-cols-2 overflow-hidden rounded-2xl border border-border/70 bg-card lg:grid-cols-4">
@@ -85,7 +89,9 @@ export function AssetsView({
         })}
       </div>
 
-      {tab === 'assets' ? <AssetTable assets={shownAssets} facilities={tree} /> : <StockTable facilities={tree} rows={shownStock} />}
+      {tab === 'assets'
+        ? <AssetTable assets={shownAssets} facilities={tree} location={location} onLocationChange={setLocation} />
+        : <StockTable facilities={tree} rows={shownStock} location={location} onLocationChange={setLocation} />}
     </div>
   )
 }

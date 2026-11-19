@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { MoneyInput } from '@/components/ui/money-input'
 import { createAssetAction } from '@/server/assets/actions'
-import type { TreeFacility } from './location-tree'
+import type { TreeFacility } from './location-types'
 
 const CONDITIONS = ['Tốt', 'Trầy xước', 'Hư']
 

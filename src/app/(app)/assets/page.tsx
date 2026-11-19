@@ -20,7 +20,6 @@ async function Assets() {
   const [list, stock] = await Promise.all([listAssets(db, ctx, {}), listStock(db, ctx, {})])
   return (
     <AssetsView
-      facilities={tree.map((f) => ({ id: f.id, name: f.name }))}
       tree={tree}
       assets={list.map((a) => ({ id: a.id, code: a.code, name: a.name, category: a.category, value: a.value, condition: a.condition, status: a.status, locationKind: a.locationKind, locationId: a.locationId, facilityId: a.facilityId }))}
       stock={stock}
