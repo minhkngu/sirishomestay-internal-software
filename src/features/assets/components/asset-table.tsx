@@ -12,9 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils'
 import { formatVND } from '@/domain/money'
 import { removeDiacritics } from '@/domain/text'
-import { LocationFilter } from './location-filter'
+import { LocationFilters } from './location-filters'
 import { MoveDialog } from './move-dialog'
-import type { Selected, TreeFacility } from './location-types'
+import type { TreeFacility } from './location-types'
 
 export type AssetRow = { id: string; code: string; name: string; category: string; value: number; condition: string; status: string; locationKind: string; locationId: string; facilityId: string }
 
@@ -38,18 +38,20 @@ function stateTone(state: string): string {
 
 const STATE_OPTIONS = ['Tốt', 'Trầy xước', 'Hỏng', 'Đã thanh lý']
 
-const locationKey = (s: Selected) => (s.kind === 'all' ? 'all' : `${s.kind}:${s.id}`)
-
 export function AssetTable({
   assets,
   facilities,
-  location,
-  onLocationChange,
+  facilityId,
+  roomId,
+  onFacilityChange,
+  onRoomChange,
 }: {
   assets: AssetRow[]
   facilities: TreeFacility[]
-  location: Selected
-  onLocationChange: (value: Selected) => void
+  facilityId: string
+  roomId: string
+  onFacilityChange: (value: string) => void
+  onRoomChange: (value: string) => void
 }) {
   const router = useRouter()
   const [q, setQ] = useState('')
@@ -76,7 +78,7 @@ export function AssetTable({
     }
     return true
   })
-  const { pageRows, pager } = usePager(shown, 'assets', `${locationKey(location)}|${state}|${q}`)
+  const { pageRows, pager } = usePager(shown, 'assets', `${facilityId}|${roomId}|${state}|${q}`)
   const chosen = assets.filter((a) => checked.includes(a.id))
   const oneFacility = new Set(chosen.map((a) => a.facilityId)).size === 1
   const toggle = (id: string) => setChecked(checked.includes(id) ? checked.filter((x) => x !== id) : [...checked, id])
@@ -97,7 +99,7 @@ export function AssetTable({
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70" />
           <Input aria-label="Tìm tài sản" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm mã, tên, loại…" className="h-9 pl-9" />
         </div>
-        <LocationFilter facilities={facilities} value={location} onChange={onLocationChange} />
+        <LocationFilters facilities={facilities} facilityId={facilityId} roomId={roomId} onFacilityChange={onFacilityChange} onRoomChange={onRoomChange} />
         <Select value={state || 'all'} onValueChange={(value) => setState(value && value !== 'all' ? value : '')} items={[{ value: 'all', label: 'Tình trạng' }, ...STATE_OPTIONS.map((s) => ({ value: s, label: s }))]}>
           <SelectTrigger aria-label="Lọc tình trạng" className="h-9 gap-2 border-border/80 bg-card px-2.5 text-[13px]">
             <SelectValue />
