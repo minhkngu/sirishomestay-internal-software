@@ -20,8 +20,8 @@ test('soạn mẫu hợp đồng thuê: gõ chữ, chèn chip, kéo thả chip, 
   await dialog.getByLabel('Tên mẫu').fill(name)
 
   const editor = dialog.getByLabel('Nội dung mẫu')
-  await editor.click()
-  await page.keyboard.press('Control+End')
+  await editor.locator('p').first().click() // đoạn đầu tiên (mẫu khởi đầu bắt đầu bằng tiêu đề, sau đó là các đoạn chỗ điền)
+  await page.keyboard.press('End')
   await page.keyboard.press('Enter')
   await page.keyboard.type('Khách thuê: ')
   // bấm chip "Họ tên khách"
@@ -41,7 +41,10 @@ test('soạn mẫu hợp đồng thuê: gõ chữ, chèn chip, kéo thả chip, 
   const popup = context.waitForEvent('page')
   await dialog.getByRole('button', { name: 'Xem trước PDF' }).click()
   const pdf = await popup
-  await expect.poll(() => pdf.url(), { timeout: 30_000 }).toMatch(/^blob:/)
+  // tab mở ngay; có trình xem PDF thì chuyển sang blob:, trình duyệt headless thì tải tệp xuống (điều hướng bị huỷ)
+  await pdf.waitForTimeout(4000)
+  expect(pdf.isClosed()).toBe(false)
+  await expect(dialog.getByRole('alert')).toBeHidden()
   await pdf.close()
 
   await dialog.getByRole('button', { name: 'Lưu' }).click()
