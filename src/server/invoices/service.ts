@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, like, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { addenda, facilities, feeTypes, feeUnits, invoiceLines, invoices, invoiceFeeQuantities, leaseFeeMeters, leaseFees, leaseFeeSnapshots, leaseOccupants, leases, meterReadings, meters, oneOffCharges, payments, pendingAdjustments, rooms, tenants, utilityRates } from '@/db'
+import { addenda, facilities, feeTypes, feeUnits, invoiceLines, invoices, invoiceFeeQuantities, leaseFeeMeters, leaseFees, leaseFeeSnapshots, leaseOccupants, leases, meterReadings, meters, oneOffCharges, payments, pendingAdjustments, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { computeDueDate } from '@/domain/due-date'
@@ -8,7 +8,7 @@ import { todayVN } from '@/domain/dates'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { midPeriodAdjustments } from '@/domain/adjustments'
 import { buildMonthlyInvoice, nextBillingPeriod, settlementState } from '@/domain/invoice-builder'
-import type { Addendum, ContractFee, Invoice, MeterReading, DueRule, InvoiceLineInput, Lease, Meter, OneOffCharge, PendingAdjustment, Proration, UtilityRate } from '@/domain/types'
+import type { Addendum, ContractFee, Invoice, MeterReading, DueRule, InvoiceLineInput, Lease, Meter, OneOffCharge, PendingAdjustment, Proration } from '@/domain/types'
 import { finalizeTermination } from '@/server/addenda/finalize'
 import { recordAudit, recordAuditBatch } from '@/server/audit'
 import { registerExportOwnerResolver } from '@/server/files/owners'
@@ -68,18 +68,18 @@ export async function loadAddenda(db: Pick<DB, 'select'>, leaseId: string): Prom
 async function loadCalcInputs(db: Pick<DB, 'select'>, facilityId: string, data: Map<string, { lease: Lease; addenda: Addendum[] }>) {
   const leaseIds = [...data.keys()]
   const roomIds = [...new Set([...data.values()].flatMap(x => [x.lease.roomId, ...x.addenda.map(a => a.newRoomId).filter((r): r is string => !!r)]))]
-  const [settings, ms, rates, oneOffs, pending] = await Promise.all([
-    getSettings(db), roomIds.length ? db.select().from(meters).where(inArray(meters.roomId, roomIds)) : [], db.select().from(utilityRates).where(eq(utilityRates.facilityId, facilityId)),
+  const [settings, ms, oneOffs, pending] = await Promise.all([
+    getSettings(db), roomIds.length ? db.select().from(meters).where(inArray(meters.roomId, roomIds)) : []  ,
     leaseIds.length ? db.select().from(oneOffCharges).where(inArray(oneOffCharges.leaseId, leaseIds)) : [], leaseIds.length ? db.select().from(pendingAdjustments).where(inArray(pendingAdjustments.leaseId, leaseIds)) : [],
   ])
   const feeMeterLinks = leaseIds.length ? await db.select({ leaseFeeId: leaseFeeMeters.leaseFeeId, meterId: leaseFeeMeters.meterId }).from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).where(inArray(leaseFeeSnapshots.leaseId, leaseIds)) : []
   const readings = ms.length ? await db.select().from(meterReadings).where(inArray(meterReadings.meterId, ms.map(m => m.id))) : []
-  return { settings, meters: ms, rates, oneOffs, pending, readings, feeMeterLinks }
+  return { settings, meters: ms, oneOffs, pending, readings, feeMeterLinks }
 }
 type CalcInputs = Awaited<ReturnType<typeof loadCalcInputs>>
 function calculateWith(inputs: CalcInputs, lease: Lease, addendaRows: Addendum[], facilityId: string, period: string, override?: { start: string; end: string; coefficient?: number }, fullMonth = false, proration?: Proration, periodQuantities: Array<{ leaseFeeId: string; period: string; quantity: number }> = []) {
   return buildMonthlyInvoice({
-    lease, addenda: addendaRows, facilityId, period, proration: proration ?? lease.proration ?? inputs.settings.proration, meters: inputs.meters as Meter[], readings: inputs.readings as MeterReading[], feeMeterLinks: inputs.feeMeterLinks, periodQuantities, rates: inputs.rates as UtilityRate[],
+    lease, addenda: addendaRows, facilityId, period, proration: proration ?? lease.proration ?? inputs.settings.proration, meters: inputs.meters as Meter[], readings: inputs.readings as MeterReading[], feeMeterLinks: inputs.feeMeterLinks, periodQuantities,
     oneOffs: inputs.oneOffs.filter(x => x.leaseId === lease.id).map(x => ({ ...x, kind: x.kind as OneOffCharge['kind'], invoicedInId: x.invoiceId })),
     pending: inputs.pending.filter(x => x.leaseId === lease.id).map(x => ({ ...x, invoicedInId: x.invoiceId })) as PendingAdjustment[], overridePeriod: override, fullMonth,
   })
