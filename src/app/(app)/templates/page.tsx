@@ -2,7 +2,7 @@ import { db } from '@/db/client'
 import { RequirePermission } from '@/components/require-permission'
 import { getAccessContext } from '@/server/session'
 import { listTemplates } from '@/server/templates/service'
-import { listInvoiceTemplates } from '@/server/invoice-templates/service'
+import { listInvoiceTemplatePreviews, listInvoiceTemplates } from '@/server/invoice-templates/service'
 import { TemplatesView } from '@/features/templates/components/templates-view'
 
 export default async function TemplatesPage() {
@@ -11,10 +11,10 @@ export default async function TemplatesPage() {
 
 async function Templates() {
   const ctx = await getAccessContext()
-  const [list, invoiceTemplates] = await Promise.all([listTemplates(db, ctx), listInvoiceTemplates(db, ctx)])
+  const [list, invoiceTemplates, previews] = await Promise.all([listTemplates(db, ctx), listInvoiceTemplates(db, ctx), listInvoiceTemplatePreviews(db, ctx)])
   return (
     <TemplatesView
-      invoiceTemplates={invoiceTemplates.map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault, isSystem: t.isSystem, hasBody: !!t.body, style: t.style as 'formal' | 'modern', body: t.body }))}
+      invoiceTemplates={invoiceTemplates.map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault, isSystem: t.isSystem, hasBody: !!t.body, style: t.style as 'formal' | 'modern', body: t.body, preview: previews[t.id] ?? null }))}
       wordTemplates={list.map((t) => ({ id: t.id, docType: t.docType, name: t.name, hasFile: !!t.fileId, hasBody: !!t.body, isDefault: t.isDefault, style: t.style, body: t.body }))}
     />
   )
