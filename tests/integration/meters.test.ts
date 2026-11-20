@@ -64,6 +64,13 @@ describe('meters', () => {
     expect(sheet.rows.map((x) => x.electric?.current)).toEqual([1100, null, 1300])
   })
 
+  it('chỉ số kỳ trước không được lớn hơn chỉ số đã ghi của kỳ sau', async () => {
+    await read('E101', '2026-10', '2026-10-31', 1100)
+    const r = await saveReadings(db, hung(), '2026-09', [{ meterId: m.E101, value: 1200, readOn: '2026-09-30' }])
+    expect(r.saved).toBe(0)
+    expect(r.errors).toEqual([{ meterId: m.E101, message: 'Chỉ số lớn hơn chỉ số của kỳ sau' }])
+  })
+
   it('ghi lại cùng kỳ thì cập nhật, không tạo dòng trùng', async () => {
     await saveReadings(db, hung(), '2026-10', [{ meterId: m.E101, value: 1100, readOn: '2026-10-31' }])
     await saveReadings(db, hung(), '2026-10', [{ meterId: m.E101, value: 1120, readOn: '2026-10-31' }])

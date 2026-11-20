@@ -70,7 +70,7 @@ Theo `CLAUDE.md`: N-layer (`server` → `domain`, `db`), service nhận `(db, ct
 
 ### 4. Xem mẫu hoá đơn
 - Khi lưu mẫu (tạo, sửa, đổi kiểu trình bày, khôi phục mặc định), server dựng PDF một lần bằng đường dựng hiện có (`previewInvoiceTemplateHtml`) và lưu lại bản xem gắn với mẫu. Cách lưu (cột trong bảng hoặc qua lớp lưu file hiện có) do người xây chọn; chỉ cần đọc lại không phải dựng lại.
-- Danh sách mẫu (`invoice-templates-manager.tsx`) đưa bản xem vào ngay trong từng mẫu, không gọi server khi mở. Từ 4 mẫu trở lên, mỗi mẫu là một mục bấm để mở (toggle) với mẫu mặc định mở sẵn; ít hơn thì hiện hết.
+- Danh sách mẫu (`invoice-templates-manager.tsx`) đưa bản xem vào ngay trong từng mẫu, không gọi server khi mở. Từ 2 mẫu trở lên, mỗi mẫu là một mục bấm để mở (toggle) với mẫu mặc định mở sẵn; ít hơn thì hiện hết.
 - Mẫu cũ chưa có bản xem: dựng một lần khi lần đầu cần và lưu lại. Mẫu cũ dựng theo khối (không có `body`) vẫn hiện nhãn "Mẫu cũ, nên soạn lại" như hiện nay.
 - Nút "Xem" bằng popup hiện tại được thay bằng bản xem tại chỗ.
 
@@ -78,7 +78,7 @@ Theo `CLAUDE.md`: N-layer (`server` → `domain`, `db`), service nhận `(db, ct
 
 - Unit: quy tắc gợi ý chỉ số cuối ước tính; ghép dữ liệu ô "Theo tháng" (đổi công tơ giữa tháng, thiếu chỉ số).
 - Integration (PGlite): tạo phòng sinh đủ hai công tơ; migration bổ sung không tạo trùng; thay công tơ ước tính bắt buộc ghi chú; lưu mẫu sinh bản xem.
-- Kiểm tra bằng trình duyệt: tạo phòng rồi ghi chỉ số ngay; thay công tơ ước tính rồi xem nhãn ở bảng và hoá đơn; tab "Theo tháng" trên màn hẹp; mở danh sách mẫu hoá đơn với 1 mẫu và với 4 mẫu trở lên.
+- Kiểm tra bằng trình duyệt: tạo phòng rồi ghi chỉ số ngay; thay công tơ ước tính rồi xem nhãn ở bảng và hoá đơn; tab "Theo tháng" trên màn hẹp; mở danh sách mẫu hoá đơn với 1 mẫu và với 2 mẫu trở lên.
 
 ## Việc để người xây quyết định
 

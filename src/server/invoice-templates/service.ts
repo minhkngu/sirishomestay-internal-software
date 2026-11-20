@@ -98,9 +98,10 @@ export async function getInvoiceTemplatePreview(db: DB, templateId: string): Pro
   return base64
 }
 /** Bản xem của mọi mẫu (id → base64) cho trang danh sách mẫu. */
-export async function listInvoiceTemplatePreviews(db: DB, ctx: AccessContext): Promise<Record<string, string>> {
+export async function listInvoiceTemplatePreviews(db: DB, ctx: AccessContext, ids?: string[]): Promise<Record<string, string>> {
   void ctx
-  const rows = await db.select({ id: invoiceTemplates.id }).from(invoiceTemplates).orderBy(asc(invoiceTemplates.createdAt))
+  const all = await db.select({ id: invoiceTemplates.id }).from(invoiceTemplates).orderBy(asc(invoiceTemplates.createdAt))
+  const rows = ids ? all.filter((r) => ids.includes(r.id)) : all
   const entries = await Promise.all(rows.map(async (r) => [r.id, await getInvoiceTemplatePreview(db, r.id).catch(() => null)] as const))
   return Object.fromEntries(entries.filter((e): e is readonly [string, string] => e[1] !== null))
 }

@@ -10,6 +10,8 @@ export const docTemplates = pgTable('doc_templates', {
   body: text('body'),
   /** Kiểu trình bày khi xuất: 'formal' (Trang trọng) hoặc 'modern' (Hiện đại). */
   style: text('style').notNull().default('formal'),
+  /** Bản xem PDF dựng sẵn (base64) và phiên bản bộ dựng đã dùng; null nghĩa là chưa dựng. */
+  previewPdf: text('preview_pdf'), previewVersion: integer('preview_version'),
   isDefault: boolean('is_default').notNull().default(false),
   isDemo: boolean('is_demo').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

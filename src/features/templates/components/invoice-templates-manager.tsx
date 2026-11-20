@@ -7,8 +7,9 @@ import { PdfInline } from '@/components/pdf-inline'
 import { Button } from '@/components/ui/button'
 import { DEFAULT_INVOICE_HTML } from '@/domain/invoice-template-html'
 import type { TemplateStyle } from '@/domain/doc-template'
-import { deleteInvoiceTemplateAction, previewInvoiceTemplateHtmlAction, restoreDefaultInvoiceTemplatesAction, saveInvoiceTemplateAction, setDefaultInvoiceTemplateAction } from '@/server/invoice-templates/actions'
+import { deleteInvoiceTemplateAction, getInvoiceTemplatePreviewAction, previewInvoiceTemplateHtmlAction, restoreDefaultInvoiceTemplatesAction, saveInvoiceTemplateAction, setDefaultInvoiceTemplateAction } from '@/server/invoice-templates/actions'
 import { STYLE_LABEL, TemplateDialog, type TemplateOps } from './template-dialog'
+import { useLazyPreview } from './use-lazy-preview'
 
 type Tpl = { id: string; name: string; isDefault: boolean; isSystem: boolean; hasBody: boolean; style: TemplateStyle; body: string | null; preview: string | null }
 
@@ -18,7 +19,7 @@ const ops: TemplateOps = {
 }
 
 /** Từ số mẫu này trở lên, mỗi mẫu thu thành một mục bấm để mở (toggle). */
-const TOGGLE_FROM = 4
+const TOGGLE_FROM = 2
 
 /** Danh sách mẫu hoá đơn: bản xem hiện sẵn, soạn HTML như mẫu hợp đồng, đặt mặc định, xoá. */
 export function InvoiceTemplatesManager({ templates }: { templates: Tpl[] }) {
@@ -29,11 +30,12 @@ export function InvoiceTemplatesManager({ templates }: { templates: Tpl[] }) {
   const [editing, setEditing] = useState<{ template: Tpl | null } | null>(null)
   const [open, setOpen] = useState<Set<string>>(() => new Set(templates.filter((t) => t.isDefault).map((t) => t.id)))
   const collapsible = templates.length >= TOGGLE_FROM
+  const { previews, loading, ensure } = useLazyPreview(Object.fromEntries(templates.map((t) => [t.id, t.preview])), getInvoiceTemplatePreviewAction)
   const [deleting, setDeleting] = useState<Tpl | null>(null)
 
   const act = (fn: () => Promise<{ ok: boolean; error?: string }>) =>
     start(async () => { setError(null); setMsg(null); const r = await fn(); if (!r.ok) setError(r.error ?? 'Có lỗi'); else router.refresh() })
-  const toggle = (id: string) => setOpen((cur) => { const next = new Set(cur); if (next.has(id)) next.delete(id); else next.add(id); return next })
+  const toggle = (id: string) => { setOpen((cur) => { const next = new Set(cur); if (next.has(id)) next.delete(id); else next.add(id); return next }); void ensure(id) }
 
   return (
     <div className="space-y-4">
@@ -62,7 +64,7 @@ export function InvoiceTemplatesManager({ templates }: { templates: Tpl[] }) {
                 </div>
                 {shown && (
                   <div id={`preview-${t.id}`}>
-                    {t.preview ? <PdfInline base64={t.preview} title={t.name} /> : <p className="text-xs text-muted-foreground">Chưa dựng được bản xem. Bấm “Sửa” rồi lưu lại để dựng lại.</p>}
+                    {previews[t.id] ? <PdfInline base64={previews[t.id]!} title={t.name} /> : loading.has(t.id) ? <p className="text-xs text-muted-foreground">Đang tải bản xem…</p> : <p className="text-xs text-muted-foreground">Chưa dựng được bản xem. Bấm “Sửa” rồi lưu lại để dựng lại.</p>}
                   </div>
                 )}
               </li>

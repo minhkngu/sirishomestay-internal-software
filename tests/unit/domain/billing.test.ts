@@ -208,7 +208,7 @@ describe('buildMonthlyInvoice', () => {
     const est = buildMonthlyInvoice({ ...base, lease: l, meters: [oldE, newE], readings: [{ meterId: 'old', period: '2026-09', readOn: '2026-09-30', value: 1000 }, { meterId: 'new', period: '2026-10', readOn: '2026-10-31', value: 40 }] })
     const desc = (r: typeof normal) => r.lines.find((x) => x.type === 'electric')!.description
     expect(desc(normal)).not.toContain('ước tính')
-    expect(desc(est).endsWith(' — có chỉ số ước tính')).toBe(true)
+    expect(desc(est).endsWith(' (ước tính)')).toBe(true)
   })
   it('tiền phòng + phí cố định kỳ N, điện tháng N−1, phí lẻ và điều chỉnh đang chờ', () => {
     const r = buildMonthlyInvoice({
