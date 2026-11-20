@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { facilities, meterReadings, meters, rooms } from '@/db'
-import { listMeterOverview, listReadingSheet, saveReadings, replaceMeter, suggestMeterFinalReading } from '@/server/meters/service'
+import { listMeterOverview, listReadingSheet, saveReadings, replaceMeter, suggestMeterFinalReading, listMonthlyReadings } from '@/server/meters/service'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import type { AccessContext, Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'
@@ -190,6 +190,45 @@ describe('meters', () => {
       const rows = (await listMeterOverview(db, hung(), fa)).filter((r) => r.roomId === r101 && r.removedOn)
       expect(rows).toHaveLength(1)
       expect(rows[0]).toMatchObject({ finalReadingEstimated: true, estimateNote: 'cháy' })
+    })
+  })
+
+  describe('listMonthlyReadings', () => {
+    it('trả 6 kỳ kết thúc ở kỳ cuối, ô có chỉ số và mức dùng, ô chưa ghi để trống', async () => {
+      await read('E101', '2026-10', '2026-10-31', 1100)
+      const r = await listMonthlyReadings(db, hung(), fa, '2026-10')
+      expect(r.periods).toEqual(['2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10'])
+      const row = r.rows.find((x) => x.roomCode === '101')!
+      expect(row.electric).toHaveLength(6)
+      expect(row.electric[4]).toMatchObject({ period: '2026-09', values: [1000] })
+      expect(row.electric[5]).toMatchObject({ period: '2026-10', values: [1100], usage: 100 })
+      expect(row.electric[0].values).toEqual([])
+    })
+
+    it('phòng thiếu công tơ vẫn có hàng với ô rỗng', async () => {
+      await db.insert(rooms).values({ facilityId: fa, code: '301', floor: '3' })
+      const row = (await listMonthlyReadings(db, hung(), fa, '2026-10')).rows.find((x) => x.roomCode === '301')!
+      expect(row.electric.every((c) => c.values.length === 0)).toBe(true)
+      expect(row.water).toHaveLength(6)
+    })
+
+    it('chỉ trả phòng đang dùng của toà được chọn', async () => {
+      await db.update(rooms).set({ isActive: false }).where(eq(rooms.id, r102))
+      await db.insert(rooms).values({ facilityId: fb, code: 'X1' })
+      expect((await listMonthlyReadings(db, hung(), fa, '2026-10')).rows.map((x) => x.roomCode)).toEqual(['101', '201'])
+    })
+
+    it('người không có quyền toà đó hoặc thiếu quyền meters bị từ chối', async () => {
+      await expect(listMonthlyReadings(db, ctxOf(['meters'], [fb]), fa, '2026-10')).rejects.toThrow(NotFoundError)
+      await expect(listMonthlyReadings(db, ctxOf(['billing'], [fa]), fa, '2026-10')).rejects.toThrow(ForbiddenError)
+    })
+
+    it('toà không có phòng trả rows rỗng, số kỳ tối đa 12, kỳ sai bị từ chối', async () => {
+      const ctx = ctxOf(['meters'], [fb])
+      const empty = await listMonthlyReadings(db, ctx, fb, '2026-10', 24)
+      expect(empty.rows).toEqual([])
+      expect(empty.periods).toHaveLength(12)
+      await expect(listMonthlyReadings(db, hung(), fa, '2026-13')).rejects.toThrow(ValidationError)
     })
   })
 })

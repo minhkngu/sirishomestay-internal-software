@@ -5,6 +5,7 @@ import { assertCan, type AccessContext } from '@/domain/access'
 import { daysInMonth } from '@/domain/dates'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { meterUsage, suggestFinalReading } from '@/domain/meters'
+import { buildMonthlyCells, type MonthlyCell } from '@/domain/meters-monthly'
 import type { Meter, MeterReading, Utility } from '@/domain/types'
 import { recordAudit } from '@/server/audit'
 
@@ -270,4 +271,31 @@ export async function listMeterOverview(db: DB, ctx: AccessContext, facilityId: 
     }
   })
   return rows.sort((a, b) => (a.floor ?? '').localeCompare(b.floor ?? '') || a.roomCode.localeCompare(b.roomCode) || Number(a.removedOn !== null) - Number(b.removedOn !== null) || (a.feeName ?? '').localeCompare(b.feeName ?? ''))
+}
+
+export type MonthlyRow = { roomId: string; roomCode: string; floor: string | null; electric: MonthlyCell[]; water: MonthlyCell[] }
+
+/** Bảng chỉ số theo tháng của một toà: mỗi phòng đang dùng một hàng, `months` kỳ kết thúc ở `endPeriod` (tối đa 12). */
+export async function listMonthlyReadings(db: DB, ctx: AccessContext, facilityId: string, endPeriod: string, months = 6): Promise<{ periods: string[]; rows: MonthlyRow[] }> {
+  assertCan(ctx, 'meters', facilityId)
+  periodRange(endPeriod)
+  const count = Math.min(Math.max(Math.trunc(months), 1), 12)
+  const periods = Array.from({ length: count }, (_, i) => shiftPeriod(endPeriod, i - (count - 1)))
+  const windowStart = `${periods[0]}-01`
+  const windowEnd = periodRange(endPeriod)[1]
+  const inFacility = and(eq(rooms.facilityId, facilityId), eq(rooms.isActive, true))
+  const [roomRows, meterRows, windowReadings, baseline] = await Promise.all([
+    db.select().from(rooms).where(inFacility).orderBy(asc(rooms.floor), asc(rooms.code)),
+    db.select({ m: meters }).from(meters).innerJoin(rooms, eq(rooms.id, meters.roomId)).where(and(inFacility, inArray(meters.utility, ['electric', 'water']))),
+    db.select({ r: meterReadings }).from(meterReadings).innerJoin(meters, eq(meters.id, meterReadings.meterId)).innerJoin(rooms, eq(rooms.id, meters.roomId)).where(and(inFacility, sql`${meterReadings.readOn} >= ${windowStart}`, sql`${meterReadings.readOn} <= ${windowEnd}`)),
+    db.selectDistinctOn([meterReadings.meterId], { r: meterReadings }).from(meterReadings).innerJoin(meters, eq(meters.id, meterReadings.meterId)).innerJoin(rooms, eq(rooms.id, meters.roomId)).where(and(inFacility, sql`${meterReadings.readOn} < ${windowStart}`)).orderBy(meterReadings.meterId, sql`${meterReadings.readOn} desc`),
+  ])
+  const allMeters = meterRows.map((x) => toMeter(x.m))
+  const allReadings = [...baseline, ...windowReadings].map((x) => toReading(x.r))
+  const forUtility = (roomId: string, utility: Utility) => {
+    const ms = allMeters.filter((m) => m.roomId === roomId && m.utility === utility)
+    const ids = new Set(ms.map((m) => m.id))
+    return buildMonthlyCells(periods, ms, allReadings.filter((r) => ids.has(r.meterId)))
+  }
+  return { periods, rows: roomRows.map((r) => ({ roomId: r.id, roomCode: r.code, floor: r.floor, electric: forUtility(r.id, 'electric'), water: forUtility(r.id, 'water') })) }
 }
