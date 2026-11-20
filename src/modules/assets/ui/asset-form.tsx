@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { ASSET_CONDITIONS } from '@/domain/asset-labels'
+import { ASSET_CONDITION, ASSET_CONDITIONS } from '@/domain/asset-labels'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -35,7 +35,7 @@ function AssetDialogForm({ facilities, onClose }: { facilities: TreeFacility[]; 
     name: '',
     category: '',
     value: '',
-    condition: 'Tốt',
+    condition: ASSET_CONDITION.good as string,
     facilityId: facilities[0]?.id ?? '',
     where: `warehouse:${facilities[0]?.id ?? ''}`,
   })

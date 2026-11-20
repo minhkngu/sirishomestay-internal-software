@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { ASSET_CONDITION } from '@/domain/asset-labels'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -36,7 +37,14 @@ export function EditAssets({
   const [picking, setPicking] = useState(false)
   const [creating, setCreating] = useState(false)
   const [filter, setFilter] = useState('')
-  const [form, setForm] = useState({ code: '', name: '', model: '', category: '', value: '0', condition: 'Tốt' })
+  const [form, setForm] = useState({
+    code: '',
+    name: '',
+    model: '',
+    category: '',
+    value: '0',
+    condition: ASSET_CONDITION.good as string,
+  })
   const [formError, setFormError] = useState('')
   const set = (patch: Partial<AssetsDraft>) => onChange({ ...draft, ...patch })
   const candidates = available.filter(
@@ -253,11 +261,18 @@ export function EditAssets({
                       model: form.model.trim(),
                       category: form.category.trim(),
                       value,
-                      condition: form.condition.trim() || 'Tốt',
+                      condition: form.condition.trim() || ASSET_CONDITION.good,
                     },
                   ],
                 })
-                setForm({ code: '', name: '', model: '', category: '', value: '0', condition: 'Tốt' })
+                setForm({
+                  code: '',
+                  name: '',
+                  model: '',
+                  category: '',
+                  value: '0',
+                  condition: ASSET_CONDITION.good,
+                })
                 setFormError('')
                 setCreating(false)
                 setPicking(false)

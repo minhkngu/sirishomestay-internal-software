@@ -2,6 +2,7 @@ export const PDF_DOC_TYPES = ['invoice_monthly', 'invoice_termination', 'receipt
 export type PdfDocType = (typeof PDF_DOC_TYPES)[number]
 
 import { formatDateVN } from './dates'
+import { ASSET_CONDITION } from './asset-labels'
 import { formatVND, numberToVietnameseWords } from './money'
 import { TENANT_KIND_LABELS } from './tenant-kind'
 
@@ -92,7 +93,7 @@ const HANDOVER: Field[] = [
   loop('tai_san', 'Danh sách tài sản', [
     { key: 'ma', label: 'Mã tài sản', example: 'TS-0101' },
     { key: 'ten', label: 'Tên tài sản', example: 'Máy lạnh' },
-    { key: 'tinh_trang', label: 'Tình trạng', example: 'Tốt' },
+    { key: 'tinh_trang', label: 'Tình trạng', example: ASSET_CONDITION.good },
     { key: 'phat', label: 'Tiền phạt', example: '0' },
   ]),
   loop('chi_so', 'Chỉ số điện nước', [

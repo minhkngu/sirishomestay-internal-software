@@ -1,4 +1,5 @@
 import { and, eq, isNull, sql } from 'drizzle-orm'
+import { ASSET_CONDITION } from '@/domain/asset-labels'
 import {
   assets,
   depositEntries,
@@ -301,7 +302,7 @@ async function applyRow(tx: DB, ctx: AccessContext, r: OpsRow): Promise<'created
     name: str(d.name)!,
     category: str(d.category) ?? '',
     value: d.value === undefined ? 0 : num(d.value),
-    condition: str(d.condition) ?? 'Tốt',
+    condition: str(d.condition) ?? ASSET_CONDITION.good,
   }
   if (existing) {
     if (existing.facilityId !== facility.id) throw new ValidationError('Mã tài sản đã thuộc cơ sở khác')

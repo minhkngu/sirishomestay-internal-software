@@ -4,7 +4,8 @@ import type { AssetStatus } from './statuses'
  * Tình trạng tài sản nhập tay (lưu nguyên chữ trong cột `condition`, nên đổi chữ là đổi dữ liệu):
  * dùng ở form tài sản và biên bản bàn giao.
  */
-export const ASSET_CONDITION = { good: 'Tốt', scratched: 'Trầy xước', damaged: 'Hư' } as const
+export const ASSET_CONDITION = { good: 'Tốt', scratched: 'Trầy xước', damaged: 'Hư', missing: 'Mất' } as const
+/** `missing` chỉ dùng khi bàn giao (nút "Mất"), không nằm trong danh sách chọn bên dưới. */
 export const ASSET_CONDITIONS = [ASSET_CONDITION.good, ASSET_CONDITION.scratched, ASSET_CONDITION.damaged] as const
 
 /** Trạng thái tài sản trong DB (đang dùng, hỏng, đã thanh lý). */

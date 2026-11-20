@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, ilike, inArray, ne } from 'drizzle-orm'
+import { ASSET_CONDITION } from '@/domain/asset-labels'
 import { z } from 'zod'
 import { assetMoves, assets, facilities, handoverItems, handovers, rooms } from '@/db'
 import type { DB } from '@/db/client'
@@ -19,7 +20,7 @@ const createInput = z.object({
   model: z.string().trim().default(''),
   category: z.string().trim().default(''),
   value: z.number().int().min(0, 'Giá trị không hợp lệ').default(0),
-  condition: z.string().trim().default('Tốt'),
+  condition: z.string().trim().default(ASSET_CONDITION.good),
   facilityId: z.string().uuid(),
   location: z.object({ kind: z.enum(['room', 'common', 'warehouse', 'unassigned']), id: z.string().uuid() }),
 })

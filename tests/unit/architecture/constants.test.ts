@@ -27,7 +27,7 @@ describe('hằng số chỉ có một nguồn', () => {
   })
 
   it("múi giờ 'Asia/Ho_Chi_Minh' chỉ nằm trong src/domain/dates.ts", () => {
-    expect(filesMatching(/'Asia\/Ho_Chi_Minh'/)).toEqual(['src/domain/dates.ts'])
+    expect(filesMatching(/['"`]Asia\/Ho_Chi_Minh['"`]/)).toEqual(['src/domain/dates.ts'])
   })
 
   it("nhãn thu tiền cash: 'Tiền mặt' chỉ định nghĩa một lần", () => {
@@ -36,5 +36,12 @@ describe('hằng số chỉ có một nguồn', () => {
 
   it('thứ hạng trạng thái ký (draft: 0) chỉ định nghĩa một lần', () => {
     expect(countMatches(/draft: 0\b/g)).toBe(1)
+  })
+
+  it('chữ tình trạng tài sản (Tốt, Trầy xước, Hư, Mất) chỉ nằm trong src/domain/asset-labels.ts', () => {
+    // Chỉ khớp nguyên cả chuỗi trong dấu nháy; schema DB giữ giá trị mặc định cố ý (db chỉ import type từ domain).
+    const literal = /(['"`])(Tốt|Trầy xước|Hư|Mất)/
+    const allowed = (p: string) => p === 'src/domain/asset-labels.ts' || p.startsWith('src/db/schema/')
+    expect(sources.filter((s) => !allowed(s.path) && literal.test(s.text)).map((s) => s.path)).toEqual([])
   })
 })

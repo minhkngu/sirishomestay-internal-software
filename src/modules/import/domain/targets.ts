@@ -1,4 +1,5 @@
 import { removeDiacritics } from '@/domain/text'
+import { ASSET_CONDITION } from '@/domain/asset-labels'
 
 export type ImportTarget = 'rooms' | 'tenants' | 'leases' | 'deposits' | 'debts' | 'meter_readings' | 'assets'
 export type ImportField = { key: string; label: string; required: boolean; aliases: string[] }
@@ -204,7 +205,7 @@ const EXAMPLES: Record<string, string> = {
   code: 'TV-001',
   name: 'Tivi',
   category: 'Điện tử',
-  condition: 'Tốt',
+  condition: ASSET_CONDITION.good,
 }
 /** Tiêu đề (nhãn tiếng Việt) và dòng ví dụ của file mẫu cho từng loại dữ liệu. */
 export function templateColumns(target: ImportTarget) {

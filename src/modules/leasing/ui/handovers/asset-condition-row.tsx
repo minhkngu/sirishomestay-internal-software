@@ -2,7 +2,7 @@
 
 import { FileUpload } from '@/modules/platform/ui'
 import { formatVND } from '@/domain/money'
-import { ASSET_CONDITIONS } from '@/domain/asset-labels'
+import { ASSET_CONDITION, ASSET_CONDITIONS } from '@/domain/asset-labels'
 import { MoneyInput } from '@/components/ui/money-input'
 import { cn } from '@/lib/utils'
 
@@ -33,7 +33,7 @@ export function AssetConditionRow({
   onChange: (patch: Partial<ItemState>) => void
   onPhoto: () => void
 }) {
-  const pick = (c: string) => onChange({ condition: c, damaged: c === 'Hư', ...(c !== 'Hư' ? {} : {}) })
+  const pick = (c: string) => onChange({ condition: c, damaged: c === ASSET_CONDITION.damaged })
   return (
     <li className="space-y-2 rounded-lg border bg-card p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -64,10 +64,16 @@ export function AssetConditionRow({
         <button
           type="button"
           disabled={readOnly}
-          onClick={() => onChange({ missing: !item.missing, condition: !item.missing ? 'Mất' : 'Tốt', damaged: false })}
+          onClick={() =>
+            onChange({
+              missing: !item.missing,
+              condition: !item.missing ? ASSET_CONDITION.missing : ASSET_CONDITION.good,
+              damaged: false,
+            })
+          }
           className={cn('min-h-11 flex-1 rounded-lg border px-3 text-sm', item.missing && 'bg-destructive text-white')}
         >
-          Mất
+          {ASSET_CONDITION.missing}
         </button>
       </div>
       <input

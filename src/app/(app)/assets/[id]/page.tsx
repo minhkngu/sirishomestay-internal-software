@@ -1,4 +1,5 @@
 import { RequirePermission, getAccessContext } from '@/modules/platform'
+import { ASSET_CONDITION } from '@/domain/asset-labels'
 import { db } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
 import { VN_TIME_ZONE } from '@/domain/dates'
@@ -56,7 +57,7 @@ async function Asset({ params }: { params: Promise<{ id: string }> }) {
             {history.handovers.map((h, i) => (
               <li key={i}>
                 {h.date} — {h.kind === 'check_in' ? 'Check-in' : 'Check-out'}:{' '}
-                {h.missing ? 'Mất' : h.damaged ? 'Hư' : h.condition}
+                {h.missing ? ASSET_CONDITION.missing : h.damaged ? ASSET_CONDITION.damaged : h.condition}
                 {h.penalty ? ` (phạt ${formatVND(h.penalty)})` : ''}
               </li>
             ))}

@@ -28,7 +28,7 @@ export const handoverItems = pgTable('handover_items', {
   assetId: uuid('asset_id')
     .notNull()
     .references(() => assets.id),
-  condition: text('condition').notNull().default('Tốt'),
+  condition: text('condition').notNull().default('Tốt'), // = ASSET_CONDITION.good (db chỉ import type từ domain)
   note: text('note').notNull().default(''),
   damaged: boolean('damaged').notNull().default(false),
   missing: boolean('missing').notNull().default(false),
