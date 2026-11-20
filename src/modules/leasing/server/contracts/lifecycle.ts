@@ -26,7 +26,8 @@ import type { ExportFormat } from '@/modules/documents'
 import { exportDocument, registerDocLoader } from '@/modules/documents'
 import type { StorageAdapter } from '@/modules/platform'
 import { getLease } from './leases'
-import { loadRoom, SIGN_RANK, type SignStatus } from './shared'
+import { SIGN_RANK } from '../../domain/sign-status'
+import { loadRoom, type SignStatus } from './shared'
 
 export async function deleteContract(
   db: DB,

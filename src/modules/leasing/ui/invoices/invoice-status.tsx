@@ -1,15 +1,7 @@
 import { Badge } from '@/components/ui/badge'
+import { INVOICE_STATUS_LABELS, type InvoiceState } from '../../domain/labels'
 
-const LABEL: Record<string, string> = {
-  draft: 'Nháp',
-  unpaid: 'Chưa thu',
-  partial: 'Thu một phần',
-  paid: 'Đã thu đủ',
-  overdue: 'Quá hạn',
-  refund_pending: 'Chờ hoàn khách',
-  refunded: 'Đã hoàn',
-}
-export const invoiceStatusLabel = (state: string) => LABEL[state] ?? state
+export const invoiceStatusLabel = (state: string) => INVOICE_STATUS_LABELS[state as InvoiceState] ?? state
 export function InvoiceStatus({ state }: { state: string }) {
   const bad = state === 'overdue'
   return (

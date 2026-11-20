@@ -5,6 +5,8 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { FileUpload } from '@/modules/platform/ui'
 import { formatDateVN } from '@/domain/dates'
+import type { SignStatus } from '@/domain/statuses'
+import { SIGN_STATUS_LABELS } from '../../domain/sign-status'
 import { exportAddendumAction, setAddendumSignStatusAction } from '../../server/addenda/actions'
 
 const TYPE: Record<string, string> = {
@@ -14,7 +16,6 @@ const TYPE: Record<string, string> = {
   termination: 'Thanh lý',
   occupants: 'Đổi người ở',
 }
-const SIGN: Record<string, string> = { draft: 'Nháp', exported: 'Đã xuất', signed: 'Đã ký' }
 export function AddendaList({
   items,
 }: {
@@ -28,7 +29,8 @@ export function AddendaList({
       {items.map((a) => (
         <li key={a.id} className="flex flex-wrap items-center gap-2">
           <span>
-            {TYPE[a.type] ?? a.type} · hiệu lực {formatDateVN(a.effectiveDate)} · {SIGN[a.signStatus] ?? a.signStatus}
+            {TYPE[a.type] ?? a.type} · hiệu lực {formatDateVN(a.effectiveDate)} ·{' '}
+            {SIGN_STATUS_LABELS[a.signStatus as SignStatus] ?? a.signStatus}
           </span>
           {a.type !== 'occupants' && (
             <Button

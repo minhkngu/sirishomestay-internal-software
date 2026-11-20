@@ -10,6 +10,7 @@ import { setListParams, useFacilitySelection, useListParam, usePager } from '@/c
 import { formatDateVN } from '@/domain/dates'
 import { matchesInvoiceView, matchesPeriod, type InvoiceView } from '@/domain/list-filters'
 import { formatVND } from '@/domain/money'
+import { INVOICE_STATUS_LABELS } from '../../domain/labels'
 import { invoiceStatusLabel } from './invoice-status'
 import type { listInvoices } from '../../server/invoices/service'
 
@@ -17,9 +18,9 @@ type InvoiceRow = Awaited<ReturnType<typeof listInvoices>>[number]
 
 const VIEWS = [
   ['all', 'Tất cả'],
-  ['draft', 'Nháp'],
-  ['unpaid', 'Chưa thu'],
-  ['overdue', 'Quá hạn'],
+  ['draft', INVOICE_STATUS_LABELS.draft],
+  ['unpaid', INVOICE_STATUS_LABELS.unpaid],
+  ['overdue', INVOICE_STATUS_LABELS.overdue],
 ] as const
 
 export function InvoiceList({

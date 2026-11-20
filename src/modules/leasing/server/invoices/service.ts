@@ -55,6 +55,7 @@ import {
   resolveInvoiceTemplate,
 } from '@/modules/documents'
 import { resolveBankAccount } from '@/domain/vietqr'
+import { PAYMENT_METHOD_LABELS, type PaymentMethod } from '../../domain/labels'
 
 const batchSchema = z.object({ facilityId: z.uuid(), period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) })
 const periodSchema = z
@@ -898,7 +899,6 @@ export async function exportReceipt(
 ) {
   return exportDocument(db, ctx, storage, { docType: 'receipt', entityId: paymentId, templateId, format })
 }
-const METHOD_LABEL = { cash: 'Tiền mặt', transfer: 'Chuyển khoản', other: 'Khác' } as const
 registerPdfLoader('receipt', async (db, ctx, id) => {
   const [p] = await db.select().from(payments).where(eq(payments.id, id))
   if (!p) throw new NotFoundError()
@@ -919,7 +919,7 @@ registerPdfLoader('receipt', async (db, ctx, id) => {
         invoiceCode: inv.code,
         paidOn: p.paidOn,
         amount: p.amount,
-        method: METHOD_LABEL[p.method as keyof typeof METHOD_LABEL] ?? p.method,
+        method: PAYMENT_METHOD_LABELS[p.method as PaymentMethod] ?? p.method,
         receivedBy: ctx.userId === p.receivedBy ? (ctx.fullName ?? '') : '',
         facility: { name: row.facility.name, address: row.facility.address },
         room: row.room.code,

@@ -9,6 +9,8 @@ import { useFacilitySelection, useListParam, usePager } from '@/components/list/
 import { formatDateVN } from '@/domain/dates'
 import { matchesContractView, type ContractView } from '@/domain/list-filters'
 import { formatVND } from '@/domain/money'
+import type { SignStatus } from '@/domain/statuses'
+import { SIGN_STATUS_LABELS } from '../../domain/sign-status'
 import type { DepositListItem, LeaseListItem } from '../../server/contracts/service'
 import type { ReactNode } from 'react'
 
@@ -19,7 +21,6 @@ const VIEWS = [
   ['ended', 'Đã kết thúc'],
   ['deposits', 'Cọc chờ'],
 ] as const
-const SIGN = { draft: 'Nháp', exported: 'Đã xuất', signed: 'Đã ký' } as const
 
 export function ContractList({
   leases,
@@ -130,7 +131,7 @@ export function ContractList({
                           : 'border border-border/80 bg-muted/60 text-muted-foreground'
                     }`}
                   >
-                    {SIGN[l.signStatus as keyof typeof SIGN]}
+                    {SIGN_STATUS_LABELS[l.signStatus as SignStatus]}
                   </span>
                 </td>
               </tr>
@@ -160,7 +161,7 @@ export function ContractList({
                 <td className="p-3 font-medium text-foreground tabular-nums">{formatVND(c.agreedRent)}</td>
                 <td className="p-3">
                   <span className="inline-flex rounded-full border border-border/80 bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                    {SIGN[c.signStatus as keyof typeof SIGN]}
+                    {SIGN_STATUS_LABELS[c.signStatus as SignStatus]}
                   </span>
                 </td>
               </tr>

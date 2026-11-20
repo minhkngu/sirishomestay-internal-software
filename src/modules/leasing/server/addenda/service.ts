@@ -27,6 +27,8 @@ import {
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { resolveFeePrice } from '../../domain/fee-price'
+import { SIGN_RANK } from '../../domain/sign-status'
+import type { SignStatus } from '@/domain/statuses'
 import { listFeeTypePrices } from '@/modules/facilities'
 import { midPeriodAdjustments } from '../../domain/adjustments'
 import { contractTermsAt } from '../../domain/contract-terms'
@@ -781,8 +783,6 @@ export async function listAddenda(db: DB, ctx: AccessContext, leaseId: string) {
 }
 
 // ---------------------------------------------------------------- trạng thái ký và xuất Word
-const RANK = { draft: 0, exported: 1, signed: 2 } as const
-type Sign = keyof typeof RANK
 async function loadAddendum(db: DB, ctx: AccessContext, id: string) {
   const [row] = await db
     .select({ a: addenda, facilityId: rooms.facilityId })
@@ -798,13 +798,14 @@ export async function setAddendumSignStatus(
   db: DB,
   ctx: AccessContext,
   id: string,
-  status: Sign,
+  status: SignStatus,
   signedFileId?: string,
 ): Promise<void> {
   await db.transaction(async (tx0) => {
     const tx = tx0 as unknown as DB
     const { a, facilityId } = await loadAddendum(tx, ctx, id)
-    if (RANK[status] < RANK[a.signStatus as Sign]) throw new ValidationError('Không thể lùi trạng thái ký')
+    if (SIGN_RANK[status] < SIGN_RANK[a.signStatus as SignStatus])
+      throw new ValidationError('Không thể lùi trạng thái ký')
     if (a.type === 'assignment' && status === 'signed' && !signedFileId && !a.signedFileId)
       throw new ValidationError('Cần tải tệp phụ lục đã ký')
     if (signedFileId) {

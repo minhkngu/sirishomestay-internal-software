@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { MoneyInput } from '@/components/ui/money-input'
+import { PAYMENT_METHOD_LABELS, type PaymentMethod } from '../../domain/labels'
 import { addPaymentAction, exportReceiptAction, removePaymentAction } from '../../server/invoices/actions'
 
 type Pay = {
@@ -15,12 +16,6 @@ type Pay = {
   amount: number
   method: string
   note: string
-}
-
-const METHOD: Record<string, string> = {
-  cash: 'Tiền mặt',
-  transfer: 'Chuyển khoản',
-  other: 'Khác',
 }
 
 /** Danh sách khoản thu + form ghi thu; hoá đơn tổng âm nhập số tiền âm (đã hoàn cho khách). */
@@ -99,7 +94,7 @@ export function PaymentDialog({
                 <span className="font-bold tabular-nums text-emerald-700">{formatVND(p.amount)}</span>
                 <span className="text-muted-foreground">·</span>
                 <span className="rounded-full border border-border/80 bg-muted/60 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
-                  {METHOD[p.method] ?? p.method}
+                  {PAYMENT_METHOD_LABELS[p.method as PaymentMethod] ?? p.method}
                 </span>
                 {p.note && (
                   <>
