@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, like, lte, ne, sql } from 'drizzle-orm'
 import {
-  addenda, assets, contractVersions, depositContracts, depositEntries, docTemplates, facilities, feeTypes, feeUnits, files, handoverItems, handovers, incidents, invoices, payments, oneOffCharges, pendingAdjustments, invoiceTemplates, leaseFees, leaseFeeSnapshots, leaseOccupants, leases, rooms, tenants,
+  addenda, assets, contractVersions, depositContracts, depositEntries, docTemplates, facilities, feeTypes, feeUnits, files, handoverItems, handovers, incidents, invoices, payments, oneOffCharges, pendingAdjustments, invoiceTemplates, leaseFeeSnapshots, leaseOccupants, leases, rooms, tenants,
 } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, can, facilityKey, facilityScope, type AccessContext } from '@/domain/access'
@@ -53,21 +53,8 @@ export async function nextLeaseCode(tx: Pick<DB, 'select'>, facilityCode: string
 }
 
 async function contractFees(tx: Pick<DB, 'select'>, leaseId: string): Promise<ContractFee[]> {
-  const [lease] = await tx.select({ feeModel: leases.feeModel }).from(leases).where(eq(leases.id, leaseId))
-  if (lease?.feeModel === 'snapshot') {
-    const rows = await tx.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, leaseId))
-    return rows.map(f => ({ leaseFeeId: f.id, feeTypeId: f.feeTypeId, name: f.name, unit: f.unit, billing: f.billing as ContractFee['billing'], quantityFrom: f.quantitySource === 'occupants' ? 'occupants' as const : 'manual' as const, quantitySource: f.quantitySource as NonNullable<ContractFee['quantitySource']>, quantity: f.quantity, unitPrice: f.unitPrice }))
-  }
-  const rows = await tx
-    .select({ f: leaseFees, t: feeTypes, u: feeUnits })
-    .from(leaseFees)
-    .innerJoin(feeTypes, eq(feeTypes.id, leaseFees.feeTypeId))
-    .innerJoin(feeUnits, eq(feeUnits.id, feeTypes.unitId))
-    .where(eq(leaseFees.leaseId, leaseId))
-  return rows.map(({ f, t, u }) => ({
-    leaseFeeId: f.id, feeTypeId: t.id, name: t.name, unit: u.name, billing: t.billing as ContractFee['billing'], quantityFrom: t.quantityFrom as ContractFee['quantityFrom'],
-    quantity: f.quantity, unitPrice: f.unitPrice,
-  }))
+  const rows = await tx.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, leaseId))
+  return rows.map(f => ({ leaseFeeId: f.id, feeTypeId: f.feeTypeId, name: f.name, unit: f.unit, billing: f.billing as ContractFee['billing'], quantityFrom: f.quantitySource === 'occupants' ? 'occupants' as const : 'manual' as const, quantitySource: f.quantitySource as NonNullable<ContractFee['quantitySource']>, quantity: f.quantity, unitPrice: f.unitPrice }))
 }
 
 const toDomainEntry = (e: typeof depositEntries.$inferSelect): DepositEntry => ({
@@ -128,7 +115,6 @@ export async function cancelDepositContract(db: DB, ctx: AccessContext, id: stri
 // ------------------------------------------------------------------ hợp đồng thuê
 
 export type LeaseFeeInput = { feeTypeId: string | null; name: string; unit: string; quantitySource: 'occupants' | 'room' | 'meter' | 'period_input'; unitPrice: number; quantity?: number; initialReading?: number; existingMeterId?: string }
-type LegacyFeeInput = { feeTypeId: string; quantity: number; unitPrice: number }
 export type LeaseInput = {
   roomId: string
   tenantId: string
@@ -149,8 +135,7 @@ export type LeaseInput = {
     remove: Array<{ assetId: string; action: 'dispose' } | { assetId: string; action: 'move'; to: { kind: 'warehouse' | 'room'; id: string } }>
     conditions?: Array<{ assetCode: string; condition: string }>
   }
-  feeModel?: 'legacy' | 'snapshot'
-  fees?: LegacyFeeInput[] | LeaseFeeInput[]
+  fees?: LeaseFeeInput[]
   dueRule?: unknown
   proration?: Proration | null
   billingCycleMonths?: number
@@ -175,12 +160,9 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
   // Cột tiền là số nguyên 32 bit; vượt thì Postgres báo lỗi khó hiểu, nên chặn sớm với thông báo rõ
   if (input.monthlyRent > MAX_MONEY) throw new ValidationError('Tiền thuê quá lớn (tối đa 2.147.483.647)', { monthlyRent: 'Tiền thuê quá lớn' })
   if (input.depositAmount > MAX_MONEY) throw new ValidationError('Tiền cọc quá lớn (tối đa 2.147.483.647)', { depositAmount: 'Tiền cọc quá lớn' })
-  const occupants = input.feeModel === 'snapshot' ? [...new Set([tenant.id, ...(input.occupantIds ?? [])])] : [...new Set(input.occupantIds?.length ? input.occupantIds : [tenant.id])]
+  const occupants = [...new Set([tenant.id, ...(input.occupantIds ?? [])])]
   if (occupants.length === 0) throw new ValidationError('Chọn ít nhất một người ở', { occupantIds: 'Chọn ít nhất một người ở' })
-  for (const o of occupants) {
-    const occupant = await loadTenant(tx, ctx, o)
-    if (input.feeModel !== 'snapshot' && occupant.kind === 'company' && occupant.id !== tenant.id) throw new ValidationError('Người ở phải là khách cá nhân', { occupantIds: 'Người ở phải là khách cá nhân' })
-  }
+  for (const o of occupants) await loadTenant(tx, ctx, o)
 
   const [active] = await tx.select().from(leases).where(and(eq(leases.roomId, room.id), eq(leases.status, 'active')))
   if (active) throw new ValidationError('Phòng đã có hợp đồng trong khoảng thời gian này')
@@ -189,16 +171,17 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
   const code = await nextLeaseCode(tx, fac.code, input.startDate)
   const [lease] = await tx.insert(leases).values({
     code, roomId: room.id, tenantId: tenant.id, startDate: input.startDate, endDate: input.endDate, monthlyRent: input.monthlyRent,
-    depositAmount: input.depositAmount, note: input.note ?? '', contractTemplateId: input.contractTemplateId ?? null, invoiceTemplateId: input.invoiceTemplateId ?? null, feeModel: input.feeModel ?? 'legacy', dueRule: input.dueRule ?? null, proration: input.proration ?? null, billingCycleMonths: input.billingCycleMonths ?? 1, billWaterByMeter: input.billWaterByMeter ?? true, fromDepositContractId: fromDepositId,
+    depositAmount: input.depositAmount, note: input.note ?? '', contractTemplateId: input.contractTemplateId ?? null, invoiceTemplateId: input.invoiceTemplateId ?? null, dueRule: input.dueRule ?? null, proration: input.proration ?? null, billingCycleMonths: input.billingCycleMonths ?? 1, billWaterByMeter: input.billWaterByMeter ?? true, fromDepositContractId: fromDepositId,
   }).returning()
   await tx.insert(leaseOccupants).values(occupants.map((tenantId) => ({ leaseId: lease.id, tenantId })))
-  if (input.fees?.length && input.feeModel === 'snapshot') {
-    const fees = input.fees as LeaseFeeInput[]
+  const meterStarts: { leaseFeeId: string; reading: number }[] = []
+  if (input.fees?.length) {
+    const fees = input.fees
     // Phí tính theo đồng hồ được thêm nhiều dòng cùng loại (mỗi dòng một đồng hồ); các phí khác chỉ một dòng mỗi loại
     const meterIds = fees.flatMap(f => f.existingMeterId ? [f.existingMeterId] : [])
     if (new Set(meterIds).size !== meterIds.length) throw new ValidationError('Đồng hồ bị chọn trùng')
     const seenCommon = new Set<string>()
-    for (const fee of input.fees as LeaseFeeInput[]) {
+    for (const fee of fees) {
       if (!Number.isSafeInteger(fee.unitPrice) || fee.unitPrice < 0 || fee.unitPrice > 2_147_483_647 || !['occupants', 'room', 'meter', 'period_input'].includes(fee.quantitySource)) throw new ValidationError('Phí dịch vụ không hợp lệ')
       let name = fee.name?.trim(), unit = fee.unit?.trim(), source: NonNullable<ContractFee['quantitySource']> = fee.quantitySource
       let billing: ContractFee['billing'] = source === 'meter' || source === 'period_input' ? 'per_occurrence' : 'monthly_fixed'
@@ -217,9 +200,9 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
       const quantity = source === 'legacy_fixed' ? (fee.quantity ?? 1) : 1
       if (!Number.isSafeInteger(quantity) || quantity < 0 || quantity > 2_147_483_647) throw new ValidationError('Số lượng phí không hợp lệ')
       const [savedFee] = await tx.insert(leaseFeeSnapshots).values({ leaseId: lease.id, feeTypeId: fee.feeTypeId, name, unit, quantitySource: source, quantity, billing, unitPrice: fee.unitPrice }).returning()
-      if (source === 'meter') await ensureFeeMeter(tx, ctx, { roomId: room.id, leaseFeeId: savedFee.id, initialReading: fee.initialReading, existingMeterId: fee.existingMeterId, installedOn: input.startDate })
+      if (source === 'meter') { await ensureFeeMeter(tx, ctx, { roomId: room.id, leaseFeeId: savedFee.id, initialReading: fee.initialReading, existingMeterId: fee.existingMeterId, installedOn: input.startDate }); meterStarts.push({ leaseFeeId: savedFee.id, reading: fee.initialReading! }) }
     }
-  } else if (input.fees?.length) await tx.insert(leaseFees).values((input.fees as LegacyFeeInput[]).map((f) => ({ leaseId: lease.id, ...f })))
+  }
 
   // sổ cọc: cọc giữ chỗ chuyển sang hợp đồng thuê; phần còn thiếu ghi dòng thu chờ
   let held = 0
@@ -292,7 +275,7 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
     roomId: lease.roomId, startDate: lease.startDate, endDate: lease.endDate, monthlyRent: lease.monthlyRent,
     depositAmount: lease.depositAmount, fees, occupantIds: occupants,
   }
-  const firstInvoiceLines = buildFirstInvoice(terms, lease.startDate, proration, received)
+  const firstInvoiceLines = buildFirstInvoice(terms, lease.startDate, proration, received, meterStarts)
   await recordAudit(tx, ctx, { action: 'create', entity: 'lease', entityId: lease.id, facilityId: room.facilityId, summary: `Tạo hợp đồng thuê ${lease.code}`, after: lease })
   return { lease, firstInvoiceLines, warnings: [], handoverItems: createdHandoverItems }
 }
@@ -397,36 +380,9 @@ function checkDate(value: string) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(Date.parse(value)) || new Date(value).toISOString().slice(0, 10) !== value) throw new ValidationError('Ngày không hợp lệ')
 }
 
-/** Sửa phí dịch vụ của hợp đồng (cả mô hình cũ và bản chụp phí): đổi đơn giá, gỡ phí, thêm phí từ loại phí đã cài. Phí theo đồng hồ không thêm hay gỡ ở đây. */
-/** Chuyển phí của hợp đồng kiểu cũ sang bản chụp phí (giữ nguyên tên, đơn vị, đơn giá, số lượng) để gắn được đồng hồ. Trả về bảng đổi id phí cũ → mới. */
-async function convertLegacyFees(tx: DB, leaseId: string): Promise<Map<string, string>> {
-  const rows = await tx.select({ f: leaseFees, t: feeTypes, u: feeUnits }).from(leaseFees).innerJoin(feeTypes, eq(feeTypes.id, leaseFees.feeTypeId)).innerJoin(feeUnits, eq(feeUnits.id, feeTypes.unitId)).where(eq(leaseFees.leaseId, leaseId))
-  const mapping = new Map<string, string>()
-  for (const { f, t, u } of rows) {
-    const [saved] = await tx.insert(leaseFeeSnapshots).values({ leaseId, feeTypeId: t.id, name: t.name, unit: u.name, quantitySource: t.quantityFrom === 'manual' ? 'legacy_fixed' : t.quantityFrom, quantity: f.quantity, billing: t.billing, unitPrice: f.unitPrice }).returning()
-    mapping.set(f.id, saved.id)
-  }
-  await tx.delete(leaseFees).where(eq(leaseFees.leaseId, leaseId))
-  await tx.update(leases).set({ feeModel: 'snapshot', updatedAt: new Date() }).where(eq(leases.id, leaseId))
-  return mapping
-}
-
-async function applyLeaseFeeEdits(tx: DB, ctx: AccessContext, leaseId: string, feeModel: string, rawEdits: NonNullable<LeaseEditInput['fees']>, roomId: string): Promise<void> {
-  let edits = rawEdits
-  // Thêm phí theo đồng hồ vào hợp đồng kiểu cũ: chuyển sang bản chụp phí trước
-  if (feeModel !== 'snapshot') {
-    const newTypeIds = edits.flatMap(e => !e.leaseFeeId && e.feeTypeId ? [e.feeTypeId] : [])
-    const addsMeter = newTypeIds.length > 0 && (await tx.select({ id: feeTypes.id }).from(feeTypes).where(and(inArray(feeTypes.id, newTypeIds), eq(feeTypes.quantityFrom, 'meter')))).length > 0
-    if (addsMeter) {
-      const mapping = await convertLegacyFees(tx, leaseId)
-      edits = edits.map(e => e.leaseFeeId ? { ...e, leaseFeeId: mapping.get(e.leaseFeeId) ?? e.leaseFeeId } : e)
-      feeModel = 'snapshot'
-    }
-  }
-  const snapshot = feeModel === 'snapshot'
-  const existing = snapshot
-    ? await tx.select({ id: leaseFeeSnapshots.id, feeTypeId: leaseFeeSnapshots.feeTypeId, name: leaseFeeSnapshots.name, source: leaseFeeSnapshots.quantitySource }).from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, leaseId))
-    : (await tx.select({ id: leaseFees.id, feeTypeId: leaseFees.feeTypeId, name: feeTypes.name }).from(leaseFees).innerJoin(feeTypes, eq(feeTypes.id, leaseFees.feeTypeId)).where(eq(leaseFees.leaseId, leaseId))).map(r => ({ ...r, source: 'legacy' }))
+/** Sửa phí dịch vụ của hợp đồng: đổi đơn giá, gỡ phí, thêm phí từ loại phí đã cài. Phí theo đồng hồ không gỡ tại đây. */
+async function applyLeaseFeeEdits(tx: DB, ctx: AccessContext, leaseId: string, edits: NonNullable<LeaseEditInput['fees']>, roomId: string): Promise<void> {
+  const existing = await tx.select({ id: leaseFeeSnapshots.id, feeTypeId: leaseFeeSnapshots.feeTypeId, name: leaseFeeSnapshots.name, source: leaseFeeSnapshots.quantitySource }).from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, leaseId))
   const keepIds = new Set(edits.flatMap(e => e.leaseFeeId ? [e.leaseFeeId] : []))
   for (const row of existing) if (!keepIds.has(row.id) && row.source === 'meter') throw new ValidationError(`Phí ${row.name} tính theo đồng hồ, không gỡ được tại đây`)
   const seenTypes = new Set(existing.filter(r => r.feeTypeId && r.source !== 'meter').map(r => r.feeTypeId as string))
@@ -434,29 +390,23 @@ async function applyLeaseFeeEdits(tx: DB, ctx: AccessContext, leaseId: string, f
     if (!Number.isSafeInteger(edit.unitPrice) || edit.unitPrice < 0 || edit.unitPrice > 2_147_483_647) throw new ValidationError('Đơn giá phí không hợp lệ')
     if (edit.leaseFeeId) {
       if (!existing.some(r => r.id === edit.leaseFeeId)) throw new ValidationError('Phí không thuộc hợp đồng này')
-      if (snapshot) await tx.update(leaseFeeSnapshots).set({ unitPrice: edit.unitPrice }).where(eq(leaseFeeSnapshots.id, edit.leaseFeeId))
-      else await tx.update(leaseFees).set({ unitPrice: edit.unitPrice }).where(eq(leaseFees.id, edit.leaseFeeId))
+      await tx.update(leaseFeeSnapshots).set({ unitPrice: edit.unitPrice }).where(eq(leaseFeeSnapshots.id, edit.leaseFeeId))
       continue
     }
     if (!edit.feeTypeId) throw new ValidationError('Chọn loại phí đã cài đặt')
     const [row] = await tx.select({ type: feeTypes, unit: feeUnits }).from(feeTypes).innerJoin(feeUnits, eq(feeTypes.unitId, feeUnits.id)).where(eq(feeTypes.id, edit.feeTypeId))
     if (!row || !row.type.isActive) throw new ValidationError('Loại phí không tồn tại hoặc đã lưu trữ')
     if (row.type.quantityFrom === 'meter') {
-      if (!snapshot) throw new ValidationError('Hợp đồng này dùng mô hình phí cũ, chưa gắn được phí tính theo đồng hồ')
       const [saved] = await tx.insert(leaseFeeSnapshots).values({ leaseId, feeTypeId: row.type.id, name: row.type.name, unit: row.unit.name, quantitySource: 'meter', quantity: 1, billing: row.type.billing, unitPrice: edit.unitPrice }).returning()
       await ensureFeeMeter(tx, ctx, { roomId, leaseFeeId: saved.id, initialReading: edit.initialReading, existingMeterId: edit.existingMeterId, installedOn: todayVN() })
       continue
     }
     if (seenTypes.has(row.type.id)) throw new ValidationError(`Phí ${row.type.name} đã có trong hợp đồng`)
     seenTypes.add(row.type.id)
-    if (snapshot) await tx.insert(leaseFeeSnapshots).values({ leaseId, feeTypeId: row.type.id, name: row.type.name, unit: row.unit.name, quantitySource: row.type.quantityFrom === 'manual' ? 'legacy_fixed' : row.type.quantityFrom, quantity: 1, billing: row.type.billing, unitPrice: edit.unitPrice })
-    else await tx.insert(leaseFees).values({ leaseId, feeTypeId: row.type.id, quantity: 1, unitPrice: edit.unitPrice })
+    await tx.insert(leaseFeeSnapshots).values({ leaseId, feeTypeId: row.type.id, name: row.type.name, unit: row.unit.name, quantitySource: row.type.quantityFrom === 'manual' ? 'legacy_fixed' : row.type.quantityFrom, quantity: 1, billing: row.type.billing, unitPrice: edit.unitPrice })
   }
   const removed = existing.filter(r => !keepIds.has(r.id)).map(r => r.id)
-  if (removed.length) {
-    if (snapshot) await tx.delete(leaseFeeSnapshots).where(inArray(leaseFeeSnapshots.id, removed))
-    else await tx.delete(leaseFees).where(inArray(leaseFees.id, removed))
-  }
+  if (removed.length) await tx.delete(leaseFeeSnapshots).where(inArray(leaseFeeSnapshots.id, removed))
 }
 
 export async function updateLease(db: DB, ctx: AccessContext, id: string, input: LeaseEditInput, confirmedSigned: boolean): Promise<void> {
@@ -483,7 +433,7 @@ export async function updateLease(db: DB, ctx: AccessContext, id: string, input:
       const [template] = await tx.select().from(docTemplates).where(eq(docTemplates.id, input.contractTemplateId))
       if (!template || template.docType !== 'lease' || !template.body) throw new ValidationError('Mẫu hợp đồng không hợp lệ hoặc chưa sẵn sàng')
     }
-    if (input.fees !== undefined) await applyLeaseFeeEdits(tx, ctx, id, before.feeModel, input.fees, input.roomId)
+    if (input.fees !== undefined) await applyLeaseFeeEdits(tx, ctx, id, input.fees, input.roomId)
     await captureContractVersion(tx, ctx, 'lease', id, 'edit')
     const [after] = await tx.update(leases).set({ roomId: input.roomId, tenantId: input.tenantId, startDate: input.startDate, endDate: input.endDate, monthlyRent: input.monthlyRent, depositAmount: input.depositAmount, note: input.note ?? '', ...(input.contractTemplateId !== undefined && { contractTemplateId: input.contractTemplateId }), ...(input.invoiceTemplateId !== undefined && { invoiceTemplateId: input.invoiceTemplateId }), updatedAt: new Date() }).where(eq(leases.id, id)).returning()
     // Đổi người đại diện (bên ký): người cũ vẫn ở lại, người mới được thêm vào danh sách người ở nếu chưa có

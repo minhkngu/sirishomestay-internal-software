@@ -113,7 +113,6 @@ export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAsse
     const input = {
       roomId, tenantId, occupantIds, startDate, endDate, monthlyRent: Number(rent), depositAmount: Number(deposit), receivedDeposit: Number(received), note, contractTemplateId: contractTemplateId || null, invoiceTemplateId: invoiceTemplateId || null,
       handover: { expectedRoomAssetIds: assets.filter(a => a.locationKind === 'room' && a.locationId === roomId).map(a => a.id), expectedAddedLocations: changes.addAssetIds.map(id => { const a = assets.find(x => x.id === id)!; return { assetId: id, kind: a.locationKind, id: a.locationId } }), ...changes, conditions: handoverAssets.map(asset => ({ assetCode: asset.code, condition: assetEntry(assetConditions, asset.code) ?? asset.condition })) },
-      feeModel: 'snapshot' as const,
       fees: fees.map(f => ({ feeTypeId: f.feeTypeId, name: f.name, unit: f.unit, quantitySource: f.quantitySource, unitPrice: Number(f.price), quantity: Number(f.quantity), initialReading: f.initialReading.trim() === '' ? undefined : Number(f.initialReading), existingMeterId: meterIds[f.key] })),
       proration: overrideProration || null, billingCycleMonths: Number(cycle) || 1,
       dueRule: dayOfMonth ? { kind: 'day_of_next_month', day: Number(dayOfMonth) } : null,

@@ -104,6 +104,13 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): { lines: Invoic
       if (!item) { warnings.push(`Chưa nhập số lượng ${f.name} kỳ ${period}`); continue }
       lines.push({ type: 'fee', description: `${f.name} kỳ ${period}`, quantity: item.quantity, unitPrice: f.unitPrice, amount: item.quantity * f.unitPrice, meta: { leaseFeeId: f.leaseFeeId, period, unit: f.unit } })
     }
+    if (f.quantitySource === 'meter' && terms.startDate >= monthStart && terms.startDate <= monthEnd) {
+      // Kỳ ký hợp đồng: chưa dùng, chỉ số đầu và cuối đều là chỉ số ghi lúc ký
+      const link = input.feeMeterLinks?.find(x => x.leaseFeeId === f.leaseFeeId)
+      const start = input.readings.find(r => r.meterId === link?.meterId && r.kind === 'handover' && r.readOn === terms.startDate)
+      if (start) lines.push({ type: 'fee', description: `${f.name} (chỉ số ${start.value} → ${start.value})`, quantity: 0, unitPrice: f.unitPrice, amount: 0, meta: { leaseFeeId: f.leaseFeeId, unit: f.unit } })
+      continue
+    }
     if (f.quantitySource === 'meter' && terms.startDate <= prevEnd && terms.endDate >= prevStart) {
       const link = input.feeMeterLinks?.find(x => x.leaseFeeId === f.leaseFeeId)
       const linked = input.meters.find(m => m.id === link?.meterId)

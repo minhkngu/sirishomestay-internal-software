@@ -19,7 +19,7 @@ it.skipIf(!process.env.TEST_POSTGRES_URL)('đồng thời hai dòng phí chọn 
     const [facility] = await db.insert(schema.facilities).values({ code: 'RACE', name: 'Race' }).returning()
     const [room] = await db.insert(schema.rooms).values({ facilityId: facility.id, code: 'R' }).returning()
     const tenant = await createTenant(db, admin, { kind: 'vietnamese', homeFacilityId: facility.id, fullName: 'Test', phone: '0901234567', idNumber: '123456789012' })
-    const [lease] = await db.insert(schema.leases).values({ code: 'RACE-LEASE', roomId: room.id, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2026-12-31', monthlyRent: 0, depositAmount: 0, feeModel: 'snapshot' }).returning()
+    const [lease] = await db.insert(schema.leases).values({ code: 'RACE-LEASE', roomId: room.id, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2026-12-31', monthlyRent: 0, depositAmount: 0 }).returning()
     const [meter] = await db.insert(schema.meters).values({ roomId: room.id, utility: 'electric', installedOn: '2026-01-01', startReading: 0 }).returning()
     const fees = await db.insert(schema.leaseFeeSnapshots).values([1, 2].map(() => ({ leaseId: lease.id, name: 'Race', unit: 'kWh', quantitySource: 'meter', unitPrice: 1 }))).returning()
     const results = await Promise.allSettled(fees.map(fee => db.transaction(tx => ensureFeeMeter(tx as unknown as DB, admin, { roomId: room.id, leaseFeeId: fee.id, existingMeterId: meter.id, initialReading: 123, installedOn: '2026-01-01' }))))

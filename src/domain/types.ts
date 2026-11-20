@@ -28,7 +28,6 @@ export type Lease = {
   occupantIds: string[]
   billingCycleMonths: number
   billWaterByMeter: boolean
-  feeModel?: 'legacy' | 'snapshot'
   dueRule?: DueRule | null
   proration?: Proration | null
 }

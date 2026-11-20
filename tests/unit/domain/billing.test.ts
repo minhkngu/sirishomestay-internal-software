@@ -237,6 +237,14 @@ describe('buildMonthlyInvoice', () => {
     expect(r.lines.find((l) => l.type === 'rent')?.amount).toBe(4_800_000)
     expect(r.lines.some((l) => l.meta?.leaseFeeId === 'e1')).toBe(false)
   })
+  it('kỳ ký hợp đồng có dòng phí đồng hồ mức dùng 0, chỉ số đầu bằng chỉ số cuối', () => {
+    const t = { ...terms(), startDate: '2026-11-15' }
+    const r = buildMonthlyInvoice({ ...base, lease: lease({ ...t, occupantIds: ['t1', 't2'] }), readings: [{ meterId: 'me', period: '2026-11', kind: 'handover', readOn: '2026-11-15', value: 120 }] })
+    const electric = r.lines.find((l) => l.meta?.leaseFeeId === 'e1')
+    expect(electric).toMatchObject({ quantity: 0, unitPrice: 3500, amount: 0 })
+    expect(electric!.description).toContain('120 → 120')
+    expect(r.warnings).toEqual([])
+  })
   it('fullMonth bỏ qua tính lẻ ngày', () => {
     const t = { ...terms(), startDate: '2026-11-15' }
     expect(buildMonthlyInvoice({ ...base, lease: lease({ ...t, occupantIds: ['t1', 't2'] }), fullMonth: true }).lines.find((l) => l.type === 'rent')?.amount).toBe(9_000_000)
@@ -291,7 +299,7 @@ describe('buildTerminationInvoice', () => {
   const input = () => ({
     terms: { ...contractTermsAt(lease({ startDate: '2026-01-01' }), [], '2026-11-20'), startDate: '2026-01-01' },
     endDate: '2026-11-20', approvedInvoices: [paidNov],
-    utilities: [{ type: 'electric' as const, usage: 100, unitPrice: 3500 }, { type: 'water' as const, usage: 4, unitPrice: 17_500 }],
+    meterFees: [{ leaseFeeId: 'e1', name: 'Điện', unit: 'kWh', usage: 100, unitPrice: 3500 }, { leaseFeeId: 'w1', name: 'Nước', unit: 'm³', usage: 4, unitPrice: 17_500 }],
     oneOffs: [], pending: [], penalties: [{ description: 'Hỏng máy lạnh', amount: 500_000 }], unpaidTotal: 0,
     depositBalance: 9_000_000, forfeit: { mode: 'none' as const }, proration: 'days_30' as const,
   })
@@ -412,7 +420,7 @@ it('hóa đơn trong tháng thanh lý chỉ tính đến ngày thanh lý', () =>
 
 describe('phí snapshot trong hóa đơn', () => {
   const input = {
-    lease: lease({ feeModel: 'snapshot', occupantIds: ['a', 'b'], fees: [
+    lease: lease({ occupantIds: ['a', 'b'], fees: [
       fee({ feeTypeId: null, leaseFeeId: 'a', name: 'A', unit: 'người', quantitySource: 'occupants', unitPrice: 10_000 }),
       fee({ feeTypeId: null, leaseFeeId: 'b', name: 'B', unit: 'phòng', quantitySource: 'room', unitPrice: 30_000 }),
       fee({ feeTypeId: null, leaseFeeId: 'c', name: 'C', unit: 'm³', quantitySource: 'meter', unitPrice: 5_000 }),

@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { addenda, assets, depositContracts, depositEntries, facilities, feeTypes, feeUnits, files, handoverItems, handovers, invoiceLines, invoices, leaseOccupants, leases, meterReadings, meters, oneOffCharges, payments, pendingAdjustments, rooms, tenants, utilityRates } from '@/db'
+import { addenda, assets, depositContracts, depositEntries, facilities, feeTypes, feeUnits, files, handoverItems, handovers, invoiceLines, invoices, leaseFeeMeters, leaseFeeSnapshots, leaseOccupants, leases, meterReadings, meters, oneOffCharges, payments, pendingAdjustments, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { resolveFeePrice } from '@/domain/fee-price'
@@ -13,8 +13,7 @@ import { NotFoundError, ValidationError } from '@/domain/errors'
 import type { DocEntities } from '@/domain/template-fields'
 import { buildTerminationInvoice } from '@/domain/liquidation'
 import { meterUsage } from '@/domain/meters'
-import { rateFor } from '@/domain/rates'
-import type { ContractFee, DepositEntry, ForfeitInput, Invoice, InvoiceLineInput, Meter, MeterReading, OneOffCharge, PendingAdjustment, Proration, UtilityRate } from '@/domain/types'
+import type { ContractFee, DepositEntry, ForfeitInput, Invoice, InvoiceLineInput, Meter, MeterReading, OneOffCharge, PendingAdjustment, Proration } from '@/domain/types'
 import { recordAudit } from '@/server/audit'
 import { captureContractVersion, recordTerminationHandover, recordTerminationReadings } from '@/server/contracts/history'
 import { registerExportOwnerResolver, registerOwnerResolver } from '@/server/files/owners'
@@ -210,10 +209,10 @@ export async function createTermination(db: DB, ctx: AccessContext, leaseId: str
     await recordTerminationHandover(tx, versionId, existingCheckout ? null : checkout.id)
     const [row] = await tx.insert(addenda).values({ leaseId, type: 'termination', effectiveDate: data.endDate, depositForfeit: data.forfeit, adjustmentTarget: 'next' }).returning()
 
-    const [base, all, settings, entries, allInvoices, ms, rates, oneOffs, pending, items] = await Promise.all([
+    const [base, all, settings, entries, allInvoices, ms, feeLinks, oneOffs, pending, items] = await Promise.all([
       leaseData(tx, leaseId), loadAddenda(tx, leaseId), getSettings(tx), tx.select().from(depositEntries).where(eq(depositEntries.leaseId, leaseId)),
       tx.select().from(invoices).where(eq(invoices.leaseId, leaseId)), tx.select().from(meters).where(eq(meters.roomId, l.roomId)),
-      tx.select().from(utilityRates).where(eq(utilityRates.facilityId, facilityId)), tx.select().from(oneOffCharges).where(eq(oneOffCharges.leaseId, leaseId)),
+      tx.select({ leaseFeeId: leaseFeeMeters.leaseFeeId, meterId: leaseFeeMeters.meterId }).from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).where(eq(leaseFeeSnapshots.leaseId, leaseId)), tx.select().from(oneOffCharges).where(eq(oneOffCharges.leaseId, leaseId)),
       tx.select().from(pendingAdjustments).where(eq(pendingAdjustments.leaseId, leaseId)), tx.select({ penalty: handoverItems.penalty, name: assets.name }).from(handoverItems).innerJoin(assets, eq(assets.id, handoverItems.assetId)).where(eq(handoverItems.handoverId, checkout.id)),
     ])
     const terms = contractTermsAt(base, all, data.endDate)
@@ -231,16 +230,18 @@ export async function createTermination(db: DB, ctx: AccessContext, leaseId: str
     const prev = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5)) - 2, 1)).toISOString().slice(0, 10)
     const utilStart = billedThisMonth ? monthStart : prev
     const readings = ms.length ? await tx.select().from(meterReadings).where(inArray(meterReadings.meterId, ms.map(m => m.id))) : []
-    const utilities: { type: 'electric' | 'water'; usage: number; unitPrice: number }[] = []
-    for (const type of ['electric', 'water'] as const) {
-      if (type === 'water' && !terms.billWaterByMeter) continue
-      const mine = ms.filter(m => m.utility === type) as Meter[]; if (!mine.length) continue
-      const u = meterUsage(mine, readings as MeterReading[], utilStart, data.endDate)
-      if (u.missing.length) throw new ValidationError(`Chưa có chỉ số ${type === 'electric' ? 'điện' : 'nước'} để tính tiền`)
-      utilities.push({ type, usage: u.usage, unitPrice: rateFor(rates as UtilityRate[], facilityId, type, utilStart) })
+    // Phí tính theo đồng hồ: mức dùng qua mọi đồng hồ cùng loại của phòng (điện, nước) hoặc chỉ đồng hồ đã gắn (loại khác)
+    const meterFees: { leaseFeeId: string; name: string; unit: string; usage: number; unitPrice: number }[] = []
+    for (const f of terms.fees.filter(x => x.quantitySource === 'meter' && x.leaseFeeId)) {
+      const linked = ms.find(m => m.id === feeLinks.find(x => x.leaseFeeId === f.leaseFeeId)?.meterId)
+      if (!linked) throw new ValidationError(`Chưa có đồng hồ ${f.name} để tính tiền`)
+      const chain = (linked.utility === 'electric' || linked.utility === 'water' ? ms.filter(m => m.roomId === terms.roomId && m.utility === linked.utility) : [linked]) as Meter[]
+      const u = meterUsage(chain, readings as MeterReading[], utilStart, data.endDate)
+      if (u.missing.length) throw new ValidationError(`Chưa có chỉ số ${f.name} để tính tiền`)
+      meterFees.push({ leaseFeeId: f.leaseFeeId!, name: f.name, unit: f.unit, usage: u.usage, unitPrice: f.unitPrice })
     }
     const built = buildTerminationInvoice({
-      terms, endDate: data.endDate, approvedInvoices: approved.map(asInvoice), utilities, proration: (base.proration ?? settings.proration) as Proration,
+      terms, endDate: data.endDate, approvedInvoices: approved.map(asInvoice), meterFees, proration: (base.proration ?? settings.proration) as Proration,
       oneOffs: oneOffs.map(x => ({ ...x, kind: x.kind as OneOffCharge['kind'], invoicedInId: x.invoiceId })), pending: pending.map(x => ({ ...x, invoicedInId: x.invoiceId })) as PendingAdjustment[],
       penalties: items.filter(i => i.penalty > 0).map(i => ({ description: `Phạt tài sản: ${i.name}`, amount: i.penalty })), unpaidTotal,
       depositBalance: depositBalance(entries.map(e => ({ id: e.id, date: e.date, type: e.type as DepositEntry['type'], amount: e.amount, status: e.status as DepositEntry['status'] }))), forfeit: data.forfeit as ForfeitInput,

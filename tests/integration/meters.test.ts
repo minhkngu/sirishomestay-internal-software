@@ -66,7 +66,7 @@ describe('meters', () => {
 
   it('thay đồng hồ chuyển liên kết dòng phí sang đồng hồ mới', async () => {
     const [tenant] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: fa, fullName: 'Khách', phone: '+84901234567', idNumber: '012345678901' }).returning()
-    const [lease] = await db.insert(leases).values({ code: 'HD1', roomId: r101, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-01-01', monthlyRent: 1, depositAmount: 1, feeModel: 'snapshot' }).returning()
+    const [lease] = await db.insert(leases).values({ code: 'HD1', roomId: r101, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-01-01', monthlyRent: 1, depositAmount: 1 }).returning()
     const [fee] = await db.insert(leaseFeeSnapshots).values({ leaseId: lease.id, name: 'Điện', unit: 'kWh', quantitySource: 'meter', billing: 'per_occurrence', unitPrice: 3500 }).returning()
     await db.insert(leaseFeeMeters).values({ leaseFeeId: fee.id, meterId: m.E101 })
     await replaceMeter(db, hung(), r101, 'electric', { removedOn: '2026-10-20', finalReading: 1260, startReading: 0 })
@@ -80,7 +80,7 @@ describe('meters', () => {
     const contractCtx = () => ctxOf(['tenants_contracts', 'meters'], [fa])
     async function leaseFee(roomId: string, code: string) {
       const [tenant] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: fa, fullName: `Khách ${code}`, phone: `+8490123${code.padStart(4, '0')}`, idNumber: `0123456${code.padStart(5, '0')}` }).returning()
-      const [lease] = await db.insert(leases).values({ code, roomId, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-01-01', monthlyRent: 1, depositAmount: 1, feeModel: 'snapshot' }).returning()
+      const [lease] = await db.insert(leases).values({ code, roomId, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-01-01', monthlyRent: 1, depositAmount: 1 }).returning()
       const [fee] = await db.insert(leaseFeeSnapshots).values({ leaseId: lease.id, name: 'Phí', unit: 'đv', quantitySource: 'meter', billing: 'per_occurrence', unitPrice: 1 }).returning()
       return { lease, fee }
     }
@@ -104,7 +104,7 @@ describe('meters', () => {
       const { fee } = await leaseFee(r101, '3')
       await attach(r101, fee.id, m.E101)
       const [tenant2] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: fa, fullName: 'Khách 4', phone: '+84901230004', idNumber: '012345600004' }).returning()
-      const [lease2] = await db.insert(leases).values({ code: '4', roomId: r101, tenantId: tenant2.id, startDate: '2026-01-01', endDate: '2027-01-01', monthlyRent: 1, depositAmount: 1, feeModel: 'snapshot', status: 'ended' }).returning()
+      const [lease2] = await db.insert(leases).values({ code: '4', roomId: r101, tenantId: tenant2.id, startDate: '2026-01-01', endDate: '2027-01-01', monthlyRent: 1, depositAmount: 1, status: 'ended' }).returning()
       const [fee2] = await db.insert(leaseFeeSnapshots).values({ leaseId: lease2.id, name: 'Phí', unit: 'đv', quantitySource: 'meter', billing: 'per_occurrence', unitPrice: 1 }).returning()
       // đồng hồ đang gắn phí của hợp đồng đang chạy (hợp đồng 3) nên dòng phí khác không dùng được
       await expect(attach(r101, fee2.id, m.E101)).rejects.toThrow('Đồng hồ đang gắn với phí của hợp đồng khác')

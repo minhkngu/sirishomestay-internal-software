@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, like, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { addenda, facilities, feeTypes, feeUnits, invoiceLines, invoices, invoiceFeeQuantities, leaseFeeMeters, leaseFees, leaseFeeSnapshots, leaseOccupants, leases, meterReadings, meters, oneOffCharges, payments, pendingAdjustments, rooms, tenants } from '@/db'
+import { addenda, facilities, feeTypes, feeUnits, invoiceLines, invoices, invoiceFeeQuantities, leaseFeeMeters, leaseFeeSnapshots, leaseOccupants, leases, meterReadings, meters, oneOffCharges, payments, pendingAdjustments, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { computeDueDate } from '@/domain/due-date'
@@ -33,10 +33,9 @@ async function getInvoice(db: Pick<DB, 'select'>, ctx: AccessContext, id: string
 async function leasesData(db: Pick<DB, 'select'>, ids: string[]): Promise<Map<string, { lease: Lease; addenda: Addendum[] }>> {
   const out = new Map<string, { lease: Lease; addenda: Addendum[] }>()
   if (!ids.length) return out
-  const [rows, occupants, feeRows, addendaRows, snapshots] = await Promise.all([
+  const [rows, occupants, addendaRows, snapshots] = await Promise.all([
     db.select().from(leases).where(inArray(leases.id, ids)),
     db.select().from(leaseOccupants).where(inArray(leaseOccupants.leaseId, ids)),
-    db.select({ fee: leaseFees, type: feeTypes, unit: feeUnits }).from(leaseFees).innerJoin(feeTypes, eq(leaseFees.feeTypeId, feeTypes.id)).innerJoin(feeUnits, eq(feeTypes.unitId, feeUnits.id)).where(inArray(leaseFees.leaseId, ids)),
     db.select().from(addenda).where(inArray(addenda.leaseId, ids)).orderBy(asc(addenda.effectiveDate), asc(addenda.createdAt)),
     db.select().from(leaseFeeSnapshots).where(inArray(leaseFeeSnapshots.leaseId, ids)),
   ])
@@ -46,9 +45,9 @@ async function leasesData(db: Pick<DB, 'select'>, ids: string[]): Promise<Map<st
     const firstTransfer = mine.find(a => a.type === 'transfer'), firstOccupants = mine.find(a => a.type === 'occupants')
     const lease: Lease = {
       id: row.id, code: row.code, roomId: firstTransfer?.oldRoomId ?? row.roomId, startDate: row.startDate, endDate: row.endDate, monthlyRent: row.monthlyRent, depositAmount: row.depositAmount,
-      billingCycleMonths: row.billingCycleMonths, billWaterByMeter: row.billWaterByMeter, feeModel: row.feeModel as 'legacy' | 'snapshot', dueRule: row.dueRule as DueRule | null, proration: row.proration as Proration | null,
+      billingCycleMonths: row.billingCycleMonths, billWaterByMeter: row.billWaterByMeter, dueRule: row.dueRule as DueRule | null, proration: row.proration as Proration | null,
       occupantIds: (firstOccupants?.oldOccupantIds as string[] | undefined) ?? occupants.filter(x => x.leaseId === row.id).map(x => x.tenantId),
-      fees: row.feeModel === 'snapshot' ? snapshots.filter(f => f.leaseId === row.id).map(f => ({ leaseFeeId: f.id, feeTypeId: f.feeTypeId, name: f.name, unit: f.unit, billing: f.billing as ContractFee['billing'], quantityFrom: f.quantitySource === 'occupants' ? 'occupants' as const : 'manual' as const, quantitySource: f.quantitySource as NonNullable<ContractFee['quantitySource']>, quantity: f.quantity, unitPrice: f.unitPrice })) : feeRows.filter(f => f.fee.leaseId === row.id).map(({ fee, type, unit }) => ({ feeTypeId: type.id, name: type.name, unit: unit.name, billing: type.billing as ContractFee['billing'], quantityFrom: type.quantityFrom as ContractFee['quantityFrom'], quantity: fee.quantity, unitPrice: fee.unitPrice })),
+      fees: snapshots.filter(f => f.leaseId === row.id).map(f => ({ leaseFeeId: f.id, feeTypeId: f.feeTypeId, name: f.name, unit: f.unit, billing: f.billing as ContractFee['billing'], quantityFrom: f.quantitySource === 'occupants' ? 'occupants' as const : 'manual' as const, quantitySource: f.quantitySource as NonNullable<ContractFee['quantitySource']>, quantity: f.quantity, unitPrice: f.unitPrice })),
     }
     out.set(row.id, { lease, addenda: mine.map(toAddendum) })
   }
@@ -186,7 +185,7 @@ export async function approveInvoice(db: DB, ctx: AccessContext, id: string, inp
   return db.transaction(async tx0 => {
     const tx = tx0 as unknown as DB; await tx.select({ id: invoices.id }).from(invoices).where(eq(invoices.id, id)).for('update'); const before = await getInvoice(tx, ctx, id); if (before.status !== 'draft') throw new ValidationError('Hoá đơn đã được duyệt')
     const [lease, settings] = await Promise.all([leaseData(tx, before.leaseId), getSettings(tx)])
-    if (lease.feeModel === 'snapshot') {
+    if (before.kind === 'monthly') {
       const calculated = await calculate(tx, lease, before.facilityId, before.periodStart.slice(0, 7), { start: before.periodStart, end: before.periodEnd, coefficient: before.coefficient ?? undefined }, before.fullMonth, before.proration as Proration | undefined, before.id)
       const missing = calculated.warnings.filter(w => w.startsWith('Chưa') || lease.fees.some(f => w.startsWith(`${f.name}:`)))
       if (missing.length) throw new ValidationError(missing.join('; '))
@@ -241,15 +240,14 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
   return db.transaction(async tx0 => {
     const tx = tx0 as unknown as DB; const inv = await getInvoice(tx, ctx, id)
     const old = await tx.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, id))
-    const [leaseRow] = await tx.select({ feeModel: leases.feeModel }).from(leases).where(eq(leases.id, inv.leaseId))
-    if (leaseRow?.feeModel === 'snapshot') {
+    {
       const protectedLine = (l: { id?: string; type: string; quantity: number; unitPrice: number; meta?: unknown }) => { const meta = l.meta as { leaseFeeId?: unknown } | null; return typeof meta?.leaseFeeId === 'string' ? JSON.stringify([l.id, meta.leaseFeeId, l.type, l.quantity, l.unitPrice]) : null }
       const beforeFees = old.map(protectedLine).filter(Boolean).sort()
       const afterFees = data.map(protectedLine).filter(Boolean).sort()
       if (JSON.stringify(beforeFees) !== JSON.stringify(afterFees)) throw new ValidationError('Không sửa hoặc xóa dòng phí hợp đồng tại đây; hãy cập nhật số lượng theo kỳ')
     }
     const next = data.map(l => {
-      const protectedFee = leaseRow?.feeModel === 'snapshot' && typeof (l.meta as { leaseFeeId?: unknown } | null)?.leaseFeeId === 'string' ? old.find(previous => previous.id === l.id) : undefined
+      const protectedFee = typeof (l.meta as { leaseFeeId?: unknown } | null)?.leaseFeeId === 'string' ? old.find(previous => previous.id === l.id) : undefined
       return { invoiceId: id, type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, amount: protectedFee?.amount ?? Math.round(l.quantity * l.unitPrice), meta: protectedFee ? protectedFee.meta : l.meta ?? null }
     })
     // Phí phát sinh / điều chỉnh bị bỏ khỏi hoá đơn thì trả về trạng thái chưa tính

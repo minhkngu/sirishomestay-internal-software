@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { addenda, assets, depositEntries, feeTypes, feeTypePrices, feeUnits, leaseFees, payments, facilities, files, invoiceLines, invoices, leaseOccupants, leases, meterReadings, meters, pendingAdjustments, rooms, tenants, utilityRates } from '@/db'
+import { addenda, assets, depositEntries, feeTypes, feeTypePrices, feeUnits, leaseFeeMeters, leaseFeeSnapshots, payments, facilities, files, invoiceLines, invoices, leaseOccupants, leases, meterReadings, meters, pendingAdjustments, rooms, tenants, utilityRates } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
@@ -23,8 +23,13 @@ describe('phụ lục hợp đồng', () => {
     await db.insert(depositEntries).values({ leaseId, date: '2026-01-01', type: 'collect', amount: 9000000, status: 'done' })
     const [inv] = await db.insert(invoices).values({ code: 'TD-HD-202611-0001', leaseId, facilityId, kind: 'monthly', periodStart: '2026-11-01', periodEnd: '2026-11-30', issueDate: '2026-11-01', dueDate: '2026-12-05', status: 'approved' }).returning(); invoiceId = inv.id
     await db.insert(invoiceLines).values({ invoiceId, type: 'rent', description: 'Tiền phòng', quantity: 1, unitPrice: 9000000, amount: 9000000 })
-    await db.insert(utilityRates).values({ facilityId, utility: 'electric', effectiveFrom: '2026-01-01', pricePerUnit: 3500 })
   })
+  // Phí điện của hợp đồng gắn đồng hồ điện của phòng, đơn giá do hợp đồng quyết định
+  async function electricFee(meterId: string, unitPrice = 3500) {
+    const [fee] = await db.insert(leaseFeeSnapshots).values({ leaseId, name: 'Điện', unit: 'kWh', quantitySource: 'meter', billing: 'per_occurrence', unitPrice }).returning()
+    await db.insert(leaseFeeMeters).values({ leaseFeeId: fee.id, meterId })
+    return fee
+  }
   it('ngữ cảnh phụ lục dùng giá phí riêng theo toà hợp đồng', async () => {
     const [unit] = await db.insert(feeUnits).values({ name: 'tháng' }).returning()
     const [fee] = await db.insert(feeTypes).values({ name: 'Dịch vụ', unitId: unit.id, defaultPrice: 200000 }).returning()
@@ -73,9 +78,11 @@ describe('phụ lục hợp đồng', () => {
     const [m] = await db.insert(meters).values({ roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 }).returning()
     await db.insert(meterReadings).values({ meterId: m.id, period: '2026-10', readOn: '2026-10-31', value: 100 })
     const [photo] = await db.insert(files).values({ storageKey: 'k', contentType: 'image/jpeg', ownerType: 'tenant_document', ownerId: tenantId }).returning()
+    await electricFee(m.id)
     await expect(createTermination(db, ctx(), leaseId, { endDate: '2026-12-10', forfeit: { mode: 'none' }, readings: [] })).rejects.toThrow(/Nhập chỉ số/)
     const r = await createTermination(db, ctx(), leaseId, { endDate: '2026-12-10', forfeit: { mode: 'partial', amount: 2000000 }, readings: [{ meterId: m.id, value: 160 }] })
-    expect(r.invoice!.lines.map(l => l.type)).toEqual(expect.arrayContaining(['rent', 'electric', 'adjustment', 'deposit_offset']))
+    expect(r.invoice!.lines.map(l => l.type)).toEqual(expect.arrayContaining(['rent', 'fee', 'adjustment', 'deposit_offset']))
+    expect(r.invoice!.lines.find(l => l.description.startsWith('Điện'))).toMatchObject({ quantity: 60, unitPrice: 3500, amount: 210000 })
     expect(r.invoice!.lines.find(l => l.type === 'deposit_offset')!.amount).toBe(-7000000)
     await expect(createTermination(db, ctx(), leaseId, { endDate: '2026-12-11', readings: [{ meterId: m.id, value: 170 }] })).rejects.toThrow('đã có phụ lục thanh lý')
     await approveInvoice(db, ctx(), r.invoice!.id, { dueDate: '2026-12-20' })
@@ -101,7 +108,7 @@ describe('phụ lục hợp đồng', () => {
     it('đổi người ở 2 → 3 từ 16/11 với phí theo người 200.000 → +100.000', async () => {
       const [unit] = await db.insert(feeUnits).values({ name: 'người' }).returning()
       const [fee] = await db.insert(feeTypes).values({ name: 'Phí người ở', unitId: unit.id, defaultPrice: 200000, billing: 'monthly_fixed', quantityFrom: 'occupants' }).returning()
-      await db.insert(leaseFees).values({ leaseId, feeTypeId: fee.id, quantity: 1, unitPrice: 200000 })
+      await db.insert(leaseFeeSnapshots).values({ leaseId, feeTypeId: fee.id, name: 'Phí người ở', unit: 'người', quantitySource: 'occupants', quantity: 1, billing: 'monthly_fixed', unitPrice: 200000 })
       const [a, b] = await db.insert(tenants).values([{ kind: 'vietnamese', homeFacilityId: facilityId, fullName: 'A', phone: '+84901230001', idNumber: '012345678001' }, { kind: 'vietnamese', homeFacilityId: facilityId, fullName: 'B', phone: '+84901230002', idNumber: '012345678002' }]).returning()
       await db.insert(leaseOccupants).values({ leaseId, tenantId: a.id })
       const r = await createOccupantChange(db, ctx(), leaseId, { effectiveDate: '2026-11-16', occupantIds: [tenantId, a.id, b.id] })
@@ -111,6 +118,7 @@ describe('phụ lục hợp đồng', () => {
       await db.insert(payments).values({ invoiceId, paidOn: '2026-11-05', amount: 9000000, method: 'cash', receivedBy: crypto.randomUUID() })
       const [m] = await db.insert(meters).values({ roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 }).returning()
       await db.insert(meterReadings).values({ meterId: m.id, period: '2026-10', readOn: '2026-10-31', value: 100 })
+      await electricFee(m.id)
       await db.insert(assets).values({ code: 'TV1', name: 'TV', value: 500000, locationKind: 'room', locationId: roomId, facilityId })
       const h = await startHandover(db, ctx(), leaseId, 'check_out'); const d = await (await import('@/server/handovers/service')).getHandover(db, ctx(), h.id)
       await saveHandover(db, ctx(), h.id, { items: [{ id: d.items[0].id, penalty: 500000 }], meterReadings: [] })

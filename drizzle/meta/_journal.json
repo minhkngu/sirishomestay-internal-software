@@ -225,6 +225,13 @@
       "when": 1795166248238,
       "tag": "0031_smart_microbe",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1795168811786,
+      "tag": "0032_spotty_night_nurse",
+      "breakpoints": true
     }
   ]
 }
