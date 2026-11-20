@@ -6,7 +6,7 @@ import { computeDueDate } from '@/modules/leasing/domain/due-date'
 import { contractTermsAt } from '@/modules/leasing/domain/contract-terms'
 import { midPeriodAdjustments } from '@/modules/leasing/domain/adjustments'
 import { buildMonthlyInvoice, buildFirstInvoice } from '@/modules/leasing/domain/invoice-builder'
-import { depositBalance, depositDiffEntry } from '@/domain/deposit'
+import { depositBalance, depositDiffEntry } from '@/modules/leasing/domain/deposit'
 import { buildTerminationInvoice } from '@/modules/leasing/domain/liquidation'
 import { ValidationError } from '@/domain/errors'
 import type {

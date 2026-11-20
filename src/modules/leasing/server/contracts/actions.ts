@@ -263,7 +263,7 @@ export async function quickContractDataAction(kind: 'lease' | 'deposit', id: str
         ? await (async () => {
             const l = contract as Awaited<ReturnType<typeof getLease>>
             const { listFeeTypes, listFeeTypePrices, listFeeUnits } = await import('@/modules/facilities')
-            const { resolveFeePrice } = await import('@/domain/fee-price')
+            const { resolveFeePrice } = await import('../../domain/fee-price')
             const [types, prices, units] = await Promise.all([
               listFeeTypes(db, ctx),
               listFeeTypePrices(db, ctx),

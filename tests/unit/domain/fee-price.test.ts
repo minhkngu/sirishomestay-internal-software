@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { resolveFeePrice } from '@/domain/fee-price'
+import { resolveFeePrice } from '@/modules/leasing/domain/fee-price'
 it('chọn giá riêng, kể cả 0; còn lại dùng giá chung', () => {
   expect(resolveFeePrice(200000, { a: 250000, b: 0 }, 'a')).toBe(250000)
   expect(resolveFeePrice(200000, { a: 250000, b: 0 }, 'b')).toBe(0)

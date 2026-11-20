@@ -14,7 +14,7 @@ import {
 import { buttonVariants } from '@/components/ui/button'
 import { db } from '@/db/client'
 import { NotFoundError } from '@/domain/errors'
-import { DEPOSIT_ENTRY_LABELS, depositBalance, runningDepositBalances } from '@/domain/deposit'
+import { DEPOSIT_ENTRY_LABELS, depositBalance, runningDepositBalances } from '@/modules/leasing'
 import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { getAccessContext } from '@/modules/platform'
@@ -28,7 +28,7 @@ import { listInvoices } from '@/modules/leasing'
 import { ContractActions } from './contract-actions'
 import { listAddenda } from '@/modules/leasing'
 import { cn } from '@/lib/utils'
-import { signStatusLabel } from '@/domain/sign-status'
+import { signStatusLabel } from '@/modules/leasing'
 import type { DepositEntryStatus, DepositEntryType } from '@/domain/statuses'
 
 type Entry = { id: string; date: string; type: DepositEntryType; amount: number; status: DepositEntryStatus }

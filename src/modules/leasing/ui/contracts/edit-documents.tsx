@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatDateVN, todayVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
-import { DEPOSIT_ENTRY_LABELS } from '@/domain/deposit'
+import { DEPOSIT_ENTRY_LABELS } from '../../domain/deposit'
 import type { DepositEntry } from '@/domain/types'
 
 export type DepositRow = { id: string; date: string; type: string; amount: number; status: string }

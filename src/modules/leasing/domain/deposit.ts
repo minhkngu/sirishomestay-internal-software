@@ -1,4 +1,4 @@
-import type { DepositEntry, ISODate } from './types'
+import type { DepositEntry, ISODate } from '@/domain/types'
 
 type BalanceEntry = Pick<DepositEntry, 'type' | 'amount' | 'status'>
 

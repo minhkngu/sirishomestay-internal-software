@@ -3,7 +3,7 @@ import { depositContracts, depositEntries, leaseOccupants, leases, tenants } fro
 import type { DB } from '@/db/client'
 import { can, type AccessContext } from '@/domain/access'
 import { roomStatus, type RoomStatus } from '@/domain/room-status'
-import { depositBalance } from '@/domain/deposit'
+import { depositBalance } from '../../domain/deposit'
 import type { DepositEntry, LeaseTerms } from '@/domain/types'
 import { todayVN } from '@/domain/dates'
 import { contractTermsAt } from '../../domain/contract-terms'
