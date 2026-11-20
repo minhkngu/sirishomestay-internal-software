@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, inArray, lte } from 'drizzle-orm'
+import { MAX_MONEY } from '@/domain/money'
 import { z } from 'zod'
 import { feeTypes, feeTypePrices, feeUnits, utilityRates, feeDefaults, facilities } from '@/db'
 import type { DB } from '@/db/client'
@@ -223,7 +224,7 @@ export async function createRate(db: DB, ctx: AccessContext, input: unknown): Pr
 
 const feePriceKey = z.object({ feeTypeId: z.uuid(), facilityId: z.uuid() })
 const feePriceInput = feePriceKey.extend({
-  price: z.number().int().min(0, 'Đơn giá không hợp lệ').max(2147483647, 'Đơn giá không hợp lệ'),
+  price: z.number().int().min(0, 'Đơn giá không hợp lệ').max(MAX_MONEY, 'Đơn giá không hợp lệ'),
 })
 
 export async function listFeeTypePrices(
@@ -297,7 +298,7 @@ const feeFacilitiesInput = z.object({
           .number()
           .int()
           .min(0, 'Đơn giá không hợp lệ')
-          .max(2147483647, 'Đơn giá không hợp lệ')
+          .max(MAX_MONEY, 'Đơn giá không hợp lệ')
           .nullable()
           .optional(),
       }),

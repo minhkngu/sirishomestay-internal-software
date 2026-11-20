@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
+import { MAX_INT4 } from '@/domain/money'
 import { leaseFeeMeters, leaseFeeSnapshots, leases, meterReadings, meters, rooms } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
@@ -347,7 +348,7 @@ export async function ensureFeeMeter(
   if (!room) throw new NotFoundError()
   assertCan(ctx, 'tenants_contracts', room.facilityId)
   // Chỉ số ban đầu luôn bắt buộc: chỉ số đầu của đồng hồ mới, hoặc chỉ số bàn giao của đồng hồ có sẵn
-  if (!Number.isSafeInteger(input.initialReading) || input.initialReading! < 0 || input.initialReading! > 2_147_483_647)
+  if (!Number.isSafeInteger(input.initialReading) || input.initialReading! < 0 || input.initialReading! > MAX_INT4)
     throw new ValidationError('Nhập chỉ số ban đầu hợp lệ', { initialReading: 'Nhập chỉ số nguyên không âm' })
   let found: typeof meters.$inferSelect
   if (input.existingMeterId) {

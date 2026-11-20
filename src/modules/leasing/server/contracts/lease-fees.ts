@@ -1,4 +1,5 @@
 import { and, eq, inArray } from 'drizzle-orm'
+import { MAX_MONEY } from '@/domain/money'
 import { feeTypes, feeUnits, leaseFees, leaseFeeSnapshots, leases } from '@/db'
 import { ValidationError } from '@/domain/errors'
 import { todayVN } from '@/domain/dates'
@@ -90,7 +91,7 @@ export async function applyLeaseFeeEdits(
     existing.filter((r) => r.feeTypeId && r.source !== 'meter').map((r) => r.feeTypeId as string),
   )
   for (const edit of edits) {
-    if (!Number.isSafeInteger(edit.unitPrice) || edit.unitPrice < 0 || edit.unitPrice > 2_147_483_647)
+    if (!Number.isSafeInteger(edit.unitPrice) || edit.unitPrice < 0 || edit.unitPrice > MAX_MONEY)
       throw new ValidationError('Đơn giá phí không hợp lệ')
     if (edit.leaseFeeId) {
       if (!existing.some((r) => r.id === edit.leaseFeeId)) throw new ValidationError('Phí không thuộc hợp đồng này')

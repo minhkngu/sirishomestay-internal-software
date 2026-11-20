@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, inArray, like, sql } from 'drizzle-orm'
+import { MAX_INT4 } from '@/domain/money'
 import { z } from 'zod'
 import {
   addenda,
@@ -494,7 +495,7 @@ export async function saveInvoiceFeeQuantities(
 ): Promise<void> {
   const data = parse(
     z
-      .array(z.object({ leaseFeeId: z.uuid(), quantity: z.number().int().safe().nonnegative().max(2_147_483_647) }))
+      .array(z.object({ leaseFeeId: z.uuid(), quantity: z.number().int().safe().nonnegative().max(MAX_INT4) }))
       .refine((items) => new Set(items.map((i) => i.leaseFeeId)).size === items.length, 'Phí bị trùng'),
     quantities,
   )

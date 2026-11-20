@@ -8,10 +8,13 @@ function toIso(y: number, m: number, d: number): string | null {
   return `${y}-${pad(m)}-${pad(d)}`
 }
 
-/** Ngày hôm nay (yyyy-mm-dd) theo múi giờ Asia/Ho_Chi_Minh. */
+/** Múi giờ hiển thị và tính ngày của cả hệ thống. */
+export const VN_TIME_ZONE = 'Asia/Ho_Chi_Minh'
+
+/** Ngày hôm nay (yyyy-mm-dd) theo múi giờ Việt Nam. */
 export function todayVN(now: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Ho_Chi_Minh',
+    timeZone: VN_TIME_ZONE,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

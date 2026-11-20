@@ -1,6 +1,7 @@
 import { RequirePermission, getAccessContext } from '@/modules/platform'
 import { db } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
+import { VN_TIME_ZONE } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { orNotFound } from '@/lib/or-not-found'
 import { incidentsForAsset } from '@/modules/leasing'
@@ -66,7 +67,7 @@ async function Asset({ params }: { params: Promise<{ id: string }> }) {
       <ul className="space-y-1 text-sm">
         {moves.map((m) => (
           <li key={m.id}>
-            {m.movedAt.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })} — {m.from} → {m.to}
+            {m.movedAt.toLocaleString('vi-VN', { timeZone: VN_TIME_ZONE })} — {m.from} → {m.to}
             {m.reason ? ` (${m.reason})` : ''}
           </li>
         ))}

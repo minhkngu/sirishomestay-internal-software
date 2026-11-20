@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { db } from '@/db/client'
 import { assertCan } from '@/domain/access'
+import { VN_TIME_ZONE } from '@/domain/dates'
 import { getAccessContext, listAuditLogs } from '@/modules/platform'
 import { listUsers } from '@/modules/users'
 
@@ -60,7 +61,7 @@ export default async function AuditPage({
             {logs.map((l) => (
               <tr key={l.id} className="border-t">
                 <td className="p-2 whitespace-nowrap">
-                  {l.createdAt.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}
+                  {l.createdAt.toLocaleString('vi-VN', { timeZone: VN_TIME_ZONE })}
                 </td>
                 <td className="p-2">{l.userId ? (name.get(l.userId) ?? l.userId.slice(0, 8)) : '—'}</td>
                 <td className="p-2">{l.summary || l.action}</td>

@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { compressImage } from '@/lib/image'
+import { MAX_IMAGE_BYTES } from '../domain/upload-limits'
 import { confirmUploadAction, requestUploadAction } from '../server/files/actions'
 import type { OwnerType } from '../server/files/owners'
 
@@ -42,7 +43,7 @@ export async function uploadOne(
   let main: Blob = file
   let thumb: Blob | null = null
   if (file.type.startsWith('image/')) ({ main, thumb } = await compressImage(file))
-  if (ownerType === 'lease_photo' && (main.size > 2 * 1024 * 1024 || (thumb && thumb.size > 2 * 1024 * 1024)))
+  if (ownerType === 'lease_photo' && (main.size > MAX_IMAGE_BYTES || (thumb && thumb.size > MAX_IMAGE_BYTES)))
     throw new Error('Ảnh vượt quá 2 MiB')
   const contentType = main.type || file.type
   const req = await requestUploadAction({ ownerType, ownerId, contentType, name: name ?? file.name, meta })
