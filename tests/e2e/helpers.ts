@@ -8,6 +8,12 @@ export const meterValue = () => Math.floor(Date.now() / 1000)
 
 /** Phí mặc định theo đồng hồ (vd. Điện) được tự thêm vào form hợp đồng và đòi chỉ số ban đầu: điền cho mọi ô còn trống. */
 export async function fillMeterReadings(page: Page) {
+  // Mỗi dòng phí đồng hồ phải chọn một đồng hồ của phòng: chọn đồng hồ rảnh đầu tiên còn trống
+  const pickers = page.getByLabel(/^Đồng hồ /)
+  for (let i = 0; i < await pickers.count(); i++) if (!(await pickers.nth(i).inputValue())) {
+    const options = await pickers.nth(i).locator('option').evaluateAll((os) => os.map((o) => (o as HTMLOptionElement).value).filter(Boolean))
+    if (options.length) await pickers.nth(i).selectOption(options[0])
+  }
   const inputs = page.getByLabel(/^Chỉ số ban đầu /)
   for (let i = 0; i < await inputs.count(); i++) if (!(await inputs.nth(i).inputValue())) await inputs.nth(i).fill(String(meterValue()))
 }

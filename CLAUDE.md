@@ -70,6 +70,8 @@ Web nội bộ cho nhân viên Siris quản lý cơ sở, phòng, khách thuê, 
 - Bộ lọc xuống dòng gọn, không tràn ngang; bảng thành dòng 2 dòng; nút chính vẫn ở đầu trang hoặc đầu tab.
 - Khi đổi một `<select>` native sang `Select`, cập nhật e2e từ `selectOption` sang click trigger rồi `getByRole('option')`.
 
+- Điện nước: mỗi phòng luôn có sẵn hai đồng hồ điện, nước (tạo cùng phòng, không xoá được; chỉ thêm đồng hồ khác). Điện, nước là phí của hợp đồng tính theo đồng hồ: mỗi dòng phí gắn đúng một đồng hồ của phòng đó, đồng hồ đã gắn không dùng cho phí khác, đơn giá lấy từ hợp đồng (giá trong Cài đặt chỉ là giá tham khảo). Không có kiểu tính theo bảng giá cơ sở.
+
 ## Conventions
 - Service nhận `(db, ctx, input)`, `ctx` từ `getAccessContext()`; kiểm quyền bằng `can()` ở `src/domain/access.ts`.
 - Server action bọc service bằng `toActionResult` rồi `revalidatePath`; input là `unknown`, parse bằng zod trong service.
