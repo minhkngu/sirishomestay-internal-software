@@ -21,8 +21,6 @@ Repo là **Modular monolith**: mỗi mảng nghiệp vụ là một module ở `
 | 5 | `import` | nhập Excel |
 | 5 | `dashboard` | nhắc việc |
 
-Mỗi module nằm ở `src/modules/<tên>/`.
-
 ## 2. Luồng một yêu cầu
 
 - **Trang (server component)** trong `src/app/(app)/<mục>/page.tsx`: gọi `getAccessContext()` (`src/modules/platform/server/session.ts`, chuyển về `/login` nếu chưa đăng nhập hoặc bị khoá), rồi gọi service với `db` từ `@/db/client`. Trang không tự viết truy vấn (ESLint chặn).
@@ -54,7 +52,7 @@ Luật:
 - **Ghi bảng của module khác** chỉ qua API module đó. Đọc (select/join) bảng khác thì được. Luật ghi không có công cụ kiểm, chỉ giữ bằng review.
 - **Đặt file:** file domain chỉ một module dùng → vào module đó; hai module trở lên → ở lại `src/domain`. Component đi theo module của server nó import; import hai module ngang tầng → đặt cạnh route trong `src/app`.
 - **`src/modules/registrations.ts`:** import được mọi module; chỉ điểm vào được import nó: `src/app` và `server/**/actions.ts` của module; cổng `actions.ts` chỉ re-export, không import.
-- **Công cụ kiểm:** `eslint-plugin-boundaries` trong `eslint.config.mjs` kiểm mọi luật trên (`npm run lint`); `tests/unit/architecture/modules.test.ts` dựng đồ thị import (bỏ `import type`) và kiểm lại tầng, cổng công khai, dùng chung không import module, `src/proxy.ts`, component client trong `src/app`.
+- **Công cụ kiểm:** `eslint-plugin-boundaries` trong `eslint.config.mjs` kiểm mọi luật trên (`npm run lint`); luật `import/no-duplicates` gộp import giá trị trùng nguồn nhưng không bắt kiểu `{ X, type Y }` lẫn trong cùng câu import, nên gộp tay; `tests/unit/architecture/modules.test.ts` dựng đồ thị import (bỏ `import type`) và kiểm lại tầng, cổng công khai, dùng chung không import module, `src/proxy.ts`, component client trong `src/app`.
 
 ### Vì sao chia như vậy
 

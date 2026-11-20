@@ -63,7 +63,7 @@ export async function contractFees(tx: Pick<DB, 'select'>, leaseId: string): Pro
   }))
 }
 
-// ------------------------------------------------------------------ hợp đồng thuê
+// ------------------------------------------------------------------ truy vấn hợp đồng thuê
 
 export type LeaseListItem = Lease & { roomCode: string; facilityId: string; tenantName: string; occupantCount: number }
 

@@ -11,8 +11,7 @@ import { insertLease } from './lease-insert'
 import { applyLeaseFeeEdits } from './lease-fees'
 import type { LeaseCreated, LeaseInput, LeaseEditInput } from './lease-types'
 
-export { nextLeaseCode } from './lease-queries'
-export { listLeases, listLeaseOccupants, getLease } from './lease-queries'
+export { nextLeaseCode, listLeases, listLeaseOccupants, getLease } from './lease-queries'
 export type { LeaseListItem, LeaseDetail } from './lease-queries'
 export type { LeaseFeeInput, LeaseInput, LeaseCreated, LeaseEditInput } from './lease-types'
 
@@ -41,7 +40,7 @@ export async function convertDepositToLease(
   })
 }
 
-// ------------------------------------------------------------------ truy vấn
+// ------------------------------------------------------------------ sửa hợp đồng
 
 export async function updateLease(
   db: DB,
