@@ -32,12 +32,13 @@ export async function NewContract({ sp, showHeading = true }: { sp: NewContractS
   const allRooms = await listRoomsWithStatus(db, ctx, {})
   const rooms = facs.flatMap((f) => allRooms.filter((r) => r.facilityId === f.id).map((r) => ({ f, r })))
   const roomIds = rooms.map(({ r }) => r.id)
-  const meterRows = roomIds.length ? await db.select({ id: meters.id, roomId: meters.roomId, feeTypeId: meters.feeTypeId, name: leaseFeeSnapshots.name, unit: leaseFeeSnapshots.unit }).from(meters).innerJoin(leaseFeeMeters, eq(leaseFeeMeters.meterId, meters.id)).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).where(and(inArray(meters.roomId, roomIds), eq(meters.utility, 'fee'), isNull(meters.removedOn))) : []
+  const meterRows = roomIds.length ? await db.select({ id: meters.id, roomId: meters.roomId, utility: meters.utility, serial: meters.serial }).from(meters).where(and(inArray(meters.roomId, roomIds), isNull(meters.removedOn))) : []
   const meterIds = [...new Set(meterRows.map(m => m.id))]
   // Đồng hồ đang gắn dòng phí của hợp đồng còn hiệu lực thì không được chọn lại
   const busyRows = meterIds.length ? await db.select({ meterId: leaseFeeMeters.meterId }).from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).innerJoin(leases, eq(leases.id, leaseFeeSnapshots.leaseId)).where(and(inArray(leaseFeeMeters.meterId, meterIds), eq(leases.status, 'active'))) : []
   const busyIds = new Set(busyRows.map(r => r.meterId))
-  const roomMeters = [...new Map(meterRows.map(m => [m.id, { ...m, busy: busyIds.has(m.id) }])).values()]
+  const utilityLabel = { electric: 'Điện', water: 'Nước', fee: 'Khác' } as const
+  const roomMeters = meterRows.map(m => ({ id: m.id, roomId: m.roomId, utility: m.utility as 'electric' | 'water' | 'fee', label: `${utilityLabel[m.utility as keyof typeof utilityLabel] ?? 'Khác'}${m.serial ? ` · ${m.serial}` : ''}`, busy: busyIds.has(m.id) }))
   const tenantOptions = tenants.map((t) => ({ id: t.id, name: displayName(t), kind: t.kind }))
   const unitName = new Map(units.map((u) => [u.id, u.name]))
 

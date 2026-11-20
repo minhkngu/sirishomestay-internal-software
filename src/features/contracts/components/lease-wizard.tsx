@@ -101,9 +101,10 @@ export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAsse
     else if (Number(deposit) > MAX_MONEY) errors.depositAmount = TOO_BIG
     if (!Number.isSafeInteger(Number(received)) || Number(received) < (initial.receivedDeposit ?? 0) || Number(received) > Number(deposit)) errors.receivedDeposit = 'Tiền thực nhận phải từ cọc kế thừa đến tiền cọc'
     if (handoverAssets.some(asset => !(assetEntry(assetConditions, asset.code) ?? asset.condition).trim())) errors.handover = 'Nhập tình trạng cho từng tài sản bàn giao'
+    const pickedMeters = resolveMeterIds({ roomMeters, roomId, fees })
     for (const fee of fees) {
       if (!Number.isSafeInteger(Number(fee.price)) || fee.price.trim() === '' || Number(fee.price) < 0 || (fee.legacyFixed && (!Number.isSafeInteger(Number(fee.quantity)) || Number(fee.quantity) < 0))) errors.fees = `Kiểm tra đơn giá hoặc số lượng phí ${fee.name}`
-      const meterError = meterFeeError(fee)
+      const meterError = meterFeeError(fee, pickedMeters[fee.key])
       if (meterError) errors.fees = meterError
     }
     setFieldErrors(errors)

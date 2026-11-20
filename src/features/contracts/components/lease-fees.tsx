@@ -7,7 +7,7 @@ import { MoneyInput } from '@/components/ui/money-input'
 import { availableMeters, resolveMeterIds } from '../lease-fee-meters'
 
 export type FeeOption = { id: string; name: string; unit: string; defaultPrice: number; prices: Record<string, number>; billing: string; quantityFrom: string }
-export type RoomFeeMeter = { id: string; roomId: string; feeTypeId: string | null; name: string; unit: string; busy: boolean }
+export type RoomFeeMeter = { id: string; roomId: string; label: string; utility: 'electric' | 'water' | 'fee'; busy: boolean }
 export type FeeDraft = { key: string; feeTypeId: string | null; name: string; unit: string; quantitySource: 'occupants' | 'room' | 'meter' | 'period_input'; price: string; quantity: string; initialReading: string; existingMeterId?: string; legacyFixed?: boolean }
 
 export function LeaseFees({ feeTypes, roomMeters, roomId, fees, onChange, onAddCommon }: { feeTypes: FeeOption[]; roomMeters: RoomFeeMeter[]; roomId: string; fees: FeeDraft[]; onChange: (fees: FeeDraft[]) => void; onAddCommon: (id: string) => void }) {
@@ -24,7 +24,7 @@ export function LeaseFees({ feeTypes, roomMeters, roomId, fees, onChange, onAddC
         <p className="text-xs text-muted-foreground">{f.legacyFixed ? 'Số lượng cố định' : ({ occupants: 'Theo số người ở', room: 'Theo phòng', meter: 'Theo đồng hồ', period_input: 'Nhập số lượng mỗi kỳ' } as const)[f.quantitySource]}</p>
         <label className="block text-sm">Đơn giá<MoneyInput aria-label={`Đơn giá ${f.name}`} value={f.price} onValueChange={price => patch(f.key, { price })} /></label>
         {f.legacyFixed && <label className="block text-sm">Số lượng<Input aria-label={`Số lượng ${f.name}`} inputMode="numeric" value={f.quantity} onChange={e => patch(f.key, { quantity: e.target.value })} /></label>}
-        {f.quantitySource === 'meter' && <div className="space-y-2"><label className="block text-sm">Đồng hồ<select aria-label={`Đồng hồ ${f.name}`} className="block w-full rounded border p-2" value={resolved[f.key] ?? ''} onChange={e => patch(f.key, { existingMeterId: e.target.value })}><option value="">Tạo đồng hồ mới</option>{choices.map(m => <option key={m.id} value={m.id}>{m.name} ({m.unit})</option>)}</select></label>
+        {f.quantitySource === 'meter' && <div className="space-y-2"><label className="block text-sm">Đồng hồ<select aria-label={`Đồng hồ ${f.name}`} className="block w-full rounded border p-2" value={resolved[f.key] ?? ''} onChange={e => patch(f.key, { existingMeterId: e.target.value })}><option value="">— Chọn đồng hồ —</option>{choices.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}</select></label>
           <label className="block text-sm">{resolved[f.key] ? 'Chỉ số hiện tại của đồng hồ' : 'Chỉ số ban đầu'}<Input aria-label={`Chỉ số ban đầu ${f.name}`} inputMode="numeric" value={f.initialReading} onChange={e => patch(f.key, { initialReading: e.target.value })} /></label></div>}
       </div>
     })}
