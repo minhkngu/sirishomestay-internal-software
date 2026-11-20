@@ -40,7 +40,7 @@ describe('hằng số chỉ có một nguồn', () => {
 
   it('chữ tình trạng tài sản (Tốt, Trầy xước, Hư, Mất) chỉ nằm trong src/domain/asset-labels.ts', () => {
     // Chỉ khớp nguyên cả chuỗi trong dấu nháy; schema DB giữ giá trị mặc định cố ý (db chỉ import type từ domain).
-    const literal = /(['"`])(Tốt|Trầy xước|Hư|Mất)/
+    const literal = /(['"`])(Tốt|Trầy xước|Hư|Mất)\1/
     const allowed = (p: string) => p === 'src/domain/asset-labels.ts' || p.startsWith('src/db/schema/')
     expect(sources.filter((s) => !allowed(s.path) && literal.test(s.text)).map((s) => s.path)).toEqual([])
   })
