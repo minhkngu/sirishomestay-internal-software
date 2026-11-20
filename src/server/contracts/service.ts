@@ -217,7 +217,7 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
       const quantity = source === 'legacy_fixed' ? (fee.quantity ?? 1) : 1
       if (!Number.isSafeInteger(quantity) || quantity < 0 || quantity > 2_147_483_647) throw new ValidationError('Số lượng phí không hợp lệ')
       const [savedFee] = await tx.insert(leaseFeeSnapshots).values({ leaseId: lease.id, feeTypeId: fee.feeTypeId, name, unit, quantitySource: source, quantity, billing, unitPrice: fee.unitPrice }).returning()
-      if (source === 'meter') await ensureFeeMeter(tx, ctx, { roomId: room.id, feeTypeId: fee.feeTypeId, leaseFeeId: savedFee.id, initialReading: fee.initialReading, existingMeterId: fee.existingMeterId, installedOn: input.startDate })
+      if (source === 'meter') await ensureFeeMeter(tx, ctx, { roomId: room.id, leaseFeeId: savedFee.id, initialReading: fee.initialReading, existingMeterId: fee.existingMeterId, installedOn: input.startDate })
     }
   } else if (input.fees?.length) await tx.insert(leaseFees).values((input.fees as LegacyFeeInput[]).map((f) => ({ leaseId: lease.id, ...f })))
 
@@ -444,7 +444,7 @@ async function applyLeaseFeeEdits(tx: DB, ctx: AccessContext, leaseId: string, f
     if (row.type.quantityFrom === 'meter') {
       if (!snapshot) throw new ValidationError('Hợp đồng này dùng mô hình phí cũ, chưa gắn được phí tính theo đồng hồ')
       const [saved] = await tx.insert(leaseFeeSnapshots).values({ leaseId, feeTypeId: row.type.id, name: row.type.name, unit: row.unit.name, quantitySource: 'meter', quantity: 1, billing: row.type.billing, unitPrice: edit.unitPrice }).returning()
-      await ensureFeeMeter(tx, ctx, { roomId, feeTypeId: row.type.id, leaseFeeId: saved.id, initialReading: edit.initialReading, existingMeterId: edit.existingMeterId, installedOn: todayVN() })
+      await ensureFeeMeter(tx, ctx, { roomId, leaseFeeId: saved.id, initialReading: edit.initialReading, existingMeterId: edit.existingMeterId, installedOn: todayVN() })
       continue
     }
     if (seenTypes.has(row.type.id)) throw new ValidationError(`Phí ${row.type.name} đã có trong hợp đồng`)

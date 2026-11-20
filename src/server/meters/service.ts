@@ -200,40 +200,43 @@ export async function roomMeterHistory(db: DB, ctx: AccessContext, roomId: strin
 }
 
 /** Tạo hoặc liên kết đồng hồ cho phí trong transaction hiện tại. */
-export async function ensureFeeMeter(tx: DB, ctx: AccessContext, input: { roomId: string; feeTypeId: string | null; leaseFeeId: string; existingMeterId?: string; initialReading?: number; installedOn: string }): Promise<{ id: string }> {
+export async function ensureFeeMeter(tx: DB, ctx: AccessContext, input: { roomId: string; leaseFeeId: string; existingMeterId?: string; initialReading?: number; installedOn: string }): Promise<{ id: string }> {
   const [room] = await tx.select().from(rooms).where(eq(rooms.id, input.roomId)).for('update')
   if (!room) throw new NotFoundError()
   assertCan(ctx, 'tenants_contracts', room.facilityId)
-  // Chỉ số ban đầu luôn bắt buộc: chỉ số đầu của đồng hồ mới, hoặc chỉ số bàn giao của đồng hồ có sẵn
+  // Chỉ số ban đầu luôn bắt buộc: chỉ số bàn giao của đồng hồ đã chọn tại ngày bắt đầu
   if (!Number.isSafeInteger(input.initialReading) || input.initialReading! < 0 || input.initialReading! > 2_147_483_647) throw new ValidationError('Nhập chỉ số ban đầu hợp lệ', { initialReading: 'Nhập chỉ số nguyên không âm' })
-  let found: typeof meters.$inferSelect
-  if (input.existingMeterId) {
-    const [meter] = await tx.select().from(meters).where(and(eq(meters.id, input.existingMeterId), eq(meters.roomId, room.id), isNull(meters.removedOn))).for('update')
-    if (!meter) throw new ValidationError('Đồng hồ không phù hợp với phí')
-    if (input.feeTypeId) {
-      if (meter.feeTypeId !== input.feeTypeId) throw new ValidationError('Đồng hồ không thuộc phí này')
-    } else {
-      const [row] = await tx.select({ fee: leaseFeeSnapshots }).from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).where(eq(leaseFeeMeters.meterId, meter.id))
-      const [current] = await tx.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.id, input.leaseFeeId))
-      if (meter.feeTypeId || !row || !current || row.fee.unit !== current.unit || row.fee.quantitySource !== 'meter') throw new ValidationError('Đồng hồ không phù hợp với phí')
-    }
-    const [busy] = await tx.select({ id: leaseFeeMeters.leaseFeeId }).from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).innerJoin(leases, eq(leases.id, leaseFeeSnapshots.leaseId)).where(and(eq(leaseFeeMeters.meterId, meter.id), eq(leases.status, 'active')))
-    if (busy) throw new ValidationError('Đồng hồ đang gắn với phí của hợp đồng khác')
-    const readings = await tx.select().from(meterReadings).where(eq(meterReadings.meterId, meter.id))
-    const latest = readings.reduce((max, r) => Math.max(max, r.value), meter.startReading)
-    if (input.initialReading! < latest) throw new ValidationError(`Chỉ số ban đầu không được nhỏ hơn chỉ số gần nhất (${latest})`, { initialReading: `Không nhỏ hơn ${latest}` })
-    // Chỉ số bàn giao cùng ngày (vd. chốt khi thanh lý hợp đồng trước) được nhận lại nếu trùng giá trị
-    const sameDay = readings.find(r => r.kind === 'handover' && r.readOn === input.installedOn)
-    if (sameDay && sameDay.value !== input.initialReading) throw new ValidationError(`Đồng hồ đã có chỉ số bàn giao ${sameDay.value} trong ngày này`, { initialReading: `Nhập đúng chỉ số đã chốt: ${sameDay.value}` })
-    await recordAudit(tx, ctx, { action: 'update', entity: 'meter', entityId: meter.id, facilityId: room.facilityId, summary: 'Dùng lại đồng hồ cho phí hợp đồng', after: { leaseFeeId: input.leaseFeeId, initialReading: input.initialReading, readOn: input.installedOn } })
-    if (!sameDay) await tx.insert(meterReadings).values({ meterId: meter.id, period: input.installedOn.slice(0, 7), kind: 'handover', readOn: input.installedOn, value: input.initialReading! })
-    found = meter
-  } else {
-    ;[found] = await tx.insert(meters).values({ roomId: room.id, utility: 'fee', feeTypeId: input.feeTypeId, startReading: input.initialReading!, installedOn: input.installedOn }).returning()
-    await recordAudit(tx, ctx, { action: 'create', entity: 'meter', entityId: found.id, facilityId: room.facilityId, summary: 'Tạo đồng hồ cho phí hợp đồng', after: found })
-  }
+  if (!input.existingMeterId) throw new ValidationError('Chọn đồng hồ cho phí', { existingMeterId: 'Chọn đồng hồ của phòng' })
+  // Chỉ đồng hồ đang dùng của đúng phòng này; mỗi đồng hồ chỉ gắn một dòng phí của hợp đồng đang chạy
+  const [meter] = await tx.select().from(meters).where(and(eq(meters.id, input.existingMeterId), eq(meters.roomId, room.id), isNull(meters.removedOn))).for('update')
+  if (!meter) throw new ValidationError('Đồng hồ không thuộc phòng này hoặc đã được gỡ', { existingMeterId: 'Chọn đồng hồ của phòng' })
+  const [busy] = await tx.select({ id: leaseFeeMeters.leaseFeeId }).from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).innerJoin(leases, eq(leases.id, leaseFeeSnapshots.leaseId)).where(and(eq(leaseFeeMeters.meterId, meter.id), eq(leases.status, 'active')))
+  if (busy) throw new ValidationError('Đồng hồ đang gắn với phí của hợp đồng khác')
+  const readings = await tx.select().from(meterReadings).where(eq(meterReadings.meterId, meter.id))
+  const latest = readings.reduce((max, r) => Math.max(max, r.value), meter.startReading)
+  if (input.initialReading! < latest) throw new ValidationError(`Chỉ số ban đầu không được nhỏ hơn chỉ số gần nhất (${latest})`, { initialReading: `Không nhỏ hơn ${latest}` })
+  // Chỉ số bàn giao cùng ngày (vd. chốt khi thanh lý hợp đồng trước) được nhận lại nếu trùng giá trị
+  const sameDay = readings.find(r => r.kind === 'handover' && r.readOn === input.installedOn)
+  if (sameDay && sameDay.value !== input.initialReading) throw new ValidationError(`Đồng hồ đã có chỉ số bàn giao ${sameDay.value} trong ngày này`, { initialReading: `Nhập đúng chỉ số đã chốt: ${sameDay.value}` })
+  await recordAudit(tx, ctx, { action: 'update', entity: 'meter', entityId: meter.id, facilityId: room.facilityId, summary: 'Dùng lại đồng hồ cho phí hợp đồng', after: { leaseFeeId: input.leaseFeeId, initialReading: input.initialReading, readOn: input.installedOn } })
+  if (!sameDay) await tx.insert(meterReadings).values({ meterId: meter.id, period: input.installedOn.slice(0, 7), kind: 'handover', readOn: input.installedOn, value: input.initialReading! })
+  const found = meter
   await tx.insert(leaseFeeMeters).values({ leaseFeeId: input.leaseFeeId, meterId: found.id })
   return { id: found.id }
+}
+
+/** Thêm một đồng hồ (loại khác) cho phòng; đồng hồ điện, nước mặc định đã có sẵn. Không có thao tác xoá đồng hồ. */
+export async function addRoomMeter(db: DB, ctx: AccessContext, roomId: string, input: { startReading: number; installedOn: string; serial?: string }): Promise<{ id: string }> {
+  return db.transaction(async (tx) => {
+    const [room] = await tx.select().from(rooms).where(eq(rooms.id, roomId))
+    if (!room) throw new NotFoundError()
+    assertCan(ctx, 'meters', room.facilityId)
+    if (!Number.isSafeInteger(input.startReading) || input.startReading < 0) throw new ValidationError('Chỉ số đầu không hợp lệ', { startReading: 'Nhập chỉ số nguyên không âm' })
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.installedOn)) throw new ValidationError('Ngày lắp không hợp lệ', { installedOn: 'Chọn ngày lắp' })
+    const [created] = await tx.insert(meters).values({ roomId, utility: 'fee', serial: input.serial?.trim() || null, installedOn: input.installedOn, startReading: input.startReading }).returning()
+    await recordAudit(tx, ctx, { action: 'create', entity: 'meter', entityId: created.id, facilityId: room.facilityId, summary: `Thêm đồng hồ phòng ${room.code}`, after: created })
+    return { id: created.id }
+  })
 }
 
 export type MeterOverviewRow = {
