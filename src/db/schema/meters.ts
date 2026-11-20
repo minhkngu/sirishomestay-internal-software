@@ -14,6 +14,9 @@ export const meters = pgTable('meters', {
   startReading: integer('start_reading').notNull().default(0),
   removedOn: date('removed_on', { mode: 'string' }),
   finalReading: integer('final_reading'),
+  /** Chỉ số cuối do nhân viên ước tính (công tơ hỏng, không đọc được), kèm lý do. */
+  finalReadingEstimated: boolean('final_reading_estimated').notNull().default(false),
+  estimateNote: text('estimate_note'),
   isDemo: boolean('is_demo').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
