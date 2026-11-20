@@ -116,7 +116,11 @@ const boundariesConfig = {
       ...layers.map((l) => ({ type: l, pattern: `src/${l}`, partialMatch: false })),
     ],
     // registrations.ts nằm ở src/modules nên cũng khớp element `module`; luật của nó viết theo category này.
-    'boundaries/files': [{ category: 'registrations', pattern: 'src/modules/registrations.ts' }],
+    // src/proxy.ts là file đơn lẻ (không phải thư mục) nên nhận diện bằng category `proxy`.
+    'boundaries/files': [
+      { category: 'registrations', pattern: 'src/modules/registrations.ts' },
+      { category: 'proxy', pattern: 'src/proxy.ts' },
+    ],
   },
   rules: {
     'boundaries/dependencies': [
@@ -135,6 +139,11 @@ const boundariesConfig = {
           {
             from: { element: { type: 'components' } },
             allow: { to: { element: { types: { anyOf: ['components', 'domain', 'lib'] } } } },
+          },
+          // proxy chạy ở edge, trước mọi route: chỉ dùng lib, domain.
+          {
+            from: { file: { categories: 'proxy' } },
+            allow: { to: { element: { types: { anyOf: ['lib', 'domain'] } } } },
           },
           {
             from: { element: { type: 'app' } },

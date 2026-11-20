@@ -40,14 +40,15 @@ describe('đồ thị import', () => {
 describe('vi phạm ranh giới module', () => {
   it('fixture: báo đúng từng lý do', () => {
     expect(moduleViolations(buildImportGraph(FIXTURE)).sort()).toEqual([
+      'src/app/client.tsx -> src/modules/users/index.ts: client import cổng server',
+      'src/app/legacy/actions.ts -> src/modules/users/server/service.ts: không qua cổng công khai',
       'src/lib/util.ts -> src/modules/users/index.ts: dùng chung import module',
       'src/modules/leasing/actions.ts -> src/modules/registrations.ts: không qua cổng công khai',
       'src/modules/leasing/server/service.ts -> src/modules/assets/server/register.ts: không qua cổng công khai',
       'src/modules/leasing/server/service.ts -> src/modules/users/server/service.ts: không qua cổng công khai',
       'src/modules/leasing/ui/view.tsx -> src/modules/users/index.ts: không qua cổng công khai',
       'src/modules/users/server/service.ts -> src/modules/assets/index.ts: tầng không thấp hơn',
-      'src/server/legacy/actions.ts -> src/modules/users/server/service.ts: không qua cổng công khai',
-      'src/server/legacy/service.ts -> src/modules/registrations.ts: không qua cổng công khai',
+      'src/proxy.ts -> src/modules/users/index.ts: proxy chỉ import lib/domain',
     ])
   })
 
