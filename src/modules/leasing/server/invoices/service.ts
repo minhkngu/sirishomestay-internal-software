@@ -374,7 +374,7 @@ export async function createDrafts(db: DB, ctx: AccessContext, input: { facility
       ? await tx
           .insert(invoices)
           .values(
-            items.map((item) => ({
+            items.map((item): typeof invoices.$inferInsert => ({
               code: `${prefix}${String(++seq).padStart(4, '0')}`,
               leaseId: item.leaseId,
               facilityId: data.facilityId,

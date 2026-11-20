@@ -7,7 +7,9 @@ import type {
   DepositEntryStatus,
   DepositEntryType,
   HandoverKind,
+  HandoverStatus,
   IncidentStatus,
+  InvoiceKind,
   InvoiceStatus,
   LeaseStatus,
   SignStatus,
@@ -26,6 +28,8 @@ describe('kiểu cột trạng thái', () => {
     expectTypeOf<typeof assets.$inferSelect.status>().toEqualTypeOf<AssetStatus>()
     expectTypeOf<typeof incidents.$inferSelect.status>().toEqualTypeOf<IncidentStatus>()
     expectTypeOf<typeof handovers.$inferSelect.kind>().toEqualTypeOf<HandoverKind>()
+    expectTypeOf<typeof handovers.$inferSelect.status>().toEqualTypeOf<HandoverStatus>()
     expectTypeOf<typeof invoices.$inferSelect.status>().toEqualTypeOf<InvoiceStatus>()
+    expectTypeOf<typeof invoices.$inferSelect.kind>().toEqualTypeOf<InvoiceKind>()
   })
 })
