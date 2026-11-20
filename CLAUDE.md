@@ -32,7 +32,7 @@ Web nội bộ cho nhân viên Siris quản lý cơ sở, phòng, khách thuê, 
 ## Conventions
 - Service nhận `(db, ctx, input)`, `ctx` từ `getAccessContext()`; kiểm quyền bằng `can()` ở `src/domain/access.ts`.
 - Server action bọc service bằng `toActionResult` rồi `revalidatePath`; input là `unknown`, parse bằng zod trong service.
-- File có `register*(` cấp module phải được import trong `src/modules/registrations.ts`; mọi `actions.ts`, API `route.ts` và layout `(app)` import nó ở dòng đầu (test kiểm).
+- File có `register*(` cấp module phải được import trong `src/modules/registrations.ts`; mọi file `'use server'` `src/modules/*/server/**/actions.ts`, API `route.ts` và layout `(app)` import nó (sau `'use server'` nếu có); cổng `actions.ts` không import (test kiểm).
 - Test ở `tests/unit`, `tests/integration` (PGlite, không cần Docker), `tests/e2e`.
 - Commit, comment, chuỗi giao diện viết tiếng Việt; commit theo Conventional Commits: `feat:` `fix:` `docs:` `perf:` `refactor:` `test:` `chore:` `ci:`.
 - Thiết kế ở `docs/superpowers/specs/`, kế hoạch ở `docs/superpowers/plans/`.

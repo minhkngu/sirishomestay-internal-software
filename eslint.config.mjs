@@ -91,13 +91,9 @@ const modulePolicies = [
     from: { file: { categories: 'registrations' } },
     allow: { to: { element: { types: { anyOf: ['module', 'module-domain', 'module-server'] } } } },
   },
-  // Điểm vào được import registrations: src/app, cổng actions.ts và server/**/actions.ts của module.
+  // Điểm vào được import registrations: src/app, server/**/actions.ts của module (cổng actions.ts chỉ re-export, không import).
   {
-    from: [
-      { element: { type: 'app' } },
-      { element: { type: 'module', fileInternalPath: 'actions.ts' } },
-      { element: { type: 'module-server', fileInternalPath: '**/actions.ts' } },
-    ],
+    from: [{ element: { type: 'app' } }, { element: { type: 'module-server', fileInternalPath: '**/actions.ts' } }],
     allow: { to: { file: { categories: 'registrations' } } },
   },
   // src/app chỉ import module qua cổng công khai.

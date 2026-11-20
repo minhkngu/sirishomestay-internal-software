@@ -50,7 +50,7 @@ Luật:
 - **Ghi bảng của module khác** chỉ qua API module đó. Đọc (select/join) bảng khác thì được. Luật ghi không có công cụ kiểm, chỉ giữ bằng review.
 - **Đặt file:** file domain chỉ một module dùng → vào module đó; hai module trở lên → ở lại `src/domain`. Component đi theo module của server nó import; import hai module ngang tầng → đặt cạnh route trong `src/app`.
 
-- **`src/modules/registrations.ts`:** import được mọi module; chỉ điểm vào được import nó: `src/app`, cổng `actions.ts` và `server/**/actions.ts` của module.
+- **`src/modules/registrations.ts`:** import được mọi module; chỉ điểm vào được import nó: `src/app` và `server/**/actions.ts` của module; cổng `actions.ts` chỉ re-export, không import.
 - **Công cụ kiểm:** `eslint-plugin-boundaries` trong `eslint.config.mjs` kiểm mọi luật trên (`npm run lint`); `tests/unit/architecture/modules.test.ts` dựng đồ thị import (bỏ `import type`) và kiểm lại tầng, cổng công khai, dùng chung không import module.
 
 ### Vì sao chia như vậy

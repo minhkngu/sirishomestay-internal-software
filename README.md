@@ -19,7 +19,7 @@ Công nghệ: Next.js 16 (App Router), React 19, TypeScript, Tailwind v4 + shadc
    cp .env.example .env.local
    ```
 
-   Biến được kiểm khi app khởi động (`src/lib/env.ts`); thiếu hoặc sai sẽ báo đúng tên biến.
+   `src/lib/env.ts` kiểm `STORAGE_DRIVER` và biến `R2_*` khi dùng lần đầu; thiếu biến Supabase thì rơi về bộ nhớ trong (xem mục Lưu trữ tệp).
 3. Cài thư viện, tạo bảng, tạo tài khoản quản trị đầu tiên (mật khẩu tạm in ra một lần), chạy:
 
    ```bash
