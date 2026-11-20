@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { sql } from 'drizzle-orm'
 
 // client.ts đặt connect_timeout = 5 giây; hạn chót rộng hơn gấp đôi cộng 5 giây để chịu tải khi chạy song song.
-const DEADLINE_MS = 15000
+const DEADLINE_MS = 15000 // timeout của it (20000) lớn hơn hạn chót 5 giây
 
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -39,4 +39,4 @@ it('rejects promptly when the database accepts a connection but never completes 
     for (const socket of sockets) socket.destroy()
     await new Promise<void>((resolve) => server.close(() => resolve()))
   }
-}, DEADLINE_MS + 5000)
+}, 20000)
