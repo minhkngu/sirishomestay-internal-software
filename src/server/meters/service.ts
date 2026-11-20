@@ -36,7 +36,7 @@ export type MeterCell = {
   abnormal: boolean
   replaced: boolean
 }
-export type ReadingRow = { roomId: string; roomCode: string; floor: string | null; electric: MeterCell | null; water: MeterCell | null; feeMeters: Array<{ name: string; cell: MeterCell }> }
+export type ReadingRow = { roomId: string; roomCode: string; floor: string | null; /** Phòng có hợp đồng đang chạy bao trùm kỳ ghi. */ occupied: boolean; electric: MeterCell | null; water: MeterCell | null; feeMeters: Array<{ name: string; cell: MeterCell }> }
 
 function safeUsage(ms: Meter[], rs: MeterReading[], s: string, e: string): { usage: number | null; missing: boolean } {
   try {
@@ -54,11 +54,13 @@ export async function listReadingSheet(db: DB, ctx: AccessContext, facilityId: s
   // Chỉ cần kỳ này và 3 kỳ trước (tính trung bình) + chỉ số gần nhất trước mốc đó làm số đầu kỳ
   const cutoff = `${shiftPeriod(period, -4)}-01`
   const inFacility = and(eq(rooms.facilityId, facilityId), eq(rooms.isActive, true))
-  const [pairs, recent, older] = await Promise.all([
+  const [pairs, recent, older, occupiedRows] = await Promise.all([
     db.select({ room: rooms, meter: meters }).from(rooms).leftJoin(meters, eq(meters.roomId, rooms.id)).where(inFacility).orderBy(asc(rooms.floor), asc(rooms.code)),
     db.select({ r: meterReadings }).from(meterReadings).innerJoin(meters, eq(meters.id, meterReadings.meterId)).innerJoin(rooms, eq(rooms.id, meters.roomId)).where(and(inFacility, sql`${meterReadings.readOn} >= ${cutoff}`)),
     db.selectDistinctOn([meterReadings.meterId], { r: meterReadings }).from(meterReadings).innerJoin(meters, eq(meters.id, meterReadings.meterId)).innerJoin(rooms, eq(rooms.id, meters.roomId)).where(and(inFacility, sql`${meterReadings.readOn} < ${cutoff}`)).orderBy(meterReadings.meterId, sql`${meterReadings.readOn} desc`),
+    db.select({ roomId: leases.roomId }).from(leases).innerJoin(rooms, eq(rooms.id, leases.roomId)).where(and(inFacility, eq(leases.status, 'active'), sql`${leases.startDate} <= ${end}`, sql`${leases.endDate} >= ${start}`)),
   ])
+  const occupiedIds = new Set(occupiedRows.map((x) => x.roomId))
   const roomRows: (typeof rooms.$inferSelect)[] = []
   for (const p of pairs) if (!roomRows.some((r) => r.id === p.room.id)) roomRows.push(p.room)
   if (roomRows.length === 0) return { rows: [] as ReadingRow[], progress: { recorded: 0, total: 0 } }
@@ -89,8 +91,8 @@ export async function listReadingSheet(db: DB, ctx: AccessContext, facilityId: s
 
   const feeIds = allMeters.filter(m => m.utility === 'fee' && !m.removedOn).map(m => m.id)
   const feeLabels = feeIds.length ? await db.select({ meterId: leaseFeeMeters.meterId, name: leaseFeeSnapshots.name }).from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).where(inArray(leaseFeeMeters.meterId, feeIds)) : []
-  const rows: ReadingRow[] = roomRows.map((r) => ({ roomId: r.id, roomCode: r.code, floor: r.floor, electric: cell(r.id, 'electric'), water: cell(r.id, 'water'), feeMeters: allMeters.filter(m => m.roomId === r.id && m.utility === 'fee' && !m.removedOn).map(m => ({ name: feeLabels.find(f => f.meterId === m.id)?.name ?? 'Phí', cell: cell(r.id, 'fee', m.id)! })) }))
-  const withElectric = rows.filter((r) => r.electric)
+  const rows: ReadingRow[] = roomRows.map((r) => ({ roomId: r.id, roomCode: r.code, floor: r.floor, occupied: occupiedIds.has(r.id), electric: cell(r.id, 'electric'), water: cell(r.id, 'water'), feeMeters: allMeters.filter(m => m.roomId === r.id && m.utility === 'fee' && !m.removedOn).map(m => ({ name: feeLabels.find(f => f.meterId === m.id)?.name ?? 'Phí', cell: cell(r.id, 'fee', m.id)! })) }))
+  const withElectric = rows.filter((r) => r.occupied && r.electric)
   return { rows, progress: { recorded: withElectric.filter((r) => r.electric!.current != null).length, total: withElectric.length } }
 }
 

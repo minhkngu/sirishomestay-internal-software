@@ -8,7 +8,7 @@ import { saveReadingsAction } from '@/server/meters/actions'
 import { ReplaceMeterDialog } from './replace-meter-dialog'
 
 export type GridCell = { meterId: string; serial: string | null; previous: number; current: number | null; usage: number | null; abnormal: boolean; replaced: boolean }
-export type GridRow = { roomId: string; roomCode: string; electric: GridCell | null; water: GridCell | null; feeMeters?: Array<{ name: string; cell: GridCell }> }
+export type GridRow = { roomId: string; roomCode: string; occupied?: boolean; electric: GridCell | null; water: GridCell | null; feeMeters?: Array<{ name: string; cell: GridCell }> }
 
 export function ReadingGrid({ rows, period, readOn, progress }: { rows: GridRow[]; period: string; readOn: string; progress: { recorded: number; total: number } }) {
   const router = useRouter()
@@ -16,9 +16,12 @@ export function ReadingGrid({ rows, period, readOn, progress }: { rows: GridRow[
   const [values, setValues] = useState<Record<string, string>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [msg, setMsg] = useState<string | null>(null)
+  const [onlyOccupied, setOnlyOccupied] = useState(true)
   const [replacing, setReplacing] = useState<{ roomId: string; roomCode: string; utility: 'electric' | 'water' } | null>(null)
   const refs = useRef<Record<string, HTMLInputElement | null>>({})
-  const order = rows.flatMap((r) => [r.electric?.meterId, r.water?.meterId, ...(r.feeMeters ?? []).map(f => f.cell.meterId)].filter(Boolean) as string[])
+  // Phòng có người ở lên trước; bật bộ lọc thì ẩn phòng trống
+  const shownRows = [...rows].filter((r) => !onlyOccupied || r.occupied).sort((a, b) => Number(!!b.occupied) - Number(!!a.occupied))
+  const order = shownRows.flatMap((r) => [r.electric?.meterId, r.water?.meterId, ...(r.feeMeters ?? []).map(f => f.cell.meterId)].filter(Boolean) as string[])
 
   function onKey(e: React.KeyboardEvent, meterId: string) {
     if (e.key !== 'Enter') return
@@ -68,17 +71,20 @@ export function ReadingGrid({ rows, period, readOn, progress }: { rows: GridRow[
 
   return (
     <div className="space-y-3">
-      <p className="text-sm">Đã ghi <strong>{progress.recorded}/{progress.total}</strong> phòng (điện)</p>
+      <div className="flex flex-wrap items-center gap-4 text-sm">
+        <p>Đã ghi <strong>{progress.recorded}/{progress.total}</strong> phòng có người ở (điện)</p>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={onlyOccupied} onChange={(e) => setOnlyOccupied(e.target.checked)} />Chỉ phòng có người ở</label>
+      </div>
       <div className="overflow-x-auto rounded-md border bg-card">
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-left">
             <tr><th className="p-2" rowSpan={2}>Phòng</th><th className="p-2" colSpan={3}>Điện (kWh)</th><th className="p-2" colSpan={3}>Nước (m³)</th></tr>
             <tr><th className="p-2">Cũ</th><th className="p-2">Mới</th><th className="p-2">Tiêu thụ</th><th className="p-2">Cũ</th><th className="p-2">Mới</th><th className="p-2">Tiêu thụ</th></tr>
           </thead>
-          <tbody>{rows.map((r) => <tr key={r.roomId} className="border-t"><td className="p-2 font-medium">{r.roomCode}</td>{cell(r, r.electric, 'electric')}{cell(r, r.water, 'water')}</tr>)}</tbody>
+          <tbody>{shownRows.map((r) => <tr key={r.roomId} className="border-t"><td className="p-2 font-medium">{r.roomCode}<span className={cn('ml-2 rounded px-1.5 py-0.5 text-xs font-normal', r.occupied ? 'bg-emerald-100 text-emerald-900' : 'bg-muted text-muted-foreground')}>{r.occupied ? 'Có người ở' : 'Trống'}</span></td>{cell(r, r.electric, 'electric')}{cell(r, r.water, 'water')}</tr>)}</tbody>
         </table>
       </div>
-      {rows.flatMap(r => (r.feeMeters ?? []).map(f => <div key={f.cell.meterId} className="flex flex-wrap items-center gap-3 rounded border p-3 text-sm">
+      {shownRows.flatMap(r => (r.feeMeters ?? []).map(f => <div key={f.cell.meterId} className="flex flex-wrap items-center gap-3 rounded border p-3 text-sm">
         <span>{r.roomCode} · {f.name}</span><span>Chỉ số cũ: {f.cell.previous}</span>
         <input aria-label={`${f.name} phòng ${r.roomCode}`} inputMode="numeric" className="h-9 w-24 rounded border px-2 text-right" value={values[f.cell.meterId] ?? (f.cell.current != null ? String(f.cell.current) : '')} onChange={e => setValues({ ...values, [f.cell.meterId]: e.target.value })} />
         {errors[f.cell.meterId] && <span className="text-destructive">{errors[f.cell.meterId]}</span>}

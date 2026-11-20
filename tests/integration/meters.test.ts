@@ -42,14 +42,29 @@ describe('meters', () => {
     await read('W101', '2026-09', '2026-09-30', 100); await read('W102', '2026-09', '2026-09-30', 50); await read('W201', '2026-09', '2026-09-30', 80)
   })
 
-  it('bảng ghi: mỗi phòng có chỉ số kỳ trước, chỉ số kỳ này, tiêu thụ và tiến độ', async () => {
+  async function occupy(roomId: string, code: string, over: Partial<typeof leases.$inferInsert> = {}) {
+    const [tenant] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: fa, fullName: `Khách ${code}`, phone: `+8490123${code.padStart(4, '0')}`, idNumber: `0123456${code.padStart(5, '0')}` }).returning()
+    await db.insert(leases).values({ code, roomId, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-01-01', monthlyRent: 1, depositAmount: 1, ...over })
+  }
+
+  it('bảng ghi: mỗi phòng có chỉ số kỳ trước, chỉ số kỳ này, tiêu thụ và tiến độ theo phòng có người ở', async () => {
+    await occupy(r101, 'A1'); await occupy(r102, 'A2')
     await read('E101', '2026-10', '2026-10-31', 1100)
     const sheet = await listReadingSheet(db, hung(), fa, '2026-10')
     expect(sheet.rows.map((r) => r.roomCode)).toEqual(['101', '102', '201'])
     const r = sheet.rows[0]
     expect(r.electric).toMatchObject({ meterId: m.E101, previous: 1000, current: 1100, usage: 100 })
     expect(sheet.rows[1].electric).toMatchObject({ previous: 500, current: null, usage: null })
-    expect(sheet.progress).toEqual({ recorded: 1, total: 3 }) // tiến độ tính theo điện
+    expect(sheet.rows.map((x) => x.occupied)).toEqual([true, true, false])
+    expect(sheet.progress).toEqual({ recorded: 1, total: 2 }) // tiến độ tính theo điện của phòng có người ở
+  })
+
+  it('phòng chỉ có hợp đồng đã kết thúc hoặc chưa bắt đầu trong kỳ không được coi là có người ở', async () => {
+    await occupy(r101, 'B1', { status: 'ended', endDate: '2026-09-30' })
+    await occupy(r102, 'B2', { startDate: '2026-11-15' })
+    const sheet = await listReadingSheet(db, hung(), fa, '2026-10')
+    expect(sheet.rows.map((x) => x.occupied)).toEqual([false, false, false])
+    expect(sheet.progress).toEqual({ recorded: 0, total: 0 })
   })
 
   it('chỉ số nhỏ hơn kỳ trước → lỗi ở đúng dòng, các dòng khác vẫn lưu', async () => {
