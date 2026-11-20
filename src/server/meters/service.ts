@@ -164,6 +164,8 @@ export async function replaceMeter(
     if (input.estimated && !note) throw new ValidationError('Nhập lý do ước tính', { note: 'Nhập lý do ước tính' })
     await tx.update(meters).set({ removedOn: input.removedOn, finalReading: input.finalReading, finalReadingEstimated: input.estimated === true, estimateNote: input.estimated ? note : null, updatedAt: new Date() }).where(eq(meters.id, current.id))
     const [fresh] = await tx.insert(meters).values({ roomId, utility, serial: input.newSerial ?? null, installedOn: input.removedOn, startReading: input.startReading }).returning()
+    // Dòng phí đang gắn đồng hồ cũ chuyển sang đồng hồ mới để vẫn đọc đúng chỉ số và không để đồng hồ mới trống cho phí khác
+    await tx.update(leaseFeeMeters).set({ meterId: fresh.id }).where(eq(leaseFeeMeters.meterId, current.id))
     await recordAudit(tx, ctx, {
       action: 'update', entity: 'meter', entityId: fresh.id, facilityId: room.facilityId, summary: `Thay đồng hồ ${utility === 'electric' ? 'điện' : 'nước'} phòng ${room.code}`,
       before: { meterId: current.id, serial: current.serial }, after: { meterId: fresh.id, ...input, estimated: input.estimated === true, note },

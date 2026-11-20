@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { facilities, meterReadings, meters, rooms } from '@/db'
+import { facilities, leaseFeeMeters, leaseFeeSnapshots, leases, meterReadings, meters, rooms, tenants } from '@/db'
 import { listMeterOverview, listReadingSheet, saveReadings, replaceMeter, suggestMeterFinalReading, listMonthlyReadings } from '@/server/meters/service'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import type { AccessContext, Permission } from '@/domain/access'
@@ -62,6 +62,18 @@ describe('meters', () => {
     expect(r.errors).toEqual([{ meterId: m.E102, message: 'Chỉ số mới nhỏ hơn chỉ số cũ' }])
     const sheet = await listReadingSheet(db, hung(), fa, '2026-10')
     expect(sheet.rows.map((x) => x.electric?.current)).toEqual([1100, null, 1300])
+  })
+
+  it('thay đồng hồ chuyển liên kết dòng phí sang đồng hồ mới', async () => {
+    const [tenant] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: fa, fullName: 'Khách', phone: '+84901234567', idNumber: '012345678901' }).returning()
+    const [lease] = await db.insert(leases).values({ code: 'HD1', roomId: r101, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-01-01', monthlyRent: 1, depositAmount: 1, feeModel: 'snapshot' }).returning()
+    const [fee] = await db.insert(leaseFeeSnapshots).values({ leaseId: lease.id, name: 'Điện', unit: 'kWh', quantitySource: 'meter', billing: 'per_occurrence', unitPrice: 3500 }).returning()
+    await db.insert(leaseFeeMeters).values({ leaseFeeId: fee.id, meterId: m.E101 })
+    await replaceMeter(db, hung(), r101, 'electric', { removedOn: '2026-10-20', finalReading: 1260, startReading: 0 })
+    const [link] = await db.select().from(leaseFeeMeters).where(eq(leaseFeeMeters.leaseFeeId, fee.id))
+    const fresh = (await db.select().from(meters).where(eq(meters.roomId, r101))).find((x) => x.utility === 'electric' && x.removedOn === null)!
+    expect(link.meterId).toBe(fresh.id)
+    expect(link.meterId).not.toBe(m.E101)
   })
 
   it('chỉ số kỳ trước không được lớn hơn chỉ số đã ghi của kỳ sau', async () => {
