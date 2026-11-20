@@ -19,7 +19,7 @@ export function MeterList({ rows }: { rows: MeterOverviewRow[] }) {
               <td className="p-3">{r.leaseCode ?? '—'}</td>
               <td className="p-3">{r.serial ?? '—'}</td>
               <td className="p-3">{r.startReading}</td>
-              <td className="p-3">{r.removedOn ? `Đã gỡ ${r.removedOn}` : 'Đang dùng'}</td>
+              <td className="p-3">{r.removedOn ? <span title={r.estimateNote ?? undefined}>{`Đã gỡ ${r.removedOn}`}{r.finalReadingEstimated && <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-900">chỉ số cuối ước tính</span>}</span> : 'Đang dùng'}</td>
               <td className="p-3">
                 {r.readings.length === 0 ? <span className="text-muted-foreground">Chưa có chỉ số</span> : (
                   <details>

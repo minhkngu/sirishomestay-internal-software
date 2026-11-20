@@ -4,7 +4,7 @@ import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { daysInMonth } from '@/domain/dates'
 import { NotFoundError, ValidationError } from '@/domain/errors'
-import { meterUsage } from '@/domain/meters'
+import { meterUsage, suggestFinalReading } from '@/domain/meters'
 import type { Meter, MeterReading, Utility } from '@/domain/types'
 import { recordAudit } from '@/server/audit'
 
@@ -22,7 +22,7 @@ function shiftPeriod(period: string, delta: number): string {
 }
 
 const toMeter = (m: typeof meters.$inferSelect): Meter => ({
-  id: m.id, roomId: m.roomId, utility: m.utility as Utility, serial: m.serial, installedOn: m.installedOn, startReading: m.startReading, removedOn: m.removedOn, finalReading: m.finalReading,
+  id: m.id, roomId: m.roomId, utility: m.utility as Utility, serial: m.serial, installedOn: m.installedOn, startReading: m.startReading, removedOn: m.removedOn, finalReading: m.finalReading, finalReadingEstimated: m.finalReadingEstimated,
 })
 const toReading = (r: typeof meterReadings.$inferSelect): MeterReading => ({ meterId: r.meterId, period: r.period, readOn: r.readOn, value: r.value, kind: r.kind as 'monthly' | 'handover' })
 
@@ -146,7 +146,7 @@ export async function createDefaultMeters(tx: DB, roomIds: string[], installedOn
 /** Thay đồng hồ: chốt đồng hồ cũ (ngày gỡ + chỉ số cuối) và lắp đồng hồ mới với chỉ số đầu. */
 export async function replaceMeter(
   db: DB, ctx: AccessContext, roomId: string, utility: Utility,
-  input: { removedOn: string; finalReading: number; newSerial?: string; startReading: number },
+  input: { removedOn: string; finalReading: number; newSerial?: string; startReading: number; estimated?: boolean; note?: string },
 ): Promise<void> {
   await db.transaction(async (tx) => {
     const [room] = await tx.select().from(rooms).where(eq(rooms.id, roomId))
@@ -159,13 +159,29 @@ export async function replaceMeter(
     const maxRead = rs.reduce((mx, r) => Math.max(mx, r.value), current.startReading)
     if (input.finalReading < maxRead) throw new ValidationError(DECREASE, { finalReading: DECREASE })
     if (input.startReading < 0) throw new ValidationError('Chỉ số đầu không hợp lệ')
-    await tx.update(meters).set({ removedOn: input.removedOn, finalReading: input.finalReading, updatedAt: new Date() }).where(eq(meters.id, current.id))
+    const note = input.note?.trim() || null
+    if (input.estimated && !note) throw new ValidationError('Nhập lý do ước tính', { note: 'Nhập lý do ước tính' })
+    await tx.update(meters).set({ removedOn: input.removedOn, finalReading: input.finalReading, finalReadingEstimated: input.estimated === true, estimateNote: input.estimated ? note : null, updatedAt: new Date() }).where(eq(meters.id, current.id))
     const [fresh] = await tx.insert(meters).values({ roomId, utility, serial: input.newSerial ?? null, installedOn: input.removedOn, startReading: input.startReading }).returning()
     await recordAudit(tx, ctx, {
       action: 'update', entity: 'meter', entityId: fresh.id, facilityId: room.facilityId, summary: `Thay đồng hồ ${utility === 'electric' ? 'điện' : 'nước'} phòng ${room.code}`,
-      before: { meterId: current.id, serial: current.serial }, after: { meterId: fresh.id, ...input },
+      before: { meterId: current.id, serial: current.serial }, after: { meterId: fresh.id, ...input, estimated: input.estimated === true, note },
     })
   })
+}
+
+/** Gợi ý chỉ số cuối cho công tơ đang dùng khi không đọc được: chỉ số gần nhất + trung bình mức dùng 3 tháng gần nhất. */
+export async function suggestMeterFinalReading(db: DB, ctx: AccessContext, roomId: string, utility: Utility): Promise<{ value: number; basis: 'average' | 'last' }> {
+  const [room] = await db.select().from(rooms).where(eq(rooms.id, roomId))
+  if (!room) throw new NotFoundError()
+  assertCan(ctx, 'meters', room.facilityId)
+  const [current] = await db.select().from(meters).where(and(eq(meters.roomId, roomId), eq(meters.utility, utility), isNull(meters.removedOn)))
+  if (!current) throw new ValidationError('Phòng chưa có đồng hồ để thay')
+  const recent = await db.select().from(meterReadings).where(and(eq(meterReadings.meterId, current.id), eq(meterReadings.kind, 'monthly'))).orderBy(desc(meterReadings.readOn)).limit(4)
+  if (recent.length === 0) return { value: current.startReading, basis: 'last' }
+  const values = recent.map((r) => r.value).reverse() // cũ → mới
+  const usages = values.slice(1).map((v, i) => v - values[i]).filter((u) => u >= 0)
+  return suggestFinalReading(recent[0].value, usages)
 }
 
 /** Lịch sử đồng hồ + chỉ số của một phòng (trang phòng). */
@@ -219,6 +235,7 @@ export type MeterOverviewRow = {
   meterId: string; roomId: string; roomCode: string; floor: string | null
   feeName: string | null; unit: string | null; leaseCode: string | null
   serial: string | null; startReading: number; installedOn: string; removedOn: string | null
+  finalReadingEstimated: boolean; estimateNote: string | null
   readings: { period: string; kind: 'monthly' | 'handover'; readOn: string; value: number }[]
 }
 
@@ -248,6 +265,7 @@ export async function listMeterOverview(db: DB, ctx: AccessContext, facilityId: 
       feeName: link?.name ?? legacy?.name ?? null, unit: link?.unit ?? legacy?.unit ?? null,
       leaseCode: link?.status === 'active' ? link.leaseCode : null,
       serial: meter.serial, startReading: meter.startReading, installedOn: meter.installedOn, removedOn: meter.removedOn,
+      finalReadingEstimated: meter.finalReadingEstimated, estimateNote: meter.estimateNote,
       readings: (readingsByMeter.get(meter.id) ?? []).map(r => ({ period: r.period, kind: r.kind as 'monthly' | 'handover', readOn: r.readOn, value: r.value })),
     }
   })

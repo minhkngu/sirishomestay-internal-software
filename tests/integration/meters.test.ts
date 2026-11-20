@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { facilities, meterReadings, meters, rooms } from '@/db'
-import { listMeterOverview, listReadingSheet, saveReadings, replaceMeter } from '@/server/meters/service'
+import { listMeterOverview, listReadingSheet, saveReadings, replaceMeter, suggestMeterFinalReading } from '@/server/meters/service'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import type { AccessContext, Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'
@@ -138,5 +138,58 @@ describe('meters', () => {
   it('người ngoài phạm vi cơ sở bị từ chối, người thiếu quyền meters bị từ chối', async () => {
     await expect(listMeterOverview(db, ctxOf(['meters'], [fb]), fa)).rejects.toThrow(NotFoundError)
     await expect(listMeterOverview(db, ctxOf(['billing'], [fa]), fa)).rejects.toThrow(ForbiddenError)
+  })
+
+  describe('thay công tơ ước tính', () => {
+    const oldE101 = () => db.select().from(meters).where(eq(meters.id, m.E101)).then((r) => r[0])
+
+    it('thay công tơ ước tính lưu cờ và lý do trên công tơ cũ', async () => {
+      await replaceMeter(db, hung(), r101, 'electric', { removedOn: '2026-10-20', finalReading: 1060, startReading: 0, estimated: true, note: 'Công tơ cháy, không đọc được' })
+      const old = await oldE101()
+      expect(old).toMatchObject({ finalReading: 1060, finalReadingEstimated: true, estimateNote: 'Công tơ cháy, không đọc được' })
+    })
+
+    it('thay thường không bật cờ ước tính', async () => {
+      await replaceMeter(db, hung(), r101, 'electric', { removedOn: '2026-10-20', finalReading: 1060, startReading: 0 })
+      expect(await oldE101()).toMatchObject({ finalReadingEstimated: false, estimateNote: null })
+    })
+
+    it('ước tính mà thiếu lý do bị từ chối với lỗi ở trường note', async () => {
+      const err = await replaceMeter(db, hung(), r101, 'electric', { removedOn: '2026-10-20', finalReading: 1060, startReading: 0, estimated: true, note: '  ' }).catch((e) => e)
+      expect(err).toBeInstanceOf(ValidationError)
+      expect(err.fieldErrors?.note).toBeTruthy()
+      expect((await oldE101()).removedOn).toBeNull()
+    })
+
+    it('chỉ số cuối ước tính nhỏ hơn chỉ số đã ghi bị từ chối', async () => {
+      await expect(replaceMeter(db, hung(), r101, 'electric', { removedOn: '2026-10-20', finalReading: 900, startReading: 0, estimated: true, note: 'hỏng' })).rejects.toThrow(ValidationError)
+    })
+
+    it('suggestMeterFinalReading: chỉ số gần nhất cộng trung bình mức dùng 3 tháng gần nhất', async () => {
+      await read('E101', '2026-06', '2026-06-30', 700); await read('E101', '2026-07', '2026-07-31', 790); await read('E101', '2026-08', '2026-08-31', 900)
+      expect(await suggestMeterFinalReading(db, hung(), r101, 'electric')).toEqual({ value: 1100, basis: 'average' })
+    })
+
+    it('suggestMeterFinalReading: công tơ chỉ có một chỉ số trả chỉ số đó với basis last', async () => {
+      expect(await suggestMeterFinalReading(db, hung(), r101, 'electric')).toEqual({ value: 1000, basis: 'last' })
+    })
+
+    it('suggestMeterFinalReading: công tơ chưa có chỉ số nào trả chỉ số đầu với basis last', async () => {
+      const [room] = await db.insert(rooms).values({ facilityId: fa, code: '301', floor: '3' }).returning()
+      await db.insert(meters).values({ roomId: room.id, utility: 'electric', installedOn: '2026-01-01', startReading: 50 })
+      expect(await suggestMeterFinalReading(db, hung(), room.id, 'electric')).toEqual({ value: 50, basis: 'last' })
+    })
+
+    it('người không có quyền meters của toà không gợi ý được', async () => {
+      await expect(suggestMeterFinalReading(db, ctxOf(['meters'], [fb]), r101, 'electric')).rejects.toThrow(NotFoundError)
+      await expect(suggestMeterFinalReading(db, ctxOf(['billing'], [fa]), r101, 'electric')).rejects.toThrow(ForbiddenError)
+    })
+
+    it('listMeterOverview trả cờ và lý do ước tính của công tơ đã gỡ', async () => {
+      await replaceMeter(db, hung(), r101, 'electric', { removedOn: '2026-10-20', finalReading: 1060, startReading: 0, estimated: true, note: 'cháy' })
+      const rows = (await listMeterOverview(db, hung(), fa)).filter((r) => r.roomId === r101 && r.removedOn)
+      expect(rows).toHaveLength(1)
+      expect(rows[0]).toMatchObject({ finalReadingEstimated: true, estimateNote: 'cháy' })
+    })
   })
 })
