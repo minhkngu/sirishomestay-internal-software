@@ -8,18 +8,20 @@ Cập nhật lần cuối: 20/11/2026.
 
 Repo là **Modular monolith**: mỗi mảng nghiệp vụ là một module ở `src/modules/<tên>/`, chia lớp `domain/`, `server/`, `ui/` bên trong. Dùng chung: `src/domain`, `src/components`, `src/lib`, `src/db`; route ở `src/app`.
 
-| Tầng | Module | Phụ trách | Vị trí |
-|---|---|---|---|
-| 1 | `platform` | phiên đăng nhập, nhật ký, tệp và lưu trữ, cài đặt chung (`settings-tabs.tsx` ghép giao diện platform và facilities nên nằm ở `src/app/(app)/settings/`; `auth-user.ts` ở `src/lib/supabase/`) | `src/modules/platform/` |
-| 2 | `users` | người dùng, nhóm quyền, cơ sở được cấp | `src/modules/users/` |
-| 2 | `tenants` | khách thuê, giấy tờ tuỳ thân | `src/modules/tenants/` |
-| 2 | `facilities` | cơ sở, phòng, tiện ích, loại phí và giá (`use-run.tsx` ở `src/components/`; `room-occupancy.ts` ở `domain/`) | `src/modules/facilities/` |
-| 2 | `documents` | mẫu giấy tờ, mẫu hoá đơn, dựng PDF/Word/PNG | `src/modules/documents/` |
-| 3 | `assets` | tài sản, kho, chuyển tài sản | `src/modules/assets/` |
-| 3 | `meters` | đồng hồ, chỉ số điện nước | `src/modules/meters/` |
-| 4 | `leasing` | cọc, hợp đồng, phụ lục, bàn giao, sổ cọc, phí phát sinh, hoá đơn, thu tiền, sự cố (`deposit.ts`, `fee-price.ts`, `sign-status.ts` ở `domain/`; trang `src/app` lấy qua `index.ts`) | `src/modules/leasing/` |
-| 5 | `import` | nhập Excel (`targets.ts` thuần nên ở `domain/`) | `src/modules/import/` |
-| 5 | `dashboard` | nhắc việc | `src/modules/dashboard/` |
+| Tầng | Module | Phụ trách |
+|---|---|---|
+| 1 | `platform` | phiên đăng nhập, nhật ký, tệp và lưu trữ, cài đặt chung |
+| 2 | `users` | người dùng, nhóm quyền, cơ sở được cấp |
+| 2 | `tenants` | khách thuê, giấy tờ tuỳ thân |
+| 2 | `facilities` | cơ sở, phòng, tiện ích, loại phí và giá |
+| 2 | `documents` | mẫu giấy tờ, mẫu hoá đơn, dựng PDF/Word/PNG |
+| 3 | `assets` | tài sản, kho, chuyển tài sản |
+| 3 | `meters` | đồng hồ, chỉ số điện nước |
+| 4 | `leasing` | cọc, hợp đồng, phụ lục, bàn giao, sổ cọc, phí phát sinh, hoá đơn, thu tiền, sự cố |
+| 5 | `import` | nhập Excel |
+| 5 | `dashboard` | nhắc việc |
+
+Mỗi module nằm ở `src/modules/<tên>/`.
 
 ## 2. Luồng một yêu cầu
 
@@ -51,7 +53,6 @@ Luật:
 - **Dùng chung** (`src/domain`, `src/components`, `src/lib`, `src/db`) không import module. `src/db` được `import type` từ `src/domain` (không import giá trị).
 - **Ghi bảng của module khác** chỉ qua API module đó. Đọc (select/join) bảng khác thì được. Luật ghi không có công cụ kiểm, chỉ giữ bằng review.
 - **Đặt file:** file domain chỉ một module dùng → vào module đó; hai module trở lên → ở lại `src/domain`. Component đi theo module của server nó import; import hai module ngang tầng → đặt cạnh route trong `src/app`.
-
 - **`src/modules/registrations.ts`:** import được mọi module; chỉ điểm vào được import nó: `src/app` và `server/**/actions.ts` của module; cổng `actions.ts` chỉ re-export, không import.
 - **Công cụ kiểm:** `eslint-plugin-boundaries` trong `eslint.config.mjs` kiểm mọi luật trên (`npm run lint`); `tests/unit/architecture/modules.test.ts` dựng đồ thị import (bỏ `import type`) và kiểm lại tầng, cổng công khai, dùng chung không import module, `src/proxy.ts`, component client trong `src/app`.
 
