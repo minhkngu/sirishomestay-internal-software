@@ -180,6 +180,13 @@ describe('meters', () => {
       expect(await suggestMeterFinalReading(db, hung(), room.id, 'electric')).toEqual({ value: 50, basis: 'last' })
     })
 
+    it('suggestMeterFinalReading không thấp hơn chỉ số bàn giao đã ghi sau chỉ số tháng gần nhất', async () => {
+      await db.insert(meterReadings).values({ meterId: m.E101, period: '2026-10', kind: 'handover', readOn: '2026-10-10', value: 1050 })
+      const s = await suggestMeterFinalReading(db, hung(), r101, 'electric')
+      expect(s.value).toBeGreaterThanOrEqual(1050)
+      await expect(replaceMeter(db, hung(), r101, 'electric', { removedOn: '2026-10-20', finalReading: s.value, startReading: 0, estimated: true, note: 'hỏng' })).resolves.toBeUndefined()
+    })
+
     it('người không có quyền meters của toà không gợi ý được', async () => {
       await expect(suggestMeterFinalReading(db, ctxOf(['meters'], [fb]), r101, 'electric')).rejects.toThrow(NotFoundError)
       await expect(suggestMeterFinalReading(db, ctxOf(['billing'], [fa]), r101, 'electric')).rejects.toThrow(ForbiddenError)

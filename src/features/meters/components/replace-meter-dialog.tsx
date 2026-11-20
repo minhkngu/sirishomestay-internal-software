@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { replaceMeterAction, suggestFinalReadingAction } from '@/server/meters/actions'
@@ -12,15 +12,20 @@ export function ReplaceMeterDialog({ roomId, roomCode, utility, defaultDate, onD
   const [v, setV] = useState({ removedOn: defaultDate, finalReading: '', newSerial: '', startReading: '0' })
   const [error, setError] = useState<string | null>(null)
   const [estimated, setEstimated] = useState(false)
+  const estimatedRef = useRef(false)
+  useEffect(() => { estimatedRef.current = estimated }, [estimated])
   const [note, setNote] = useState('')
   const [noteError, setNoteError] = useState<string | null>(null)
   const [hint, setHint] = useState<string | null>(null)
+  const manual = useRef('')
   function toggleEstimated(on: boolean) {
     setEstimated(on); setHint(null); setNoteError(null)
-    if (!on) return
+    if (!on) { setV((cur) => ({ ...cur, finalReading: manual.current })); return } // bỏ tick: trả lại số đã nhập tay, không giữ số gợi ý
+    manual.current = v.finalReading
     start(async () => {
       const r = await suggestFinalReadingAction(roomId, utility)
       if (!r.ok) { setError(r.error); return }
+      if (!estimatedRef.current) return // đã bỏ tick trong lúc chờ gợi ý
       setV((cur) => ({ ...cur, finalReading: String(r.data.value) }))
       setHint(r.data.basis === 'average' ? 'Gợi ý = chỉ số ghi gần nhất + mức dùng trung bình 3 tháng gần nhất. Sửa lại nếu cần.' : 'Chưa đủ dữ liệu để tính trung bình, đang gợi ý bằng chỉ số gần nhất. Sửa lại nếu cần.')
     })

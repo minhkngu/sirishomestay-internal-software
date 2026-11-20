@@ -179,10 +179,12 @@ export async function suggestMeterFinalReading(db: DB, ctx: AccessContext, roomI
   const [current] = await db.select().from(meters).where(and(eq(meters.roomId, roomId), eq(meters.utility, utility), isNull(meters.removedOn)))
   if (!current) throw new ValidationError('Phòng chưa có đồng hồ để thay')
   const recent = await db.select().from(meterReadings).where(and(eq(meterReadings.meterId, current.id), eq(meterReadings.kind, 'monthly'))).orderBy(desc(meterReadings.readOn)).limit(4)
-  if (recent.length === 0) return { value: current.startReading, basis: 'last' }
+  // Chỉ số gần nhất tính cả chỉ số bàn giao (replaceMeter cũng so với chúng); mức dùng chỉ tính từ chỉ số tháng.
+  const [latest] = await db.select().from(meterReadings).where(eq(meterReadings.meterId, current.id)).orderBy(desc(meterReadings.readOn), desc(meterReadings.createdAt)).limit(1)
+  if (!latest) return { value: current.startReading, basis: 'last' }
   const values = recent.map((r) => r.value).reverse() // cũ → mới
   const usages = values.slice(1).map((v, i) => v - values[i]).filter((u) => u >= 0)
-  return suggestFinalReading(recent[0].value, usages)
+  return suggestFinalReading(latest.value, usages)
 }
 
 /** Lịch sử đồng hồ + chỉ số của một phòng (trang phòng). */
