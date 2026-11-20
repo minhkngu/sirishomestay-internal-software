@@ -1,0 +1,54 @@
+'use client'
+
+import { useRouter } from 'next/navigation'
+import { useState, useTransition } from 'react'
+import { FormDialog } from '@/components/form-dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { todayVN } from '@/domain/dates'
+import { addRoomMeterAction } from '@/server/meters/actions'
+
+/** Thêm một đồng hồ (loại khác) cho phòng. Đồng hồ điện, nước mặc định đã có sẵn; không có thao tác xoá đồng hồ. */
+export function AddMeterButton({ rooms }: { rooms: { id: string; code: string }[] }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [pending, start] = useTransition()
+  const [roomId, setRoomId] = useState('')
+  const [serial, setSerial] = useState('')
+  const [startReading, setStartReading] = useState('0')
+  const [installedOn, setInstalledOn] = useState(() => todayVN())
+  const [error, setError] = useState<string | null>(null)
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    if (!roomId) { setError('Chọn phòng'); return }
+    if (!/^\d+$/.test(startReading.trim())) { setError('Nhập chỉ số đầu là số nguyên không âm'); return }
+    start(async () => {
+      const r = await addRoomMeterAction(roomId, { startReading: Number(startReading), installedOn, serial: serial.trim() || undefined })
+      if (!r.ok) { setError(r.error); return }
+      setOpen(false); setSerial(''); setStartReading('0')
+      router.refresh()
+    })
+  }
+
+  return (
+    <>
+      <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>Thêm đồng hồ</Button>
+      <FormDialog open={open} onOpenChange={setOpen} title="Thêm đồng hồ" description="Thêm đồng hồ khác cho phòng, ví dụ máy giặt. Đồng hồ điện và nước đã có sẵn." size="sm">
+        <form onSubmit={submit} className="space-y-3">
+          <div className="space-y-1"><Label htmlFor="add-meter-room">Phòng</Label>
+            <select id="add-meter-room" value={roomId} onChange={(e) => setRoomId(e.target.value)} className="h-9 w-full rounded-lg border bg-background px-2 text-sm">
+              <option value="">— Chọn phòng —</option>{rooms.map((r) => <option key={r.id} value={r.id}>{r.code}</option>)}
+            </select></div>
+          <div className="space-y-1"><Label htmlFor="add-meter-serial">Số seri (nếu có)</Label><Input id="add-meter-serial" value={serial} onChange={(e) => setSerial(e.target.value)} /></div>
+          <div className="space-y-1"><Label htmlFor="add-meter-start">Chỉ số đầu</Label><Input id="add-meter-start" inputMode="numeric" value={startReading} onChange={(e) => setStartReading(e.target.value)} /></div>
+          <div className="space-y-1"><Label htmlFor="add-meter-date">Ngày lắp</Label><Input id="add-meter-date" type="date" value={installedOn} onChange={(e) => setInstalledOn(e.target.value)} /></div>
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          <Button type="submit" disabled={pending}>Thêm đồng hồ</Button>
+        </form>
+      </FormDialog>
+    </>
+  )
+}

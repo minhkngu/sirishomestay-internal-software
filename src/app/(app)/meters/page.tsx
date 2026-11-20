@@ -9,6 +9,7 @@ import { listFacilities } from '@/server/facilities/service'
 import { listMeterOverview, listMonthlyReadings, listReadingSheet } from '@/server/meters/service'
 import { MeterList } from '@/features/meters/components/meter-list'
 import { MonthlyTable } from '@/features/meters/components/monthly-table'
+import { AddMeterButton } from '@/features/meters/components/add-meter-dialog'
 import { ReadingGrid } from '@/features/meters/components/reading-grid'
 
 export default async function MetersPage({ searchParams }: { searchParams: Promise<{ facility?: string; period?: string; tab?: string }> }) {
@@ -76,7 +77,7 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
         </Form>
       </div>
       {tab === 'meters' ? (
-        facilityId ? <MeterList rows={overview} /> : <div className="rounded-2xl border border-dashed border-border/80 bg-card/60 p-8 text-center text-xs text-muted-foreground">Chưa có cơ sở nào.</div>
+        facilityId ? <div className="space-y-3"><div className="flex justify-end"><AddMeterButton rooms={[...new Map(overview.map((r) => [r.roomId, { id: r.roomId, code: r.roomCode }])).values()]} /></div><MeterList rows={overview} /></div> : <div className="rounded-2xl border border-dashed border-border/80 bg-card/60 p-8 text-center text-xs text-muted-foreground">Chưa có cơ sở nào.</div>
       ) : tab === 'monthly' ? (
         monthly ? <MonthlyTable periods={monthly.periods} rows={monthly.rows} /> : <div className="rounded-2xl border border-dashed border-border/80 bg-card/60 p-8 text-center text-xs text-muted-foreground">Chưa có cơ sở nào.</div>
       ) : sheet ? (
