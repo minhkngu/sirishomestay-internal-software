@@ -2,6 +2,7 @@
 
 import { FileUpload } from '@/modules/platform/ui'
 import { formatVND } from '@/domain/money'
+import { ASSET_CONDITIONS } from '@/domain/asset-labels'
 import { MoneyInput } from '@/components/ui/money-input'
 import { cn } from '@/lib/utils'
 
@@ -17,8 +18,6 @@ export type ItemState = {
   penalty: string
   photoIds: string[]
 }
-
-const CONDITIONS = ['Tốt', 'Trầy xước', 'Hư'] as const
 
 /** Một tài sản: nút to dễ bấm trên điện thoại; chọn Hư/Mất thì hiện ô tiền phạt; chụp ảnh gắn theo món. */
 export function AssetConditionRow({
@@ -48,7 +47,7 @@ export function AssetConditionRow({
       </div>
       <p className="text-sm">Tình trạng đang ghi: {item.condition}</p>
       <div className="flex flex-wrap gap-2" role="group" aria-label={`Tình trạng ${item.assetCode}`}>
-        {CONDITIONS.map((c) => (
+        {ASSET_CONDITIONS.map((c) => (
           <button
             key={c}
             type="button"

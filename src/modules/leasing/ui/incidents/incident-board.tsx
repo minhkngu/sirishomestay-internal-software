@@ -6,6 +6,7 @@ import { useTransition } from 'react'
 import { toast } from 'sonner'
 import { CheckCircle2, Home, User, Wrench } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { INCIDENT_PRIORITY_LABELS, INCIDENT_STATUS_LABELS } from '@/domain/incident-labels'
 import { cn } from '@/lib/utils'
 import { setIncidentStatusAction } from '../../server/incidents/actions'
 
@@ -19,9 +20,9 @@ export type BoardItem = {
 }
 
 const COLS = [
-  ['new', 'Mới'],
-  ['in_progress', 'Đang xử lý'],
-  ['done', 'Xong'],
+  ['new', INCIDENT_STATUS_LABELS.new],
+  ['in_progress', INCIDENT_STATUS_LABELS.in_progress],
+  ['done', INCIDENT_STATUS_LABELS.done],
 ] as const
 
 const NEXT: Record<string, ['in_progress' | 'done', string]> = {
@@ -30,9 +31,9 @@ const NEXT: Record<string, ['in_progress' | 'done', string]> = {
 }
 
 const PRIORITY_CONFIG: Record<string, { label: string; badge: string }> = {
-  high: { label: 'Ưu tiên cao', badge: 'border-rose-200/80 bg-rose-50 text-rose-700' },
-  normal: { label: 'Bình thường', badge: 'border-border/80 bg-muted/60 text-muted-foreground' },
-  low: { label: 'Thấp', badge: 'border-border/80 bg-muted/40 text-muted-foreground' },
+  high: { label: INCIDENT_PRIORITY_LABELS.high, badge: 'border-rose-200/80 bg-rose-50 text-rose-700' },
+  normal: { label: INCIDENT_PRIORITY_LABELS.normal, badge: 'border-border/80 bg-muted/60 text-muted-foreground' },
+  low: { label: INCIDENT_PRIORITY_LABELS.low, badge: 'border-border/80 bg-muted/40 text-muted-foreground' },
 }
 
 export function IncidentBoard({ items }: { items: BoardItem[] }) {

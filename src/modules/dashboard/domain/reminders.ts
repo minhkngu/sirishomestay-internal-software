@@ -1,5 +1,6 @@
 import { can, type AccessContext } from '@/domain/access'
 import { addDays, formatDateVN } from '@/domain/dates'
+import { INCIDENT_STATUS_LABELS } from '@/domain/incident-labels'
 
 export type Severity = 'danger' | 'warning' | 'info'
 export type ReminderKind =
@@ -153,7 +154,7 @@ export function buildReminders(s: Snapshot, ctx: AccessContext, today: string, s
       .sort((a, b) => Number(b.priority === 'high') - Number(a.priority === 'high'))
       .map((i) => ({
         label: i.title,
-        sub: `${facilityName(i.facilityId)} · ${i.status === 'new' ? 'Mới' : 'Đang xử lý'}`,
+        sub: `${facilityName(i.facilityId)} · ${i.status === 'new' ? INCIDENT_STATUS_LABELS.new : INCIDENT_STATUS_LABELS.in_progress}`,
         href: `/incidents/${i.id}`,
         severity: i.priority === 'high' ? ('danger' as const) : ('info' as const),
       })),

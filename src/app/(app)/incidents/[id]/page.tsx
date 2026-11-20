@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { db } from '@/db/client'
+import { INCIDENT_STATUS_LABELS } from '@/domain/incident-labels'
+import type { IncidentStatus } from '@/domain/statuses'
 import { formatVND } from '@/domain/money'
 import { FileUpload } from '@/modules/platform/ui'
 import { orNotFound } from '@/lib/or-not-found'
@@ -8,7 +10,6 @@ import { getIncident } from '@/modules/leasing'
 import { roomCodesByIds } from '@/modules/facilities'
 import { userNamesByIds } from '@/modules/users'
 
-const STATUS: Record<string, string> = { new: 'Mới', in_progress: 'Đang xử lý', done: 'Xong', cancelled: 'Đã huỷ' }
 export default async function IncidentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const ctx = await getAccessContext()
@@ -26,7 +27,7 @@ export default async function IncidentPage({ params }: { params: Promise<{ id: s
       <h1 className="text-xl font-semibold">{inc.title}</h1>
       <dl className="grid grid-cols-2 gap-3 rounded-lg border bg-card p-4 text-sm">
         <dt className="text-muted-foreground">Trạng thái</dt>
-        <dd>{STATUS[inc.status]}</dd>
+        <dd>{INCIDENT_STATUS_LABELS[inc.status as IncidentStatus]}</dd>
         <dt className="text-muted-foreground">Phòng</dt>
         <dd>{roomCode ?? '—'}</dd>
         <dt className="text-muted-foreground">Người xử lý</dt>

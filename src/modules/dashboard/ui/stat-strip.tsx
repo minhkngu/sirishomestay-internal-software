@@ -1,4 +1,5 @@
 import { formatVND } from '@/domain/money'
+import { ROOM_STATUS_LABELS } from '@/domain/room-status'
 import { AlertCircle, BookmarkCheck, DoorOpen, Home } from 'lucide-react'
 
 export function StatStrip({
@@ -16,19 +17,19 @@ export function StatStrip({
 }) {
   const stats = [
     {
-      label: 'Đang ở',
+      label: ROOM_STATUS_LABELS.occupied,
       value: String(occupied),
       icon: Home,
       iconBg: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/50',
     },
     {
-      label: 'Đã cọc',
+      label: ROOM_STATUS_LABELS.deposited,
       value: String(deposited),
       icon: BookmarkCheck,
       iconBg: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200/50',
     },
     {
-      label: 'Trống',
+      label: ROOM_STATUS_LABELS.vacant,
       value: String(vacant),
       icon: DoorOpen,
       iconBg: 'bg-slate-50 text-slate-700 ring-1 ring-slate-200/50',

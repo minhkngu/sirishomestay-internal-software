@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { formatDateVN } from '@/domain/dates'
+import { INCIDENT_PRIORITY_LABELS, INCIDENT_STATUS_LABELS, type IncidentPriority } from '@/domain/incident-labels'
 import { formatVND } from '@/domain/money'
 
 export type RoomIncidentRow = {
@@ -16,23 +17,22 @@ export type RoomIncidentRow = {
 }
 
 const STATUS: Record<string, { label: string; badge: string }> = {
-  new: { label: 'Mới', badge: 'border-amber-200/80 bg-amber-50 text-amber-800' },
-  in_progress: { label: 'Đang xử lý', badge: 'border-sky-200/80 bg-sky-50 text-sky-800' },
-  done: { label: 'Xong', badge: 'border-emerald-200/80 bg-emerald-50 text-emerald-800' },
+  new: { label: INCIDENT_STATUS_LABELS.new, badge: 'border-amber-200/80 bg-amber-50 text-amber-800' },
+  in_progress: { label: INCIDENT_STATUS_LABELS.in_progress, badge: 'border-sky-200/80 bg-sky-50 text-sky-800' },
+  done: { label: INCIDENT_STATUS_LABELS.done, badge: 'border-emerald-200/80 bg-emerald-50 text-emerald-800' },
 }
-const PRIORITY: Record<string, string> = { high: 'Ưu tiên cao', normal: 'Bình thường', low: 'Thấp' }
 
 const STATUS_FILTERS = [
   ['', 'Tất cả'],
-  ['new', 'Mới'],
-  ['in_progress', 'Đang xử lý'],
-  ['done', 'Xong'],
+  ['new', INCIDENT_STATUS_LABELS.new],
+  ['in_progress', INCIDENT_STATUS_LABELS.in_progress],
+  ['done', INCIDENT_STATUS_LABELS.done],
 ] as const
 const PRIORITY_FILTERS = [
   ['', 'Mọi mức'],
-  ['high', 'Ưu tiên cao'],
-  ['normal', 'Bình thường'],
-  ['low', 'Thấp'],
+  ['high', INCIDENT_PRIORITY_LABELS.high],
+  ['normal', INCIDENT_PRIORITY_LABELS.normal],
+  ['low', INCIDENT_PRIORITY_LABELS.low],
 ] as const
 
 function Chips({
@@ -100,7 +100,9 @@ export function RoomIncidentList({ items }: { items: RoomIncidentRow[] }) {
               >
                 {i.title}
               </Link>
-              <span className="text-muted-foreground">{PRIORITY[i.priority] ?? i.priority}</span>
+              <span className="text-muted-foreground">
+                {INCIDENT_PRIORITY_LABELS[i.priority as IncidentPriority] ?? i.priority}
+              </span>
               <span className="w-32 truncate text-muted-foreground">{i.assigneeName ?? 'Chưa giao'}</span>
               <span className="w-24 tabular-nums text-muted-foreground">{formatDateVN(i.createdAt.slice(0, 10))}</span>
               <span className="w-24 text-right tabular-nums text-foreground">

@@ -3,10 +3,9 @@ import { HoverTip } from '@/components/ui/tooltip'
 import { StatusDot } from '@/components/list/status-dot'
 import { diffDays, formatDateVN, todayVN } from '@/domain/dates'
 import { formatPhoneDisplay } from '@/domain/phone'
+import { TENANT_KIND_SHORT_LABELS } from '@/domain/tenant-kind'
 import { displayName } from '../domain/tenant-name'
 import type { Tenant } from '../server/tenants/service'
-
-const KIND: Record<Tenant['kind'], string> = { foreign: 'Nước ngoài', vietnamese: 'Việt Nam', company: 'Công ty' }
 
 export function TenantTable({
   tenants,
@@ -53,7 +52,7 @@ export function TenantTable({
               </td>
               <td className="p-3 whitespace-nowrap">
                 <span className="inline-flex rounded-full border border-border/80 bg-muted/60 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground whitespace-nowrap shrink-0">
-                  {KIND[t.kind]}
+                  {TENANT_KIND_SHORT_LABELS[t.kind]}
                 </span>
               </td>
               <td className="p-3 font-medium text-foreground whitespace-nowrap">{formatPhoneDisplay(t.phone)}</td>

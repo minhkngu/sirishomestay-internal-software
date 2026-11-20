@@ -20,7 +20,7 @@ export default async function FacilityPage({ params }: { params: Promise<{ id: s
   const occupied = count('occupied') + count('ending_soon') + count('occupied_with_next')
   const stats: [string, number][] = [
     ['Tổng phòng', live.length],
-    ['Đang ở', occupied],
+    [ROOM_STATUS_LABELS.occupied, occupied],
     [ROOM_STATUS_LABELS.vacant, count('vacant')],
     [ROOM_STATUS_LABELS.deposited, count('deposited')],
     [ROOM_STATUS_LABELS.ending_soon, count('ending_soon')],
