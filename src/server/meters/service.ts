@@ -137,6 +137,12 @@ export async function saveReadings(db: DB, ctx: AccessContext, period: string, r
   })
 }
 
+/** Tạo sẵn công tơ điện và nước (chỉ số đầu 0) cho các phòng vừa tạo; mỗi phòng luôn có đủ hai công tơ này. */
+export async function createDefaultMeters(tx: DB, roomIds: string[], installedOn: string): Promise<void> {
+  if (roomIds.length === 0) return
+  await tx.insert(meters).values(roomIds.flatMap((roomId) => (['electric', 'water'] as const).map((utility) => ({ roomId, utility, installedOn, startReading: 0 }))))
+}
+
 /** Thay đồng hồ: chốt đồng hồ cũ (ngày gỡ + chỉ số cuối) và lắp đồng hồ mới với chỉ số đầu. */
 export async function replaceMeter(
   db: DB, ctx: AccessContext, roomId: string, utility: Utility,
