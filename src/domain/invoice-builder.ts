@@ -125,7 +125,7 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): { lines: Invoic
         if (u.missing.length) { warnings.push(`Chưa ghi chỉ số ${name} tháng ${mmYYYY(prev)}`); continue }
         const price = rateFor(input.rates, input.facilityId, utility, prevStart)
         lines.push({
-          type: utility, description: `Tiền ${name} tháng ${mmYYYY(prev)} (${u.usage} ${unit})`, quantity: u.usage, unitPrice: price,
+          type: utility, description: `Tiền ${name} tháng ${mmYYYY(prev)} (${u.usage} ${unit})${u.segments.some((s) => s.estimated) ? ' — có chỉ số ước tính' : ''}`, quantity: u.usage, unitPrice: price,
           amount: Math.round(u.usage * price), meta: { segments: u.segments },
         })
       } catch (e) {
