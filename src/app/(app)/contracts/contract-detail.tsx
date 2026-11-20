@@ -2,7 +2,19 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, Calendar, User } from 'lucide-react'
 import { can } from '@/domain/access'
-import { listOneOffs } from '@/modules/leasing'
+import {
+  listOneOffs,
+  DEPOSIT_ENTRY_LABELS,
+  depositBalance,
+  runningDepositBalances,
+  listHandovers,
+  getDepositContract,
+  getLease,
+  listLeaseOccupants,
+  listInvoices,
+  listAddenda,
+  signStatusLabel,
+} from '@/modules/leasing'
 import {
   OneOffDialog,
   DepositLedger,
@@ -14,21 +26,14 @@ import {
 import { buttonVariants } from '@/components/ui/button'
 import { db } from '@/db/client'
 import { NotFoundError } from '@/domain/errors'
-import { DEPOSIT_ENTRY_LABELS, depositBalance, runningDepositBalances } from '@/modules/leasing'
 import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
-import { getAccessContext } from '@/modules/platform'
-import { listFiles } from '@/modules/platform'
+import { getAccessContext, listFiles } from '@/modules/platform'
 import { isUsableTemplate, listTemplates } from '@/modules/documents'
-import { listHandovers } from '@/modules/leasing'
-import { getDepositContract, getLease, listLeaseOccupants } from '@/modules/leasing'
 import { formatPhoneDisplay } from '@/domain/phone'
 import { PdfViewButton } from '@/components/pdf-view-button'
-import { listInvoices } from '@/modules/leasing'
 import { ContractActions } from './contract-actions'
-import { listAddenda } from '@/modules/leasing'
 import { cn } from '@/lib/utils'
-import { signStatusLabel } from '@/modules/leasing'
 import type { DepositEntryStatus, DepositEntryType } from '@/domain/statuses'
 
 type Entry = { id: string; date: string; type: DepositEntryType; amount: number; status: DepositEntryStatus }

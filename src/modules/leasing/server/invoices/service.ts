@@ -44,13 +44,16 @@ import type {
   UtilityRate,
 } from '@/domain/types'
 import { finalizeTermination } from '../addenda/finalize'
-import { recordAudit, recordAuditBatch } from '@/modules/platform'
-import { registerExportOwnerResolver } from '@/modules/platform'
-import { getSettings } from '@/modules/platform'
-import { exportDocument, registerPdfLoader } from '@/modules/documents'
+import { recordAudit, recordAuditBatch, registerExportOwnerResolver, getSettings } from '@/modules/platform'
+import {
+  exportDocument,
+  registerPdfLoader,
+  renderInvoiceFromTemplate,
+  renderInvoicePdf,
+  renderReceiptPdf,
+  resolveInvoiceTemplate,
+} from '@/modules/documents'
 import { resolveBankAccount } from '@/domain/vietqr'
-import { renderInvoiceFromTemplate, renderInvoicePdf, renderReceiptPdf } from '@/modules/documents'
-import { resolveInvoiceTemplate } from '@/modules/documents'
 
 const batchSchema = z.object({ facilityId: z.uuid(), period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) })
 const periodSchema = z

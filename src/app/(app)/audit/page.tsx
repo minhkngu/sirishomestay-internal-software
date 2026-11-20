@@ -1,8 +1,7 @@
 import { notFound } from 'next/navigation'
 import { db } from '@/db/client'
 import { assertCan } from '@/domain/access'
-import { getAccessContext } from '@/modules/platform'
-import { listAuditLogs } from '@/modules/platform'
+import { getAccessContext, listAuditLogs } from '@/modules/platform'
 import { listUsers } from '@/modules/users'
 
 export default async function AuditPage({

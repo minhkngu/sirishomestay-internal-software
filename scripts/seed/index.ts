@@ -1,7 +1,7 @@
-import { sql } from 'drizzle-orm'
+import { sql, eq } from 'drizzle-orm'
 import type { DB } from '@/db/client'
 import { userProfiles } from '@/db'
-import { eq } from 'drizzle-orm'
+
 import { createRng } from './rng'
 import { ensureSeedBucket } from './bucket'
 import { facilitySeed } from './facilities'

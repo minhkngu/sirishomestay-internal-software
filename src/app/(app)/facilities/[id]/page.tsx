@@ -3,13 +3,9 @@ import { orNotFound } from '@/lib/or-not-found'
 import { ROOM_STATUS_LABELS, type RoomStatus } from '@/domain/room-status'
 import { can, canViewTenantIdentity } from '@/domain/access'
 import { getAccessContext } from '@/modules/platform'
-import { getFacility } from '@/modules/facilities'
+import { getFacility, listAmenities } from '@/modules/facilities'
 import { listRoomsWithStatus } from '@/modules/leasing'
-import { FacilityBankAccount } from '@/modules/facilities/ui'
-import { listAmenities } from '@/modules/facilities'
-import { RoomPanels } from '@/modules/facilities/ui'
-import { FacilityLifecycle } from '@/modules/facilities/ui'
-import { RoomMap } from '@/modules/facilities/ui'
+import { FacilityBankAccount, RoomPanels, FacilityLifecycle, RoomMap } from '@/modules/facilities/ui'
 
 export default async function FacilityPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

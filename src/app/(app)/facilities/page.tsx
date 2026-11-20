@@ -1,10 +1,8 @@
 import { PageHeader } from '@/components/list/page-header'
 import { db } from '@/db/client'
 import { getAccessContext } from '@/modules/platform'
-import { listFacilities } from '@/modules/facilities'
-import { countRoomsByFacility } from '@/modules/facilities'
-import { NewFacilityButton } from '@/modules/facilities/ui'
-import { FacilityList } from '@/modules/facilities/ui'
+import { listFacilities, countRoomsByFacility } from '@/modules/facilities'
+import { NewFacilityButton, FacilityList } from '@/modules/facilities/ui'
 
 export default async function FacilitiesPage() {
   const ctx = await getAccessContext()

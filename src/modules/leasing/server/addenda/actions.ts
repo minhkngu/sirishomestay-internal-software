@@ -5,8 +5,7 @@ import '@/modules/registrations'
 import { revalidatePath } from 'next/cache'
 import { db } from '@/db/client'
 import { toActionResult } from '@/lib/action-result'
-import { getAccessContext } from '@/modules/platform'
-import { getStorage } from '@/modules/platform'
+import { getAccessContext, getStorage } from '@/modules/platform'
 import {
   createAssignment,
   createExtension,

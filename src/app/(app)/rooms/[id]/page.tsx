@@ -9,14 +9,10 @@ import { formatVND } from '@/domain/money'
 import { orNotFound } from '@/lib/or-not-found'
 import { getAccessContext } from '@/modules/platform'
 import { listAmenities } from '@/modules/facilities'
-import { RoomEditForm } from '@/modules/facilities/ui'
-import { RoomLifecycle } from '@/modules/facilities/ui'
-import { getRoomDetail } from '@/modules/leasing'
+import { RoomEditForm, RoomLifecycle, RoomIncidentList } from '@/modules/facilities/ui'
+import { getRoomDetail, listIncidents, getPendingDepositContract, listLeases } from '@/modules/leasing'
 import { listAssets } from '@/modules/assets'
-import { RoomIncidentList } from '@/modules/facilities/ui'
-import { listIncidents } from '@/modules/leasing'
 import { userNamesByIds } from '@/modules/users'
-import { getPendingDepositContract, listLeases } from '@/modules/leasing'
 
 export default async function RoomPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

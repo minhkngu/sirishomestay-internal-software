@@ -5,8 +5,7 @@ import type { DB } from '@/db/client'
 import { assertCan, facilityScope, type AccessContext } from '@/domain/access'
 import { todayVN } from '@/domain/dates'
 import { NotFoundError, ValidationError } from '@/domain/errors'
-import { recordAudit } from '@/modules/platform'
-import { registerOwnerResolver } from '@/modules/platform'
+import { recordAudit, registerOwnerResolver } from '@/modules/platform'
 
 export type Incident = typeof incidents.$inferSelect
 import type { IncidentStatus } from '@/domain/statuses'

@@ -1,11 +1,9 @@
 import { PageHeader } from '@/components/list/page-header'
 import { db } from '@/db/client'
 import { getAccessContext } from '@/modules/platform'
-import { listAmenities } from '@/modules/facilities'
-import { listFacilities } from '@/modules/facilities'
+import { listAmenities, listFacilities } from '@/modules/facilities'
 import { listRoomsWithStatus } from '@/modules/leasing'
-import { RoomGrid } from '@/modules/facilities/ui'
-import { RoomPanels } from '@/modules/facilities/ui'
+import { RoomGrid, RoomPanels } from '@/modules/facilities/ui'
 
 export default async function RoomsPage() {
   const ctx = await getAccessContext()
