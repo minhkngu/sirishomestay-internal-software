@@ -1,7 +1,7 @@
 import { contractTermsAt, termSegments } from './contract-terms'
 import { addDays, daysInMonth, formatDateVN } from './dates'
 import { ValidationError } from './errors'
-import { meterUsage } from './meters'
+import { meterFeeUsage } from './meter-fee-usage'
 import { fullMonthCoefficient, prorateFraction } from './proration'
 import type {
   ISODate, InvoiceLineInput, Lease, Addendum, LeaseTerms, Meter, MeterReading, OneOffCharge, PendingAdjustment, Proration,
@@ -115,27 +115,8 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): { lines: Invoic
       const link = input.feeMeterLinks?.find(x => x.leaseFeeId === f.leaseFeeId)
       const linked = input.meters.find(m => m.id === link?.meterId)
       if (!linked) { warnings.push(`Chưa có đồng hồ ${f.name}`); continue }
-      // Đồng hồ điện, nước: mức dùng tính qua mọi đồng hồ cùng loại của phòng (thay đồng hồ, chuyển phòng); đồng hồ khác: chỉ đồng hồ đã gắn
-      const chainOf = (roomId: string) => linked.utility === 'electric' || linked.utility === 'water' ? input.meters.filter(m => m.roomId === roomId && m.utility === linked.utility) : [linked]
       try {
-        const beginsInPeriod = terms.startDate >= prevStart && terms.startDate <= prevEnd
-        const roomSegments = termSegments(input.lease, input.addenda.filter(a => a.newRoomId != null), prevStart, prevEnd)
-        const ranges = roomSegments.map((segment, index) => {
-          const chain = chainOf(segment.terms.roomId)
-          return {
-            meters: chain,
-            start: index === 0 ? (beginsInPeriod && chain.some(m => m.installedOn < terms.startDate) ? addDays(terms.startDate, 1) : segment.from) : addDays(segment.from, 1),
-            end: index + 1 < roomSegments.length ? addDays(segment.to, 1) : segment.to,
-            boundary: index === 0 ? (beginsInPeriod ? terms.startDate : null) : segment.from,
-            endBoundary: index + 1 < roomSegments.length ? addDays(segment.to, 1) : null,
-          }
-        })
-        const total = ranges.reduce((result, range) => {
-          const missingBoundary = range.boundary ? range.meters.filter(m => m.installedOn < range.boundary! && !input.readings.some(r => r.meterId === m.id && r.readOn === range.boundary)).map(m => m.id) : []
-          const missingEnd = range.endBoundary ? range.meters.filter(m => m.installedOn <= range.endBoundary! && (!m.removedOn || m.removedOn > range.endBoundary!) && !input.readings.some(r => r.meterId === m.id && r.readOn === range.endBoundary)).map(m => m.id) : []
-          const part = meterUsage(range.meters, input.readings, range.start, range.end)
-          return { usage: result.usage + part.usage, segments: [...result.segments, ...part.segments], missing: [...result.missing, ...missingBoundary, ...missingEnd, ...part.missing] }
-        }, { usage: 0, segments: [] as ReturnType<typeof meterUsage>['segments'], missing: [] as string[] })
+        const total = meterFeeUsage({ lease: input.lease, addenda: input.addenda, linked, meters: input.meters, readings: input.readings, from: prevStart, to: prevEnd, startDate: terms.startDate })
         if (total.missing.length) { warnings.push(`Chưa ghi chỉ số ${f.name} tháng ${mmYYYY(prev)}`); continue }
         lines.push({
           type: 'fee', description: `${f.name} tháng ${mmYYYY(prev)} (${total.usage} ${f.unit})${total.segments.some((x) => x.estimated) ? ' (ước tính)' : ''}`,

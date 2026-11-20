@@ -6,7 +6,7 @@ import type { AccessContext, Permission } from '@/domain/access'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import { addendumFormData, createExtension, createOccupantChange, createTermination, createTransfer, previewAddendum } from '@/server/addenda/service'
 import { saveHandover, startHandover } from '@/server/handovers/service'
-import { approveInvoice, getInvoiceDetail } from '@/server/invoices/service'
+import { approveInvoice, getInvoiceDetail, updateLines } from '@/server/invoices/service'
 import { createTestDb } from '../helpers/db'
 
 const context = (permissions: Permission[], facilityId: string): AccessContext => ({ userId: crypto.randomUUID(), email: 't@example.com', fullName: 'Test', permissions: new Set(permissions), facilityIds: new Set([facilityId]), isAdmin: false })
@@ -30,6 +30,39 @@ describe('phụ lục hợp đồng', () => {
     await db.insert(leaseFeeMeters).values({ leaseFeeId: fee.id, meterId })
     return fee
   }
+  describe('phí điện theo đồng hồ khi chuyển phòng và thanh lý', () => {
+    it('chuyển phòng chuyển liên kết phí điện sang đồng hồ điện phòng mới; thanh lý sau đó cộng mức dùng hai phòng', async () => {
+      const [m1] = await db.insert(meters).values({ roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 }).returning()
+      const [m2] = await db.insert(meters).values({ roomId: room2Id, utility: 'electric', installedOn: '2026-01-01', startReading: 0 }).returning()
+      await db.insert(meterReadings).values({ meterId: m1.id, period: '2026-10', readOn: '2026-10-31', value: 60 })
+      const fee = await electricFee(m1.id)
+      await createTransfer(db, ctx(), leaseId, { effectiveDate: '2026-11-16', newRoomId: room2Id, readings: [{ meterId: m1.id, value: 100 }, { meterId: m2.id, value: 50 }] })
+      expect((await db.select().from(leaseFeeMeters).where(eq(leaseFeeMeters.leaseFeeId, fee.id)))[0].meterId).toBe(m2.id)
+      const r = await createTermination(db, ctx(), leaseId, { endDate: '2026-12-10', forfeit: { mode: 'none' }, readings: [{ meterId: m2.id, value: 80 }] })
+      expect(r.invoice!.lines.find(l => l.description.startsWith('Điện'))).toMatchObject({ quantity: 70 }) // 100−60 ở phòng cũ + 80−50 ở phòng mới
+    })
+
+    it('thanh lý không tính phần điện của khách trước khi hợp đồng bắt đầu giữa kỳ', async () => {
+      await db.update(leases).set({ startDate: '2026-10-15' }).where(eq(leases.id, leaseId))
+      const [m] = await db.insert(meters).values({ roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 }).returning()
+      await db.insert(meterReadings).values([{ meterId: m.id, period: '2026-09', readOn: '2026-09-30', value: 10 }, { meterId: m.id, period: '2026-10', kind: 'handover', readOn: '2026-10-15', value: 80 }])
+      await electricFee(m.id)
+      const r = await createTermination(db, ctx(), leaseId, { endDate: '2026-11-10', forfeit: { mode: 'none' }, readings: [{ meterId: m.id, value: 130 }] })
+      expect(r.invoice!.lines.find(l => l.description.startsWith('Điện'))).toMatchObject({ quantity: 50 })
+    })
+
+    it('dòng phí đồng hồ của hoá đơn thanh lý nháp sửa được (hoá đơn tháng thì bị khoá)', async () => {
+      const [m] = await db.insert(meters).values({ roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 }).returning()
+      await db.insert(meterReadings).values({ meterId: m.id, period: '2026-10', readOn: '2026-10-31', value: 100 })
+      await electricFee(m.id)
+      const r = await createTermination(db, ctx(), leaseId, { endDate: '2026-12-10', forfeit: { mode: 'none' }, readings: [{ meterId: m.id, value: 160 }] })
+      const rows = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, r.invoice!.id))
+      const edited = rows.map(l => ({ id: l.id, type: l.type, description: l.description, quantity: l.description.startsWith('Điện') ? 50 : l.quantity, unitPrice: l.unitPrice, meta: l.meta }))
+      await updateLines(db, ctx(), r.invoice!.id, edited)
+      expect((await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, r.invoice!.id))).find(l => l.description.startsWith('Điện'))).toMatchObject({ quantity: 50, amount: 175000 })
+    })
+  })
+
   it('ngữ cảnh phụ lục dùng giá phí riêng theo toà hợp đồng', async () => {
     const [unit] = await db.insert(feeUnits).values({ name: 'tháng' }).returning()
     const [fee] = await db.insert(feeTypes).values({ name: 'Dịch vụ', unitId: unit.id, defaultPrice: 200000 }).returning()
