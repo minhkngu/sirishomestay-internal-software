@@ -202,14 +202,14 @@ export function InvoiceEditor(p: Props) {
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-border/80 bg-card">
-          <table className="w-full min-w-[980px] text-xs">
+          <table className="w-full min-w-[1150px] text-xs">
             <thead className="border-b border-border/70 bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="px-3.5 py-3 text-left min-w-44 whitespace-nowrap">Mô tả</th>
                 <th className="px-3.5 py-3 text-left w-64 whitespace-nowrap">Thời gian</th>
                 <th className="px-3.5 py-3 text-left w-56 whitespace-nowrap">Chỉ số</th>
-                <th className="px-3.5 py-3 text-right w-24 whitespace-nowrap">SL</th>
-                <th className="px-3.5 py-3 text-right w-32 whitespace-nowrap">Đơn giá</th>
+                <th className="px-3.5 py-3 text-right min-w-20 whitespace-nowrap">SL</th>
+                <th className="px-3.5 py-3 text-right min-w-32 whitespace-nowrap">Đơn giá</th>
                 <th className="px-3.5 py-3 text-right w-36 whitespace-nowrap">Thành tiền</th>
                 <th className="px-2 py-3 w-12 text-center"></th>
               </tr>
