@@ -105,6 +105,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
       {inv.status === 'draft' && <InvoiceFeeQuantities key={inv.updatedAt.toISOString()} invoiceId={id} fees={d.periodFees} />}
       <InvoiceEditorWithFees
+        meterPanels={d.meterPanels}
         addFee={{
           // Loại phí tính theo đồng hồ cần gắn đồng hồ nên chỉ thêm qua hợp đồng
           feeTypes: feeTypes.filter((f) => f.quantityFrom !== 'meter').map((f) => ({ id: f.id, name: f.name, unit: unitName.get(f.unitId) ?? '', defaultPrice: f.defaultPrice, prices: feePrices[f.id] ?? {}, billing: f.billing, quantityFrom: f.quantityFrom })),

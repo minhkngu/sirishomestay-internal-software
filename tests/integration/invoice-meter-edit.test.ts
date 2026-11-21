@@ -4,7 +4,7 @@ import { facilities, invoiceLines, invoices, leaseFeeMeters, leaseFeeSnapshots, 
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ForbiddenError, ValidationError } from '@/domain/errors'
-import { approveInvoice, createDrafts, updateInvoiceMeterReading } from '@/server/invoices/service'
+import { approveInvoice, createDrafts, getInvoiceDetail, updateInvoiceMeterReading } from '@/server/invoices/service'
 import { listReadingSheet } from '@/server/meters/service'
 import { createTestDb } from '../helpers/db'
 
@@ -64,5 +64,29 @@ describe('sửa chỉ số điện trong hoá đơn', () => {
     await updateInvoiceMeterReading(db, ctx(), invoiceId, { leaseFeeId: feeId, value: 260 })
     await approveInvoice(db, ctx(), invoiceId, { dueDate: '2026-12-05' })
     expect((await electricLine()).amount).toBe(560000)
+  })
+
+  it('chi tiết hoá đơn liệt kê các chỉ số đã chốt của đồng hồ (3 tháng gần nhất), thiếu thì để trống', async () => {
+    const d = await getInvoiceDetail(db, ctx(), invoiceId)
+    expect(d.meterPanels).toHaveLength(1)
+    expect(d.meterPanels[0]).toMatchObject({ leaseFeeId: feeId, name: 'Điện' })
+    expect(d.meterPanels[0].rows).toEqual([
+      { period: '2026-09', readOn: null, value: null },
+      { period: '2026-10', readOn: '2026-10-31', value: 100 },
+      { period: '2026-11', readOn: '2026-11-30', value: 200 },
+    ])
+  })
+  it('sửa chỉ số tháng đầu kỳ (tháng 10) trong hoá đơn tháng 12: lượng dùng tính lại', async () => {
+    await updateInvoiceMeterReading(db, ctx(), invoiceId, { leaseFeeId: feeId, period: '2026-10', value: 120 })
+    expect((await electricLine()).quantity).toBe(80)
+  })
+  it('thêm chỉ số còn thiếu của tháng 11 rồi tính lại hoá đơn', async () => {
+    await db.delete(meterReadings).where(and(eq(meterReadings.meterId, meterId), eq(meterReadings.period, '2026-11')))
+    await updateInvoiceMeterReading(db, ctx(), invoiceId, { leaseFeeId: feeId, period: '2026-11', value: 230 })
+    expect((await electricLine()).quantity).toBe(130)
+  })
+  it('tháng ngoài 3 tháng gần nhất thì từ chối', async () => {
+    await expect(updateInvoiceMeterReading(db, ctx(), invoiceId, { leaseFeeId: feeId, period: '2026-05', value: 10 })).rejects.toThrow(ValidationError)
+    await expect(updateInvoiceMeterReading(db, ctx(), invoiceId, { leaseFeeId: feeId, period: '2026-12', value: 300 })).rejects.toThrow(ValidationError)
   })
 })

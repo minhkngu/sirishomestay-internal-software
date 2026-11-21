@@ -41,6 +41,7 @@ type EditorLine = Line & { unitPriceText: string }
 type AddFee = { feeTypes: FeeOption[]; usedTypeIds: string[]; facilityId: string; renderCreateFee?: (p: { onCreated: (fee: FeeOption) => void }) => React.ReactNode }
 
 type Props = {
+  meterPanels?: MeterPanel[]
   addFee?: AddFee
   id: string
   status: string
@@ -56,28 +57,37 @@ type Props = {
   lines: Line[]
 }
 
-type Segment = { start: number; end: number }
-/** Dòng phí theo đồng hồ: sửa chỉ số chốt cuối tháng trước ngay tại hoá đơn, ghi ngược về tab Chỉ số. */
-function MeterReadingEdit({ invoiceId, meta }: { invoiceId: string; meta: Record<string, unknown> | null }) {
+type MeterPanel = { leaseFeeId: string; name: string; unit: string; rows: Array<{ period: string; readOn: string | null; value: number | null }> }
+const periodLabel = (period: string) => `${period.slice(5)}/${period.slice(0, 4)}`
+/** Chỉ số đã chốt của đồng hồ (3 tháng liền trước): sửa số sai hoặc thêm số còn thiếu ngay tại hoá đơn, ghi ngược về tab Chỉ số. */
+function MeterReadingsPanel({ invoiceId, panel, editable }: { invoiceId: string; panel: MeterPanel; editable: boolean }) {
   const router = useRouter()
   const [pending, start] = useTransition()
-  const segments = (meta?.segments as Segment[] | undefined) ?? []
-  const leaseFeeId = meta?.leaseFeeId
-  const [value, setValue] = useState(String(segments[0]?.end ?? ''))
+  const [values, setValues] = useState<Record<string, string>>(Object.fromEntries(panel.rows.map((r) => [r.period, r.value == null ? '' : String(r.value)])))
   const [error, setError] = useState('')
-  if (typeof leaseFeeId !== 'string' || segments.length === 0) return null
-  if (segments.length > 1) return <p className="mt-1.5 text-[11px] text-muted-foreground">Có nhiều đoạn đồng hồ trong tháng: sửa ở tab Chỉ số.</p>
-  const save = () => start(async () => {
-    const r = await updateInvoiceMeterReadingAction(invoiceId, { leaseFeeId, value: Number(value) })
+  const save = (period: string) => start(async () => {
+    const r = await updateInvoiceMeterReadingAction(invoiceId, { leaseFeeId: panel.leaseFeeId, period, value: Number(values[period]) })
     if (!r.ok) { setError(r.error); return }
     setError(''); toast.success('Đã cập nhật chỉ số và tính lại hoá đơn'); router.refresh()
   })
   return (
-    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-      <span>Chỉ số {segments[0].start.toLocaleString('vi-VN')} →</span>
-      <input aria-label="Chỉ số chốt mới" inputMode="numeric" value={value} onChange={(e) => setValue(e.target.value)} className="h-7 w-24 rounded-lg border border-border/80 bg-background px-2 text-right tabular-nums text-foreground" />
-      <Button type="button" size="sm" variant="outline" disabled={pending || value.trim() === '' || !/^\d+$/.test(value.trim())} onClick={save} className="h-7 rounded-lg text-[11px]">Cập nhật chỉ số</Button>
-      {error && <span role="alert" className="w-full text-destructive">{error}</span>}
+    <div className="mt-2 rounded-lg border border-border/70 bg-muted/20 p-2.5 text-[11px] text-muted-foreground">
+      <p className="mb-1.5 font-medium text-foreground">Chỉ số đã chốt ({panel.unit})</p>
+      <ul className="space-y-1">
+        {panel.rows.map((r) => (
+          <li key={r.period} className="flex flex-wrap items-center gap-2">
+            <span className="w-16 tabular-nums">Tháng {periodLabel(r.period)}</span>
+            <span className="w-24 tabular-nums">{r.readOn ? r.readOn.split('-').reverse().join('/') : 'chưa chốt'}</span>
+            {editable ? (
+              <>
+                <input aria-label={`Chỉ số ${panel.name} tháng ${periodLabel(r.period)}`} inputMode="numeric" value={values[r.period]} onChange={(e) => setValues({ ...values, [r.period]: e.target.value })} className="h-7 w-24 rounded-lg border border-border/80 bg-background px-2 text-right tabular-nums text-foreground" />
+                <Button type="button" size="sm" variant="outline" disabled={pending || !/^\d+$/.test((values[r.period] ?? '').trim()) || (r.value != null && values[r.period].trim() === String(r.value))} onClick={() => save(r.period)} className="h-7 rounded-lg text-[11px]">{r.value == null ? 'Thêm' : 'Lưu'}</Button>
+              </>
+            ) : <span className="tabular-nums text-foreground">{r.value == null ? '—' : r.value.toLocaleString('vi-VN')}</span>}
+          </li>
+        ))}
+      </ul>
+      {error && <p role="alert" className="mt-1.5 text-destructive">{error}</p>}
     </div>
   )
 }
@@ -246,7 +256,7 @@ export function InvoiceEditor(p: Props) {
                       className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
                     />
                     {typeof l.meta?.coefficient === 'number' && <p className="mt-1 text-[11px] tabular-nums text-muted-foreground">Hệ số kỳ × {l.meta.coefficient.toLocaleString('vi-VN', { maximumFractionDigits: 4 })}{l.meta.coefficient !== 1 ? ' (tính theo ngày)' : ''}</p>}
-                    {p.status === 'draft' && <MeterReadingEdit invoiceId={p.id} meta={l.meta} />}
+                    {(() => { const panel = p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId); return panel ? <MeterReadingsPanel invoiceId={p.id} panel={panel} editable={p.status === 'draft'} /> : null })()}
                   </td>
                   <td className="p-2.5">
                     <input
