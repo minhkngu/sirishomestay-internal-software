@@ -16,6 +16,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { formatVND } from '@/domain/money'
 import { MoneyInput } from '@/components/ui/money-input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { FeePickerDialog, type FeeOption } from '@/components/fee-picker-dialog'
 import { feeLineFromType } from '@/domain/invoice-fee-line'
 import { cn } from '@/lib/utils'
@@ -31,6 +32,8 @@ import {
 
 type Line = {
   id?: string
+  /** Thành tiền đã lưu; dòng hợp đồng giữ số này (đã nhân hệ số), dòng khác tính lại từ SL × đơn giá. */
+  amount?: number
   type: string
   description: string
   quantity: number
@@ -39,6 +42,9 @@ type Line = {
 }
 
 type EditorLine = Line & { unitPriceText: string }
+/** Dòng tiền phòng và phí hợp đồng lấy từ hợp đồng nên không sửa mô tả, SL, đơn giá và không xoá ở đây. */
+const isLocked = (l: Line) => l.type === 'rent' || typeof l.meta?.leaseFeeId === 'string'
+const lineAmount = (l: Line) => (isLocked(l) && l.amount != null ? l.amount : Math.round(l.quantity * l.unitPrice))
 
 type AddFee = { feeTypes: FeeOption[]; usedTypeIds: string[]; facilityId: string; renderCreateFee?: (p: { onCreated: (fee: FeeOption) => void }) => React.ReactNode }
 
@@ -94,35 +100,34 @@ function LineTimeEdit({ invoiceId, lineId, meta, editable }: { invoiceId: string
 }
 type MeterPanel = { leaseFeeId: string; name: string; unit: string; rows: Array<{ period: string; readOn: string | null; value: number | null }> }
 const periodLabel = (period: string) => `${period.slice(5)}/${period.slice(0, 4)}`
-/** Chỉ số đã chốt của đồng hồ (3 tháng liền trước): sửa số sai hoặc thêm số còn thiếu ngay tại hoá đơn, ghi ngược về tab Chỉ số. */
+/** Chỉ số đã chốt của đồng hồ: chọn tháng ở dropdown rồi sửa số sai hoặc thêm số còn thiếu ngay tại hoá đơn (ghi ngược về tab Chỉ số). */
 function MeterReadingsPanel({ invoiceId, panel, editable }: { invoiceId: string; panel: MeterPanel; editable: boolean }) {
   const router = useRouter()
   const [pending, start] = useTransition()
+  const [period, setPeriod] = useState(panel.rows[panel.rows.length - 1].period)
+  const row = panel.rows.find((r) => r.period === period) ?? panel.rows[panel.rows.length - 1]
   const [values, setValues] = useState<Record<string, string>>(Object.fromEntries(panel.rows.map((r) => [r.period, r.value == null ? '' : String(r.value)])))
   const [error, setError] = useState('')
-  const save = (period: string) => start(async () => {
-    const r = await updateInvoiceMeterReadingAction(invoiceId, { leaseFeeId: panel.leaseFeeId, period, value: Number(values[period]) })
+  const items = panel.rows.map((r) => ({ value: r.period, label: `Tháng ${periodLabel(r.period)} · ${r.value == null ? 'chưa chốt' : r.value.toLocaleString('vi-VN')}` }))
+  const value = values[row.period] ?? ''
+  const save = () => start(async () => {
+    const r = await updateInvoiceMeterReadingAction(invoiceId, { leaseFeeId: panel.leaseFeeId, period: row.period, value: Number(value) })
     if (!r.ok) { setError(r.error); return }
     setError(''); toast.success('Đã cập nhật chỉ số và tính lại hoá đơn'); router.refresh()
   })
   return (
-    <div className="mt-2 rounded-lg border border-border/70 bg-muted/20 p-2.5 text-[11px] text-muted-foreground">
-      <p className="mb-1.5 font-medium text-foreground">Chỉ số đã chốt ({panel.unit})</p>
-      <ul className="space-y-1">
-        {panel.rows.map((r) => (
-          <li key={r.period} className="flex flex-wrap items-center gap-2">
-            <span className="w-16 tabular-nums">Tháng {periodLabel(r.period)}</span>
-            <span className="w-24 tabular-nums">{r.readOn ? r.readOn.split('-').reverse().join('/') : 'chưa chốt'}</span>
-            {editable ? (
-              <>
-                <input aria-label={`Chỉ số ${panel.name} tháng ${periodLabel(r.period)}`} inputMode="numeric" value={values[r.period]} onChange={(e) => setValues({ ...values, [r.period]: e.target.value })} className="h-7 w-24 rounded-lg border border-border/80 bg-background px-2 text-right tabular-nums text-foreground" />
-                <Button type="button" size="sm" variant="outline" disabled={pending || !/^\d+$/.test((values[r.period] ?? '').trim()) || (r.value != null && values[r.period].trim() === String(r.value))} onClick={() => save(r.period)} className="h-7 rounded-lg text-[11px]">{r.value == null ? 'Thêm' : 'Lưu'}</Button>
-              </>
-            ) : <span className="tabular-nums text-foreground">{r.value == null ? '—' : r.value.toLocaleString('vi-VN')}</span>}
-          </li>
-        ))}
-      </ul>
-      {error && <p role="alert" className="mt-1.5 text-destructive">{error}</p>}
+    <div className="space-y-1.5 text-[11px] text-muted-foreground">
+      <Select value={row.period} onValueChange={(v) => { if (v) { setPeriod(String(v)); setError('') } }} items={items}>
+        <SelectTrigger aria-label={`Chọn tháng chỉ số ${panel.name}`} className="h-8 w-full rounded-lg border-border/80 bg-background text-xs"><SelectValue /></SelectTrigger>
+        <SelectContent>{items.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+      </Select>
+      {editable ? (
+        <div className="flex items-center gap-1.5">
+          <input aria-label={`Chỉ số ${panel.name} tháng ${periodLabel(row.period)}`} inputMode="numeric" placeholder={`Chỉ số (${panel.unit})`} value={value} onChange={(e) => setValues({ ...values, [row.period]: e.target.value })} className="h-8 w-full min-w-0 rounded-lg border border-border/80 bg-background px-2 text-right text-xs tabular-nums text-foreground" />
+          <Button type="button" size="sm" variant="outline" disabled={pending || !/^\d+$/.test(value.trim()) || (row.value != null && value.trim() === String(row.value))} onClick={save} className="h-8 shrink-0 rounded-lg text-[11px]">{row.value == null ? 'Thêm' : 'Lưu'}</Button>
+        </div>
+      ) : null}
+      {error && <p role="alert" className="text-destructive">{error}</p>}
     </div>
   )
 }
@@ -141,7 +146,7 @@ export function InvoiceEditor(p: Props) {
   const [due, setDue] = useState(p.dueDateIso ?? '')
   const [pickingFee, setPickingFee] = useState(false)
   const [createdFees, setCreatedFees] = useState<FeeOption[]>([])
-  const total = lines.reduce((n, l) => n + Math.round(l.quantity * l.unitPrice), 0)
+  const total = lines.reduce((n, l) => n + lineAmount(l), 0)
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>, ok: string, after?: () => void) =>
     start(async () => {
@@ -271,10 +276,11 @@ export function InvoiceEditor(p: Props) {
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-border/80 bg-card">
-          <table className="w-full min-w-[750px] text-xs">
+          <table className="w-full min-w-[980px] text-xs">
             <thead className="border-b border-border/70 bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="px-3.5 py-3 text-left min-w-44 whitespace-nowrap">Mô tả</th>
+                <th className="px-3.5 py-3 text-left w-56 whitespace-nowrap">Chỉ số</th>
                 <th className="px-3.5 py-3 text-right w-24 whitespace-nowrap">SL</th>
                 <th className="px-3.5 py-3 text-right w-32 whitespace-nowrap">Đơn giá</th>
                 <th className="px-3.5 py-3 text-right w-36 whitespace-nowrap">Thành tiền</th>
@@ -287,18 +293,21 @@ export function InvoiceEditor(p: Props) {
                   <td className="p-2.5">
                     <input
                       value={l.description}
+                      disabled={isLocked(l)}
                       onChange={(e) => set(i, { description: e.target.value })}
-                      className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
+                      className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 disabled:cursor-not-allowed disabled:border-transparent disabled:bg-transparent disabled:px-0 disabled:text-foreground"
                     />
                     <LineTimeEdit invoiceId={p.id} lineId={l.id} meta={l.meta} editable={p.status === 'draft'} />
-                    {(() => { const panel = p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId); return panel ? <MeterReadingsPanel invoiceId={p.id} panel={panel} editable={p.status === 'draft'} /> : null })()}
+                  </td>
+                  <td className="p-2.5 align-top">
+                    {(() => { const panel = p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId); return panel ? <MeterReadingsPanel invoiceId={p.id} panel={panel} editable={p.status === 'draft'} /> : <span className="text-muted-foreground/60">—</span> })()}
                   </td>
                   <td className="p-2.5">
                     <input
                       type="number"
                       step="any"
                       value={l.quantity}
-                      disabled={typeof l.meta?.leaseFeeId === 'string'}
+                      disabled={isLocked(l)}
                       onChange={(e) => set(i, { quantity: Number(e.target.value) })}
                       className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
                     />
@@ -307,18 +316,18 @@ export function InvoiceEditor(p: Props) {
                     <MoneyInput
                       allowNegative
                       value={l.unitPriceText}
-                      disabled={typeof l.meta?.leaseFeeId === 'string'}
+                      disabled={isLocked(l)}
                       onValueChange={(value) => set(i, { unitPriceText: value, unitPrice: value === '' || value === '-' ? 0 : Number(value) })}
                       className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
                     />
                   </td>
                   <td className="p-2.5 text-right font-bold tabular-nums text-foreground">
-                    {formatVND(Math.round(l.quantity * l.unitPrice))}
+                    {formatVND(lineAmount(l))}
                   </td>
                   <td className="p-2.5 text-center">
                     <button
                       type="button"
-                      disabled={typeof l.meta?.leaseFeeId === 'string'}
+                      disabled={isLocked(l)}
                       onClick={() => setLines(lines.filter((_, j) => j !== i))}
                       className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-rose-50 hover:text-rose-600"
                       title="Xoá dòng"
@@ -331,7 +340,7 @@ export function InvoiceEditor(p: Props) {
             </tbody>
             <tfoot className="border-t border-border/80 bg-muted/30">
               <tr>
-                <td colSpan={3} className="px-4 py-3 text-right font-semibold text-foreground">
+                <td colSpan={4} className="px-4 py-3 text-right font-semibold text-foreground">
                   Tổng
                 </td>
                 <td className="px-3.5 py-3 text-right text-sm font-bold tabular-nums text-primary">
@@ -367,7 +376,7 @@ export function InvoiceEditor(p: Props) {
           <Button
             size="sm"
             disabled={pending}
-            onClick={() => run(() => updateLinesAction(p.id, lines.map((l) => ({ type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta: l.meta }))), 'Đã lưu các dòng')}
+            onClick={() => run(() => updateLinesAction(p.id, lines.map((l) => ({ id: l.id, type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta: l.meta }))), 'Đã lưu các dòng')}
             className="gap-1.5 rounded-xl font-medium text-xs shadow-2xs"
           >
             <Check className="size-3.5" />
