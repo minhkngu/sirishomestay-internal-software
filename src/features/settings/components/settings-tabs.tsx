@@ -25,6 +25,7 @@ function GeneralTab({ s }: { s: Settings }) {
   const [proration, setProration] = useState(s.proration)
   const [ruleKind, setRuleKind] = useState(s.dueRule.kind)
   const [day, setDay] = useState(String(s.dueRule.kind === 'day_of_next_month' ? s.dueRule.day : 5))
+  const [invoiceDay, setInvoiceDay] = useState(String(s.dueRule.kind === 'day_of_invoice_month' ? s.dueRule.day : 5))
   const [after, setAfter] = useState(String(s.dueRule.kind === 'days_after_approval' ? s.dueRule.days : 5))
   const [retention, setRetention] = useState(String(s.photoRetentionDays))
   return (
@@ -40,6 +41,7 @@ function GeneralTab({ s }: { s: Settings }) {
       </div>
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">Hạn thanh toán mặc định</legend>
+        <label className="flex items-center gap-2 text-sm"><input type="radio" checked={ruleKind === 'day_of_invoice_month'} onChange={() => setRuleKind('day_of_invoice_month')} /> Ngày <Input aria-label="Ngày của tháng hoá đơn" className="w-16" inputMode="numeric" value={invoiceDay} onChange={(e) => { setInvoiceDay(e.target.value); setRuleKind('day_of_invoice_month') }} /> của chính tháng hoá đơn</label>
         <label className="flex items-center gap-2 text-sm"><input type="radio" checked={ruleKind === 'day_of_next_month'} onChange={() => setRuleKind('day_of_next_month')} /> Ngày <Input aria-label="Ngày của tháng sau" className="w-16" inputMode="numeric" value={day} onChange={(e) => setDay(e.target.value)} /> của tháng sau</label>
         <label className="flex items-center gap-2 text-sm"><input type="radio" checked={ruleKind === 'days_after_approval'} onChange={() => setRuleKind('days_after_approval')} /> <Input aria-label="Số ngày sau khi duyệt" className="w-16" inputMode="numeric" value={after} onChange={(e) => setAfter(e.target.value)} /> ngày sau khi duyệt</label>
       </fieldset>
@@ -47,7 +49,7 @@ function GeneralTab({ s }: { s: Settings }) {
       <Msg error={error} ok={ok} />
       <Button disabled={pending} onClick={() => run(() => updateSettingsAction({
         visaWarningDays: Number(visa), contractWarningDays: Number(contract), proration, photoRetentionDays: Number(retention),
-        dueRule: ruleKind === 'day_of_next_month' ? { kind: 'day_of_next_month', day: Number(day) } : { kind: 'days_after_approval', days: Number(after) },
+        dueRule: ruleKind === 'day_of_invoice_month' ? { kind: 'day_of_invoice_month', day: Number(invoiceDay) } : ruleKind === 'day_of_next_month' ? { kind: 'day_of_next_month', day: Number(day) } : { kind: 'days_after_approval', days: Number(after) },
       }))}>Lưu</Button>
     </div>
   )

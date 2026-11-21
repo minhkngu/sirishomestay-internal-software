@@ -2,7 +2,7 @@
 export type ISODate = string
 export type Proration = 'days_30' | 'actual_days'
 export type Utility = 'electric' | 'water'
-export type DueRule = { kind: 'day_of_next_month'; day: number } | { kind: 'days_after_approval'; days: number }
+export type DueRule = { kind: 'day_of_next_month'; day: number } | { kind: 'days_after_approval'; days: number } | { kind: 'day_of_invoice_month'; day: number }
 
 export type ContractFee = {
   feeTypeId: string | null
