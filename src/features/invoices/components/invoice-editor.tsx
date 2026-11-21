@@ -128,6 +128,7 @@ const NEW_READING = '__new'
 function MeterReadingsPanel({ panel, editable, consumption, staged, onStage }: { panel: MeterPanel; editable: boolean; consumption: number; /** Chỉ số đã điền nhưng chưa lưu, theo tháng. */ staged: Record<string, string>; onStage: (period: string, value: string) => void }) {
   const [period, setPeriod] = useState<string | null>(null)
   const [text, setText] = useState('')
+  const [openText, setOpenText] = useState('')
   const [, setError] = useState('')
   const last = panel.rows[panel.rows.length - 1]
   const rowLabel = (r: MeterPanel['rows'][number]) => staged[r.period] !== undefined ? `Tháng ${periodLabel(r.period)} · ${Number(staged[r.period]).toLocaleString('vi-VN')} (chưa lưu)` : `Tháng ${periodLabel(r.period)} · ${r.value == null ? 'chưa chốt' : r.value.toLocaleString('vi-VN')}`
@@ -135,16 +136,26 @@ function MeterReadingsPanel({ panel, editable, consumption, staged, onStage }: {
   const row = panel.rows.find((r) => r.period === period)
   // Số đầu kỳ: nếu tháng liền trước đang được điền (chưa lưu) thì lấy số đó
   const prevRow = row ? panel.rows[panel.rows.indexOf(row) - 1] : undefined
-  const opening = row ? (prevRow && staged[prevRow.period] !== undefined ? Number(staged[prevRow.period]) : row.opening) : null
+  const openingOf = (r: MeterPanel['rows'][number]) => {
+    const prev = panel.rows[panel.rows.indexOf(r) - 1]
+    return prev && staged[prev.period] !== undefined ? Number(staged[prev.period]) : r.opening
+  }
+  // Số đầu kỳ chính là chỉ số chốt của tháng liền trước: sửa được khi tháng đó nằm trong danh sách (cùng quy tắc 3 tháng gần nhất)
+  const openingEditable = editable && !!prevRow
+  const opening = openingEditable ? (/^\d+$/.test(openText.trim()) ? Number(openText.trim()) : null) : (row ? openingOf(row) : null)
   const closing = /^\d+$/.test(text.trim()) ? Number(text.trim()) : null
   const tooLow = closing !== null && opening !== null && closing < opening
   const open = (value: string) => {
     const target = value === NEW_READING ? (panel.rows.find((r) => r.value == null) ?? last).period : value
     const found = panel.rows.find((r) => r.period === target) ?? last
-    setText(staged[found.period] ?? (found.value == null ? '' : String(found.value))); setError(''); setPeriod(found.period)
+    setText(staged[found.period] ?? (found.value == null ? '' : String(found.value)))
+    const o = openingOf(found); setOpenText(o == null ? '' : String(o))
+    setError(''); setPeriod(found.period)
   }
   const apply = () => {
     if (!row) return
+    // Đổi số đầu kỳ = sửa chỉ số chốt của tháng liền trước
+    if (openingEditable && prevRow && opening !== null && opening !== openingOf(row)) onStage(prevRow.period, String(opening))
     onStage(row.period, String(Number(text.trim())))
     setPeriod(null)
   }
@@ -170,7 +181,9 @@ function MeterReadingsPanel({ panel, editable, consumption, staged, onStage }: {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="meter-reading-open">Số đầu kỳ ({panel.unit})</Label>
-                <Input id="meter-reading-open" readOnly disabled value={opening === null ? '—' : opening.toLocaleString('vi-VN')} className="h-9 text-right tabular-nums" />
+                {openingEditable
+                  ? <Input id="meter-reading-open" inputMode="numeric" value={openText} onChange={(e) => setOpenText(e.target.value)} className="h-9 text-right tabular-nums" />
+                  : <Input id="meter-reading-open" readOnly disabled value={opening === null ? '—' : opening.toLocaleString('vi-VN')} className="h-9 text-right tabular-nums" />}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="meter-reading-value">Số cuối kỳ ({panel.unit})</Label>
@@ -182,7 +195,7 @@ function MeterReadingsPanel({ panel, editable, consumption, staged, onStage }: {
             </p>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="ghost" onClick={() => setPeriod(null)}>Huỷ</Button>
-              <Button type="button" disabled={!/^\d+$/.test(text.trim()) || tooLow || (row.value != null && staged[row.period] === undefined && text.trim() === String(row.value))} onClick={apply}>Áp dụng</Button>
+              <Button type="button" disabled={!/^\d+$/.test(text.trim()) || (openingEditable && opening === null) || tooLow || (row.value != null && staged[row.period] === undefined && text.trim() === String(row.value) && !(openingEditable && opening !== openingOf(row)))} onClick={apply}>Áp dụng</Button>
             </div>
           </div>
         </FormDialog>
