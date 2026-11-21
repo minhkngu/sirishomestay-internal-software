@@ -8,6 +8,8 @@ export const meters = pgTable('meters', {
   id: uuid('id').primaryKey().defaultRandom(),
   roomId: uuid('room_id').notNull().references(() => rooms.id),
   utility: text('utility').notNull(),
+  /** Tên đồng hồ trong phòng (Điện, Nước, Máy giặt...), hiện ở mọi nơi chọn hoặc liệt kê đồng hồ. */
+  name: text('name').notNull().default(''),
   feeTypeId: uuid('fee_type_id').references(() => feeTypes.id), // electric | water
   serial: text('serial'),
   installedOn: date('installed_on', { mode: 'string' }).notNull(),

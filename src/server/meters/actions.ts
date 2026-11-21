@@ -21,7 +21,7 @@ export async function suggestFinalReadingAction(roomId: string, utility: 'electr
   return toActionResult(() => suggestMeterFinalReading(db, ctx, roomId, utility))
 }
 
-export async function addRoomMeterAction(roomId: string, input: { startReading: number; installedOn: string; serial?: string }) {
+export async function addRoomMeterAction(roomId: string, input: { name: string; startReading: number; installedOn: string; serial?: string }) {
   const ctx = await getAccessContext()
   return toActionResult(async () => { const r = await addRoomMeter(db, ctx, roomId, input); revalidatePath('/meters'); return r })
 }

@@ -128,10 +128,10 @@ export async function quickContractDataAction(kind: 'lease' | 'deposit', id: str
       const unitName = new Map(units.map(u => [u.id, u.name]))
       const { meters, leaseFeeMeters, leaseFeeSnapshots, leases } = await import('@/db')
       const { and, eq, isNull } = await import('drizzle-orm')
-      const meterRows = await db.select({ id: meters.id, utility: meters.utility, serial: meters.serial }).from(meters).where(and(eq(meters.roomId, l.roomId), isNull(meters.removedOn)))
+      const meterRows = await db.select({ id: meters.id, utility: meters.utility, name: meters.name, serial: meters.serial }).from(meters).where(and(eq(meters.roomId, l.roomId), isNull(meters.removedOn)))
       const busyRows = await db.select({ meterId: leaseFeeMeters.meterId }).from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).innerJoin(leases, eq(leases.id, leaseFeeSnapshots.leaseId)).where(eq(leases.status, 'active'))
       const busyIds = new Set(busyRows.map(r => r.meterId))
-      const roomMeters = meterRows.map(m => ({ id: m.id, label: `${m.utility === 'electric' ? 'Điện' : m.utility === 'water' ? 'Nước' : 'Khác'}${m.serial ? ` · ${m.serial}` : ''}` }))
+      const roomMeters = meterRows.map(m => ({ id: m.id, label: `${m.name || (m.utility === 'electric' ? 'Điện' : m.utility === 'water' ? 'Nước' : 'Đồng hồ')}${m.serial ? ` · ${m.serial}` : ''}` }))
       return {
         editable: true,
         units: units.map(u => ({ id: u.id, name: u.name })),

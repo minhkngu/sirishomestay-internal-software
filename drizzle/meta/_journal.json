@@ -232,6 +232,20 @@
       "when": 1795168811786,
       "tag": "0032_spotty_night_nurse",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1795233444568,
+      "tag": "0033_light_thundra",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1795233448921,
+      "tag": "0034_backfill_meter_names",
+      "breakpoints": true
     }
   ]
 }

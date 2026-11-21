@@ -91,7 +91,7 @@ export async function listReadingSheet(db: DB, ctx: AccessContext, facilityId: s
 
   const feeIds = allMeters.filter(m => m.utility === 'fee' && !m.removedOn).map(m => m.id)
   const feeLabels = feeIds.length ? await db.select({ meterId: leaseFeeMeters.meterId, name: leaseFeeSnapshots.name }).from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).where(inArray(leaseFeeMeters.meterId, feeIds)) : []
-  const rows: ReadingRow[] = roomRows.map((r) => ({ roomId: r.id, roomCode: r.code, floor: r.floor, occupied: occupiedIds.has(r.id), electric: cell(r.id, 'electric'), water: cell(r.id, 'water'), feeMeters: allMeters.filter(m => m.roomId === r.id && m.utility === 'fee' && !m.removedOn).map(m => ({ name: feeLabels.find(f => f.meterId === m.id)?.name ?? 'Phí', cell: cell(r.id, 'fee', m.id)! })) }))
+  const rows: ReadingRow[] = roomRows.map((r) => ({ roomId: r.id, roomCode: r.code, floor: r.floor, occupied: occupiedIds.has(r.id), electric: cell(r.id, 'electric'), water: cell(r.id, 'water'), feeMeters: allMeters.filter(m => m.roomId === r.id && m.utility === 'fee' && !m.removedOn).map(m => ({ name: m.name || feeLabels.find(f => f.meterId === m.id)?.name || 'Đồng hồ khác', cell: cell(r.id, 'fee', m.id)! })) }))
   const withElectric = rows.filter((r) => r.occupied && r.electric)
   return { rows, progress: { recorded: withElectric.filter((r) => r.electric!.current != null).length, total: withElectric.length } }
 }
@@ -143,7 +143,7 @@ export async function saveReadings(db: DB, ctx: AccessContext, period: string, r
 /** Tạo sẵn công tơ điện và nước (chỉ số đầu 0) cho các phòng vừa tạo; mỗi phòng luôn có đủ hai công tơ này. */
 export async function createDefaultMeters(tx: DB, roomIds: string[], installedOn: string): Promise<void> {
   if (roomIds.length === 0) return
-  await tx.insert(meters).values(roomIds.flatMap((roomId) => (['electric', 'water'] as const).map((utility) => ({ roomId, utility, installedOn, startReading: 0 }))))
+  await tx.insert(meters).values(roomIds.flatMap((roomId) => ([['electric', 'Điện'], ['water', 'Nước']] as const).map(([utility, name]) => ({ roomId, utility, name, installedOn, startReading: 0 }))))
 }
 
 /** Thay đồng hồ: chốt đồng hồ cũ (ngày gỡ + chỉ số cuối) và lắp đồng hồ mới với chỉ số đầu. */
@@ -165,7 +165,7 @@ export async function replaceMeter(
     const note = input.note?.trim() || null
     if (input.estimated && !note) throw new ValidationError('Nhập lý do ước tính', { note: 'Nhập lý do ước tính' })
     await tx.update(meters).set({ removedOn: input.removedOn, finalReading: input.finalReading, finalReadingEstimated: input.estimated === true, estimateNote: input.estimated ? note : null, updatedAt: new Date() }).where(eq(meters.id, current.id))
-    const [fresh] = await tx.insert(meters).values({ roomId, utility, serial: input.newSerial ?? null, installedOn: input.removedOn, startReading: input.startReading }).returning()
+    const [fresh] = await tx.insert(meters).values({ roomId, utility, name: current.name, serial: input.newSerial ?? null, installedOn: input.removedOn, startReading: input.startReading }).returning()
     // Dòng phí đang gắn đồng hồ cũ chuyển sang đồng hồ mới để vẫn đọc đúng chỉ số và không để đồng hồ mới trống cho phí khác
     await tx.update(leaseFeeMeters).set({ meterId: fresh.id }).where(eq(leaseFeeMeters.meterId, current.id))
     await recordAudit(tx, ctx, {
@@ -228,14 +228,19 @@ export async function ensureFeeMeter(tx: DB, ctx: AccessContext, input: { roomId
 }
 
 /** Thêm một đồng hồ (loại khác) cho phòng; đồng hồ điện, nước mặc định đã có sẵn. Không có thao tác xoá đồng hồ. */
-export async function addRoomMeter(db: DB, ctx: AccessContext, roomId: string, input: { startReading: number; installedOn: string; serial?: string }): Promise<{ id: string }> {
+export async function addRoomMeter(db: DB, ctx: AccessContext, roomId: string, input: { name: string; startReading: number; installedOn: string; serial?: string }): Promise<{ id: string }> {
   return db.transaction(async (tx) => {
     const [room] = await tx.select().from(rooms).where(eq(rooms.id, roomId))
     if (!room) throw new NotFoundError()
     assertCan(ctx, 'meters', room.facilityId)
+    const name = input.name?.trim()
+    if (!name) throw new ValidationError('Nhập tên đồng hồ', { name: 'Nhập tên đồng hồ' })
+    if (name.length > 60) throw new ValidationError('Tên đồng hồ tối đa 60 ký tự', { name: 'Tên đồng hồ quá dài' })
+    const sameName = (await tx.select({ name: meters.name }).from(meters).where(and(eq(meters.roomId, roomId), isNull(meters.removedOn)))).some((m) => m.name.toLowerCase() === name.toLowerCase())
+    if (sameName) throw new ValidationError('Tên đồng hồ đã có trong phòng', { name: 'Tên đồng hồ đã có trong phòng' })
     if (!Number.isSafeInteger(input.startReading) || input.startReading < 0) throw new ValidationError('Chỉ số đầu không hợp lệ', { startReading: 'Nhập chỉ số nguyên không âm' })
     if (!/^\d{4}-\d{2}-\d{2}$/.test(input.installedOn)) throw new ValidationError('Ngày lắp không hợp lệ', { installedOn: 'Chọn ngày lắp' })
-    const [created] = await tx.insert(meters).values({ roomId, utility: 'fee', serial: input.serial?.trim() || null, installedOn: input.installedOn, startReading: input.startReading }).returning()
+    const [created] = await tx.insert(meters).values({ roomId, utility: 'fee', name, serial: input.serial?.trim() || null, installedOn: input.installedOn, startReading: input.startReading }).returning()
     await recordAudit(tx, ctx, { action: 'create', entity: 'meter', entityId: created.id, facilityId: room.facilityId, summary: `Thêm đồng hồ phòng ${room.code}`, after: created })
     return { id: created.id }
   })
@@ -243,7 +248,7 @@ export async function addRoomMeter(db: DB, ctx: AccessContext, roomId: string, i
 
 export type MeterOverviewRow = {
   meterId: string; roomId: string; roomCode: string; floor: string | null
-  feeName: string | null; unit: string | null; leaseCode: string | null
+  meterName: string; feeName: string | null; unit: string | null; leaseCode: string | null
   serial: string | null; startReading: number; installedOn: string; removedOn: string | null
   finalReadingEstimated: boolean; estimateNote: string | null
   readings: { period: string; kind: 'monthly' | 'handover'; readOn: string; value: number }[]
@@ -271,7 +276,7 @@ export async function listMeterOverview(db: DB, ctx: AccessContext, facilityId: 
     const link = mine[0]
     const legacy = LEGACY[meter.utility]
     return {
-      meterId: meter.id, roomId: room.id, roomCode: room.code, floor: room.floor,
+      meterId: meter.id, roomId: room.id, roomCode: room.code, floor: room.floor, meterName: meter.name || legacy?.name || 'Đồng hồ',
       feeName: link?.name ?? legacy?.name ?? null, unit: link?.unit ?? legacy?.unit ?? null,
       leaseCode: link?.status === 'active' ? link.leaseCode : null,
       serial: meter.serial, startReading: meter.startReading, installedOn: meter.installedOn, removedOn: meter.removedOn,

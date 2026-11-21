@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { facilities, leaseFeeMeters, leaseFeeSnapshots, leases, meterReadings, meters, rooms, tenants } from '@/db'
-import { addRoomMeter, ensureFeeMeter, listMeterOverview, listReadingSheet, saveReadings, replaceMeter, suggestMeterFinalReading, listMonthlyReadings } from '@/server/meters/service'
+import { addRoomMeter, createDefaultMeters, ensureFeeMeter, listMeterOverview, listReadingSheet, saveReadings, replaceMeter, suggestMeterFinalReading, listMonthlyReadings } from '@/server/meters/service'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import type { AccessContext, Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'
@@ -130,11 +130,27 @@ describe('meters', () => {
       await expect(attach(r101, fee.id, undefined)).rejects.toThrow('Chọn đồng hồ cho phí')
     })
 
-    it('addRoomMeter thêm đồng hồ loại khác cho phòng và cần quyền đồng hồ của cơ sở', async () => {
-      const created = await addRoomMeter(db, hung(), r101, { startReading: 5, installedOn: '2026-10-01', serial: ' X1 ' })
+    it('addRoomMeter thêm đồng hồ có tên cho phòng và cần quyền đồng hồ của cơ sở', async () => {
+      const created = await addRoomMeter(db, hung(), r101, { name: ' Máy giặt ', startReading: 5, installedOn: '2026-10-01', serial: ' X1 ' })
       const [row] = await db.select().from(meters).where(eq(meters.id, created.id))
-      expect(row).toMatchObject({ roomId: r101, utility: 'fee', serial: 'X1', startReading: 5, removedOn: null })
-      await expect(addRoomMeter(db, ctxOf(['meters'], [fb]), r101, { startReading: 0, installedOn: '2026-10-01' })).rejects.toThrow(NotFoundError)
+      expect(row).toMatchObject({ roomId: r101, name: 'Máy giặt', utility: 'fee', serial: 'X1', startReading: 5, removedOn: null })
+      await expect(addRoomMeter(db, ctxOf(['meters'], [fb]), r101, { name: 'Máy sấy', startReading: 0, installedOn: '2026-10-01' })).rejects.toThrow(NotFoundError)
+    })
+
+    it('addRoomMeter bắt buộc có tên và không trùng tên đồng hồ đang dùng của phòng', async () => {
+      await expect(addRoomMeter(db, hung(), r101, { name: '  ', startReading: 0, installedOn: '2026-10-01' })).rejects.toThrow('Nhập tên đồng hồ')
+      await addRoomMeter(db, hung(), r101, { name: 'Máy giặt', startReading: 0, installedOn: '2026-10-01' })
+      await expect(addRoomMeter(db, hung(), r101, { name: 'máy giặt', startReading: 0, installedOn: '2026-10-01' })).rejects.toThrow('Tên đồng hồ đã có trong phòng')
+      await addRoomMeter(db, hung(), r102, { name: 'Máy giặt', startReading: 0, installedOn: '2026-10-01' }) // phòng khác dùng lại tên được
+    })
+
+    it('đồng hồ mặc định có tên Điện, Nước và thay đồng hồ giữ nguyên tên', async () => {
+      const [room] = await db.insert(rooms).values({ facilityId: fa, code: '301' }).returning()
+      await createDefaultMeters(db, [room.id], '2026-10-01')
+      expect((await db.select().from(meters).where(eq(meters.roomId, room.id))).map((x) => x.name).sort()).toEqual(['Nước', 'Điện'])
+      await replaceMeter(db, hung(), room.id, 'electric', { removedOn: '2026-10-20', finalReading: 0, startReading: 0 })
+      const active = (await db.select().from(meters).where(eq(meters.roomId, room.id))).filter((x) => x.removedOn === null)
+      expect(active.map((x) => x.name).sort()).toEqual(['Nước', 'Điện'])
     })
   })
 
