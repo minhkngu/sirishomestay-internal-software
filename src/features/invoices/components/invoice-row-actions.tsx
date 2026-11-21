@@ -17,6 +17,12 @@ export function InvoiceRowActions({ id, code, draft, unapproveBlock, collect }: 
   const [pending, start] = useTransition()
   const [collecting, setCollecting] = useState(false)
   const [confirm, setConfirm] = useState<'approve' | 'unapprove' | 'delete' | null>(null)
+  const run = (fn: () => Promise<{ ok: boolean; error?: string }>, ok: string) =>
+    start(async () => {
+      const r = await fn()
+      if (!r.ok) toast.error(r.error)
+      else { toast.success(ok); router.refresh() }
+    })
   // Hộp xác nhận của app thay window.confirm (app desktop có thể chặn hộp thoại gốc nên bấm không thấy phản hồi)
   const dialog = (
     <ConfirmDialog
@@ -33,12 +39,6 @@ export function InvoiceRowActions({ id, code, draft, unapproveBlock, collect }: 
       }}
     />
   )
-  const run = (fn: () => Promise<{ ok: boolean; error?: string }>, ok: string) =>
-    start(async () => {
-      const r = await fn()
-      if (!r.ok) toast.error(r.error)
-      else { toast.success(ok); router.refresh() }
-    })
   if (!draft) {
     return (
       <div className="flex items-center gap-1">
