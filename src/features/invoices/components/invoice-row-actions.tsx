@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useTransition } from 'react'
 import { toast } from 'sonner'
+import { Check, Pencil, Trash2 } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { approveInvoiceAction, deleteInvoiceAction } from '@/server/invoices/actions'
@@ -19,17 +20,18 @@ export function InvoiceRowActions({ id, code, draft }: { id: string; code: strin
       else { toast.success(ok); router.refresh() }
     })
   return (
-    <div className="flex items-center justify-end gap-1.5">
+    <div className="flex items-center gap-1">
+      {!draft && <span className="size-8" aria-hidden="true" />}
       {draft && (
-        <Button size="sm" variant="outline" disabled={pending} aria-label={`Duyệt ${code}`}
+        <Button size="icon-sm" variant="ghost" disabled={pending} aria-label={`Duyệt ${code}`} title="Duyệt"
           onClick={() => { if (window.confirm(`Duyệt hoá đơn ${code}?`)) run(() => approveInvoiceAction(id, {}), 'Đã duyệt hoá đơn') }}>
-          Duyệt
+          <Check className="size-4 text-primary" aria-hidden="true" />
         </Button>
       )}
-      <Link href={`/invoices/${id}`} aria-label={`Sửa ${code}`} className={cn(buttonVariants({ size: 'sm', variant: 'outline' }))}>Sửa</Link>
-      <Button size="sm" variant="outline" disabled={pending} aria-label={`Xoá ${code}`}
+      <Link href={`/invoices/${id}`} aria-label={`Sửa ${code}`} title="Sửa" className={cn(buttonVariants({ size: 'icon-sm', variant: 'ghost' }))}><Pencil className="size-4" aria-hidden="true" /></Link>
+      <Button size="icon-sm" variant="ghost" disabled={pending} aria-label={`Xoá ${code}`} title="Xoá"
         onClick={() => { if (window.confirm(`Xoá hoá đơn ${code}? Không thể hoàn tác.`)) run(() => deleteInvoiceAction(id), 'Đã xoá hoá đơn') }}>
-        Xoá
+        <Trash2 className="size-4 text-rose-600" aria-hidden="true" />
       </Button>
     </div>
   )

@@ -65,9 +65,10 @@ export function InvoiceList({ invoices, facilities }: { invoices: InvoiceRow[]; 
 
       {/* Invoices Table */}
       <div className="overflow-x-auto rounded-2xl border border-border/80 bg-card shadow-2xs">
-        <table className="w-full min-w-[1000px] text-xs">
+        <table className="w-full min-w-[900px] text-xs">
           <thead className="border-b border-border/60 bg-muted/40 text-left">
             <tr>
+              <th className="w-px p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap"><span className="sr-only">Thao tác</span></th>
               <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Mã</th>
               <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Phòng</th>
               {facilities.length > 1 && (
@@ -79,12 +80,12 @@ export function InvoiceList({ invoices, facilities }: { invoices: InvoiceRow[]; 
               <th className="p-3 text-right font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Đã thu</th>
               <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Hạn</th>
               <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Trạng thái</th>
-              <th className="p-3 text-right font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50">
             {pageRows.map((i) => (
               <tr key={i.id} className="transition-colors hover:bg-muted/30">
+                <td className="p-3 whitespace-nowrap"><InvoiceRowActions id={i.id} code={i.code} draft={i.state === 'draft'} /></td>
                 <td className="p-3 whitespace-nowrap">
                   <button
                     type="button"
@@ -120,7 +121,6 @@ export function InvoiceList({ invoices, facilities }: { invoices: InvoiceRow[]; 
                     {invoiceStatusLabel(i.state)}
                   </StatusDot>
                 </td>
-                <td className="p-3 whitespace-nowrap"><InvoiceRowActions id={i.id} code={i.code} draft={i.state === 'draft'} /></td>
               </tr>
             ))}
             {rows.length === 0 && (
