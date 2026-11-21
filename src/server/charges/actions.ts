@@ -6,7 +6,7 @@ import { toActionResult } from '@/lib/action-result'
 import { getAccessContext } from '@/server/session'
 import { addDepositEntry, addOneOff, markDepositDone, removeOneOff } from './service'
 
-const refresh = () => { revalidatePath('/contracts', 'layout'); revalidatePath('/rooms', 'layout') }
+const refresh = () => { revalidatePath('/contracts', 'layout'); revalidatePath('/rooms', 'layout'); revalidatePath('/cashbook') }
 export async function addOneOffAction(leaseId: string, input: { kind: 'service' | 'penalty'; description: string; date: string; quantity: number; unitPrice: number }) {
   const ctx = await getAccessContext()
   return toActionResult(async () => { const row = await addOneOff(db, ctx, leaseId, input); refresh(); return { id: row.id } })

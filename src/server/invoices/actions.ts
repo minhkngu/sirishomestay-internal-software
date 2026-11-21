@@ -8,7 +8,7 @@ import { getAccessContext } from '@/server/session'
 import { getStorage } from '@/server/storage'
 import { saveInvoiceFeeQuantities, addPayment, approveInvoice, createDraftForLease, createDrafts, deleteInvoice, exportReceipt, listInvoiceableLeases, previewBatch, previewLease, leaseDebt, recordLeasePayment, removePayment, setInvoiceDueDate, setLineTime, setPeriod, unapproveInvoice, updateInvoiceMeterReading, updateLines } from './service'
 
-const refresh = () => { revalidatePath('/invoices', 'layout'); revalidatePath('/contracts', 'layout') }
+const refresh = () => { revalidatePath('/invoices', 'layout'); revalidatePath('/contracts', 'layout'); revalidatePath('/cashbook') }
 export async function previewBatchAction(input: { facilityId: string; period: string }) {
   const ctx = await getAccessContext()
   return toActionResult(() => previewBatch(db, ctx, input))
