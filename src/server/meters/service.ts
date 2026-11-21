@@ -338,7 +338,8 @@ export type ReadingHistoryRow = {
   /** Tên loại đồng hồ (đã bỏ mã trong ngoặc) để lọc và hiển thị. */
   meterName: string; meterCode: string | null; unit: string | null
   kind: 'monthly' | 'handover'; period: string; readOn: string
-  opening: number; closing: number; usage: number
+  /** Chỉ số bàn giao đứng riêng, không có số đầu và mức dùng (null). */
+  opening: number | null; closing: number; usage: number | null
   /** Mã hoá đơn đã duyệt đang dùng chỉ số này; có thì không sửa, xoá được. */
   lockedBy: string | null
 }
@@ -358,7 +359,7 @@ export async function listReadingHistory(db: DB, ctx: AccessContext, facilityId:
     let prev = m.startReading
     for (const r of asc) {
       if (r.period >= from && r.period <= to) {
-        rows.push({ id: r.id, meterId: m.meterId, roomId: m.roomId, roomCode: m.roomCode, floor: m.floor, meterName: typeName(m.meterName), meterCode: m.meterCode, unit: m.unit, kind: r.kind, period: r.period, readOn: r.readOn, opening: prev, closing: r.value, usage: Math.max(r.value - prev, 0), lockedBy: r.kind === 'monthly' ? (locked.get(`${m.roomId}|${r.period}`) ?? null) : handoverLock(handoverCover, m.roomId, r.readOn) })
+        rows.push({ id: r.id, meterId: m.meterId, roomId: m.roomId, roomCode: m.roomCode, floor: m.floor, meterName: typeName(m.meterName), meterCode: m.meterCode, unit: m.unit, kind: r.kind, period: r.period, readOn: r.readOn, opening: r.kind === 'handover' ? null : prev, closing: r.value, usage: r.kind === 'handover' ? null : Math.max(r.value - prev, 0), lockedBy: r.kind === 'monthly' ? (locked.get(`${m.roomId}|${r.period}`) ?? null) : handoverLock(handoverCover, m.roomId, r.readOn) })
       }
       prev = r.value
     }
@@ -387,15 +388,12 @@ export async function updateMeterReading(db: DB, ctx: AccessContext, id: string,
       if (result.errors.length) throw new ValidationError(result.errors[0].message)
       return
     }
-    // Chỉ số bàn giao: kiểm thứ tự với các lần chốt khác của cùng đồng hồ rồi cập nhật tại chỗ
+    // Chỉ số bàn giao đứng riêng, độc lập với chuỗi chỉ số tháng: chỉ kiểm giá trị, ngày và ngày lắp
     if (!Number.isInteger(input.value) || input.value < 0) throw new ValidationError('Chỉ số không hợp lệ')
     if (!/^\d{4}-\d{2}-\d{2}$/.test(input.readOn)) throw new ValidationError('Ngày chốt không hợp lệ')
     if (f.m.installedOn > input.readOn) throw new ValidationError('Đồng hồ chưa được lắp vào ngày này')
-    const others = (await tx.select().from(meterReadings).where(eq(meterReadings.meterId, f.m.id))).filter((r) => r.id !== id).sort((a, b) => (a.readOn < b.readOn ? -1 : 1))
-    const prev = [...others].reverse().find((r) => r.readOn <= input.readOn)
-    const next = others.find((r) => r.readOn > input.readOn)
-    if (input.value < (prev?.value ?? f.m.startReading)) throw new ValidationError(DECREASE)
-    if (next && input.value > next.value) throw new ValidationError('Chỉ số lớn hơn chỉ số của lần chốt sau')
+    const [clash] = await tx.select({ id: meterReadings.id }).from(meterReadings).where(and(eq(meterReadings.meterId, f.m.id), eq(meterReadings.kind, 'handover'), eq(meterReadings.readOn, input.readOn), sql`${meterReadings.id} <> ${id}`))
+    if (clash) throw new ValidationError('Đồng hồ đã có chỉ số bàn giao vào ngày này')
     await tx.update(meterReadings).set({ value: input.value, readOn: input.readOn, period: input.readOn.slice(0, 7), updatedAt: new Date() }).where(eq(meterReadings.id, id))
     await recordAudit(tx, ctx, { action: 'update', entity: 'meter_readings', entityId: id, facilityId: f.facilityId, summary: `Sửa chỉ số bàn giao đồng hồ phòng ${f.roomCode}`, before: f.r, after: { value: input.value, readOn: input.readOn } })
   })
