@@ -48,13 +48,14 @@ export function MeterList({ rows }: { rows: MeterOverviewRow[] }) {
         <div className="px-4 py-12 text-center text-xs text-muted-foreground">{view === 'removed' ? 'Chưa có đồng hồ nào đã gỡ.' : 'Không có đồng hồ nào khớp bộ lọc.'}</div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-[13px]">
+          <table className="w-full min-w-[800px] text-[13px]">
             <thead>
               <tr className="text-xs text-muted-foreground">
                 <th className="sticky left-0 z-10 bg-card px-4 py-2.5 text-left font-normal">Phòng</th>
                 <th className="px-4 py-2.5 text-left font-normal">Đồng hồ</th>
                 <th className="px-4 py-2.5 text-left font-normal">Phí &amp; hợp đồng</th>
                 <th className="px-4 py-2.5 text-right font-normal">Chỉ số đầu</th>
+                <th className="px-4 py-2.5 text-right font-normal">Chỉ số hiện tại</th>
                 <th className="px-4 py-2.5 text-right font-normal">Lịch sử</th>
               </tr>
             </thead>
@@ -87,6 +88,14 @@ export function MeterList({ rows }: { rows: MeterOverviewRow[] }) {
                   <td className="px-4 py-2.5 text-right">
                     <div className="tabular-nums text-foreground">{fmt(row.startReading)}</div>
                     <div className="mt-0.5 text-[11px] tabular-nums text-muted-foreground">lắp {formatDateVN(row.installedOn)}</div>
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    {row.lastReading ? (
+                      <>
+                        <div className="tabular-nums text-foreground">{fmt(row.lastReading.value)}</div>
+                        <div className="mt-0.5 text-[11px] tabular-nums text-muted-foreground">chốt {formatDateVN(row.lastReading.readOn)}</div>
+                      </>
+                    ) : <span className="text-[11px] text-muted-foreground">Chưa chốt</span>}
                   </td>
                   <td className="px-4 py-2.5 text-right">
                     {row.readings.length === 0 ? <span className="text-[11px] text-muted-foreground">Chưa có chỉ số</span> : (

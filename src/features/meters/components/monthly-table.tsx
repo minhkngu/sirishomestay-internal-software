@@ -73,7 +73,7 @@ function Group({ title, rows, periods, pick }: { title: string; rows: MonthlyRow
   )
 }
 
-/** Bảng chỉ số theo tháng của một toà (chỉ xem); việc sửa vẫn làm ở bảng "Ghi chỉ số". */
+/** Bảng chỉ số theo tháng của một toà (chỉ xem); việc chốt số làm ở chế độ "Chốt tháng này". */
 export function MonthlyTable({ periods, rows, utility }: { periods: string[]; rows: MonthlyRow[]; utility: string }) {
   const [showAll, setShowAll] = useState(false)
   const withData = (row: MonthlyRow) => [...row.electric, ...row.water].some((cell) => cell.values.length > 0 || cell.handover.length > 0)
@@ -97,7 +97,7 @@ export function MonthlyTable({ periods, rows, utility }: { periods: string[]; ro
       {rowsToShow.length === 0 ? (
         <div className="px-4 py-12 text-center">
           <p className="text-sm font-medium text-foreground">Chưa có chỉ số trong kỳ này</p>
-          <p className="mt-1 text-xs text-muted-foreground">Ghi chỉ số ở tab “Ghi chỉ số”, hoặc hiện tất cả phòng để xem các kỳ trước.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Chốt chỉ số ở tab “Chốt chỉ số”, hoặc hiện tất cả phòng để xem các kỳ trước.</p>
           <button type="button" className="mt-3 text-xs font-medium text-primary hover:underline hover:underline-offset-2" onClick={() => setShowAll(true)}>Hiện tất cả phòng</button>
         </div>
       ) : (

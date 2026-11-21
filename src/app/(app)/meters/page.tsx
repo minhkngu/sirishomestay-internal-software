@@ -14,10 +14,9 @@ import { ReadingGrid } from '@/features/meters/components/reading-grid'
 import { MeterFilters } from '@/features/meters/components/meter-filters'
 import { readingMeterTypes, sortMeterTypes } from '@/features/meters/meter-types'
 
-type Tab = 'readings' | 'monthly' | 'meters'
+type Tab = 'readings' | 'meters'
 const TABS: Array<[Tab, string]> = [
-  ['readings', 'Ghi chỉ số'],
-  ['monthly', 'Theo tháng'],
+  ['readings', 'Chốt chỉ số'],
   ['meters', 'Đồng hồ'],
 ]
 
@@ -38,38 +37,39 @@ function uniqueRooms(rows: Array<{ roomId: string; roomCode: string }>) {
     .sort((a, b) => a.label.localeCompare(b.label, 'vi', { numeric: true }))
 }
 
-export default async function MetersPage({ searchParams }: { searchParams: Promise<{ facility?: string; period?: string; tab?: string; room?: string; meter?: string }> }) {
+export default async function MetersPage({ searchParams }: { searchParams: Promise<{ facility?: string; period?: string; tab?: string; room?: string; meter?: string; view?: string }> }) {
   return <RequirePermission perm="meters"><Meters searchParams={searchParams} /></RequirePermission>
 }
 
-async function Meters({ searchParams }: { searchParams: Promise<{ facility?: string; period?: string; tab?: string; room?: string; meter?: string }> }) {
+async function Meters({ searchParams }: { searchParams: Promise<{ facility?: string; period?: string; tab?: string; room?: string; meter?: string; view?: string }> }) {
   const sp = await searchParams
   const ctx = await getAccessContext()
   const facs = await listFacilities(db, ctx)
   const today = todayVN()
   const period = /^\d{4}-\d{2}$/.test(sp.period ?? '') ? sp.period! : today.slice(0, 7)
   const facilityId = facs.find((f) => f.id === sp.facility)?.id ?? facs[0]?.id
-  const tab: Tab = sp.tab === 'meters' ? 'meters' : sp.tab === 'monthly' ? 'monthly' : 'readings'
-  const sheet = tab === 'readings' && facilityId ? await listReadingSheet(db, ctx, facilityId, period) : null
-  const monthly = tab === 'monthly' && facilityId ? await listMonthlyReadings(db, ctx, facilityId, period) : null
+  // Liên kết cũ ?tab=monthly mở chế độ xem nhiều tháng của tab Chốt chỉ số
+  const tab: Tab = sp.tab === 'meters' ? 'meters' : 'readings'
+  const history = tab === 'readings' && (sp.view === 'history' || sp.tab === 'monthly')
+  const sheet = tab === 'readings' && !history && facilityId ? await listReadingSheet(db, ctx, facilityId, period) : null
+  const monthly = history && facilityId ? await listMonthlyReadings(db, ctx, facilityId, period) : null
   const overview = tab === 'meters' && facilityId ? await listMeterOverview(db, ctx, facilityId) : []
   const end = `${period}-${String(daysInMonth(period)).padStart(2, '0')}`
   const readOn = today.startsWith(period) ? today : end
 
   const readingRows = sheet?.rows ?? []
   const monthlyRows = monthly?.rows ?? []
-  const roomOptions = tab === 'readings' ? uniqueRooms(readingRows) : tab === 'monthly' ? uniqueRooms(monthlyRows) : uniqueRooms(overview)
+  const roomOptions = tab === 'readings' ? uniqueRooms(history ? monthlyRows : readingRows) : uniqueRooms(overview)
   const roomId = roomOptions.some((room) => room.value === sp.room) ? sp.room! : ''
 
   const scopedReadings = readingRows.filter((row) => !roomId || row.roomId === roomId)
   const scopedMonthly = monthlyRows.filter((row) => !roomId || row.roomId === roomId)
   const scopedOverview = overview.filter((row) => !roomId || row.roomId === roomId)
 
-  const meterTypes = tab === 'readings' ? readingMeterTypes(scopedReadings)
-    : tab === 'monthly' ? ['Điện', 'Nước']
+  const meterTypes = tab === 'readings' ? (history ? ['Điện', 'Nước'] : readingMeterTypes(scopedReadings))
     : sortMeterTypes(scopedOverview.map((row) => row.meterName))
   const meter = meterTypes.includes(sp.meter ?? '') ? sp.meter! : ''
-  const meterOptions = [{ value: '', label: tab === 'monthly' ? 'Cả điện và nước' : 'Tất cả đồng hồ' }, ...meterTypes.map((type) => ({ value: type, label: type }))]
+  const meterOptions = [{ value: '', label: history ? 'Cả điện và nước' : 'Tất cả đồng hồ' }, ...meterTypes.map((type) => ({ value: type, label: type }))]
 
   const periodOptions = periodChoices(today)
   if (!periodOptions.some((option) => option.value === period)) periodOptions.unshift({ value: period, label: periodLabel(period) })
@@ -77,6 +77,7 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
   const clearParams = new URLSearchParams({ tab })
   if (facilityId) clearParams.set('facility', facilityId)
   if (tab !== 'meters') clearParams.set('period', period)
+  if (history) clearParams.set('view', 'history')
   const clearFiltersHref = `/meters?${clearParams.toString()}`
 
   function tabHref(next: Tab) {
@@ -87,13 +88,19 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
     if (meter) params.set('meter', meter)
     return `/meters?tab=${next}${params.size ? `&${params.toString()}` : ''}`
   }
+  const viewHref = (view: 'sheet' | 'history') => {
+    const params = new URLSearchParams({ tab: 'readings', period })
+    if (facilityId) params.set('facility', facilityId)
+    if (view === 'history') params.set('view', 'history')
+    return `/meters?${params.toString()}`
+  }
 
   const addMeterRooms = uniqueRooms(overview).map((room) => ({ id: room.value, code: room.label }))
 
   return (
     <div className="space-y-5">
       <PageHeader title="Chỉ số" action={tab === 'meters' && facilityId ? <AddMeterButton rooms={addMeterRooms} /> : undefined} />
-      <p className="-mt-2 text-sm text-muted-foreground">Ghi chỉ số điện, nước và đồng hồ phụ; xem lại theo tháng và quản lý đồng hồ.</p>
+      <p className="-mt-2 text-sm text-muted-foreground">Chốt chỉ số điện, nước và đồng hồ phụ hằng tháng để làm hoá đơn; quản lý đồng hồ.</p>
 
       <nav aria-label="Mục chỉ số" className="flex items-center gap-0.5 overflow-x-auto border-b border-border/70">
         {TABS.map(([key, label]) => (
@@ -127,9 +134,16 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
             showPeriod={tab !== 'meters'}
           />
 
-          {tab === 'readings' ? (
+          {tab === 'readings' && (
+            <div className="flex items-center gap-0.5" role="group" aria-label="Cách xem chỉ số">
+              <Link href={viewHref('sheet')} aria-current={!history ? 'page' : undefined} className={cn('rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors', !history ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground')}>Chốt tháng này</Link>
+              <Link href={viewHref('history')} aria-current={history ? 'page' : undefined} className={cn('rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors', history ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground')}>Xem nhiều tháng</Link>
+            </div>
+          )}
+
+          {tab === 'readings' && !history ? (
             sheet ? <ReadingGrid key={`${facilityId}-${period}`} rows={scopedReadings} period={period} readOn={readOn} meterFilter={meter} roomFiltered={Boolean(roomId)} clearFiltersHref={roomId || meter ? clearFiltersHref : undefined} /> : <EmptyData />
-          ) : tab === 'monthly' ? (
+          ) : tab === 'readings' ? (
             monthly ? <MonthlyTable periods={monthly.periods} rows={scopedMonthly} utility={meter} /> : <EmptyData />
           ) : (
             <MeterList rows={meter ? scopedOverview.filter((row) => row.meterName === meter) : scopedOverview} />

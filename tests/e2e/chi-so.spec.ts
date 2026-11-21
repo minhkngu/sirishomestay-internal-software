@@ -9,17 +9,22 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Nhắc việc' })).toBeVisible()
 })
 
-test('menu Chỉ số và trang có hai tab Ghi chỉ số, Đồng hồ', async ({ page }) => {
+test('menu Chỉ số và trang có hai tab Chốt chỉ số, Đồng hồ', async ({ page }) => {
   const nav = page.getByRole('navigation').first()
   await expect(nav.getByRole('link', { name: 'Chỉ số', exact: true }).first()).toBeVisible()
   await expect(page.getByRole('link', { name: 'Điện nước', exact: true })).toHaveCount(0)
   await page.goto('/meters')
   await expect(page.getByRole('heading', { name: 'Chỉ số', exact: true })).toBeVisible()
   await expect(page.getByLabel('Kỳ ghi')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Chốt chỉ số', exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Theo tháng', exact: true })).toHaveCount(0)
+  await page.getByRole('link', { name: 'Xem nhiều tháng', exact: true }).click()
+  await expect(page).toHaveURL(/view=history/)
   await page.getByRole('link', { name: 'Đồng hồ', exact: true }).click()
   await expect(page).toHaveURL(/tab=meters/)
   await expect(page.getByLabel('Kỳ ghi')).toHaveCount(0)
   await chooseSelectOption(page, 'Toà', /Thảo Điền/)
   await expect(page.getByRole('columnheader', { name: 'Phí & hợp đồng' })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: 'Chỉ số hiện tại' })).toBeVisible()
   await expect(page.getByRole('row').nth(1)).toContainText(/Điện|Nước|\(/)
 })

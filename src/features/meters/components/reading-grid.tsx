@@ -98,7 +98,7 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, roomFiltered = 
             )}
           />
           <div className={cn('mt-0.5 text-right text-[11px] tabular-nums text-muted-foreground', error && 'text-destructive')}>
-            {error ?? `cũ ${fmt(cell.previous)}`}
+            {error ?? `số cũ ${fmt(cell.previous)}`}
           </div>
         </td>
         <td className="px-4 py-2.5 text-right text-[13px] tabular-nums text-foreground">
@@ -160,8 +160,8 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, roomFiltered = 
                     <th rowSpan={2} className="w-10 px-2 py-2.5" aria-label="Thao tác" />
                   </tr>
                   <tr className="text-xs text-muted-foreground">
-                    {showElectric && <><th className="w-36 px-4 pb-2 text-right font-normal">Chỉ số mới</th><th className="w-36 px-4 pb-2 text-right font-normal">Dùng</th></>}
-                    {showWater && <><th className="w-36 px-4 pb-2 text-right font-normal">Chỉ số mới</th><th className="w-36 px-4 pb-2 text-right font-normal">Dùng</th></>}
+                    {showElectric && <><th className="w-36 px-4 pb-2 text-right font-normal">Số chốt</th><th className="w-36 px-4 pb-2 text-right font-normal">Dùng</th></>}
+                    {showWater && <><th className="w-36 px-4 pb-2 text-right font-normal">Số chốt</th><th className="w-36 px-4 pb-2 text-right font-normal">Dùng</th></>}
                   </tr>
                 </thead>
                 <tbody>

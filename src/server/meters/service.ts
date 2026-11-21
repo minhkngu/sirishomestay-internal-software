@@ -264,6 +264,8 @@ export type MeterOverviewRow = {
   meterName: string; meterCode: string | null; feeName: string | null; unit: string | null; leaseCode: string | null
   serial: string | null; startReading: number; installedOn: string; removedOn: string | null
   finalReadingEstimated: boolean; estimateNote: string | null
+  /** Chỉ số mới nhất theo ngày ghi (chốt tháng hoặc bàn giao), null nếu chưa có. */
+  lastReading: { value: number; readOn: string } | null
   readings: { period: string; kind: 'monthly' | 'handover'; readOn: string; value: number }[]
 }
 
@@ -294,6 +296,7 @@ export async function listMeterOverview(db: DB, ctx: AccessContext, facilityId: 
       leaseCode: link?.status === 'active' ? link.leaseCode : null,
       serial: meter.serial, startReading: meter.startReading, installedOn: meter.installedOn, removedOn: meter.removedOn,
       finalReadingEstimated: meter.finalReadingEstimated, estimateNote: meter.estimateNote,
+      lastReading: (readingsByMeter.get(meter.id) ?? [])[0] ? { value: readingsByMeter.get(meter.id)![0].value, readOn: readingsByMeter.get(meter.id)![0].readOn } : null,
       readings: (readingsByMeter.get(meter.id) ?? []).map(r => ({ period: r.period, kind: r.kind as 'monthly' | 'handover', readOn: r.readOn, value: r.value })),
     }
   })

@@ -336,4 +336,14 @@ describe('meters', () => {
       await expect(listMonthlyReadings(db, hung(), fa, '2026-13')).rejects.toThrow(ValidationError)
     })
   })
+
+  it('tổng quan đồng hồ có chỉ số hiện tại (số chốt mới nhất), chỉ số đầu không đổi', async () => {
+    await addMeter(r101, 'water', 'NEW101', 7)
+    const empty = (await listMeterOverview(db, hung(), fa)).find(r => r.meterId === m.NEW101)!
+    expect(empty.lastReading).toBeNull()
+    await saveReadings(db, hung(), '2026-10', [{ meterId: m.E101, value: 1500, readOn: '2026-10-31' }])
+    const row = (await listMeterOverview(db, hung(), fa)).find(r => r.meterId === m.E101)!
+    expect(row.lastReading).toEqual({ value: 1500, readOn: '2026-10-31' })
+    expect(row.startReading).toBe(0)
+  })
 })
