@@ -8,7 +8,7 @@ import { todayVN } from '@/domain/dates'
 import { displayName } from '@/domain/tenant-name'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { midPeriodAdjustments } from '@/domain/adjustments'
-import { fullMonthCoefficient, prorateFraction } from '@/domain/proration'
+import { fullMonthCoefficient, monthsCoefficient } from '@/domain/proration'
 import { buildMonthlyInvoice, nextBillingPeriod, settlementState } from '@/domain/invoice-builder'
 import type { Addendum, ContractFee, Invoice, MeterReading, DueRule, InvoiceLineInput, Lease, Meter, OneOffCharge, PendingAdjustment, Proration } from '@/domain/types'
 import { finalizeTermination } from '@/server/addenda/finalize'
@@ -324,7 +324,7 @@ export async function setLineTime(db: DB, ctx: AccessContext, invoiceId: string,
     let coefficient = data.coefficient
     if (coefficient === undefined) {
       const [lease, settings] = await Promise.all([leaseData(tx, inv.leaseId), getSettings(tx)])
-      coefficient = inv.fullMonth ? fullMonthCoefficient(from, to) : prorateFraction(from, to, (inv.proration as Proration | null) ?? lease.proration ?? settings.proration)
+      coefficient = inv.fullMonth ? fullMonthCoefficient(from, to) : monthsCoefficient(from, to, (inv.proration as Proration | null) ?? lease.proration ?? settings.proration)
     }
     const base = line.type === 'rent' ? 1 : line.quantity
     const amount = Math.round(base * line.unitPrice * coefficient)

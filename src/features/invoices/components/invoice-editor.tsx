@@ -13,12 +13,13 @@ import {
   Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { MoneyInput } from '@/components/ui/money-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { FeePickerDialog, type FeeOption } from '@/components/fee-picker-dialog'
 import { feeLineFromType } from '@/domain/invoice-fee-line'
-import { fullMonthCoefficient, prorateFraction } from '@/domain/proration'
+import { fullMonthCoefficient, monthsCoefficient } from '@/domain/proration'
 import type { Proration } from '@/domain/types'
 import {
   approveInvoiceAction,
@@ -87,11 +88,10 @@ function LineTime({ line, defaultFrom, defaultTo, fullMonth, proration, editable
   const coefficient = typeof meta.coefficient === 'number' ? meta.coefficient : line.type === 'rent' ? line.quantity : line.amount != null && line.quantity * line.unitPrice !== 0 ? Math.round((line.amount / (line.quantity * line.unitPrice)) * 10000) / 10000 : 1
   const [coef, setCoef] = useState(String(coefficient))
   const round4 = (n: number) => Math.round(n * 10000) / 10000
-  const label = <span className="tabular-nums">Hệ số × {coefficient.toLocaleString('vi-VN', { maximumFractionDigits: 4 })}{meta.coefficientOverride === true ? ' (chỉnh riêng)' : coefficient !== 1 ? ' (tính theo ngày)' : ''}</span>
-  if (!editable) return <p className="mt-1 text-[11px] text-muted-foreground">{label}</p>
+  if (!editable) return <p className="text-[11px] tabular-nums text-muted-foreground">{formatDateVN(from)} – {formatDateVN(to)}<br />Hệ số × {coefficient.toLocaleString('vi-VN', { maximumFractionDigits: 4 })}{meta.coefficientOverride === true ? ' (chỉnh riêng)' : ''}</p>
   const setDates = (nextFrom: string, nextTo: string) => {
     if (!nextFrom || !nextTo || nextTo < nextFrom) { onChange({ ...meta, from: nextFrom, to: nextTo }); return }
-    const next = round4(fullMonth ? fullMonthCoefficient(nextFrom, nextTo) : prorateFraction(nextFrom, nextTo, proration))
+    const next = round4(fullMonth ? fullMonthCoefficient(nextFrom, nextTo) : monthsCoefficient(nextFrom, nextTo, proration))
     setCoef(String(next))
     onChange({ ...meta, from: nextFrom, to: nextTo, coefficient: next, coefficientOverride: false })
   }
@@ -101,12 +101,17 @@ function LineTime({ line, defaultFrom, defaultTo, fullMonth, proration, editable
     if (text.trim() !== '' && Number.isFinite(n) && n >= 0) onChange({ ...meta, from, to, coefficient: round4(n), coefficientOverride: true })
   }
   return (
-    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-      {label}
-      <input aria-label="Từ ngày" type="date" value={from} onChange={(e) => setDates(e.target.value, to)} className="h-7 rounded-lg border border-border/80 bg-background px-1.5 text-foreground" />
-      <span>–</span>
-      <input aria-label="Đến ngày" type="date" value={to} onChange={(e) => setDates(from, e.target.value)} className="h-7 rounded-lg border border-border/80 bg-background px-1.5 text-foreground" />
-      <input aria-label="Hệ số" inputMode="decimal" value={coef} onChange={(e) => setCoefficient(e.target.value)} className="h-7 w-20 rounded-lg border border-border/80 bg-background px-2 text-right tabular-nums text-foreground" />
+    <div className="space-y-1.5 text-[11px] text-muted-foreground">
+      <div className="flex items-center gap-1">
+        <input aria-label="Từ ngày" type="date" value={from} onChange={(e) => setDates(e.target.value, to)} className="h-8 w-full min-w-0 rounded-lg border border-border/80 bg-background px-1.5 text-xs text-foreground" />
+        <span>–</span>
+        <input aria-label="Đến ngày" type="date" value={to} onChange={(e) => setDates(from, e.target.value)} className="h-8 w-full min-w-0 rounded-lg border border-border/80 bg-background px-1.5 text-xs text-foreground" />
+      </div>
+      <label className="flex items-center gap-1.5">
+        <span className="shrink-0">Hệ số ×</span>
+        <input aria-label="Hệ số" inputMode="decimal" value={coef} onChange={(e) => setCoefficient(e.target.value)} className="h-8 w-20 rounded-lg border border-border/80 bg-background px-2 text-right text-xs tabular-nums text-foreground" />
+        {meta.coefficientOverride === true && <span>(chỉnh riêng)</span>}
+      </label>
     </div>
   )
 }
@@ -201,6 +206,7 @@ export function InvoiceEditor(p: Props) {
             <thead className="border-b border-border/70 bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="px-3.5 py-3 text-left min-w-44 whitespace-nowrap">Mô tả</th>
+                <th className="px-3.5 py-3 text-left w-64 whitespace-nowrap">Thời gian</th>
                 <th className="px-3.5 py-3 text-left w-56 whitespace-nowrap">Chỉ số</th>
                 <th className="px-3.5 py-3 text-right w-24 whitespace-nowrap">SL</th>
                 <th className="px-3.5 py-3 text-right w-32 whitespace-nowrap">Đơn giá</th>
@@ -218,7 +224,9 @@ export function InvoiceEditor(p: Props) {
                       onChange={(e) => set(i, { description: e.target.value })}
                       className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 disabled:cursor-not-allowed disabled:border-transparent disabled:bg-transparent disabled:px-0 disabled:text-foreground"
                     />
-                    {isTimeBased(l) && <LineTime line={l} defaultFrom={p.start} defaultTo={p.end} fullMonth={p.fullMonth} proration={p.proration} editable={p.status === 'draft'} onChange={(meta) => set(i, timePatch(l, meta))} />}
+                  </td>
+                  <td className="p-2.5 align-top">
+                    {isTimeBased(l) ? <LineTime line={l} defaultFrom={p.start} defaultTo={p.end} fullMonth={p.fullMonth} proration={p.proration} editable={p.status === 'draft'} onChange={(meta) => set(i, timePatch(l, meta))} /> : <span className="text-muted-foreground/60">—</span>}
                   </td>
                   <td className="p-2.5 align-top">
                     {(() => { const panel = p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId); return panel ? <MeterReadingsPanel invoiceId={p.id} panel={panel} editable={p.status === 'draft'} /> : <span className="text-muted-foreground/60">—</span> })()}
@@ -261,7 +269,7 @@ export function InvoiceEditor(p: Props) {
             </tbody>
             <tfoot className="border-t border-border/80 bg-muted/30">
               <tr>
-                <td colSpan={4} className="px-4 py-3 text-right font-semibold text-foreground">
+                <td colSpan={5} className="px-4 py-3 text-right font-semibold text-foreground">
                   Tổng
                 </td>
                 <td className="px-3.5 py-3 text-right text-sm font-bold tabular-nums text-primary">
