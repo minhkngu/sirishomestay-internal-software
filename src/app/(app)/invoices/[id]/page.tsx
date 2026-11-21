@@ -13,6 +13,7 @@ import { InvoiceStatus } from '@/features/invoices/components/invoice-status'
 import { PaymentDialog } from '@/features/invoices/components/payment-dialog'
 import { getInvoiceDetail, tenantBalance } from '@/server/invoices/service'
 import { getAccessContext } from '@/server/session'
+import { getSettings } from '@/server/settings/service'
 import { listFeeTypePrices, listFeeTypes, listFeeUnits } from '@/server/fees/service'
 
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
@@ -27,6 +28,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const [feeTypes, feeUnits, feePrices] = inv.status === 'draft' ? await Promise.all([listFeeTypes(db, ctx), listFeeUnits(db, ctx), listFeeTypePrices(db, ctx)]) : [[], [], {} as Record<string, Record<string, number>>]
   const unitName = new Map(feeUnits.map((u) => [u.id, u.name]))
   const remaining = d.total - d.paid
+  const dueRule = (await getSettings(db)).dueRule
+  const dueDefaultLabel = dueRule.kind === 'day_of_invoice_month' ? `ngày ${dueRule.day} của chính tháng hoá đơn` : dueRule.kind === 'day_of_next_month' ? `ngày ${dueRule.day} của tháng sau` : `${dueRule.days} ngày sau khi duyệt`
 
   return (
     <div className="max-w-5xl space-y-6">
@@ -117,6 +120,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         coefficient={inv.coefficient}
         fullMonth={inv.fullMonth}
         dueDate={inv.dueDate ? formatDateVN(inv.dueDate) : null}
+        dueDateIso={inv.dueDate}
+        dueDefaultLabel={dueDefaultLabel}
         lines={d.lines.map((l) => ({
           type: l.type,
           description: l.description,

@@ -282,11 +282,22 @@ export async function approveInvoice(db: DB, ctx: AccessContext, id: string, inp
       await refreshMeterLines(tx, before, lease)
     }
     const rule = valid.dueRule ?? lease.dueRule ?? settings.dueRule
-    const dueDate = valid.dueDate ?? (rule.kind === 'day_of_invoice_month' && before.dueDate ? before.dueDate : computeDueDate(rule, valid.approvedOn ?? todayVN(), before.periodStart.slice(0, 7)))
+    // Hạn đã có sẵn (đặt lúc tạo hoặc nhân viên sửa tay) thì giữ; chỉ tính mới khi chưa có hoặc người duyệt chọn quy tắc riêng
+    const dueDate = valid.dueDate ?? (before.dueDate && !valid.dueRule ? before.dueDate : computeDueDate(rule, valid.approvedOn ?? todayVN(), before.periodStart.slice(0, 7)))
     const [after] = await tx.update(invoices).set({ status: 'approved', dueDate, updatedAt: new Date() }).where(eq(invoices.id, id)).returning()
     if (before.kind === 'termination') await finalizeTermination(tx, ctx, before)
     await syncPendingAdjustments(tx, lease, await loadAddenda(tx, lease.id), settings.proration)
     await recordAudit(tx, ctx, { action: 'update', entity: 'invoice', entityId: id, facilityId: before.facilityId, summary: 'Duyệt hoá đơn', before, after }); return after
+  })
+}
+/** Sửa hạn thanh toán trực tiếp trên hoá đơn (nháp hoặc đã duyệt). */
+export async function setInvoiceDueDate(db: DB, ctx: AccessContext, id: string, dueDate: string): Promise<void> {
+  const date = parse(z.iso.date(), dueDate)
+  await db.transaction(async tx0 => {
+    const tx = tx0 as unknown as DB
+    const before = await getInvoice(tx, ctx, id)
+    const [after] = await tx.update(invoices).set({ dueDate: date, updatedAt: new Date() }).where(eq(invoices.id, id)).returning()
+    await recordAudit(tx, ctx, { action: 'update', entity: 'invoice', entityId: id, facilityId: before.facilityId, summary: 'Sửa hạn thanh toán', before: { dueDate: before.dueDate }, after: { dueDate: after.dueDate } })
   })
 }
 /** Đưa hoá đơn đã duyệt về nháp để sửa; chỉ khi chưa có khoản thu và không phải hoá đơn thanh lý. */

@@ -14,13 +14,6 @@ import {
   Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { formatVND } from '@/domain/money'
 import { MoneyInput } from '@/components/ui/money-input'
 import { FeePickerDialog, type FeeOption } from '@/components/fee-picker-dialog'
@@ -29,23 +22,11 @@ import { cn } from '@/lib/utils'
 import {
   approveInvoiceAction,
   deleteInvoiceAction,
+  setInvoiceDueDateAction,
   setPeriodAction,
   updateInvoiceMeterReadingAction,
   updateLinesAction,
 } from '@/server/invoices/actions'
-
-const TYPES: [string, string][] = [
-  ['rent', 'Tiền phòng'],
-  ['fee', 'Phí dịch vụ'],
-  ['electric', 'Điện'],
-  ['water', 'Nước'],
-  ['one_off', 'Phí phát sinh'],
-  ['penalty', 'Phạt'],
-  ['adjustment', 'Điều chỉnh'],
-  ['deposit', 'Cọc'],
-  ['deposit_offset', 'Trừ cọc'],
-  ['refund', 'Hoàn tiền'],
-]
 
 type Line = {
   type: string
@@ -68,6 +49,10 @@ type Props = {
   coefficient: number | null
   fullMonth: boolean
   dueDate: string | null
+  /** Hạn dạng YYYY-MM-DD để sửa trực tiếp; null khi chưa có. */
+  dueDateIso: string | null
+  /** Quy tắc hạn mặc định trong Cài đặt, viết thành câu. */
+  dueDefaultLabel: string
   lines: Line[]
 }
 
@@ -108,7 +93,7 @@ export function InvoiceEditor(p: Props) {
     coefficient: p.coefficient == null ? '' : String(p.coefficient),
     fullMonth: p.fullMonth,
   })
-  const [dueDay, setDueDay] = useState('')
+  const [due, setDue] = useState(p.dueDateIso ?? '')
   const [pickingFee, setPickingFee] = useState(false)
   const [createdFees, setCreatedFees] = useState<FeeOption[]>([])
   const total = lines.reduce((n, l) => n + Math.round(l.quantity * l.unitPrice), 0)
@@ -244,7 +229,6 @@ export function InvoiceEditor(p: Props) {
           <table className="w-full min-w-[750px] text-xs">
             <thead className="border-b border-border/70 bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               <tr>
-                <th className="px-3.5 py-3 text-left w-36 whitespace-nowrap">Loại</th>
                 <th className="px-3.5 py-3 text-left min-w-44 whitespace-nowrap">Mô tả</th>
                 <th className="px-3.5 py-3 text-right w-24 whitespace-nowrap">SL</th>
                 <th className="px-3.5 py-3 text-right w-32 whitespace-nowrap">Đơn giá</th>
@@ -255,26 +239,6 @@ export function InvoiceEditor(p: Props) {
             <tbody className="divide-y divide-border/60">
               {lines.map((l, i) => (
                 <tr key={i} className="transition-colors hover:bg-muted/20">
-                  <td className="p-2.5">
-                    <Select
-                      value={l.type}
-                      disabled={typeof l.meta?.leaseFeeId === 'string'}
-                      onValueChange={(val) => {
-                        if (val) set(i, { type: val })
-                      }}
-                    >
-                      <SelectTrigger className="h-8.5 w-full rounded-lg border-border/80 bg-background text-xs font-medium">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {TYPES.map(([k, v]) => (
-                          <SelectItem key={k} value={k}>
-                            {v}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </td>
                   <td className="p-2.5">
                     <input
                       value={l.description}
@@ -322,7 +286,7 @@ export function InvoiceEditor(p: Props) {
             </tbody>
             <tfoot className="border-t border-border/80 bg-muted/30">
               <tr>
-                <td colSpan={4} className="px-4 py-3 text-right font-semibold text-foreground">
+                <td colSpan={3} className="px-4 py-3 text-right font-semibold text-foreground">
                   Tổng
                 </td>
                 <td className="px-3.5 py-3 text-right text-sm font-bold tabular-nums text-primary">
@@ -383,6 +347,16 @@ export function InvoiceEditor(p: Props) {
         )}
       </section>
 
+      {/* Hạn thanh toán: ghi rõ, mặc định theo Cài đặt, sửa ngày trực tiếp */}
+      <section className="flex flex-wrap items-end gap-3 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
+        <div className="space-y-1.5">
+          <label htmlFor="invoice-due" className="block text-xs font-medium text-muted-foreground">Hạn thanh toán</label>
+          <input id="invoice-due" type="date" value={due} onChange={(e) => setDue(e.target.value)} className="h-9 rounded-lg border border-border/80 bg-background px-2.5 text-sm font-semibold tabular-nums text-foreground focus:border-primary focus:outline-none" />
+        </div>
+        <Button size="sm" variant="outline" disabled={pending || !due || due === (p.dueDateIso ?? '')} onClick={() => run(() => setInvoiceDueDateAction(p.id, due), 'Đã lưu hạn thanh toán')} className="rounded-xl text-xs font-medium">Lưu hạn</Button>
+        <p className="pb-2 text-xs text-muted-foreground">Mặc định theo Cài đặt: {p.dueDefaultLabel}.</p>
+      </section>
+
       {/* 3. Phê duyệt & Hạn thanh toán */}
       <section className="rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -402,31 +376,13 @@ export function InvoiceEditor(p: Props) {
 
           {!approved && (
             <div className="flex flex-wrap items-center gap-2.5">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <label htmlFor="due-day" className="whitespace-nowrap">
-                  Hạn thanh toán: ngày
-                </label>
-                <input
-                  id="due-day"
-                  inputMode="numeric"
-                  placeholder="05"
-                  value={dueDay}
-                  onChange={(e) => setDueDay(e.target.value)}
-                  className="h-8.5 w-14 rounded-lg border border-border/80 bg-background px-2 text-center text-xs font-semibold tabular-nums text-foreground focus:border-primary focus:outline-none"
-                />
-                <span className="whitespace-nowrap">tháng sau</span>
-              </div>
-
               <Button
                 size="sm"
                 disabled={pending}
                 onClick={() =>
                   run(
                     () =>
-                      approveInvoiceAction(
-                        p.id,
-                        dueDay ? { dueRule: { kind: 'day_of_next_month', day: Number(dueDay) } } : {}
-                      ),
+                      approveInvoiceAction(p.id, due ? { dueDate: due } : {}),
                     'Đã duyệt hoá đơn'
                   )
                 }
