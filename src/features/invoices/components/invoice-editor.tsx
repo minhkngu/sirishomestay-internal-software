@@ -13,6 +13,9 @@ import {
   Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { FormDialog } from '@/components/form-dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { MoneyInput } from '@/components/ui/money-input'
@@ -79,72 +82,80 @@ const timePatch = (l: Line, meta: Record<string, unknown>): Partial<EditorLine> 
   return { meta }
 }
 
-/** Thời gian và hệ số của một dòng: chỉnh ngay trên dòng, đổi từ–đến thì hệ số tự tính theo ngày, gõ hệ số thì dùng đúng số đó; lưu cùng mọi thay đổi khác của hoá đơn. */
+/** Thời gian của một dòng: chọn từ–đến ngay trên dòng, hệ số tự tính theo tháng tròn từ ngày bắt đầu; lưu cùng mọi thay đổi khác của hoá đơn. */
 function LineTime({ line, defaultFrom, defaultTo, fullMonth, proration, editable, onChange }: { line: Line; defaultFrom: string; defaultTo: string; fullMonth: boolean; proration: Proration; editable: boolean; onChange: (meta: Record<string, unknown>) => void }) {
   const meta = line.meta ?? {}
   const from = typeof meta.from === 'string' ? meta.from : defaultFrom
   const to = typeof meta.to === 'string' ? meta.to : defaultTo
-  // Hoá đơn cũ chưa lưu hệ số: suy ra từ số lượng (tiền phòng) hoặc thành tiền
-  const coefficient = typeof meta.coefficient === 'number' ? meta.coefficient : line.type === 'rent' ? line.quantity : line.amount != null && line.quantity * line.unitPrice !== 0 ? Math.round((line.amount / (line.quantity * line.unitPrice)) * 10000) / 10000 : 1
-  const [coef, setCoef] = useState(String(coefficient))
-  const round4 = (n: number) => Math.round(n * 10000) / 10000
-  if (!editable) return <p className="text-[11px] tabular-nums text-muted-foreground">{formatDateVN(from)} – {formatDateVN(to)}<br />Hệ số × {coefficient.toLocaleString('vi-VN', { maximumFractionDigits: 4 })}{meta.coefficientOverride === true ? ' (chỉnh riêng)' : ''}</p>
+  if (!editable) return <p className="text-[11px] tabular-nums text-muted-foreground">{formatDateVN(from)} – {formatDateVN(to)}</p>
   const setDates = (nextFrom: string, nextTo: string) => {
     if (!nextFrom || !nextTo || nextTo < nextFrom) { onChange({ ...meta, from: nextFrom, to: nextTo }); return }
-    const next = round4(fullMonth ? fullMonthCoefficient(nextFrom, nextTo) : monthsCoefficient(nextFrom, nextTo, proration))
-    setCoef(String(next))
+    const next = Math.round((fullMonth ? fullMonthCoefficient(nextFrom, nextTo) : monthsCoefficient(nextFrom, nextTo, proration)) * 10000) / 10000
     onChange({ ...meta, from: nextFrom, to: nextTo, coefficient: next, coefficientOverride: false })
   }
-  const setCoefficient = (text: string) => {
-    setCoef(text)
-    const n = Number(text.replace(',', '.'))
-    if (text.trim() !== '' && Number.isFinite(n) && n >= 0) onChange({ ...meta, from, to, coefficient: round4(n), coefficientOverride: true })
-  }
   return (
-    <div className="space-y-1.5 text-[11px] text-muted-foreground">
-      <div className="flex items-center gap-1">
-        <input aria-label="Từ ngày" type="date" value={from} onChange={(e) => setDates(e.target.value, to)} className="h-8 w-full min-w-0 rounded-lg border border-border/80 bg-background px-1.5 text-xs text-foreground" />
-        <span>–</span>
-        <input aria-label="Đến ngày" type="date" value={to} onChange={(e) => setDates(from, e.target.value)} className="h-8 w-full min-w-0 rounded-lg border border-border/80 bg-background px-1.5 text-xs text-foreground" />
-      </div>
-      <label className="flex items-center gap-1.5">
-        <span className="shrink-0">Hệ số ×</span>
-        <input aria-label="Hệ số" inputMode="decimal" value={coef} onChange={(e) => setCoefficient(e.target.value)} className="h-8 w-20 rounded-lg border border-border/80 bg-background px-2 text-right text-xs tabular-nums text-foreground" />
-        {meta.coefficientOverride === true && <span>(chỉnh riêng)</span>}
-      </label>
+    <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+      <input aria-label="Từ ngày" type="date" value={from} onChange={(e) => setDates(e.target.value, to)} className="h-8 w-full min-w-0 rounded-lg border border-border/80 bg-background px-1.5 text-xs text-foreground" />
+      <span>–</span>
+      <input aria-label="Đến ngày" type="date" value={to} onChange={(e) => setDates(from, e.target.value)} className="h-8 w-full min-w-0 rounded-lg border border-border/80 bg-background px-1.5 text-xs text-foreground" />
     </div>
   )
 }
 type MeterPanel = { leaseFeeId: string; name: string; unit: string; rows: Array<{ period: string; readOn: string | null; value: number | null }> }
 const periodLabel = (period: string) => `${period.slice(5)}/${period.slice(0, 4)}`
-/** Chỉ số đã chốt của đồng hồ: chọn tháng ở dropdown rồi sửa số sai hoặc thêm số còn thiếu ngay tại hoá đơn (ghi ngược về tab Chỉ số). */
+const NEW_READING = '__new'
+/** Chỉ số đã chốt của đồng hồ: danh sách các tháng, thêm dòng "Chốt chỉ số" cuối danh sách; chọn một dòng mở popup điền số (ghi ngược về tab Chỉ số). */
 function MeterReadingsPanel({ invoiceId, panel, editable }: { invoiceId: string; panel: MeterPanel; editable: boolean }) {
   const router = useRouter()
   const [pending, start] = useTransition()
-  const [period, setPeriod] = useState(panel.rows[panel.rows.length - 1].period)
-  const row = panel.rows.find((r) => r.period === period) ?? panel.rows[panel.rows.length - 1]
-  const [values, setValues] = useState<Record<string, string>>(Object.fromEntries(panel.rows.map((r) => [r.period, r.value == null ? '' : String(r.value)])))
+  const [period, setPeriod] = useState<string | null>(null)
+  const [text, setText] = useState('')
   const [error, setError] = useState('')
-  const items = panel.rows.map((r) => ({ value: r.period, label: `Tháng ${periodLabel(r.period)} · ${r.value == null ? 'chưa chốt' : r.value.toLocaleString('vi-VN')}` }))
-  const value = values[row.period] ?? ''
+  const last = panel.rows[panel.rows.length - 1]
+  const rowLabel = (r: MeterPanel['rows'][number]) => `Tháng ${periodLabel(r.period)} · ${r.value == null ? 'chưa chốt' : r.value.toLocaleString('vi-VN')}`
+  const items = [...panel.rows.map((r) => ({ value: r.period, label: rowLabel(r) })), ...(editable ? [{ value: NEW_READING, label: '＋ Chốt chỉ số' }] : [])]
+  const row = panel.rows.find((r) => r.period === period)
+  const open = (value: string) => {
+    const target = value === NEW_READING ? (panel.rows.find((r) => r.value == null) ?? last).period : value
+    const found = panel.rows.find((r) => r.period === target) ?? last
+    setText(found.value == null ? '' : String(found.value)); setError(''); setPeriod(found.period)
+  }
   const save = () => start(async () => {
-    const r = await updateInvoiceMeterReadingAction(invoiceId, { leaseFeeId: panel.leaseFeeId, period: row.period, value: Number(value) })
+    if (!row) return
+    const r = await updateInvoiceMeterReadingAction(invoiceId, { leaseFeeId: panel.leaseFeeId, period: row.period, value: Number(text) })
     if (!r.ok) { setError(r.error); return }
-    setError(''); toast.success('Đã cập nhật chỉ số và tính lại hoá đơn'); router.refresh()
+    toast.success('Đã cập nhật chỉ số và tính lại hoá đơn'); setPeriod(null); router.refresh()
   })
   return (
-    <div className="space-y-1.5 text-[11px] text-muted-foreground">
-      <Select value={row.period} onValueChange={(v) => { if (v) { setPeriod(String(v)); setError('') } }} items={items}>
-        <SelectTrigger aria-label={`Chọn tháng chỉ số ${panel.name}`} className="h-8 w-full rounded-lg border-border/80 bg-background text-xs"><SelectValue /></SelectTrigger>
+    <div className="text-[11px] text-muted-foreground">
+      <Select value={null} onValueChange={(v) => { if (v) open(String(v)) }} items={items}>
+        <SelectTrigger aria-label={`Chỉ số đã chốt ${panel.name}`} className="h-8 w-full rounded-lg border-border/80 bg-background text-xs"><SelectValue placeholder={rowLabel(last)} /></SelectTrigger>
         <SelectContent>{items.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
       </Select>
-      {editable ? (
-        <div className="flex items-center gap-1.5">
-          <input aria-label={`Chỉ số ${panel.name} tháng ${periodLabel(row.period)}`} inputMode="numeric" placeholder={`Chỉ số (${panel.unit})`} value={value} onChange={(e) => setValues({ ...values, [row.period]: e.target.value })} className="h-8 w-full min-w-0 rounded-lg border border-border/80 bg-background px-2 text-right text-xs tabular-nums text-foreground" />
-          <Button type="button" size="sm" variant="outline" disabled={pending || !/^\d+$/.test(value.trim()) || (row.value != null && value.trim() === String(row.value))} onClick={save} className="h-8 shrink-0 rounded-lg text-[11px]">{row.value == null ? 'Thêm' : 'Lưu'}</Button>
-        </div>
-      ) : null}
-      {error && <p role="alert" className="text-destructive">{error}</p>}
+      {row && (
+        <FormDialog open onOpenChange={(o) => { if (!o) setPeriod(null) }} title={`Chốt chỉ số ${panel.name}`} description={`Tháng ${periodLabel(row.period)}${row.value == null ? ' · chưa chốt' : ` · đang là ${row.value.toLocaleString('vi-VN')}`}. Số chốt ghi về tab Chỉ số và tính lại hoá đơn.`} size="sm">
+          <div className="space-y-4 pb-1">
+            {panel.rows.length > 1 && (
+              <div className="space-y-1.5">
+                <Label>Tháng chốt</Label>
+                <Select value={row.period} onValueChange={(v) => { if (v) open(String(v)) }} items={panel.rows.map((r) => ({ value: r.period, label: rowLabel(r) }))}>
+                  <SelectTrigger aria-label="Tháng chốt" className="h-9 w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>{panel.rows.map((r) => <SelectItem key={r.period} value={r.period}>{rowLabel(r)}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label htmlFor="meter-reading-value">Chỉ số ({panel.unit})</Label>
+              <Input id="meter-reading-value" inputMode="numeric" value={text} onChange={(e) => setText(e.target.value)} className="h-9 text-right tabular-nums" />
+            </div>
+            {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="ghost" onClick={() => setPeriod(null)}>Huỷ</Button>
+              <Button type="button" disabled={pending || !/^\d+$/.test(text.trim()) || (row.value != null && text.trim() === String(row.value))} onClick={save}>Lưu</Button>
+            </div>
+          </div>
+        </FormDialog>
+      )}
     </div>
   )
 }
@@ -202,14 +213,13 @@ export function InvoiceEditor(p: Props) {
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-border/80 bg-card">
-          <table className="w-full min-w-[1150px] text-xs">
+          <table className="w-full min-w-[980px] text-xs">
             <thead className="border-b border-border/70 bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="px-3.5 py-3 text-left min-w-44 whitespace-nowrap">Mô tả</th>
                 <th className="px-3.5 py-3 text-left w-64 whitespace-nowrap">Thời gian</th>
                 <th className="px-3.5 py-3 text-left w-56 whitespace-nowrap">Chỉ số</th>
                 <th className="px-3.5 py-3 text-right min-w-20 whitespace-nowrap">SL</th>
-                <th className="px-3.5 py-3 text-right min-w-32 whitespace-nowrap">Đơn giá</th>
                 <th className="px-3.5 py-3 text-right w-36 whitespace-nowrap">Thành tiền</th>
                 <th className="px-2 py-3 w-12 text-center"></th>
               </tr>
@@ -224,6 +234,17 @@ export function InvoiceEditor(p: Props) {
                       onChange={(e) => set(i, { description: e.target.value })}
                       className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 disabled:cursor-not-allowed disabled:border-transparent disabled:bg-transparent disabled:px-0 disabled:text-foreground"
                     />
+                    <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                      <span className="shrink-0">Đơn giá</span>
+                      {isLocked(l) || isAddedFee(l)
+                        ? <span className="font-medium tabular-nums text-foreground">{formatVND(l.unitPrice)}</span>
+                        : <MoneyInput
+                            allowNegative
+                            value={l.unitPriceText}
+                            onValueChange={(value) => set(i, { unitPriceText: value, unitPrice: value === '' || value === '-' ? 0 : Number(value) })}
+                            className="h-8 w-32 rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
+                          />}
+                    </div>
                   </td>
                   <td className="p-2.5 align-top">
                     {isTimeBased(l) ? <LineTime line={l} defaultFrom={p.start} defaultTo={p.end} fullMonth={p.fullMonth} proration={p.proration} editable={p.status === 'draft'} onChange={(meta) => set(i, timePatch(l, meta))} /> : <span className="text-muted-foreground/60">—</span>}
@@ -238,15 +259,6 @@ export function InvoiceEditor(p: Props) {
                       value={l.quantity}
                       disabled={isLocked(l) || isAddedFee(l)}
                       onChange={(e) => set(i, { quantity: Number(e.target.value) })}
-                      className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
-                    />
-                  </td>
-                  <td className="p-2.5">
-                    <MoneyInput
-                      allowNegative
-                      value={l.unitPriceText}
-                      disabled={isLocked(l) || isAddedFee(l)}
-                      onValueChange={(value) => set(i, { unitPriceText: value, unitPrice: value === '' || value === '-' ? 0 : Number(value) })}
                       className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
                     />
                   </td>
@@ -269,7 +281,7 @@ export function InvoiceEditor(p: Props) {
             </tbody>
             <tfoot className="border-t border-border/80 bg-muted/30">
               <tr>
-                <td colSpan={5} className="px-4 py-3 text-right font-semibold text-foreground">
+                <td colSpan={4} className="px-4 py-3 text-right font-semibold text-foreground">
                   Tổng
                 </td>
                 <td className="px-3.5 py-3 text-right text-sm font-bold tabular-nums text-primary">
