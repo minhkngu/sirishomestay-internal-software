@@ -49,7 +49,7 @@ export function SingleInvoiceDialog({ facilities, defaultPeriod }: { facilities:
   const facilityItems = facilities.map((f) => ({ value: f.id, label: f.name }))
   const leaseItems = leases.map((l) => ({ value: l.leaseId, label: `Phòng ${l.roomCode} · ${l.tenantName}` }))
   const total = preview?.lines.reduce((n, l) => n + l.amount, 0) ?? 0
-  const canCreate = !!preview?.period && preview.warnings.every((w) => !w.startsWith('Chưa'))
+  const canCreate = !!preview?.period
 
   return (
     <>
@@ -91,6 +91,7 @@ export function SingleInvoiceDialog({ facilities, defaultPeriod }: { facilities:
                 </>
               )}
               {preview.warnings.map((w) => <p key={w} className="text-amber-700">⚠ {w}</p>)}
+              {preview.period && preview.warnings.length > 0 && <p className="text-xs text-muted-foreground">Vẫn tạo được hoá đơn nháp; bổ sung số liệu còn thiếu ngay trong hoá đơn trước khi duyệt.</p>}
             </div>
           )}
           <div className="flex justify-end">
