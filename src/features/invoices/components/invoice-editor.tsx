@@ -4,10 +4,8 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import {
-  Calendar,
   Check,
   CheckCircle2,
-  Clock,
   Layers,
   Plus,
   Trash2,
@@ -56,6 +54,10 @@ const lineAmount = (l: Line) => (isLocked(l) && l.amount != null ? l.amount : Ma
 type AddFee = { feeTypes: FeeOption[]; usedTypeIds: string[]; facilityId: string; renderCreateFee?: (p: { onCreated: (fee: FeeOption) => void }) => React.ReactNode }
 
 type Props = {
+  /** Thông tin hoá đơn (mã, bên thuê, kỳ, các ô tổng); nút lưu, duyệt, xoá và hạn thanh toán nằm gọn ngay dưới. */
+  header?: React.ReactNode
+  /** Khối hiện giữa thông tin hoá đơn và bảng dòng (số lượng theo kỳ). */
+  beforeLines?: React.ReactNode
   meterPanels?: MeterPanel[]
   addFee?: AddFee
   id: string
@@ -234,6 +236,49 @@ export function InvoiceEditor(p: Props) {
 
   return (
     <div className="space-y-4">
+      <section className="space-y-4 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
+        {p.header}
+        <div className="flex flex-wrap items-end justify-between gap-3 border-t border-border/60 pt-4">
+          <div className="space-y-1.5">
+            <label htmlFor="invoice-due" className="block text-xs font-medium text-muted-foreground">Hạn thanh toán</label>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <input id="invoice-due" type="date" value={due} onChange={(e) => setDue(e.target.value)} className="h-9 rounded-lg border border-border/80 bg-background px-2.5 text-sm font-semibold tabular-nums text-foreground focus:border-primary focus:outline-none" />
+              <span className="text-xs text-muted-foreground">Mặc định theo Cài đặt: {p.dueDefaultLabel}</span>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Button size="sm" disabled={pending} onClick={saveAll} className="gap-1.5 rounded-xl text-xs font-medium shadow-2xs">
+              <Check className="size-3.5" />
+              <span>Lưu thay đổi</span>
+            </Button>
+            {!approved && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={pending}
+                onClick={() => start(async () => {
+                  const error = await persist()
+                  if (error) { toast.error(error); router.refresh(); return }
+                  const r = await approveInvoiceAction(p.id, due ? { dueDate: due } : {})
+                  if (!r.ok) { toast.error(r.error); router.refresh(); return }
+                  toast.success('Đã duyệt hoá đơn')
+                  router.refresh()
+                })}
+                className="gap-1.5 rounded-xl text-xs font-medium"
+              >
+                <CheckCircle2 className="size-3.5" />
+                <span>Duyệt hoá đơn</span>
+              </Button>
+            )}
+            <Button size="sm" variant="outline" disabled={pending} onClick={() => setDeleting(true)} className="gap-1.5 rounded-xl border-rose-200/80 text-rose-700 hover:bg-rose-50 hover:text-rose-800 text-xs font-medium">
+              <Trash2 className="size-3.5" />
+              <span>Xoá</span>
+            </Button>
+          </div>
+        </div>
+      </section>
+      {p.beforeLines}
+
       {/* 2. Các dòng */}
       <section className="space-y-4 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -263,7 +308,7 @@ export function InvoiceEditor(p: Props) {
                 <tr key={i} className="transition-colors hover:bg-muted/20">
                   <td className="p-2.5">
                     <input
-                      value={isLocked(l) ? l.description.replace(/ — phòng [0-9a-f-]{36}$/i, '') : l.description}
+                      value={isMeterLine(l) ? (p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId)?.name ?? l.description) : isLocked(l) ? l.description.replace(/ — phòng [0-9a-f-]{36}$/i, '') : l.description}
                       disabled={isLocked(l) || isAddedFee(l)}
                       onChange={(e) => set(i, { description: e.target.value })}
                       className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 disabled:cursor-not-allowed disabled:border-transparent disabled:bg-transparent disabled:px-0 disabled:text-foreground"
@@ -281,7 +326,7 @@ export function InvoiceEditor(p: Props) {
                     </div>
                   </td>
                   <td className="p-2.5 align-top">
-                    {isTimeBased(l) ? <LineTime line={l} defaultFrom={p.start} defaultTo={p.end} fullMonth={p.fullMonth} proration={p.proration} editable={p.status === 'draft'} onChange={(meta) => set(i, timePatch(l, meta))} /> : <span className="text-muted-foreground/60">—</span>}
+                    {isTimeBased(l) && !isMeterLine(l) ? <LineTime line={l} defaultFrom={p.start} defaultTo={p.end} fullMonth={p.fullMonth} proration={p.proration} editable={p.status === 'draft'} onChange={(meta) => set(i, timePatch(l, meta))} /> : <span className="text-muted-foreground/60">—</span>}
                   </td>
                   <td className="p-2.5 align-top">
                     {(() => { const panel = p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId); return panel ? <MeterReadingsPanel panel={panel} editable={p.status === 'draft'} consumption={l.quantity} staged={stagedFor(panel.leaseFeeId)} onStage={(period, value) => setStaged((cur) => ({ ...cur, [`${panel.leaseFeeId}|${period}`]: value }))} /> : <span className="text-muted-foreground/60">—</span> })()}
@@ -412,96 +457,6 @@ export function InvoiceEditor(p: Props) {
         </dl>
       </section>
 
-      {/* Hạn thanh toán: ghi rõ, mặc định theo Cài đặt, sửa ngày trực tiếp */}
-      <section className="flex flex-wrap items-end gap-3 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
-        <div className="space-y-1.5">
-          <label htmlFor="invoice-due" className="block text-xs font-medium text-muted-foreground">Hạn thanh toán</label>
-          <input id="invoice-due" type="date" value={due} onChange={(e) => setDue(e.target.value)} className="h-9 rounded-lg border border-border/80 bg-background px-2.5 text-sm font-semibold tabular-nums text-foreground focus:border-primary focus:outline-none" />
-        </div>
-        <p className="pb-2 text-xs text-muted-foreground">Mặc định theo Cài đặt: {p.dueDefaultLabel}. Lưu cùng các thay đổi khác bằng nút “Lưu thay đổi”.</p>
-      </section>
-
-      {/* 3. Phê duyệt & Hạn thanh toán */}
-      <section className="rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <Clock className="size-4 text-primary" />
-              <h3 className="text-sm font-semibold tracking-tight text-foreground">
-                Hạn thanh toán & Trạng thái
-              </h3>
-            </div>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {approved
-                ? `Hạn thanh toán: ${p.dueDate ?? 'Theo quy định'}`
-                : 'Hoá đơn đang ở trạng thái Nháp. Cần duyệt trước khi tiến hành thu tiền.'}
-            </p>
-          </div>
-
-          {!approved && (
-            <div className="flex flex-wrap items-center gap-2.5">
-              <Button size="sm" disabled={pending} onClick={saveAll} className="gap-1.5 rounded-xl text-xs font-medium shadow-2xs">
-                <Check className="size-3.5" />
-                <span>Lưu thay đổi</span>
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={pending}
-                onClick={() => start(async () => {
-                  const error = await persist()
-                  if (error) { toast.error(error); router.refresh(); return }
-                  const r = await approveInvoiceAction(p.id, due ? { dueDate: due } : {})
-                  if (!r.ok) { toast.error(r.error); router.refresh(); return }
-                  toast.success('Đã duyệt hoá đơn')
-                  router.refresh()
-                })}
-                className="gap-1.5 rounded-xl text-xs font-medium"
-              >
-                <CheckCircle2 className="size-3.5" />
-                <span>Duyệt hoá đơn</span>
-              </Button>
-
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={pending}
-                onClick={() => setDeleting(true)}
-                className="gap-1.5 rounded-xl border-rose-200/80 text-rose-700 hover:bg-rose-50 hover:text-rose-800 text-xs font-medium"
-              >
-                <Trash2 className="size-3.5" />
-                <span>Xoá</span>
-              </Button>
-            </div>
-          )}
-
-          {approved && (
-            <div className="flex items-center gap-3">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-muted/60 px-3 py-1 text-xs font-medium text-foreground">
-                <Calendar className="size-3.5 text-muted-foreground" />
-                <span>
-                  Hạn thanh toán: <strong>{p.dueDate ?? '—'}</strong>
-                </span>
-              </span>
-
-              <Button size="sm" disabled={pending} onClick={saveAll} className="gap-1.5 rounded-xl text-xs font-medium shadow-2xs">
-                <Check className="size-3.5" />
-                <span>Lưu thay đổi</span>
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={pending}
-                onClick={() => setDeleting(true)}
-                className="gap-1.5 rounded-xl border-rose-200/80 text-rose-700 hover:bg-rose-50 hover:text-rose-800 text-xs font-medium"
-              >
-                <Trash2 className="size-3.5" />
-                <span>Xoá hoá đơn</span>
-              </Button>
-            </div>
-          )}
-        </div>
-      </section>
       <ConfirmDialog
         open={deleting}
         onOpenChange={setDeleting}

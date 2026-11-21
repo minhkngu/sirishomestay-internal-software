@@ -406,13 +406,18 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
       if (JSON.stringify(beforeFees) !== JSON.stringify(afterFees)) throw new ValidationError('Không sửa hoặc xoá dòng tiền phòng, phí hợp đồng tại đây; sửa hệ số, chỉ số hoặc số lượng theo kỳ ở từng dòng')
     }
     const taxRate = (() => { const t = data.find(l => l.type === 'tax'); const r = (t?.meta as { rate?: unknown } | null | undefined)?.rate; return typeof r === 'number' && Number.isFinite(r) && r > 0 && r <= 100 ? r : 0 })()
+    // Phí hợp đồng theo đồng hồ hoặc theo kỳ chỉ dính số lượng, không nhân hệ số theo thời gian; mô tả luôn là tên phí
+    const snapIds = [...new Set(data.flatMap(l => { const m = l.meta as { leaseFeeId?: unknown } | null | undefined; return typeof m?.leaseFeeId === 'string' ? [m.leaseFeeId] : [] }))]
+    const snaps = snapIds.length ? await tx.select({ id: leaseFeeSnapshots.id, name: leaseFeeSnapshots.name, quantitySource: leaseFeeSnapshots.quantitySource }).from(leaseFeeSnapshots).where(inArray(leaseFeeSnapshots.id, snapIds)) : []
     const next = data.filter(l => l.type !== 'tax').map(l => {
       const meta = l.meta as { feeTypeId?: unknown; leaseFeeId?: unknown; coefficient?: unknown; from?: unknown; to?: unknown; coefficientOverride?: unknown } | null
       const protectedFee = inv.kind === 'monthly' && (typeof meta?.leaseFeeId === 'string' || l.type === 'rent') ? old.find(previous => previous.id === l.id) : undefined
       if (protectedFee) {
         // Dòng hợp đồng giữ mô tả, số lượng, đơn giá đã lưu; chỉ thời gian, hệ số đổi được (gửi kèm khi lưu) và thành tiền tính lại theo đó
         const prev = (protectedFee.meta ?? {}) as Record<string, unknown>
-        const timeBased = isTimeBasedLine(protectedFee.type, protectedFee.meta)
+        const snap = snaps.find(x => x.id === meta?.leaseFeeId)
+        const timeBased = protectedFee.type === 'rent' || (snap ? snap.quantitySource !== 'meter' && snap.quantitySource !== 'period_input' : isTimeBasedLine(protectedFee.type, protectedFee.meta))
+        const description = protectedFee.type === 'fee' && snap ? snap.name : protectedFee.description
         const sent = typeof meta?.coefficient === 'number' && Number.isFinite(meta.coefficient) && meta.coefficient >= 0 ? Math.round(meta.coefficient * 10000) / 10000 : undefined
         const coefChanged = sent !== undefined && (sent !== prev.coefficient || (typeof meta?.from === 'string' && meta.from !== prev.from) || (typeof meta?.to === 'string' && meta.to !== prev.to))
         const qty = protectedFee.type === 'rent' ? undefined : Number.isFinite(l.quantity) && l.quantity >= 0 ? l.quantity : protectedFee.quantity
@@ -421,9 +426,9 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
           const derived = protectedFee.type === 'rent' ? protectedFee.quantity : protectedFee.quantity * protectedFee.unitPrice !== 0 ? protectedFee.amount / (protectedFee.quantity * protectedFee.unitPrice) : 1
           const coef = coefChanged && sent !== undefined ? sent : typeof prev.coefficient === 'number' ? prev.coefficient : Math.round(derived * 10000) / 10000
           const rent = protectedFee.type === 'rent'
-          return { invoiceId: id, type: protectedFee.type, description: protectedFee.description, quantity: rent ? coef : qty ?? protectedFee.quantity, unitPrice: protectedFee.unitPrice, amount: Math.round((rent ? 1 : qty ?? protectedFee.quantity) * protectedFee.unitPrice * coef), meta: { ...prev, from: coefChanged && typeof meta?.from === 'string' ? meta.from : prev.from, to: coefChanged && typeof meta?.to === 'string' ? meta.to : prev.to, coefficient: coef, coefficientOverride: coefChanged ? meta?.coefficientOverride === true : prev.coefficientOverride } }
+          return { invoiceId: id, type: protectedFee.type, description, quantity: rent ? coef : qty ?? protectedFee.quantity, unitPrice: protectedFee.unitPrice, amount: Math.round((rent ? 1 : qty ?? protectedFee.quantity) * protectedFee.unitPrice * coef), meta: { ...prev, from: coefChanged && typeof meta?.from === 'string' ? meta.from : prev.from, to: coefChanged && typeof meta?.to === 'string' ? meta.to : prev.to, coefficient: coef, coefficientOverride: coefChanged ? meta?.coefficientOverride === true : prev.coefficientOverride } }
         }
-        return { invoiceId: id, type: protectedFee.type, description: protectedFee.description, quantity: protectedFee.quantity, unitPrice: protectedFee.unitPrice, amount: protectedFee.amount, meta: protectedFee.meta }
+        return { invoiceId: id, type: protectedFee.type, description, quantity: protectedFee.quantity, unitPrice: protectedFee.unitPrice, amount: protectedFee.amount, meta: protectedFee.meta }
       }
       // Phí ngoài hợp đồng chọn từ loại phí: giữ mô tả, đơn giá đã lưu; số lượng sửa được; thành tiền nhân hệ số riêng của dòng
       const addedFee = l.type === 'one_off' && typeof meta?.feeTypeId === 'string' && typeof meta?.leaseFeeId !== 'string'
