@@ -49,6 +49,8 @@ type EditorLine = Line & { unitPriceText: string }
 const isLocked = (l: Line) => l.type === 'rent' || typeof l.meta?.leaseFeeId === 'string'
 /** Phí ngoài hợp đồng thêm vào hoá đơn từ loại phí trong Cài đặt: mô tả cố định theo tên phí, có thời gian và hệ số riêng. */
 const isAddedFee = (l: Line) => l.type === 'one_off' && typeof l.meta?.feeTypeId === 'string' && typeof l.meta?.leaseFeeId !== 'string'
+/** Dòng nhập tay ở bảng "Chi phí phát sinh" / "Giảm giá": loại adjustment có meta.kind. Giảm giá lưu số âm. */
+const extraKind = (l: Line): 'surcharge' | 'discount' | null => (l.type === 'adjustment' && (l.meta?.kind === 'surcharge' || l.meta?.kind === 'discount') ? (l.meta.kind as 'surcharge' | 'discount') : null)
 const lineAmount = (l: Line) => (isLocked(l) && l.amount != null ? l.amount : Math.round(l.quantity * l.unitPrice * (isAddedFee(l) && typeof l.meta?.coefficient === 'number' ? l.meta.coefficient : 1)))
 
 type AddFee = { feeTypes: FeeOption[]; usedTypeIds: string[]; facilityId: string; renderCreateFee?: (p: { onCreated: (fee: FeeOption) => void }) => React.ReactNode }
@@ -172,12 +174,21 @@ function MeterReadingsPanel({ panel, editable, consumption, staged, onStage }: {
 export function InvoiceEditor(p: Props) {
   const router = useRouter()
   const [pending, start] = useTransition()
-  const [lines, setLines] = useState<EditorLine[]>(p.lines.map((l) => ({ ...l, unitPriceText: String(l.unitPrice) })))
+  const [lines, setLines] = useState<EditorLine[]>(p.lines.filter((l) => l.type !== 'tax').map((l) => ({ ...l, unitPriceText: String(l.unitPrice) })))
+  const taxLine = p.lines.find((l) => l.type === 'tax')
+  const [taxRate, setTaxRate] = useState(typeof taxLine?.meta?.rate === 'number' ? String(taxLine.meta.rate) : '')
   const [due, setDue] = useState(p.dueDateIso ?? '')
   const [pickingFee, setPickingFee] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [createdFees, setCreatedFees] = useState<FeeOption[]>([])
-  const total = lines.reduce((n, l) => n + lineAmount(l), 0)
+  // Ô chi tiết: thành tiền các dòng phí, phát sinh, giảm giá, thuế (theo % trên phần còn lại) rồi tổng
+  const subtotal = lines.filter((l) => !extraKind(l)).reduce((n, l) => n + lineAmount(l), 0)
+  const surcharge = lines.filter((l) => extraKind(l) === 'surcharge').reduce((n, l) => n + lineAmount(l), 0)
+  const discount = lines.filter((l) => extraKind(l) === 'discount').reduce((n, l) => n + lineAmount(l), 0)
+  const rate = Number(taxRate.replace(',', '.'))
+  const validRate = Number.isFinite(rate) && rate > 0 && rate <= 100 ? rate : 0
+  const tax = Math.round(((subtotal + surcharge + discount) * validRate) / 100)
+  const total = subtotal + surcharge + discount + tax
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>, ok: string, after?: () => void) =>
     start(async () => {
@@ -203,7 +214,7 @@ export function InvoiceEditor(p: Props) {
       if (!r.ok) return r.error ?? 'Không lưu được chỉ số'
       setStaged((cur) => { const next = { ...cur }; delete next[key]; return next })
     }
-    const r = await updateLinesAction(p.id, lines.map((l) => ({ id: l.id, type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta: l.meta })))
+    const r = await updateLinesAction(p.id, [...lines.map((l) => ({ id: l.id, type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta: l.meta })), ...(validRate > 0 ? [{ type: 'tax', description: `Thuế ${validRate}%`, quantity: 1, unitPrice: tax, meta: { rate: validRate } }] : [])])
     if (!r.ok) return r.error ?? 'Không lưu được các dòng'
     if (due && due !== (p.dueDateIso ?? '')) {
       const d = await setInvoiceDueDateAction(p.id, due)
@@ -230,7 +241,7 @@ export function InvoiceEditor(p: Props) {
             <Layers className="size-4 text-primary" />
             <h2 className="text-sm font-semibold tracking-tight text-foreground">Các dòng</h2>
             <span className="rounded-full border border-border/70 bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-              {lines.length} mục
+              {lines.filter((l) => !extraKind(l)).length} mục
             </span>
           </div>
         </div>
@@ -248,7 +259,7 @@ export function InvoiceEditor(p: Props) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
-              {lines.map((l, i) => (
+              {lines.map((l, i) => extraKind(l) ? null : (
                 <tr key={i} className="transition-colors hover:bg-muted/20">
                   <td className="p-2.5">
                     <input
@@ -305,35 +316,10 @@ export function InvoiceEditor(p: Props) {
                 </tr>
               ))}
             </tbody>
-            <tfoot className="border-t border-border/80 bg-muted/30">
-              <tr>
-                <td colSpan={4} className="px-4 py-3 text-right font-semibold text-foreground">
-                  Tổng
-                </td>
-                <td className="px-3.5 py-3 text-right text-sm font-bold tabular-nums text-primary">
-                  {formatVND(total)}
-                </td>
-                <td></td>
-              </tr>
-            </tfoot>
           </table>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() =>
-              setLines([
-                ...lines,
-                { type: 'adjustment', description: '', quantity: 1, unitPrice: 0, unitPriceText: '', meta: null },
-              ])
-            }
-            className="gap-1.5 rounded-xl border-border/80 font-medium text-xs"
-          >
-            <Plus className="size-3.5" />
-            <span>Thêm dòng</span>
-          </Button>
           {p.addFee && !approved && (
             <Button size="sm" variant="outline" onClick={() => setPickingFee(true)} className="gap-1.5 rounded-xl border-border/80 font-medium text-xs">
               <Plus className="size-3.5" />
@@ -358,6 +344,72 @@ export function InvoiceEditor(p: Props) {
             renderCreateFee={p.addFee.renderCreateFee ? ({ onDone }) => p.addFee!.renderCreateFee!({ onCreated: (fee) => { setCreatedFees((cur) => [...cur, fee]); onDone() } }) : undefined}
           />
         )}
+      </section>
+
+      {/* Chi phí phát sinh và giảm giá: nhập tay, có mô tả */}
+      <section className="space-y-4 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
+        <h2 className="text-sm font-semibold tracking-tight text-foreground">Chi phí phát sinh & giảm giá</h2>
+        <div className="grid gap-4 lg:grid-cols-2">
+          {(['surcharge', 'discount'] as const).map((kind) => {
+            const rows = lines.map((l, i) => ({ l, i })).filter(({ l }) => extraKind(l) === kind)
+            const label = kind === 'surcharge' ? 'Chi phí phát sinh' : 'Giảm giá'
+            return (
+              <div key={kind} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-semibold text-foreground">{label}</h3>
+                  <Button size="sm" variant="outline" onClick={() => setLines([...lines, { type: 'adjustment', description: '', quantity: 1, unitPrice: 0, unitPriceText: '', meta: { kind } }])} className="h-8 gap-1.5 rounded-xl border-border/80 text-xs font-medium">
+                    <Plus className="size-3.5" />
+                    <span>Thêm</span>
+                  </Button>
+                </div>
+                <div className="overflow-hidden rounded-xl border border-border/80">
+                  <table className="w-full text-xs">
+                    <thead className="border-b border-border/70 bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      <tr><th className="px-3 py-2 text-left">Mô tả</th><th className="w-36 px-3 py-2 text-right">Số tiền</th><th className="w-10" /></tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {rows.map(({ l, i }) => (
+                        <tr key={i}>
+                          <td className="p-2"><input aria-label={`Mô tả ${label.toLowerCase()}`} placeholder="Nhập mô tả" value={l.description} onChange={(e) => set(i, { description: e.target.value })} className="h-8 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground focus:border-primary focus:outline-none" /></td>
+                          <td className="p-2">
+                            <MoneyInput
+                              aria-label={`Số tiền ${label.toLowerCase()}`}
+                              value={l.unitPriceText.replace('-', '')}
+                              onValueChange={(value) => { const n = value === '' ? 0 : Math.abs(Number(value)); set(i, { unitPriceText: value === '' ? '' : String(kind === 'discount' ? -n : n), unitPrice: kind === 'discount' ? -n : n }) }}
+                              className="h-8 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground focus:border-primary focus:outline-none"
+                            />
+                          </td>
+                          <td className="p-2 text-center">
+                            <button type="button" title="Xoá dòng" onClick={() => setLines(lines.filter((_, j) => j !== i))} className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-rose-50 hover:text-rose-600"><Trash2 className="size-3.5" /></button>
+                          </td>
+                        </tr>
+                      ))}
+                      {rows.length === 0 && <tr><td colSpan={3} className="p-3 text-center text-muted-foreground">Chưa có</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
+      {/* Chi tiết: thành tiền, giảm giá, phát sinh, thuế, tổng */}
+      <section className="space-y-2 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
+        <h2 className="text-sm font-semibold tracking-tight text-foreground">Chi tiết hoá đơn</h2>
+        <dl className="space-y-1.5 text-sm">
+          <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Thành tiền</dt><dd className="font-medium tabular-nums">{formatVND(subtotal)}</dd></div>
+          <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Giảm giá</dt><dd className="font-medium tabular-nums">{formatVND(discount)}</dd></div>
+          <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Phát sinh</dt><dd className="font-medium tabular-nums">{formatVND(surcharge)}</dd></div>
+          <div className="flex items-center justify-between gap-3">
+            <dt className="flex items-center gap-2 text-muted-foreground">
+              <label htmlFor="invoice-tax-rate">Thuế (%)</label>
+              <input id="invoice-tax-rate" inputMode="decimal" placeholder="0" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} className="h-8 w-20 rounded-lg border border-border/80 bg-background px-2 text-right text-xs tabular-nums text-foreground focus:border-primary focus:outline-none" />
+            </dt>
+            <dd className="font-medium tabular-nums">{formatVND(tax)}</dd>
+          </div>
+          <div className="flex justify-between gap-3 border-t border-border/70 pt-2"><dt className="font-semibold text-foreground">Tổng tiền</dt><dd className="text-base font-bold tabular-nums text-primary">{formatVND(total)}</dd></div>
+        </dl>
       </section>
 
       {/* Hạn thanh toán: ghi rõ, mặc định theo Cài đặt, sửa ngày trực tiếp */}

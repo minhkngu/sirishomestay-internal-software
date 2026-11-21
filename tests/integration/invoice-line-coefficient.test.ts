@@ -89,6 +89,22 @@ describe('thời gian và hệ số riêng từng dòng', () => {
     expect((await lines()).map(l => l.amount).sort()).toEqual(before.map(l => l.amount).sort())
   })
 
+  it('phát sinh, giảm giá nhập tay và thuế: thuế tính ở server theo % trên tổng các dòng còn lại, bỏ thuế thì dòng thuế mất', async () => {
+    const current = (await lines()).map(l => ({ id: l.id, type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta: l.meta }))
+    const extras = [
+      { type: 'adjustment', description: 'Sửa vòi nước', quantity: 1, unitPrice: 300000, meta: { kind: 'surcharge' } },
+      { type: 'adjustment', description: 'Giảm do ở lâu', quantity: 1, unitPrice: -200000, meta: { kind: 'discount' } },
+    ]
+    await updateLines(db, ctx(), invoiceId, [...current, ...extras, { type: 'tax', description: 'tự đặt', quantity: 1, unitPrice: 1, meta: { rate: 10 } }])
+    const all = await lines()
+    const base = all.filter(l => l.type !== 'tax').reduce((n, l) => n + l.amount, 0)
+    expect(base).toBe(9000000 + 200000 + 300000 - 200000)
+    const tax = all.find(l => l.type === 'tax')!
+    expect(tax).toMatchObject({ description: 'Thuế 10%', amount: Math.round(base * 0.1) })
+    await updateLines(db, ctx(), invoiceId, [...current, ...extras])
+    expect((await lines()).some(l => l.type === 'tax')).toBe(false)
+  })
+
   describe('phí ngoài hợp đồng thêm từ loại phí', () => {
     const feeTypeId = crypto.randomUUID()
     const addFee = async () => {

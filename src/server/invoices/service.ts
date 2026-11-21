@@ -387,7 +387,7 @@ export async function syncPendingAdjustments(db: DB, lease: Lease, addenda: Adde
 }
 
 const linesSchema = z.array(z.object({
-  id: z.uuid().optional(), type: z.enum(['rent', 'fee', 'electric', 'water', 'one_off', 'penalty', 'adjustment', 'deposit', 'deposit_offset', 'refund']),
+  id: z.uuid().optional(), type: z.enum(['rent', 'fee', 'electric', 'water', 'one_off', 'penalty', 'adjustment', 'deposit', 'deposit_offset', 'refund', 'tax']),
   description: z.string().trim().min(1, 'Nhập mô tả dòng'), quantity: z.number().finite(), unitPrice: z.number().int().safe(), meta: z.record(z.string(), z.unknown()).nullable().optional(),
 }))
 /** Dòng tính theo thời gian (tiền phòng, phí cố định hợp đồng): số lượng và thời gian, hệ số sửa được; điện nước (có chỉ số, theo kỳ) thì không. */
@@ -405,7 +405,8 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
       const afterFees = data.map(protectedLine).filter(Boolean).sort()
       if (JSON.stringify(beforeFees) !== JSON.stringify(afterFees)) throw new ValidationError('Không sửa hoặc xoá dòng tiền phòng, phí hợp đồng tại đây; sửa hệ số, chỉ số hoặc số lượng theo kỳ ở từng dòng')
     }
-    const next = data.map(l => {
+    const taxRate = (() => { const t = data.find(l => l.type === 'tax'); const r = (t?.meta as { rate?: unknown } | null | undefined)?.rate; return typeof r === 'number' && Number.isFinite(r) && r > 0 && r <= 100 ? r : 0 })()
+    const next = data.filter(l => l.type !== 'tax').map(l => {
       const meta = l.meta as { feeTypeId?: unknown; leaseFeeId?: unknown; coefficient?: unknown; from?: unknown; to?: unknown; coefficientOverride?: unknown } | null
       const protectedFee = inv.kind === 'monthly' && (typeof meta?.leaseFeeId === 'string' || l.type === 'rent') ? old.find(previous => previous.id === l.id) : undefined
       if (protectedFee) {
@@ -430,6 +431,11 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
       const coefficient = addedFee && typeof meta?.coefficient === 'number' ? meta.coefficient : 1
       return { invoiceId: id, type: l.type, description: saved?.description ?? l.description, quantity: l.quantity, unitPrice: saved?.unitPrice ?? l.unitPrice, amount: Math.round(l.quantity * (saved?.unitPrice ?? l.unitPrice) * coefficient), meta: l.meta ?? null }
     })
+    // Thuế: tính lại ở server theo % trên tổng các dòng còn lại (làm tròn), lưu thành một dòng riêng
+    if (taxRate > 0) {
+      const amount = Math.round(next.reduce((n, l) => n + l.amount, 0) * taxRate / 100)
+      next.push({ invoiceId: id, type: 'tax', description: `Thuế ${taxRate}%`, quantity: 1, unitPrice: amount, amount, meta: { rate: taxRate } })
+    }
     // Phí phát sinh / điều chỉnh bị bỏ khỏi hoá đơn thì trả về trạng thái chưa tính
     const keep = new Set(next.map(l => JSON.stringify(l.meta ?? {})))
     for (const l of old) {

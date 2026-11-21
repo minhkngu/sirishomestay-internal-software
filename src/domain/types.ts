@@ -74,7 +74,7 @@ export type Meter = {
 
 export type MeterReading = { meterId: string; period: string; readOn: ISODate; value: number; kind?: 'monthly' | 'handover' }
 
-export type InvoiceLineType = 'rent' | 'fee' | 'electric' | 'water' | 'one_off' | 'penalty' | 'adjustment' | 'deposit' | 'deposit_offset' | 'refund'
+export type InvoiceLineType = 'rent' | 'fee' | 'electric' | 'water' | 'one_off' | 'penalty' | 'adjustment' | 'deposit' | 'deposit_offset' | 'refund' | 'tax'
 export type InvoiceLineInput = {
   type: InvoiceLineType
   description: string

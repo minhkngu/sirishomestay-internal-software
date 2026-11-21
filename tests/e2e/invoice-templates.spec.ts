@@ -33,9 +33,6 @@ test('soạn mẫu hoá đơn HTML, xem nhanh, chọn cho hợp đồng hoặc k
   await invoice.click()
   // Mẫu hoá đơn chỉ đổi trong sửa hợp đồng, trang hoá đơn không còn ô chọn mẫu
   await expect(page.getByLabel('Mẫu hóa đơn kỳ này')).toHaveCount(0)
-  await page.getByRole('button', { name: 'Xem PDF' }).click()
-  await expect(page.getByTitle('Hóa đơn PDF')).toBeVisible()
-  await page.getByRole('dialog').getByRole('button', { name: 'Đóng' }).click()
   await page.goto('/templates')
   const row = page.getByRole('listitem').filter({ hasText: name })
   // bản xem dựng sẵn hiện ngay trong mục của mẫu (từ 2 mẫu trở lên phải bấm tên mẫu để mở)

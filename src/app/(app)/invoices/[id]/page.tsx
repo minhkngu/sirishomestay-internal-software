@@ -8,7 +8,6 @@ import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { InvoiceFeeQuantities } from '@/features/invoices/components/invoice-fee-quantities'
 import { InvoiceEditorWithFees } from './invoice-editor-with-fees'
-import { InvoiceExport } from '@/features/invoices/components/invoice-export'
 import { InvoiceStatus } from '@/features/invoices/components/invoice-status'
 import { getInvoiceDetail, tenantBalance } from '@/server/invoices/service'
 import { getAccessContext } from '@/server/session'
@@ -135,10 +134,6 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         }))}
       />
 
-      <section className="space-y-3 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
-        <h2 className="text-sm font-semibold tracking-tight text-foreground">Xuất hoá đơn & Phiếu thu</h2>
-        <InvoiceExport invoiceId={id} kind={d.invoice.kind} />
-      </section>
     </div>
   )
 }

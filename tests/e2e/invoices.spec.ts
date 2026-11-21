@@ -108,30 +108,28 @@ test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → 
   await expect(page.getByText('Đã kết thúc')).toBeVisible()
 })
 
-test('tải hoá đơn dưới dạng PDF và ảnh', async ({ page }) => {
+test('bấm mã hoá đơn xem PDF, tải ảnh ngay trong popup; trang chi tiết không còn khối xuất', async ({ page }) => {
   await page.goto('/login')
   await page.getByRole('button', { name: /^Admin/ }).click()
   await expect(page).toHaveURL(/\/$/)
   await page.goto('/invoices')
-  const detail = page.locator('main a[href^="/invoices/"]').filter({ hasNotText: 'Tạo' }).first()
-  await expect(detail).toBeVisible()
-  await detail.click()
-  await page.getByRole('button', { name: 'Xem PDF' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Xem hóa đơn PDF' })
+  const code = page.locator('main button[title="Xem bản PDF"]').first()
+  await expect(code).toBeVisible()
+  await code.click()
+  const dialog = page.getByRole('dialog', { name: /^Hoá đơn / })
   await expect(dialog).toBeVisible()
-  const preview = dialog.getByTitle('Hóa đơn PDF')
-  const previewUrl = await preview.getAttribute('src')
+  const previewUrl = await dialog.locator('iframe').getAttribute('src')
   expect(previewUrl).toMatch(/^\/api\/files\/[^?]+\?inline=1$/)
   const pdf = await page.request.get(previewUrl!)
   expect(pdf.ok()).toBe(true)
   expect(pdf.headers()['content-type']).toContain('application/pdf')
-  expect(pdf.headers()['content-disposition'] ?? '').not.toContain('attachment')
-  await dialog.getByRole('button', { name: 'Đóng' }).click()
-  for (const [label, extension] of [['Tải PDF', '.pdf'], ['Tải ảnh', '.png']] as const) {
-    const download = page.waitForEvent('download')
-    await page.getByRole('button', { name: label }).click()
-    expect((await download).suggestedFilename()).toMatch(new RegExp(`${extension.replace('.', '\\.')}$`, 'i'))
-  }
+  const download = page.waitForEvent('download')
+  await dialog.getByRole('button', { name: 'Tải ảnh' }).click()
+  expect((await download).suggestedFilename()).toMatch(/\.png$/i)
+  await page.keyboard.press('Escape')
+  await page.locator('main a[href^="/invoices/"]').filter({ hasNotText: 'Tạo' }).first().click()
+  await expect(page.getByRole('button', { name: 'Xem PDF' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Chi tiết hoá đơn' })).toBeVisible()
 })
 
 test('tạo hoá đơn lẻ từ popup: toà → phòng → tháng → xem trước → tạo', async ({ page }) => {

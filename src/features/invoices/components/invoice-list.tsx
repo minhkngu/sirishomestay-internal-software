@@ -2,6 +2,8 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { toast } from 'sonner'
+import { FileImage } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { exportDocumentAction } from '@/server/templates/actions'
 import { InvoiceRowActions } from './invoice-row-actions'
@@ -25,12 +27,18 @@ export function InvoiceList({ invoices, facilities }: { invoices: InvoiceRow[]; 
   const period = /^\d{4}-\d{2}$/.test(rawPeriod) ? rawPeriod : ''
   const allowed = useMemo(() => facilities.map((f) => f.id), [facilities])
   const selected = useFacilitySelection(allowed)
-  const [pdf, setPdf] = useState<{ url: string; code: string } | null>(null)
+  const [pdf, setPdf] = useState<{ url: string; code: string; id: string; kind: string } | null>(null)
   const [opening, startOpen] = useTransition()
   const openPdf = (i: InvoiceRow) => startOpen(async () => {
     const r = await exportDocumentAction({ docType: i.kind === 'termination' ? 'invoice_termination' : 'invoice_monthly', entityId: i.id, format: 'pdf' })
     if (!r.ok) toast.error(r.error)
-    else setPdf({ url: `/api/files/${r.data.fileId}?inline=1`, code: i.code })
+    else setPdf({ url: `/api/files/${r.data.fileId}?inline=1`, code: i.code, id: i.id, kind: i.kind })
+  })
+  const downloadImage = () => startOpen(async () => {
+    if (!pdf) return
+    const r = await exportDocumentAction({ docType: pdf.kind === 'termination' ? 'invoice_termination' : 'invoice_monthly', entityId: pdf.id, format: 'png' })
+    if (!r.ok) toast.error(r.error)
+    else window.location.href = `/api/files/${r.data.fileId}`
   })
   // Tổng dư nợ theo hợp đồng: các hoá đơn đã duyệt còn thiếu tiền (hoá đơn hoàn khách không tính)
   const debtByLease = useMemo(() => {
@@ -128,7 +136,10 @@ export function InvoiceList({ invoices, facilities }: { invoices: InvoiceRow[]; 
       <Dialog open={!!pdf} onOpenChange={(open) => { if (!open) setPdf(null) }}>
         <DialogContent className="w-[min(95vw,960px)] max-w-none sm:max-w-none rounded-2xl">
           <DialogTitle>Hoá đơn {pdf?.code}</DialogTitle>
-          {pdf && <iframe title={`Hoá đơn ${pdf.code} PDF`} src={pdf.url} className="h-[75vh] w-full rounded-xl border border-border/80" />}
+          {pdf && <iframe title={`Hoá đơn ${pdf.code} PDF`} src={pdf.url} className="h-[70vh] w-full rounded-xl border border-border/80" />}
+          <div className="flex justify-end">
+            <Button type="button" variant="outline" disabled={opening} onClick={downloadImage}><FileImage className="size-4 text-muted-foreground" aria-hidden="true" />Tải ảnh</Button>
+          </div>
         </DialogContent>
       </Dialog>
     </>
