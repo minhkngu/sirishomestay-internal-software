@@ -25,13 +25,6 @@ test('tạo hoá đơn hàng loạt → sửa kỳ → duyệt → thu một ph�
   await page.locator('a[href^="/invoices/"]').filter({ hasNotText: 'Tạo' }).first().click()
   await page.waitForLoadState('networkidle')
   await expect(page.getByText('Nháp').first()).toBeVisible()
-  // sửa kỳ thành 3 tháng rồi áp dụng
-  const start = await page.getByLabel('Từ').inputValue()
-  const [y, m] = start.split('-').map(Number)
-  const end = new Date(Date.UTC(y, m + 2, 0)).toISOString().slice(0, 10)
-  await page.getByLabel('Đến').fill(end)
-  await page.getByRole('button', { name: 'Áp dụng kỳ' }).click()
-  await expect(page.getByText('Đã tính lại tiền phòng và phí cố định')).toBeVisible()
   await page.getByRole('button', { name: 'Duyệt hoá đơn' }).click()
   await expect(page.getByText('Chưa thu').first()).toBeVisible()
   // Ghi thu theo hợp đồng ở danh sách hoá đơn: icon thu tiền mở popup, mặc định điền tổng dư nợ

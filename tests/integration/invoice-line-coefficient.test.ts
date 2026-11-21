@@ -59,4 +59,12 @@ describe('thời gian và hệ số riêng từng dòng', () => {
   it('thiếu quyền billing thì từ chối', async () => {
     await expect(setLineTime(db, context(['meters'], facilityId), invoiceId, (await rent()).id, { coefficient: 0.5 })).rejects.toThrow(ForbiddenError)
   })
+
+  it('hoá đơn nháp tạo trước đây (dòng chưa có hệ số trong dữ liệu) vẫn sửa được hệ số, lấy kỳ của hoá đơn', async () => {
+    for (const l of await lines()) await db.update(invoiceLines).set({ meta: l.type === 'fee' ? { leaseFeeId: (l.meta as { leaseFeeId: string }).leaseFeeId } : null }).where(eq(invoiceLines.id, l.id))
+    await setLineTime(db, ctx(), invoiceId, (await rent()).id, { coefficient: 0.5 })
+    expect((await rent()).amount).toBe(4500000)
+    await setLineTime(db, ctx(), invoiceId, (await fee()).id, { from: '2026-07-16', to: '2026-07-31' })
+    expect((await fee()).amount).toBe(Math.round(200000 * 16 / 31))
+  })
 })

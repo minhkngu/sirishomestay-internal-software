@@ -316,8 +316,10 @@ export async function setLineTime(db: DB, ctx: AccessContext, invoiceId: string,
     const [line] = await tx.select().from(invoiceLines).where(and(eq(invoiceLines.id, lineId), eq(invoiceLines.invoiceId, invoiceId)))
     if (!line) throw new NotFoundError()
     const meta = (line.meta ?? {}) as Record<string, unknown>
-    if ((line.type !== 'rent' && line.type !== 'fee') || typeof meta.from !== 'string' || typeof meta.to !== 'string' || typeof meta.coefficient !== 'number') throw new ValidationError('Dòng này không tính theo thời gian')
-    const from = data.from ?? meta.from, to = data.to ?? meta.to
+    // Tiền phòng và phí cố định tính theo thời gian; điện nước (có chỉ số) và phí nhập theo kỳ thì không. Hoá đơn cũ chưa lưu từ–đến thì lấy kỳ của hoá đơn.
+    const timeBased = line.type === 'rent' || (line.type === 'fee' && typeof meta.leaseFeeId === 'string' && !Array.isArray(meta.segments) && typeof meta.period !== 'string')
+    if (!timeBased) throw new ValidationError('Dòng này không tính theo thời gian')
+    const from = data.from ?? (typeof meta.from === 'string' ? meta.from : inv.periodStart), to = data.to ?? (typeof meta.to === 'string' ? meta.to : inv.periodEnd)
     if (to < from) throw new ValidationError('Ngày đến phải sau ngày từ')
     let coefficient = data.coefficient
     if (coefficient === undefined) {

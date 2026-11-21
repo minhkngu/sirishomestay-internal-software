@@ -10,7 +10,6 @@ import {
   Clock,
   Layers,
   Plus,
-  RefreshCw,
   Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -19,13 +18,11 @@ import { MoneyInput } from '@/components/ui/money-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { FeePickerDialog, type FeeOption } from '@/components/fee-picker-dialog'
 import { feeLineFromType } from '@/domain/invoice-fee-line'
-import { cn } from '@/lib/utils'
 import {
   approveInvoiceAction,
   deleteInvoiceAction,
   setInvoiceDueDateAction,
   setLineTimeAction,
-  setPeriodAction,
   updateInvoiceMeterReadingAction,
   updateLinesAction,
 } from '@/server/invoices/actions'
@@ -65,27 +62,32 @@ type Props = {
   lines: Line[]
 }
 
-type LineMeta = Record<string, unknown> | null
 /** Thời gian và hệ số riêng của một dòng tiền phòng, phí cố định: gõ hệ số, hoặc đổi từ–đến để hệ số tự tính theo ngày. */
-function LineTimeEdit({ invoiceId, lineId, meta, editable }: { invoiceId: string; lineId?: string; meta: LineMeta; editable: boolean }) {
+function LineTimeEdit({ invoiceId, line, defaultFrom, defaultTo, editable }: { invoiceId: string; line: Line; defaultFrom: string; defaultTo: string; editable: boolean }) {
   const router = useRouter()
   const [pending, start] = useTransition()
-  const coefficient = typeof meta?.coefficient === 'number' ? meta.coefficient : null
-  const [from, setFrom] = useState(String(meta?.from ?? ''))
-  const [to, setTo] = useState(String(meta?.to ?? ''))
-  const [coef, setCoef] = useState(coefficient == null ? '' : String(coefficient))
+  const meta = line.meta
+  // Tiền phòng, phí cố định tính theo thời gian; dòng điện nước (có chỉ số) và phí nhập theo kỳ thì không
+  const timeBased = line.type === 'rent' || (line.type === 'fee' && typeof meta?.leaseFeeId === 'string' && !Array.isArray(meta?.segments) && typeof meta?.period !== 'string')
+  const savedFrom = typeof meta?.from === 'string' ? meta.from : defaultFrom
+  const savedTo = typeof meta?.to === 'string' ? meta.to : defaultTo
+  // Hoá đơn cũ chưa lưu hệ số: suy ra từ số lượng (tiền phòng) hoặc thành tiền
+  const coefficient = typeof meta?.coefficient === 'number' ? meta.coefficient : line.type === 'rent' ? line.quantity : line.amount != null && line.quantity * line.unitPrice !== 0 ? Math.round((line.amount / (line.quantity * line.unitPrice)) * 10000) / 10000 : 1
+  const [from, setFrom] = useState(savedFrom)
+  const [to, setTo] = useState(savedTo)
+  const [coef, setCoef] = useState(String(coefficient))
   const [error, setError] = useState('')
-  if (coefficient == null || typeof meta?.from !== 'string') return null
-  const label = <span className="tabular-nums">Hệ số × {coefficient.toLocaleString('vi-VN', { maximumFractionDigits: 4 })}{meta.coefficientOverride === true ? ' (chỉnh riêng)' : coefficient !== 1 ? ' (tính theo ngày)' : ''}</span>
-  if (!editable || !lineId) return <p className="mt-1 text-[11px] text-muted-foreground">{label}</p>
+  if (!timeBased) return null
+  const label = <span className="tabular-nums">Hệ số × {coefficient.toLocaleString('vi-VN', { maximumFractionDigits: 4 })}{meta?.coefficientOverride === true ? ' (chỉnh riêng)' : coefficient !== 1 ? ' (tính theo ngày)' : ''}</span>
+  if (!editable || !line.id) return <p className="mt-1 text-[11px] text-muted-foreground">{label}</p>
   const apply = () => start(async () => {
     const changedCoef = coef.trim() !== String(coefficient)
     const input = changedCoef ? { coefficient: Number(coef.replace(',', '.')) } : { from, to }
-    const r = await setLineTimeAction(invoiceId, lineId, input)
+    const r = await setLineTimeAction(invoiceId, line.id!, input)
     if (!r.ok) { setError(r.error); return }
     setError(''); toast.success('Đã cập nhật thời gian, hệ số'); router.refresh()
   })
-  const dirty = coef.trim() !== String(coefficient) || from !== meta.from || to !== meta.to
+  const dirty = coef.trim() !== String(coefficient) || from !== savedFrom || to !== savedTo
   return (
     <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
       {label}
@@ -137,12 +139,6 @@ export function InvoiceEditor(p: Props) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [lines, setLines] = useState<EditorLine[]>(p.lines.map((l) => ({ ...l, unitPriceText: String(l.unitPrice) })))
-  const [period, setPeriod] = useState({
-    start: p.start,
-    end: p.end,
-    coefficient: p.coefficient == null ? '' : String(p.coefficient),
-    fullMonth: p.fullMonth,
-  })
   const [due, setDue] = useState(p.dueDateIso ?? '')
   const [pickingFee, setPickingFee] = useState(false)
   const [createdFees, setCreatedFees] = useState<FeeOption[]>([])
@@ -166,103 +162,6 @@ export function InvoiceEditor(p: Props) {
 
   return (
     <div className="space-y-4">
-      {/* 1. Kỳ hoá đơn */}
-      <section className="space-y-4 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Calendar className="size-4 text-primary" />
-            <h2 className="text-sm font-semibold tracking-tight text-foreground">Kỳ hoá đơn</h2>
-          </div>
-          <span className="rounded-full border border-border/70 bg-muted/50 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
-            {period.start} → {period.end}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 items-end">
-          <div className="space-y-1.5">
-            <label htmlFor="period-start" className="block text-xs font-medium text-muted-foreground">
-              Từ
-            </label>
-            <input
-              id="period-start"
-              type="date"
-              value={period.start}
-              onChange={(e) => setPeriod({ ...period, start: e.target.value })}
-              className="h-9 w-full rounded-xl border border-border/80 bg-background px-3 text-xs font-medium text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor="period-end" className="block text-xs font-medium text-muted-foreground">
-              Đến
-            </label>
-            <input
-              id="period-end"
-              type="date"
-              value={period.end}
-              onChange={(e) => setPeriod({ ...period, end: e.target.value })}
-              className="h-9 w-full rounded-xl border border-border/80 bg-background px-3 text-xs font-medium text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor="period-coef" className="block text-xs font-medium text-muted-foreground">
-              Hệ số
-            </label>
-            <input
-              id="period-coef"
-              type="number"
-              step="any"
-              min="0"
-              placeholder="1.0"
-              value={period.coefficient}
-              onChange={(e) => setPeriod({ ...period, coefficient: e.target.value })}
-              className="h-9 w-full rounded-xl border border-border/80 bg-background px-3 text-xs font-medium text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
-            />
-          </div>
-
-          <div className="flex h-9 items-center gap-2 rounded-xl border border-border/70 bg-muted/20 px-3">
-            <input
-              id="period-fullmonth"
-              type="checkbox"
-              checked={period.fullMonth}
-              onChange={(e) => setPeriod({ ...period, fullMonth: e.target.checked })}
-              className="size-4 rounded border-border text-primary focus:ring-primary accent-primary"
-            />
-            <label
-              htmlFor="period-fullmonth"
-              className="text-xs font-medium text-foreground cursor-pointer select-none"
-            >
-              Tính tròn tháng
-            </label>
-          </div>
-
-          <div>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={pending}
-              onClick={() =>
-                run(
-                  () =>
-                    setPeriodAction(p.id, {
-                      start: period.start,
-                      end: period.end,
-                      coefficient: period.coefficient ? Number(period.coefficient) : undefined,
-                      fullMonth: period.fullMonth,
-                    }),
-                  'Đã tính lại tiền phòng và phí cố định'
-                )
-              }
-              className="h-9 w-full rounded-xl border-border/80 gap-1.5 font-medium hover:bg-muted"
-            >
-              <RefreshCw className={cn('size-3.5', pending && 'animate-spin')} />
-              <span>Áp dụng kỳ</span>
-            </Button>
-          </div>
-        </div>
-      </section>
-
       {/* 2. Các dòng */}
       <section className="space-y-4 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -297,7 +196,7 @@ export function InvoiceEditor(p: Props) {
                       onChange={(e) => set(i, { description: e.target.value })}
                       className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 disabled:cursor-not-allowed disabled:border-transparent disabled:bg-transparent disabled:px-0 disabled:text-foreground"
                     />
-                    <LineTimeEdit invoiceId={p.id} lineId={l.id} meta={l.meta} editable={p.status === 'draft'} />
+                    <LineTimeEdit invoiceId={p.id} line={l} defaultFrom={p.start} defaultTo={p.end} editable={p.status === 'draft'} />
                   </td>
                   <td className="p-2.5 align-top">
                     {(() => { const panel = p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId); return panel ? <MeterReadingsPanel invoiceId={p.id} panel={panel} editable={p.status === 'draft'} /> : <span className="text-muted-foreground/60">—</span> })()}
