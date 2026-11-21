@@ -32,7 +32,7 @@ test('Admin thêm quyền cho Vy và khôi phục sau khi kiểm tra', async ({ 
   await login(admin, /^Admin/)
   await admin.goto('/users')
   await admin.getByRole('link', { name: /Vy —/ }).click()
-  const billing = admin.getByRole('checkbox', { name: /Hoá đơn & thu tiền/ })
+  const billing = admin.getByRole('checkbox', { name: /Hoá đơn, thu chi/ })
   const wasChecked = await billing.isChecked()
   try {
     expect(wasChecked, 'Quyền hoá đơn của Vy phải tắt trước khi kiểm thử').toBe(false)
@@ -44,7 +44,7 @@ test('Admin thêm quyền cho Vy và khôi phục sau khi kiểm tra', async ({ 
   } finally {
     await admin.goto('/users')
     await admin.getByRole('link', { name: /Vy —/ }).click()
-    await admin.getByRole('checkbox', { name: /Hoá đơn & thu tiền/ }).setChecked(wasChecked)
+    await admin.getByRole('checkbox', { name: /Hoá đơn, thu chi/ }).setChecked(wasChecked)
     await admin.getByRole('button', { name: 'Lưu', exact: true }).click()
     await expect(admin).toHaveURL(/\/users$/)
     await adminContext.close()

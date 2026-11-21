@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { Check, HandCoins, Pencil, Trash2, Undo2 } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { CollectPaymentDialog } from './collect-payment-dialog'
+import { CollectPaymentDialog } from '@/components/collect-payment-dialog'
 import { approveInvoiceAction, deleteInvoiceAction, unapproveInvoiceAction } from '@/server/invoices/actions'
 
 /** Thao tác nhanh trên dòng hoá đơn. Nháp: Duyệt, Sửa, Xoá. Đã duyệt: chỉ Bỏ duyệt (khi chưa có khoản thu), muốn sửa phải bỏ duyệt trước. */

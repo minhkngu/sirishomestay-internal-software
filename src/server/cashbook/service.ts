@@ -1,14 +1,15 @@
-import { and, asc, eq, inArray, like } from 'drizzle-orm'
-import { depositEntries, expenses, invoices, leases, payments, rooms, tenants } from '@/db'
+import { and, asc, eq, inArray, sql, type SQL } from 'drizzle-orm'
+import { depositEntries, expenses, invoiceLines, invoices, leases, payments, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, can, type AccessContext } from '@/domain/access'
 import { depositHeld, depositMovement, expenseLabel, type LedgerRow } from '@/domain/cashbook'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { displayName } from '@/domain/tenant-name'
 import { recordAudit } from '@/server/audit'
-import { leaseDebt } from '@/server/invoices/service'
 import { expenseInput } from './schemas'
 
+/** Cột ngày thuộc tháng YYYY-MM (cột kiểu date không dùng LIKE được). */
+const inMonth = (column: Parameters<typeof inArray>[0], month?: string): SQL | undefined => month ? sql`to_char(${column}, 'YYYY-MM') = ${month}` : undefined
 const NONE = ['00000000-0000-0000-0000-000000000000']
 
 /** Cơ sở người dùng được xem sổ quỹ (null = mọi cơ sở). */
@@ -26,12 +27,12 @@ export async function listCashbook(db: DB, ctx: AccessContext, input: { month?: 
   const [pay, dep, exp, depAll] = await Promise.all([
     db.select({ p: payments, facilityId: invoices.facilityId, code: invoices.code, roomCode: rooms.code, kind: tenants.kind, fullName: tenants.fullName, companyName: tenants.companyName })
       .from(payments).innerJoin(invoices, eq(invoices.id, payments.invoiceId)).innerJoin(leases, eq(leases.id, invoices.leaseId)).innerJoin(rooms, eq(rooms.id, leases.roomId)).innerJoin(tenants, eq(tenants.id, leases.tenantId))
-      .where(and(inScope(invoices.facilityId, scope), month ? like(payments.paidOn, `${month}%`) : undefined)),
+      .where(and(inScope(invoices.facilityId, scope), inMonth(payments.paidOn, month))),
     db.select({ e: depositEntries, facilityId: rooms.facilityId, roomCode: rooms.code, kind: tenants.kind, fullName: tenants.fullName, companyName: tenants.companyName })
       .from(depositEntries).innerJoin(leases, eq(leases.id, depositEntries.leaseId)).innerJoin(rooms, eq(rooms.id, leases.roomId)).innerJoin(tenants, eq(tenants.id, leases.tenantId))
-      .where(and(inScope(rooms.facilityId, scope), month ? like(depositEntries.date, `${month}%`) : undefined)),
+      .where(and(inScope(rooms.facilityId, scope), inMonth(depositEntries.date, month))),
     db.select({ x: expenses, roomCode: rooms.code }).from(expenses).leftJoin(rooms, eq(rooms.id, expenses.roomId))
-      .where(and(inScope(expenses.facilityId, scope), month ? like(expenses.date, `${month}%`) : undefined)),
+      .where(and(inScope(expenses.facilityId, scope), inMonth(expenses.date, month))),
     db.select({ type: depositEntries.type, status: depositEntries.status, amount: depositEntries.amount }).from(depositEntries).innerJoin(leases, eq(leases.id, depositEntries.leaseId)).innerJoin(rooms, eq(rooms.id, leases.roomId)).where(inScope(rooms.facilityId, scope)),
   ])
   const rows: LedgerRow[] = [
@@ -91,10 +92,31 @@ export async function listLeaseTargets(db: DB, ctx: AccessContext): Promise<Arra
   const rows = await db.select({ leaseId: leases.id, facilityId: rooms.facilityId, roomCode: rooms.code, kind: tenants.kind, fullName: tenants.fullName, companyName: tenants.companyName }).from(leases)
     .innerJoin(rooms, eq(rooms.id, leases.roomId)).innerJoin(tenants, eq(tenants.id, leases.tenantId))
     .where(and(eq(leases.status, 'active'), inScope(rooms.facilityId, scope))).orderBy(asc(rooms.code))
-  const out = []
-  for (const r of rows) {
-    if (!can(ctx, 'billing', r.facilityId)) continue
-    out.push({ leaseId: r.leaseId, facilityId: r.facilityId, roomCode: r.roomCode, tenantName: displayName(r), debt: await leaseDebt(db, ctx, r.leaseId) })
+  const allowed = rows.filter(r => can(ctx, 'billing', r.facilityId))
+  const leaseIds = allowed.map(r => r.leaseId)
+  const debt = new Map<string, number>()
+  if (leaseIds.length) {
+    // Dư nợ = tổng còn thiếu của hoá đơn đã duyệt (cùng cách tính với leaseDebt), gom theo nhóm để chỉ tốn vài truy vấn
+    const inv = await db.select({ id: invoices.id, leaseId: invoices.leaseId }).from(invoices).where(and(inArray(invoices.leaseId, leaseIds), eq(invoices.status, 'approved')))
+    const ids = inv.map(i => i.id)
+    if (ids.length) {
+      const [totals, paids] = await Promise.all([
+        db.select({ id: invoiceLines.invoiceId, n: sql<number>`sum(${invoiceLines.amount})::float8` }).from(invoiceLines).where(inArray(invoiceLines.invoiceId, ids)).groupBy(invoiceLines.invoiceId),
+        db.select({ id: payments.invoiceId, n: sql<number>`sum(${payments.amount})::float8` }).from(payments).where(inArray(payments.invoiceId, ids)).groupBy(payments.invoiceId),
+      ])
+      const total = new Map(totals.map(t => [t.id, t.n])); const paid = new Map(paids.map(t => [t.id, t.n]))
+      for (const i of inv) {
+        const t = total.get(i.id) ?? 0; const owed = t - (paid.get(i.id) ?? 0)
+        if (t > 0 && owed > 0) debt.set(i.leaseId, (debt.get(i.leaseId) ?? 0) + owed)
+      }
+    }
   }
-  return out
+  return allowed.map(r => ({ leaseId: r.leaseId, facilityId: r.facilityId, roomCode: r.roomCode, tenantName: displayName(r), debt: debt.get(r.leaseId) ?? 0 }))
+}
+
+/** Chi tiết các khoản chi trong phạm vi quyền, để mở popup sửa. */
+export async function listExpenseDetails(db: DB, ctx: AccessContext, month?: string) {
+  const scope = scopeOf(ctx)
+  const rows = await db.select().from(expenses).where(and(inScope(expenses.facilityId, scope), month && /^\d{4}-\d{2}$/.test(month) ? inMonth(expenses.date, month) : undefined))
+  return rows.map(r => ({ id: r.id, facilityId: r.facilityId, roomId: r.roomId, category: r.category, date: r.date, amount: r.amount, method: r.method, payee: r.payee, note: r.note }))
 }

@@ -10,7 +10,6 @@ import { InvoiceFeeQuantities } from '@/features/invoices/components/invoice-fee
 import { InvoiceEditorWithFees } from './invoice-editor-with-fees'
 import { InvoiceExport } from '@/features/invoices/components/invoice-export'
 import { InvoiceStatus } from '@/features/invoices/components/invoice-status'
-import { PaymentDialog } from '@/features/invoices/components/payment-dialog'
 import { getInvoiceDetail, tenantBalance } from '@/server/invoices/service'
 import { getAccessContext } from '@/server/session'
 import { getSettings } from '@/server/settings/service'
@@ -131,16 +130,6 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           quantity: l.quantity,
           unitPrice: l.unitPrice,
           meta: (l.meta as Record<string, unknown> | null) ?? null,
-        }))}
-      />
-
-      <PaymentDialog
-        payments={d.payments.map((p) => ({
-          id: p.id,
-          paidOn: p.paidOn,
-          amount: p.amount,
-          method: p.method,
-          note: p.note,
         }))}
       />
 

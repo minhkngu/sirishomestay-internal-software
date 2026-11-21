@@ -56,4 +56,4 @@ export function summarize(rows: Pick<LedgerRow, 'direction' | 'amount' | 'counte
 }
 
 /** Cọc đang giữ: cùng cách tính với sổ cọc hợp đồng (chỉ dòng đã hoàn tất). */
-export const depositHeld = (entries: Pick<DepositEntry, 'type' | 'status' | 'amount'>[]): number => depositBalance(entries as DepositEntry[])
+export const depositHeld = (entries: { type: string; status: string; amount: number }[]): number => depositBalance(entries as DepositEntry[])

@@ -88,7 +88,7 @@ export function InvoiceList({ invoices, facilities }: { invoices: InvoiceRow[]; 
           <tbody className="divide-y divide-border/50">
             {pageRows.map((i) => (
               <tr key={i.id} className="transition-colors hover:bg-muted/30">
-                <td className="p-3 whitespace-nowrap"><InvoiceRowActions id={i.id} code={i.code} draft={i.state === 'draft'} unapproveBlock={i.kind === 'termination' ? 'Hoá đơn thanh lý không bỏ duyệt được' : i.paid > 0 ? 'Đã có khoản thu, gỡ khoản thu trước khi bỏ duyệt' : null} collect={i.status === 'approved' && i.total > i.paid && debtByLease[i.leaseId] > 0 ? { leaseId: i.leaseId, roomCode: i.roomCode, tenantName: i.tenantName, debt: debtByLease[i.leaseId] } : null} /></td>
+                <td className="p-3 whitespace-nowrap"><InvoiceRowActions id={i.id} code={i.code} draft={i.state === 'draft'} unapproveBlock={i.kind === 'termination' ? 'Hoá đơn thanh lý không bỏ duyệt được' : i.paid > 0 ? 'Đã có khoản thu nên không bỏ duyệt được' : null} collect={i.status === 'approved' && i.total > i.paid && debtByLease[i.leaseId] > 0 ? { leaseId: i.leaseId, roomCode: i.roomCode, tenantName: i.tenantName, debt: debtByLease[i.leaseId] } : null} /></td>
                 <td className="p-3 whitespace-nowrap">
                   <button
                     type="button"
