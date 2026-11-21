@@ -8,12 +8,10 @@ import { InvoiceRowActions } from './invoice-row-actions'
 import { FacilityFilter } from '@/components/list/facility-filter'
 import { Pager } from '@/components/list/pager'
 import { ParamChips } from '@/components/list/param-chips'
-import { StatusDot } from '@/components/list/status-dot'
 import { setListParams, useFacilitySelection, useListParam, usePager } from '@/components/list/use-list-params'
 import { formatDateVN } from '@/domain/dates'
 import { matchesInvoiceView, matchesPeriod, type InvoiceView } from '@/domain/list-filters'
 import { formatVND } from '@/domain/money'
-import { invoiceStatusLabel } from './invoice-status'
 import type { listInvoices } from '@/server/invoices/service'
 
 type InvoiceRow = Awaited<ReturnType<typeof listInvoices>>[number]
@@ -79,13 +77,12 @@ export function InvoiceList({ invoices, facilities }: { invoices: InvoiceRow[]; 
               <th className="p-3 text-right font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Tổng</th>
               <th className="p-3 text-right font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Đã thu</th>
               <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Hạn</th>
-              <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Trạng thái</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50">
             {pageRows.map((i) => (
               <tr key={i.id} className="transition-colors hover:bg-muted/30">
-                <td className="p-3 whitespace-nowrap"><InvoiceRowActions id={i.id} code={i.code} draft={i.state === 'draft'} /></td>
+                <td className="p-3 whitespace-nowrap"><InvoiceRowActions id={i.id} code={i.code} draft={i.state === 'draft'} canUnapprove={i.status === 'approved' && i.kind !== 'termination' && i.paid === 0} /></td>
                 <td className="p-3 whitespace-nowrap">
                   <button
                     type="button"
@@ -106,27 +103,12 @@ export function InvoiceList({ invoices, facilities }: { invoices: InvoiceRow[]; 
                 <td className="p-3 text-right font-semibold text-foreground tabular-nums whitespace-nowrap">{formatVND(i.total)}</td>
                 <td className="p-3 text-right text-muted-foreground tabular-nums whitespace-nowrap">{formatVND(i.paid)}</td>
                 <td className="p-3 text-muted-foreground whitespace-nowrap">{i.dueDate ? formatDateVN(i.dueDate) : '—'}</td>
-                <td className="p-3 whitespace-nowrap">
-                  <StatusDot
-                    tone={
-                      i.state === 'overdue'
-                        ? 'danger'
-                        : i.state === 'paid' || i.state === 'refunded'
-                        ? 'ok'
-                        : i.state === 'partial' || i.state === 'refund_pending'
-                        ? 'warn'
-                        : 'muted'
-                    }
-                  >
-                    {invoiceStatusLabel(i.state)}
-                  </StatusDot>
-                </td>
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
                 <td
-                  colSpan={facilities.length > 1 ? 10 : 9}
+                  colSpan={facilities.length > 1 ? 9 : 8}
                   className="p-8 text-center text-xs text-muted-foreground"
                 >
                   Không có hoá đơn nào

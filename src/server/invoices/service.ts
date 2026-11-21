@@ -289,6 +289,21 @@ export async function approveInvoice(db: DB, ctx: AccessContext, id: string, inp
     await recordAudit(tx, ctx, { action: 'update', entity: 'invoice', entityId: id, facilityId: before.facilityId, summary: 'Duyệt hoá đơn', before, after }); return after
   })
 }
+/** Đưa hoá đơn đã duyệt về nháp để sửa; chỉ khi chưa có khoản thu và không phải hoá đơn thanh lý. */
+export async function unapproveInvoice(db: DB, ctx: AccessContext, id: string): Promise<void> {
+  await db.transaction(async tx0 => {
+    const tx = tx0 as unknown as DB
+    await tx.select({ id: invoices.id }).from(invoices).where(eq(invoices.id, id)).for('update')
+    const before = await getInvoice(tx, ctx, id)
+    if (before.status !== 'approved') throw new ValidationError('Chỉ bỏ duyệt hoá đơn đã duyệt')
+    if (before.kind === 'termination') throw new ValidationError('Không bỏ duyệt hoá đơn thanh lý')
+    if ((await tx.select({ id: payments.id }).from(payments).where(eq(payments.invoiceId, id)).limit(1)).length) throw new ValidationError('Gỡ các khoản đã thu trước khi bỏ duyệt')
+    const [after] = await tx.update(invoices).set({ status: 'draft', updatedAt: new Date() }).where(eq(invoices.id, id)).returning()
+    const [lease, settings] = await Promise.all([leaseData(tx, before.leaseId), getSettings(tx)])
+    await syncPendingAdjustments(tx, lease, await loadAddenda(tx, lease.id), settings.proration)
+    await recordAudit(tx, ctx, { action: 'update', entity: 'invoice', entityId: id, facilityId: before.facilityId, summary: 'Bỏ duyệt hoá đơn', before, after })
+  })
+}
 export async function addPayment(db: DB, ctx: AccessContext, id: string, input: { paidOn: string; amount: number; method: 'cash' | 'transfer' | 'other'; note?: string }) {
   const data = parse(paymentSchema, input)
   return db.transaction(async tx0 => {
