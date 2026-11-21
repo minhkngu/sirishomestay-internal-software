@@ -8,6 +8,7 @@ import { todayVN } from '@/domain/dates'
 import { displayName } from '@/domain/tenant-name'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { midPeriodAdjustments } from '@/domain/adjustments'
+import { fullMonthCoefficient, prorateFraction } from '@/domain/proration'
 import { buildMonthlyInvoice, nextBillingPeriod, settlementState } from '@/domain/invoice-builder'
 import type { Addendum, ContractFee, Invoice, MeterReading, DueRule, InvoiceLineInput, Lease, Meter, OneOffCharge, PendingAdjustment, Proration } from '@/domain/types'
 import { finalizeTermination } from '@/server/addenda/finalize'
@@ -296,6 +297,39 @@ export async function approveInvoice(db: DB, ctx: AccessContext, id: string, inp
     if (before.kind === 'termination') await finalizeTermination(tx, ctx, before)
     await syncPendingAdjustments(tx, lease, await loadAddenda(tx, lease.id), settings.proration)
     await recordAudit(tx, ctx, { action: 'update', entity: 'invoice', entityId: id, facilityId: before.facilityId, summary: 'Duyệt hoá đơn', before, after }); return after
+  })
+}
+const lineTimeSchema = z.object({ from: z.iso.date().optional(), to: z.iso.date().optional(), coefficient: z.number().finite().min(0, 'Hệ số không được âm').max(120, 'Hệ số quá lớn').optional() })
+  .refine(v => v.coefficient !== undefined || (v.from && v.to), 'Nhập hệ số hoặc khoảng ngày')
+  .refine(v => !v.from || !v.to || v.to >= v.from, 'Ngày đến phải sau ngày từ')
+/**
+ * Sửa riêng thời gian và hệ số của một dòng tiền phòng hoặc phí cố định trong hoá đơn nháp.
+ * Gõ hệ số thì dùng đúng số đó; đổi từ–đến thì hệ số tự tính theo ngày (cách tính lẻ ngày của hoá đơn). Đổi kỳ chung của hoá đơn sẽ tính lại mọi dòng.
+ */
+export async function setLineTime(db: DB, ctx: AccessContext, invoiceId: string, lineId: string, input: { from?: string; to?: string; coefficient?: number }): Promise<void> {
+  const data = parse(lineTimeSchema, input)
+  await db.transaction(async tx0 => {
+    const tx = tx0 as unknown as DB
+    await tx.select({ id: invoices.id }).from(invoices).where(eq(invoices.id, invoiceId)).for('update')
+    const inv = await getInvoice(tx, ctx, invoiceId)
+    if (inv.status !== 'draft') throw new ValidationError('Chỉ sửa hệ số trong hoá đơn còn nháp')
+    const [line] = await tx.select().from(invoiceLines).where(and(eq(invoiceLines.id, lineId), eq(invoiceLines.invoiceId, invoiceId)))
+    if (!line) throw new NotFoundError()
+    const meta = (line.meta ?? {}) as Record<string, unknown>
+    if ((line.type !== 'rent' && line.type !== 'fee') || typeof meta.from !== 'string' || typeof meta.to !== 'string' || typeof meta.coefficient !== 'number') throw new ValidationError('Dòng này không tính theo thời gian')
+    const from = data.from ?? meta.from, to = data.to ?? meta.to
+    if (to < from) throw new ValidationError('Ngày đến phải sau ngày từ')
+    let coefficient = data.coefficient
+    if (coefficient === undefined) {
+      const [lease, settings] = await Promise.all([leaseData(tx, inv.leaseId), getSettings(tx)])
+      coefficient = inv.fullMonth ? fullMonthCoefficient(from, to) : prorateFraction(from, to, (inv.proration as Proration | null) ?? lease.proration ?? settings.proration)
+    }
+    const base = line.type === 'rent' ? 1 : line.quantity
+    const amount = Math.round(base * line.unitPrice * coefficient)
+    const rounded = Math.round(coefficient * 10000) / 10000
+    const [after] = await tx.update(invoiceLines).set({ quantity: line.type === 'rent' ? rounded : line.quantity, amount, meta: { ...meta, from, to, coefficient: rounded, coefficientOverride: true }, updatedAt: new Date() }).where(eq(invoiceLines.id, lineId)).returning()
+    await tx.update(invoices).set({ updatedAt: new Date() }).where(eq(invoices.id, invoiceId))
+    await recordAudit(tx, ctx, { action: 'update', entity: 'invoice', entityId: invoiceId, facilityId: inv.facilityId, summary: `Sửa thời gian, hệ số dòng ${line.description}`, before: line, after })
   })
 }
 /** Sửa hạn thanh toán trực tiếp trên hoá đơn (nháp hoặc đã duyệt). */

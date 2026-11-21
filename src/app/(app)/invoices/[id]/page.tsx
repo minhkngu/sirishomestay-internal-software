@@ -124,6 +124,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         dueDateIso={inv.dueDate}
         dueDefaultLabel={dueDefaultLabel}
         lines={d.lines.map((l) => ({
+          id: l.id,
           type: l.type,
           description: l.description,
           quantity: l.quantity,

@@ -23,12 +23,14 @@ import {
   approveInvoiceAction,
   deleteInvoiceAction,
   setInvoiceDueDateAction,
+  setLineTimeAction,
   setPeriodAction,
   updateInvoiceMeterReadingAction,
   updateLinesAction,
 } from '@/server/invoices/actions'
 
 type Line = {
+  id?: string
   type: string
   description: string
   quantity: number
@@ -57,6 +59,39 @@ type Props = {
   lines: Line[]
 }
 
+type LineMeta = Record<string, unknown> | null
+/** Thời gian và hệ số riêng của một dòng tiền phòng, phí cố định: gõ hệ số, hoặc đổi từ–đến để hệ số tự tính theo ngày. */
+function LineTimeEdit({ invoiceId, lineId, meta, editable }: { invoiceId: string; lineId?: string; meta: LineMeta; editable: boolean }) {
+  const router = useRouter()
+  const [pending, start] = useTransition()
+  const coefficient = typeof meta?.coefficient === 'number' ? meta.coefficient : null
+  const [from, setFrom] = useState(String(meta?.from ?? ''))
+  const [to, setTo] = useState(String(meta?.to ?? ''))
+  const [coef, setCoef] = useState(coefficient == null ? '' : String(coefficient))
+  const [error, setError] = useState('')
+  if (coefficient == null || typeof meta?.from !== 'string') return null
+  const label = <span className="tabular-nums">Hệ số × {coefficient.toLocaleString('vi-VN', { maximumFractionDigits: 4 })}{meta.coefficientOverride === true ? ' (chỉnh riêng)' : coefficient !== 1 ? ' (tính theo ngày)' : ''}</span>
+  if (!editable || !lineId) return <p className="mt-1 text-[11px] text-muted-foreground">{label}</p>
+  const apply = () => start(async () => {
+    const changedCoef = coef.trim() !== String(coefficient)
+    const input = changedCoef ? { coefficient: Number(coef.replace(',', '.')) } : { from, to }
+    const r = await setLineTimeAction(invoiceId, lineId, input)
+    if (!r.ok) { setError(r.error); return }
+    setError(''); toast.success('Đã cập nhật thời gian, hệ số'); router.refresh()
+  })
+  const dirty = coef.trim() !== String(coefficient) || from !== meta.from || to !== meta.to
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+      {label}
+      <input aria-label="Từ ngày" type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-7 rounded-lg border border-border/80 bg-background px-1.5 text-foreground" />
+      <span>–</span>
+      <input aria-label="Đến ngày" type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-7 rounded-lg border border-border/80 bg-background px-1.5 text-foreground" />
+      <input aria-label="Hệ số" inputMode="decimal" value={coef} onChange={(e) => setCoef(e.target.value)} className="h-7 w-20 rounded-lg border border-border/80 bg-background px-2 text-right tabular-nums text-foreground" />
+      <Button type="button" size="sm" variant="outline" disabled={pending || !dirty} onClick={apply} className="h-7 rounded-lg text-[11px]">Áp dụng</Button>
+      {error && <span role="alert" className="w-full text-destructive">{error}</span>}
+    </div>
+  )
+}
 type MeterPanel = { leaseFeeId: string; name: string; unit: string; rows: Array<{ period: string; readOn: string | null; value: number | null }> }
 const periodLabel = (period: string) => `${period.slice(5)}/${period.slice(0, 4)}`
 /** Chỉ số đã chốt của đồng hồ (3 tháng liền trước): sửa số sai hoặc thêm số còn thiếu ngay tại hoá đơn, ghi ngược về tab Chỉ số. */
@@ -255,7 +290,7 @@ export function InvoiceEditor(p: Props) {
                       onChange={(e) => set(i, { description: e.target.value })}
                       className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
                     />
-                    {typeof l.meta?.coefficient === 'number' && <p className="mt-1 text-[11px] tabular-nums text-muted-foreground">Hệ số kỳ × {l.meta.coefficient.toLocaleString('vi-VN', { maximumFractionDigits: 4 })}{l.meta.coefficient !== 1 ? ' (tính theo ngày)' : ''}</p>}
+                    <LineTimeEdit invoiceId={p.id} lineId={l.id} meta={l.meta} editable={p.status === 'draft'} />
                     {(() => { const panel = p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId); return panel ? <MeterReadingsPanel invoiceId={p.id} panel={panel} editable={p.status === 'draft'} /> : null })()}
                   </td>
                   <td className="p-2.5">

@@ -11,7 +11,7 @@ import { CollectPaymentDialog } from './collect-payment-dialog'
 import { approveInvoiceAction, deleteInvoiceAction, unapproveInvoiceAction } from '@/server/invoices/actions'
 
 /** Thao tác nhanh trên dòng hoá đơn. Nháp: Duyệt, Sửa, Xoá. Đã duyệt: chỉ Bỏ duyệt (khi chưa có khoản thu), muốn sửa phải bỏ duyệt trước. */
-export function InvoiceRowActions({ id, code, draft, canUnapprove, collect }: { id: string; code: string; draft: boolean; canUnapprove: boolean; collect: { leaseId: string; roomCode: string; tenantName: string; debt: number } | null }) {
+export function InvoiceRowActions({ id, code, draft, unapproveBlock, collect }: { id: string; code: string; draft: boolean; /** Lý do không bỏ duyệt được (null = bỏ duyệt được). */ unapproveBlock: string | null; collect: { leaseId: string; roomCode: string; tenantName: string; debt: number } | null }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [collecting, setCollecting] = useState(false)
@@ -34,14 +34,10 @@ export function InvoiceRowActions({ id, code, draft, canUnapprove, collect }: { 
             </>
           )
           : <span className="size-8" aria-hidden="true" />}
-        {canUnapprove
-          ? (
-            <Button size="icon-sm" variant="ghost" disabled={pending} aria-label={`Bỏ duyệt ${code}`} title="Bỏ duyệt"
-              onClick={() => { if (window.confirm(`Bỏ duyệt hoá đơn ${code} để sửa?`)) run(() => unapproveInvoiceAction(id), 'Đã bỏ duyệt, hoá đơn về nháp') }}>
-              <Undo2 className="size-4" aria-hidden="true" />
-            </Button>
-          )
-          : <span className="size-8" aria-hidden="true" />}
+        <Button size="icon-sm" variant="ghost" disabled={pending || unapproveBlock !== null} aria-label={`Bỏ duyệt ${code}`} title={unapproveBlock ?? 'Bỏ duyệt'}
+          onClick={() => { if (window.confirm(`Bỏ duyệt hoá đơn ${code} để sửa?`)) run(() => unapproveInvoiceAction(id), 'Đã bỏ duyệt, hoá đơn về nháp') }}>
+          <Undo2 className="size-4" aria-hidden="true" />
+        </Button>
       </div>
     )
   }
