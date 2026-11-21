@@ -54,7 +54,7 @@ export async function NewInvoice({ sp }: { sp: NewInvoiceParams }) {
               {preview.warnings.length > 0 && <p className="mt-2 text-xs text-amber-700">⚠ {preview.warnings.join('; ')} — bổ sung sau khi lưu.</p>}
             </div>
           }
-          newInvoice={{ leaseId, period }}
+          newInvoice={{ leaseId, period, fixedQtyFeeIds: preview.fixedQtyFeeIds }}
           addFee={{
             feeTypes: feeTypes.filter((f) => f.quantityFrom !== 'meter').map((f) => ({ id: f.id, name: f.name, unit: unitName.get(f.unitId) ?? '', defaultPrice: f.defaultPrice, prices: feePrices[f.id] ?? {}, billing: f.billing, quantityFrom: f.quantityFrom })),
             usedTypeIds: [],

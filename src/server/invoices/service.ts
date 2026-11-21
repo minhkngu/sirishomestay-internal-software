@@ -228,7 +228,9 @@ export async function createDraftForLease(db: DB, ctx: AccessContext, input: { l
 export async function previewNewInvoice(db: DB, ctx: AccessContext, input: { leaseId: string; period: string }) {
   const item = await previewLease(db, ctx, input)
   const [info] = await db.select({ code: leases.code, roomCode: rooms.code, facilityId: rooms.facilityId, kind: tenants.kind, fullName: tenants.fullName, companyName: tenants.companyName }).from(leases).innerJoin(rooms, eq(rooms.id, leases.roomId)).innerJoin(tenants, eq(tenants.id, leases.tenantId)).where(eq(leases.id, input.leaseId))
-  return { ...item, leaseCode: info.code, roomCode: info.roomCode, facilityId: info.facilityId, tenantName: displayName(info) }
+  // Phí hợp đồng tính theo đồng hồ hoặc nhập theo kỳ: số lượng không sửa ở dòng (chốt chỉ số, nhập số lượng sau khi lưu)
+  const fixedQty = await db.select({ id: leaseFeeSnapshots.id }).from(leaseFeeSnapshots).where(and(eq(leaseFeeSnapshots.leaseId, input.leaseId), inArray(leaseFeeSnapshots.quantitySource, ['meter', 'period_input'])))
+  return { ...item, leaseCode: info.code, roomCode: info.roomCode, facilityId: info.facilityId, tenantName: displayName(info), fixedQtyFeeIds: fixedQty.map(f => f.id) }
 }
 
 /**
@@ -242,12 +244,21 @@ export async function createInvoiceFromEditor(db: DB, ctx: AccessContext, input:
     const made = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, inv.id))
     const used = new Set<string>()
     const keyOf = (type: string, meta: Record<string, unknown> | null | undefined) => `${type}|${typeof meta?.leaseFeeId === 'string' ? meta.leaseFeeId : ''}|${typeof meta?.oneOffId === 'string' ? meta.oneOffId : ''}|${typeof meta?.pendingId === 'string' ? meta.pendingId : ''}`
-    const mapped = input.lines.filter(l => l.type !== 'tax').map(l => {
+    // Dòng hợp đồng (tiền phòng, phí) giữ mô tả, đơn giá, số lượng đã lưu; chỉ thời gian và hệ số của người dùng được áp
+    const isContract = (l: { type: string; meta?: Record<string, unknown> | null }) => l.type === 'rent' || typeof l.meta?.leaseFeeId === 'string'
+    const mapped = input.lines.filter(l => l.type !== 'tax').flatMap(l => {
       const key = keyOf(l.type, l.meta)
       const match = key !== `${l.type}|||` ? made.find(m => !used.has(m.id) && keyOf(m.type, m.meta as Record<string, unknown> | null) === key) : undefined
       if (match) used.add(match.id)
-      return { ...l, id: match?.id }
+      if (isContract(l)) {
+        if (!match) return []
+        const timeBased = isTimeBasedLine(match.type, match.meta)
+        return [{ id: match.id, type: match.type, description: match.description, unitPrice: match.unitPrice, quantity: timeBased ? l.quantity : match.quantity, meta: l.meta ?? (match.meta as Record<string, unknown> | null) }]
+      }
+      return [{ ...l, id: match?.id }]
     })
+    // Dòng hợp đồng mà giao diện không gửi lên thì giữ nguyên như vừa sinh
+    for (const m of made) if (!used.has(m.id) && isContract({ type: m.type, meta: m.meta as Record<string, unknown> | null })) mapped.push({ id: m.id, type: m.type, description: m.description, unitPrice: m.unitPrice, quantity: m.quantity, meta: m.meta as Record<string, unknown> | null })
     const tax = input.lines.filter(l => l.type === 'tax')
     await updateLines(db, ctx, inv.id, [...mapped, ...tax])
     if (input.dueDate) await setInvoiceDueDate(db, ctx, inv.id, input.dueDate)

@@ -63,7 +63,7 @@ type Props = {
   addFee?: AddFee
   /** Có id: hoá đơn đã lưu. Không có id (newInvoice): bản xem trước, bấm Lưu thay đổi mới tạo hoá đơn. */
   id?: string
-  newInvoice?: { leaseId: string; period: string }
+  newInvoice?: { leaseId: string; period: string; /** Phí hợp đồng tính theo đồng hồ hoặc nhập theo kỳ: chưa sửa số lượng ở bản xem trước. */ fixedQtyFeeIds?: string[] }
   status: string
   start: string
   end: string
@@ -292,7 +292,7 @@ export function InvoiceEditor(p: Props) {
     router.refresh()
   })
 
-  const isMeterLine = (l: Line) => !!p.meterPanels?.some((x) => x.leaseFeeId === l.meta?.leaseFeeId)
+  const isMeterLine = (l: Line) => !!p.meterPanels?.some((x) => x.leaseFeeId === l.meta?.leaseFeeId) || !!p.newInvoice?.fixedQtyFeeIds?.includes(String(l.meta?.leaseFeeId))
   const approved = p.status === 'approved'
 
   return (
