@@ -5,6 +5,7 @@ import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { computeDueDate } from '@/domain/due-date'
 import { todayVN } from '@/domain/dates'
+import { displayName } from '@/domain/tenant-name'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { midPeriodAdjustments } from '@/domain/adjustments'
 import { buildMonthlyInvoice, nextBillingPeriod, settlementState } from '@/domain/invoice-builder'
@@ -90,7 +91,11 @@ async function calculate(db: DB, lease: Lease, facilityId: string, period: strin
 }
 export async function previewBatch(db: DB, ctx: AccessContext, input: { facilityId: string; period: string }) {
   const { facilityId, period } = parse(batchSchema, input); assertCan(ctx, 'billing', facilityId)
-  const rows = await db.select({ id: leases.id }).from(leases).innerJoin(rooms, eq(rooms.id, leases.roomId)).where(and(eq(rooms.facilityId, facilityId), eq(leases.status, 'active')))
+  return previewCore(db, facilityId, period)
+}
+/** Tính hoá đơn cho các hợp đồng đang hiệu lực của cơ sở, hoặc chỉ một hợp đồng khi có `onlyLeaseId`; dùng chung cho sinh hàng loạt và hoá đơn lẻ. */
+async function previewCore(db: DB, facilityId: string, period: string, onlyLeaseId?: string) {
+  const rows = await db.select({ id: leases.id }).from(leases).innerJoin(rooms, eq(rooms.id, leases.roomId)).where(and(eq(rooms.facilityId, facilityId), eq(leases.status, 'active'), ...(onlyLeaseId ? [eq(leases.id, onlyLeaseId)] : [])))
   const data = await leasesData(db, rows.map(r => r.id))
   const [inputs, ends] = await Promise.all([
     loadCalcInputs(db, facilityId, data),
@@ -101,8 +106,8 @@ export async function previewBatch(db: DB, ctx: AccessContext, input: { facility
     // Chưa có hoá đơn nào: người dùng chọn kỳ đầu tiên, không dồn các tháng trước kỳ được chọn
     const first = `${period}-01`
     const next = nextBillingPeriod(last || lease.startDate >= first ? lease : { ...lease, startDate: first }, last, period)
-    if (!next) return { leaseId: lease.id, lines: [] as InvoiceLineInput[], warnings: [] as string[], prepaidUntil: last, period: null }
-    return { leaseId: lease.id, ...calculateWith(inputs, lease, addendaRows, facilityId, period, next), prepaidUntil: null, period: next }
+    if (!next) return { leaseId: lease.id, dueRule: lease.dueRule ?? null, lines: [] as InvoiceLineInput[], warnings: [] as string[], prepaidUntil: last, period: null }
+    return { leaseId: lease.id, dueRule: lease.dueRule ?? null, ...calculateWith(inputs, lease, addendaRows, facilityId, period, next), prepaidUntil: null, period: next }
   })
 }
 /** Mã tiếp theo `<mã cơ sở>-HD-<YYYYMM>-<số thứ tự>`. Gọi trong transaction đã khoá cơ sở, hoặc chấp nhận retry khi trùng. */
@@ -113,16 +118,22 @@ export async function nextInvoiceCode(tx: Pick<DB, 'select'>, facilityCode: stri
 }
 export async function createDrafts(db: DB, ctx: AccessContext, input: { facilityId: string; period: string }) {
   const data = parse(batchSchema, input); assertCan(ctx, 'billing', data.facilityId)
+  return createDraftsCore(db, ctx, data)
+}
+async function createDraftsCore(db: DB, ctx: AccessContext, data: { facilityId: string; period: string }, onlyLeaseId?: string) {
   return db.transaction(async tx0 => {
     const tx = tx0 as unknown as DB
     await tx.execute(sql`select id from facilities where id = ${data.facilityId} for update`)
     const [facility] = await tx.select().from(facilities).where(eq(facilities.id, data.facilityId)); if (!facility) throw new NotFoundError()
-    const preview = await previewBatch(tx, ctx, data)
+    const settings = await getSettings(tx)
+    const preview = await previewCore(tx, data.facilityId, data.period, onlyLeaseId)
+    // Hạn tính ngay khi tạo nếu quy tắc là "ngày X của tháng hoá đơn"; hai quy tắc cũ tính lúc duyệt
+    const dueAtCreate = (rule: DueRule | null): string | null => { const r = rule ?? settings.dueRule; return r.kind === 'day_of_invoice_month' ? computeDueDate(r, todayVN(), data.period) : null }
     const prefix = `${facility.code}-HD-${data.period.replace('-', '')}-`
     const codes = await tx.select({ code: invoices.code }).from(invoices).where(like(invoices.code, `${prefix}%`))
     let seq = codes.reduce((max, x) => Math.max(max, Number(x.code.slice(prefix.length)) || 0), 0)
     const items = preview.filter(item => item.period)
-    const rows = items.length ? await tx.insert(invoices).values(items.map(item => ({ code: `${prefix}${String(++seq).padStart(4, '0')}`, leaseId: item.leaseId, facilityId: data.facilityId, kind: 'monthly', periodStart: item.period!.start, periodEnd: item.period!.end, issueDate: todayVN() }))).returning() : []
+    const rows = items.length ? await tx.insert(invoices).values(items.map(item => ({ code: `${prefix}${String(++seq).padStart(4, '0')}`, leaseId: item.leaseId, facilityId: data.facilityId, kind: 'monthly', periodStart: item.period!.start, periodEnd: item.period!.end, issueDate: todayVN(), dueDate: dueAtCreate(item.dueRule) }))).returning() : []
     const created: (InvoiceRow & { lines: InvoiceLineInput[] })[] = []
     const allLines: (InvoiceLineInput & { invoiceId: string })[] = []
     for (const item of items) {
@@ -138,6 +149,40 @@ export async function createDrafts(db: DB, ctx: AccessContext, input: { facility
     await recordAuditBatch(tx, ctx, created.map(inv => ({ action: 'create' as const, entity: 'invoice', entityId: inv.id, facilityId: inv.facilityId, summary: `Tạo hoá đơn ${inv.code}`, after: inv })))
     return created
   })
+}
+const leaseInputSchema = z.object({ leaseId: z.uuid(), period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) })
+async function facilityOfLease(db: Pick<DB, 'select'>, ctx: AccessContext, leaseId: string): Promise<string> {
+  const [row] = await db.select({ facilityId: rooms.facilityId }).from(leases).innerJoin(rooms, eq(rooms.id, leases.roomId)).where(eq(leases.id, leaseId))
+  if (!row) throw new NotFoundError()
+  assertCan(ctx, 'billing', row.facilityId)
+  return row.facilityId
+}
+/** Hợp đồng đang hiệu lực của toà, để chọn phòng khi tạo hoá đơn lẻ. */
+export async function listInvoiceableLeases(db: DB, ctx: AccessContext, facilityId: string): Promise<Array<{ leaseId: string; roomCode: string; tenantName: string }>> {
+  assertCan(ctx, 'billing', facilityId)
+  const rows = await db.select({ leaseId: leases.id, roomCode: rooms.code, kind: tenants.kind, fullName: tenants.fullName, companyName: tenants.companyName }).from(leases)
+    .innerJoin(rooms, eq(rooms.id, leases.roomId)).innerJoin(tenants, eq(tenants.id, leases.tenantId))
+    .where(and(eq(rooms.facilityId, facilityId), eq(leases.status, 'active'))).orderBy(asc(rooms.code))
+  return rows.map(r => ({ leaseId: r.leaseId, roomCode: r.roomCode, tenantName: displayName(r) }))
+}
+/** Xem trước hoá đơn của một hợp đồng ở một kỳ; cùng đường tính với sinh hàng loạt. */
+export async function previewLease(db: DB, ctx: AccessContext, input: { leaseId: string; period: string }) {
+  const { leaseId, period } = parse(leaseInputSchema, input)
+  const facilityId = await facilityOfLease(db, ctx, leaseId)
+  const [item] = await previewCore(db, facilityId, period, leaseId)
+  if (!item) throw new ValidationError('Hợp đồng không còn hiệu lực')
+  return item
+}
+/** Tạo một hoá đơn nháp cho một hợp đồng; kỳ đã lập hoặc ngoài hiệu lực thì từ chối. */
+export async function createDraftForLease(db: DB, ctx: AccessContext, input: { leaseId: string; period: string }): Promise<InvoiceRow> {
+  const { leaseId, period } = parse(leaseInputSchema, input)
+  const facilityId = await facilityOfLease(db, ctx, leaseId)
+  const created = await createDraftsCore(db, ctx, { facilityId, period }, leaseId)
+  if (!created.length) {
+    const [last] = await db.select({ end: sql<string>`max(${invoices.periodEnd})::text` }).from(invoices).where(eq(invoices.leaseId, leaseId))
+    throw new ValidationError(last?.end ? `Hợp đồng đã được lập hoá đơn tới ${last.end}` : 'Hợp đồng không có hiệu lực trong kỳ này')
+  }
+  return created[0]
 }
 export function invoiceStatus(total: number, paid: number, status: string, dueDate: string | null, today: string): string {
   if (status === 'draft') return 'draft'
@@ -195,7 +240,8 @@ export async function approveInvoice(db: DB, ctx: AccessContext, id: string, inp
         if (line) await tx.insert(invoiceLines).values({ ...line, invoiceId: id })
       }
     }
-    const dueDate = valid.dueDate ?? computeDueDate(valid.dueRule ?? lease.dueRule ?? settings.dueRule, valid.approvedOn ?? todayVN(), before.periodStart.slice(0, 7))
+    const rule = valid.dueRule ?? lease.dueRule ?? settings.dueRule
+    const dueDate = valid.dueDate ?? (rule.kind === 'day_of_invoice_month' && before.dueDate ? before.dueDate : computeDueDate(rule, valid.approvedOn ?? todayVN(), before.periodStart.slice(0, 7)))
     const [after] = await tx.update(invoices).set({ status: 'approved', dueDate, updatedAt: new Date() }).where(eq(invoices.id, id)).returning()
     if (before.kind === 'termination') await finalizeTermination(tx, ctx, before)
     await syncPendingAdjustments(tx, lease, await loadAddenda(tx, lease.id), settings.proration)
