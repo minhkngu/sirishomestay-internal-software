@@ -109,6 +109,12 @@ async function lockedReadings(tx: Pick<DB, 'select'>, roomIds: string[]): Promis
   }
   return out
 }
+/** Chỉ số bàn giao nằm trong kỳ của một hoá đơn đã duyệt (kể cả hoá đơn thanh lý) thì khoá, trả mã hoá đơn. */
+async function lockedHandovers(tx: Pick<DB, 'select'>, roomIds: string[]): Promise<Array<{ roomId: string; code: string; start: string; end: string }>> {
+  if (roomIds.length === 0) return []
+  return tx.select({ roomId: leases.roomId, code: invoices.code, start: invoices.periodStart, end: invoices.periodEnd }).from(invoices).innerJoin(leases, eq(leases.id, invoices.leaseId)).where(and(inArray(leases.roomId, roomIds), eq(invoices.status, 'approved')))
+}
+const handoverLock = (list: Array<{ roomId: string; code: string; start: string; end: string }>, roomId: string, readOn: string) => list.find(x => x.roomId === roomId && x.start <= readOn && x.end >= readOn)?.code ?? null
 const lockMessage = (code: string) => `Chỉ số đã dùng trong hoá đơn ${code} đã duyệt, bỏ duyệt hoá đơn trước khi đổi`
 
 export type ReadingInput = { meterId: string; value: number; readOn: string }
@@ -344,14 +350,15 @@ export async function listReadingHistory(db: DB, ctx: AccessContext, facilityId:
   assertCan(ctx, 'meters', facilityId)
   periodRange(from); periodRange(to)
   const overview = await listMeterOverview(db, ctx, facilityId)
-  const locked = await lockedReadings(db, [...new Set(overview.map((o) => o.roomId))])
+  const roomIds = [...new Set(overview.map((o) => o.roomId))]
+  const [locked, handoverCover] = await Promise.all([lockedReadings(db, roomIds), lockedHandovers(db, roomIds)])
   const rows: ReadingHistoryRow[] = []
   for (const m of overview) {
     const asc = [...m.readings].sort((a, b) => (a.readOn < b.readOn ? -1 : a.readOn > b.readOn ? 1 : 0))
     let prev = m.startReading
     for (const r of asc) {
       if (r.period >= from && r.period <= to) {
-        rows.push({ id: r.id, meterId: m.meterId, roomId: m.roomId, roomCode: m.roomCode, floor: m.floor, meterName: typeName(m.meterName), meterCode: m.meterCode, unit: m.unit, kind: r.kind, period: r.period, readOn: r.readOn, opening: prev, closing: r.value, usage: Math.max(r.value - prev, 0), lockedBy: r.kind === 'monthly' ? (locked.get(`${m.roomId}|${r.period}`) ?? null) : null })
+        rows.push({ id: r.id, meterId: m.meterId, roomId: m.roomId, roomCode: m.roomCode, floor: m.floor, meterName: typeName(m.meterName), meterCode: m.meterCode, unit: m.unit, kind: r.kind, period: r.period, readOn: r.readOn, opening: prev, closing: r.value, usage: Math.max(r.value - prev, 0), lockedBy: r.kind === 'monthly' ? (locked.get(`${m.roomId}|${r.period}`) ?? null) : handoverLock(handoverCover, m.roomId, r.readOn) })
       }
       prev = r.value
     }
@@ -363,28 +370,43 @@ async function readingForEdit(tx: DB, ctx: AccessContext, id: string) {
   const [found] = await tx.select({ r: meterReadings, m: meters, facilityId: rooms.facilityId, roomCode: rooms.code }).from(meterReadings).innerJoin(meters, eq(meters.id, meterReadings.meterId)).innerJoin(rooms, eq(rooms.id, meters.roomId)).where(eq(meterReadings.id, id))
   if (!found) throw new NotFoundError()
   assertCan(ctx, 'meters', found.facilityId)
-  if (found.r.kind !== 'monthly') throw new ValidationError('Chỉ số bàn giao sửa ở biên bản bàn giao, không sửa ở đây')
-  const lockedBy = (await lockedReadings(tx, [found.m.roomId])).get(`${found.m.roomId}|${found.r.period}`)
+  const lockedBy = found.r.kind === 'monthly'
+    ? (await lockedReadings(tx, [found.m.roomId])).get(`${found.m.roomId}|${found.r.period}`)
+    : handoverLock(await lockedHandovers(tx, [found.m.roomId]), found.m.roomId, found.r.readOn)
   if (lockedBy) throw new ValidationError(lockMessage(lockedBy))
   return found
 }
 
-/** Sửa số chốt và ngày chốt của một kỳ cũ; cùng kiểm tra với lúc ghi (không nhỏ hơn kỳ trước, không lớn hơn kỳ sau), chặn khi hoá đơn dùng nó đã duyệt. */
+/** Sửa số chốt và ngày chốt; cùng kiểm tra với lúc ghi (không nhỏ hơn lần trước, không lớn hơn lần sau), chặn khi hoá đơn dùng nó đã duyệt. */
 export async function updateMeterReading(db: DB, ctx: AccessContext, id: string, input: { value: number; readOn: string }): Promise<void> {
   await db.transaction(async (tx0) => {
     const tx = tx0 as unknown as DB
     const f = await readingForEdit(tx, ctx, id)
-    const result = await applyReadings(tx, ctx, f.r.period, [{ meterId: f.m.id, value: input.value, readOn: input.readOn }])
-    if (result.errors.length) throw new ValidationError(result.errors[0].message)
+    if (f.r.kind === 'monthly') {
+      const result = await applyReadings(tx, ctx, f.r.period, [{ meterId: f.m.id, value: input.value, readOn: input.readOn }])
+      if (result.errors.length) throw new ValidationError(result.errors[0].message)
+      return
+    }
+    // Chỉ số bàn giao: kiểm thứ tự với các lần chốt khác của cùng đồng hồ rồi cập nhật tại chỗ
+    if (!Number.isInteger(input.value) || input.value < 0) throw new ValidationError('Chỉ số không hợp lệ')
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.readOn)) throw new ValidationError('Ngày chốt không hợp lệ')
+    if (f.m.installedOn > input.readOn) throw new ValidationError('Đồng hồ chưa được lắp vào ngày này')
+    const others = (await tx.select().from(meterReadings).where(eq(meterReadings.meterId, f.m.id))).filter((r) => r.id !== id).sort((a, b) => (a.readOn < b.readOn ? -1 : 1))
+    const prev = [...others].reverse().find((r) => r.readOn <= input.readOn)
+    const next = others.find((r) => r.readOn > input.readOn)
+    if (input.value < (prev?.value ?? f.m.startReading)) throw new ValidationError(DECREASE)
+    if (next && input.value > next.value) throw new ValidationError('Chỉ số lớn hơn chỉ số của lần chốt sau')
+    await tx.update(meterReadings).set({ value: input.value, readOn: input.readOn, period: input.readOn.slice(0, 7), updatedAt: new Date() }).where(eq(meterReadings.id, id))
+    await recordAudit(tx, ctx, { action: 'update', entity: 'meter_readings', entityId: id, facilityId: f.facilityId, summary: `Sửa chỉ số bàn giao đồng hồ phòng ${f.roomCode}`, before: f.r, after: { value: input.value, readOn: input.readOn } })
   })
 }
 
-/** Xoá một lần chốt tháng (không xoá chỉ số bàn giao), chặn khi hoá đơn dùng nó đã duyệt. */
+/** Xoá một lần chốt (tháng hoặc bàn giao), chặn khi hoá đơn dùng nó đã duyệt. */
 export async function deleteMeterReading(db: DB, ctx: AccessContext, id: string): Promise<void> {
   await db.transaction(async (tx0) => {
     const tx = tx0 as unknown as DB
     const f = await readingForEdit(tx, ctx, id)
     await tx.delete(meterReadings).where(eq(meterReadings.id, id))
-    await recordAudit(tx, ctx, { action: 'delete', entity: 'meter_readings', entityId: id, facilityId: f.facilityId, summary: `Xoá chỉ số ${f.r.period} đồng hồ phòng ${f.roomCode}`, before: f.r })
+    await recordAudit(tx, ctx, { action: 'delete', entity: 'meter_readings', entityId: id, facilityId: f.facilityId, summary: `Xoá chỉ số ${f.r.kind === 'handover' ? 'bàn giao' : f.r.period} đồng hồ phòng ${f.roomCode}`, before: f.r })
   })
 }

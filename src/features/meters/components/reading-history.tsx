@@ -17,7 +17,7 @@ import type { ReadingHistoryRow } from '@/server/meters/service'
 const fmt = (value: number) => value.toLocaleString('vi-VN')
 const monthLabel = (period: string) => `${Number(period.slice(5))}/${period.slice(0, 4)}`
 
-/** Lịch sử chốt chỉ số: mỗi dòng một lần chốt (phòng, đồng hồ, tháng, số đầu, số cuối, ngày chốt). Sửa, xoá khi chưa có hoá đơn duyệt dùng chỉ số đó. */
+/** Lịch sử chốt chỉ số: mỗi dòng một lần chốt (phòng, đồng hồ, tháng, số đầu, số cuối, ngày chốt). Sửa, xoá khi chưa có hoá đơn đã duyệt dùng chỉ số đó (kể cả chỉ số bàn giao). */
 export function ReadingHistory({ rows }: { rows: ReadingHistoryRow[] }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -51,12 +51,10 @@ export function ReadingHistory({ rows }: { rows: ReadingHistoryRow[] }) {
     })
   }
 
-  const status = (r: ReadingHistoryRow) => r.kind === 'handover'
-    ? <span className="rounded-full border border-border/80 bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">Bàn giao</span>
-    : r.lockedBy
-      ? <span title={`Đang dùng trong hoá đơn ${r.lockedBy} đã duyệt`} className="inline-flex items-center gap-1 rounded-full border border-border/80 bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground"><Lock className="size-3" />Đã khoá · {r.lockedBy}</span>
-      : <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">Mở</span>
-  const actions = (r: ReadingHistoryRow) => r.kind === 'monthly' && !r.lockedBy && (
+  const status = (r: ReadingHistoryRow) => r.lockedBy
+      ? <span title={`Đang dùng trong hoá đơn ${r.lockedBy} đã duyệt`} className="inline-flex items-center gap-1 rounded-full border border-border/80 bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground"><Lock className="size-3" />{r.kind === 'handover' ? 'Bàn giao · ' : ''}Đã khoá · {r.lockedBy}</span>
+      : <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">{r.kind === 'handover' ? 'Bàn giao · Mở' : 'Mở'}</span>
+  const actions = (r: ReadingHistoryRow) => !r.lockedBy && (
     <div className="flex justify-end gap-1.5">
       <Button size="sm" variant="outline" disabled={pending} onClick={() => openEdit(r)}>Sửa</Button>
       <Button size="sm" variant="outline" disabled={pending} className="border-rose-200/80 text-rose-700 hover:bg-rose-50 hover:text-rose-800" onClick={() => setDeleting(r)}>Xoá</Button>
