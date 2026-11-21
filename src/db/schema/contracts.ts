@@ -37,7 +37,6 @@ export const leases = pgTable(
     monthlyRent: integer('monthly_rent').notNull(),
     legacyCode: text('legacy_code').unique(),
     billingCycleMonths: integer('billing_cycle_months').notNull().default(1),
-    billWaterByMeter: boolean('bill_water_by_meter').notNull().default(true),
     depositAmount: integer('deposit_amount').notNull(),
     note: text('note').notNull().default(''),
     contractTemplateId: uuid('contract_template_id').references(() => docTemplates.id),

@@ -1,6 +1,6 @@
 # Kế hoạch triển khai Siris
 
-Spec nền: [Quản lý khách thuê](../specs/2026-11-16-quan-ly-khach-thue-design.md), [Ổn định app, hoá đơn PDF, giao diện](../specs/2026-11-17-on-dinh-giao-dien-hoa-don-pdf-design.md). Spec từng tính năng nằm trong `../specs/`.
+Spec: [Thiết kế tổng](../specs/2026-11-16-quan-ly-khach-thue-design.md) (spec duy nhất của dự án).
 
 Plan làm xong thì xoá khỏi thư mục này (lần gần nhất: 19/11/2026); xem lại trong lịch sử git. Ghi chú môi trường ở [docs/operations/supabase.md](../../operations/supabase.md).
 

@@ -4,7 +4,7 @@ import type { Addendum, ISODate, Lease, LeaseTerms } from './types'
 /** Điều khoản tại một ngày = hợp đồng gốc + các phụ lục có hiệu lực ≤ ngày đó, áp theo thứ tự ngày. */
 export function contractTermsAt(lease: Lease, addenda: Addendum[], date: ISODate): LeaseTerms {
   const t: LeaseTerms = {
-    billingCycleMonths: lease.billingCycleMonths ?? 1, billWaterByMeter: lease.billWaterByMeter ?? true,
+    billingCycleMonths: lease.billingCycleMonths ?? 1,
     roomId: lease.roomId, startDate: lease.startDate, endDate: lease.endDate, monthlyRent: lease.monthlyRent,
     depositAmount: lease.depositAmount, fees: lease.fees, occupantIds: lease.occupantIds,
   }

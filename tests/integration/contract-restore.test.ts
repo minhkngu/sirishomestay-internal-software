@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { addenda, assets, depositEntries, facilities, files, handoverItems, handovers, invoiceLines, invoices, leases, meterReadings, meters, payments, rooms, tenants, utilityRates } from '@/db'
+import { addenda, assets, depositEntries, facilities, files, handoverItems, handovers, invoiceLines, invoices, leases, meterReadings, meters, payments, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
 import { createTestDb } from '../helpers/db'
@@ -98,7 +98,6 @@ describe('khôi phục hợp đồng', () => {
     const input = { roomId, tenantId, startDate: '2026-01-01', endDate: '2026-12-31', monthlyRent: 1000, depositAmount: 500 }
     const { lease } = await createLease(db, ctx, input)
     const [meter] = await db.insert(meters).values({ roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 }).returning()
-    await db.insert(utilityRates).values({ facilityId, utility: 'electric', effectiveFrom: '2026-01-01', pricePerUnit: 1000 })
     const [old] = await db.insert(meterReadings).values({ meterId: meter.id, period: '2026-08', readOn: '2026-08-31', value: 100 }).returning()
     await createTermination(db, ctx, lease.id, { endDate: '2026-10-01', readings: [{ meterId: meter.id, value: 150 }] })
     const preview = await previewContractRestore(db, ctx, 'lease', lease.id)
@@ -110,7 +109,6 @@ describe('khôi phục hợp đồng', () => {
     const input = { roomId, tenantId, startDate: '2026-01-01', endDate: '2026-12-31', monthlyRent: 1000, depositAmount: 500 }
     const { lease } = await createLease(db, ctx, input)
     const [meter] = await db.insert(meters).values({ roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 }).returning()
-    await db.insert(utilityRates).values({ facilityId, utility: 'electric', effectiveFrom: '2026-01-01', pricePerUnit: 1000 })
     await db.insert(meterReadings).values({ meterId: meter.id, period: '2026-08', readOn: '2026-08-31', value: 100 })
     const [existing] = await db.insert(meterReadings).values({ meterId: meter.id, period: '2026-10', readOn: '2026-10-01', kind: 'handover', value: 120 }).returning()
     await createTermination(db, ctx, lease.id, { endDate: '2026-10-01', readings: [{ meterId: meter.id, value: 150 }] })

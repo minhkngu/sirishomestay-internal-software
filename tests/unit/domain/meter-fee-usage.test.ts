@@ -3,7 +3,7 @@ import { meterFeeUsage } from '@/domain/meter-fee-usage'
 import type { Addendum, Lease, Meter, MeterReading } from '@/domain/types'
 
 const lease = (over: Partial<Lease> = {}): Lease => ({
-  id: 'L1', code: 'HD1', roomId: 'R1', startDate: '2026-01-01', endDate: '2027-12-31', monthlyRent: 1, billingCycleMonths: 1, billWaterByMeter: true, depositAmount: 1, fees: [], occupantIds: ['t1'], ...over,
+  id: 'L1', code: 'HD1', roomId: 'R1', startDate: '2026-01-01', endDate: '2027-12-31', monthlyRent: 1, billingCycleMonths: 1, depositAmount: 1, fees: [], occupantIds: ['t1'], ...over,
 })
 const electric = (id: string, roomId: string, over: Partial<Meter> = {}): Meter => ({ id, roomId, utility: 'electric', installedOn: '2025-01-01', startReading: 0, ...over })
 const reading = (meterId: string, readOn: string, value: number, kind: MeterReading['kind'] = 'monthly'): MeterReading => ({ meterId, period: readOn.slice(0, 7), readOn, value, kind })

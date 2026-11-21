@@ -139,7 +139,6 @@ export type LeaseInput = {
   dueRule?: unknown
   proration?: Proration | null
   billingCycleMonths?: number
-  billWaterByMeter?: boolean
 }
 
 export type LeaseCreated = { lease: Lease; firstInvoiceLines: InvoiceLineInput[]; warnings: string[]; handoverItems: Array<{ assetCode: string; itemId: string }> }
@@ -171,7 +170,7 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
   const code = await nextLeaseCode(tx, fac.code, input.startDate)
   const [lease] = await tx.insert(leases).values({
     code, roomId: room.id, tenantId: tenant.id, startDate: input.startDate, endDate: input.endDate, monthlyRent: input.monthlyRent,
-    depositAmount: input.depositAmount, note: input.note ?? '', contractTemplateId: input.contractTemplateId ?? null, invoiceTemplateId: input.invoiceTemplateId ?? null, dueRule: input.dueRule ?? null, proration: input.proration ?? null, billingCycleMonths: input.billingCycleMonths ?? 1, billWaterByMeter: input.billWaterByMeter ?? true, fromDepositContractId: fromDepositId,
+    depositAmount: input.depositAmount, note: input.note ?? '', contractTemplateId: input.contractTemplateId ?? null, invoiceTemplateId: input.invoiceTemplateId ?? null, dueRule: input.dueRule ?? null, proration: input.proration ?? null, billingCycleMonths: input.billingCycleMonths ?? 1, fromDepositContractId: fromDepositId,
   }).returning()
   await tx.insert(leaseOccupants).values(occupants.map((tenantId) => ({ leaseId: lease.id, tenantId })))
   const meterStarts: { leaseFeeId: string; reading: number }[] = []
@@ -271,7 +270,7 @@ async function insertLease(tx: DB, ctx: AccessContext, input: LeaseInput, fromDe
   const proration = (lease.proration as Proration | null) ?? settings.proration
   const fees = await contractFees(tx, lease.id)
   const terms: LeaseTerms = {
-    billingCycleMonths: lease.billingCycleMonths, billWaterByMeter: lease.billWaterByMeter,
+    billingCycleMonths: lease.billingCycleMonths,
     roomId: lease.roomId, startDate: lease.startDate, endDate: lease.endDate, monthlyRent: lease.monthlyRent,
     depositAmount: lease.depositAmount, fees, occupantIds: occupants,
   }

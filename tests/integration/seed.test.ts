@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { describe, it, expect } from 'vitest'
-import { facilities, rooms, userProfiles, userPermissions, userFacilities, feeTypes, feeUnits, utilityRates, tenants, docTemplates, files, leases, depositContracts, depositEntries, leaseOccupants, assets, meters, meterReadings, handovers, handoverItems, stockItems, stockLevels, stockMoves } from '@/db'
+import { facilities, rooms, userProfiles, userPermissions, userFacilities, feeTypes, feeUnits, tenants, docTemplates, files, leases, depositContracts, depositEntries, leaseOccupants, assets, meters, meterReadings, handovers, handoverItems, stockItems, stockLevels, stockMoves } from '@/db'
 import { runSeed, type AuthAdmin } from '../../scripts/seed'
 import { addDays } from '@/domain/dates'
 import { TEMPLATE_DOC_TYPES } from '@/domain/template-fields'
@@ -41,18 +41,13 @@ describe('runSeed', () => {
     expect((await db.select().from(userFacilities)).filter((u) => u.userId === hung.id).map((u) => u.facilityId)).toEqual([bt.id])
   })
 
-  it('nạp 6 loại phí, đơn vị và đơn giá điện nước (điện đổi giá từ đầu tháng hiện tại)', async () => {
+  it('nạp 6 loại phí và đơn vị', async () => {
     const db = await seededDb()
     const types = await db.select().from(feeTypes)
     expect(types.map((t) => t.name).sort()).toEqual(['Dọn phòng thêm', 'Giặt ủi', 'Gửi xe máy', 'Internet', 'Nước theo người', 'Phí dịch vụ'])
     expect(types.find((t) => t.name === 'Phí dịch vụ')).toMatchObject({ billing: 'monthly_fixed', quantityFrom: 'occupants' })
     expect(types.find((t) => t.name === 'Giặt ủi')).toMatchObject({ billing: 'per_occurrence' })
     expect((await db.select().from(feeUnits)).map((u) => u.name).sort()).toEqual(['kg', 'lần', 'người', 'phòng', 'xe'])
-    const rates = await db.select().from(utilityRates)
-    const td = (await db.select().from(facilities)).find((f) => f.code === 'TD')!
-    const electric = rates.filter((r) => r.facilityId === td.id && r.utility === 'electric').sort((a, b) => (a.effectiveFrom < b.effectiveFrom ? -1 : 1))
-    expect(electric.map((r) => [r.pricePerUnit, r.effectiveFrom])).toEqual([[3500, '2026-01-01'], [3800, '2026-11-01']])
-    expect(rates.filter((r) => r.utility === 'water').every((r) => r.pricePerUnit === 18000)).toBe(true)
   })
 
   it('nạp 30 khách (14 nước ngoài / 12 Việt Nam / 4 công ty) với visa hết hạn tương đối so với ngày seed', async () => {
