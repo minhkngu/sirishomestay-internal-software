@@ -15,7 +15,6 @@ export type GridCell = { meterId: string; serial: string | null; previous: numbe
 export type GridRow = { roomId: string; roomCode: string; floor?: string | null; occupied?: boolean; electric: GridCell | null; water: GridCell | null; feeMeters?: Array<{ name: string; cell: GridCell }> }
 
 const fmt = (value: number) => value.toLocaleString('vi-VN')
-const meterLabel = (utility: 'electric' | 'water') => (utility === 'electric' ? 'Điện' : 'Nước')
 
 export function ReadingGrid({ rows, period, readOn, meterFilter, roomFiltered = false, clearFiltersHref }: { rows: GridRow[]; period: string; readOn: string; meterFilter: string; roomFiltered?: boolean; clearFiltersHref?: string }) {
   const router = useRouter()
@@ -50,7 +49,7 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, roomFiltered = 
   const abnormal = progressCells.filter((cell) => cell.abnormal).length
   const progressPct = progressCells.length ? Math.round((recorded / progressCells.length) * 100) : 0
 
-  const feeRows = shownRows.flatMap((row) => visibleFeeMeters(row).map((fee) => ({ room: row, ...fee })))
+  const feeRows = shownRows.flatMap((row) => visibleFeeMeters(row))
   const dirty = Object.values(values).filter((value) => value.trim() !== '').length
 
   function onKey(event: React.KeyboardEvent, meterId: string) {
@@ -75,55 +74,86 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, roomFiltered = 
     })
   }
 
-  function utilityCells(room: GridRow, cell: GridCell | null, utility: 'electric' | 'water') {
-    if (!cell) return <td colSpan={2} className="px-4 py-3 text-right text-xs text-muted-foreground">Chưa có đồng hồ</td>
+  /** Một dòng = một đồng hồ: số đầu kỳ (chốt tháng trước), số cuối kỳ (nhập), tiêu thụ. */
+  type Item = { key: string; room: GridRow; label: string; unit: string; utility?: 'electric' | 'water'; cell: GridCell | null; first: boolean }
+  const items: Item[] = shownRows.flatMap((row) => {
+    const list: Omit<Item, 'first'>[] = [
+      ...(showElectric ? [{ key: `${row.roomId}-e`, room: row, label: 'Điện', unit: 'kWh', utility: 'electric' as const, cell: row.electric }] : []),
+      ...(showWater ? [{ key: `${row.roomId}-w`, room: row, label: 'Nước', unit: 'm³', utility: 'water' as const, cell: row.water }] : []),
+      ...visibleFeeMeters(row).map((fee) => ({ key: fee.cell.meterId, room: row, label: meterTypeName(fee.name), unit: '', cell: fee.cell })),
+    ]
+    return list.map((item, i) => ({ ...item, first: i === 0 }))
+  })
+  const [yy, mm] = period.split('-').map(Number)
+  const prev = new Date(Date.UTC(yy, mm - 2, 1))
+  const closingLabel = `Tháng ${mm}/${yy}`
+  const openingLabel = `Tháng ${prev.getUTCMonth() + 1}/${prev.getUTCFullYear()}`
+
+  function closingInput(item: Item) {
+    const cell = item.cell!
     const error = errors[cell.meterId]
     const value = values[cell.meterId] ?? (cell.current != null ? String(cell.current) : '')
-    const typed = values[cell.meterId] !== undefined && values[cell.meterId].trim() !== ''
-    const usage = typed ? Number(values[cell.meterId]) - cell.previous : cell.usage
     return (
       <>
-        <td className="px-4 py-2.5">
-          <input
-            ref={(element) => { refs.current[cell.meterId] = element }}
-            aria-label={`${meterLabel(utility)} phòng ${room.roomCode}`}
-            inputMode="numeric"
-            enterKeyHint="next"
-            value={value}
-            onChange={(event) => setValues({ ...values, [cell.meterId]: event.target.value })}
-            onKeyDown={(event) => onKey(event, cell.meterId)}
-            className={cn(
-              'h-8 w-28 rounded-lg border border-border/80 bg-card px-2 text-right text-[13px] tabular-nums text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20',
-              error && 'border-destructive bg-destructive/5',
-            )}
-          />
-          <div className={cn('mt-0.5 text-right text-[11px] tabular-nums text-muted-foreground', error && 'text-destructive')}>
-            {error ?? `số cũ ${fmt(cell.previous)}`}
-          </div>
-        </td>
-        <td className="px-4 py-2.5 text-right text-[13px] tabular-nums text-foreground">
-          <div>{usage != null && Number.isFinite(usage) ? fmt(usage) : '—'}</div>
-          {(cell.abnormal || cell.replaced) && (
-            <div className="mt-0.5 flex items-center justify-end gap-1 text-[11px]">
-              {cell.abnormal && <span className="rounded-full border border-amber-200/80 bg-amber-50 px-1.5 py-0.5 font-medium text-amber-800">Bất thường</span>}
-              {cell.replaced && <span className="text-muted-foreground">đã thay đồng hồ</span>}
-            </div>
+        <input
+          ref={(element) => { refs.current[cell.meterId] = element }}
+          aria-label={`${item.label} phòng ${item.room.roomCode}`}
+          inputMode="numeric"
+          enterKeyHint="next"
+          value={value}
+          onChange={(event) => setValues({ ...values, [cell.meterId]: event.target.value })}
+          onKeyDown={(event) => onKey(event, cell.meterId)}
+          className={cn(
+            'h-9 w-28 rounded-lg border border-border/80 bg-card px-2 text-right text-[13px] tabular-nums text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20',
+            error && 'border-destructive bg-destructive/5',
           )}
-        </td>
+        />
+        {error && <div className="mt-0.5 text-[11px] text-destructive">{error}</div>}
       </>
     )
   }
+  const usageOf = (cell: GridCell) => {
+    const typed = values[cell.meterId] !== undefined && values[cell.meterId].trim() !== ''
+    const usage = typed ? Number(values[cell.meterId]) - cell.previous : cell.usage
+    return usage != null && Number.isFinite(usage) ? usage : null
+  }
+  const flags = (cell: GridCell) => (cell.abnormal || cell.replaced) && (
+    <div className="mt-0.5 flex items-center justify-end gap-1 text-[11px]">
+      {cell.abnormal && <span className="rounded-full border border-amber-200/80 bg-amber-50 px-1.5 py-0.5 font-medium text-amber-800">Bất thường</span>}
+      {cell.replaced && <span className="text-muted-foreground">đã thay đồng hồ</span>}
+    </div>
+  )
+  const rowMenu = (item: Item) => item.utility && item.cell && (
+    <DropdownMenu>
+      <DropdownMenuTrigger aria-label={`Thao tác ${item.label} phòng ${item.room.roomCode}`} className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground">
+        <MoreHorizontal className="size-4" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuItem onClick={() => setReplacing({ roomId: item.room.roomId, roomCode: item.room.roomCode, utility: item.utility! })}>Thay đồng hồ {item.label.toLowerCase()}</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+  const roomInfo = (row: GridRow) => (
+    <>
+      <div className="font-medium tabular-nums text-foreground">Phòng {row.roomCode}</div>
+      <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+        {row.floor ? <span>Tầng {row.floor} · </span> : null}
+        {row.occupied ? <span className="inline-flex items-center gap-1 text-primary"><span className="size-1.5 rounded-full bg-primary" />Đang ở</span> : <span>Trống</span>}
+      </div>
+    </>
+  )
 
   return (
     <div className="rounded-2xl border border-border/80 bg-card">
       <div className="flex flex-wrap items-start justify-between gap-3 px-4 pb-3 pt-4">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">Bảng ghi chỉ số</h2>
+          <h2 className="text-sm font-semibold text-foreground">Chỉ số tháng {Number(period.slice(5))}/{period.slice(0, 4)}</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {progressCells.length === 0
               ? 'Kỳ này chưa có đồng hồ để ghi.'
               : <>Đã ghi <strong className="font-medium text-foreground">{recorded}/{progressCells.length}</strong> đồng hồ {roomFiltered ? 'trong phòng đang xem' : 'trên phòng có người ở'}{abnormal > 0 && <span className="text-amber-800"> · {abnormal} bất thường</span>}.</>}
           </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Số đầu kỳ là số chốt {openingLabel.replace('Tháng ', 'tháng ')}; số cuối kỳ là số chốt {closingLabel.replace('Tháng ', 'tháng ')}.</p>
           {progressCells.length > 0 && (
             <div className="mt-2 h-1 w-44 overflow-hidden rounded-full bg-muted">
               <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${progressPct}%` }} />
@@ -149,107 +179,66 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, roomFiltered = 
         </div>
       ) : (
         <>
-          {(showElectric || showWater) && (
-            <div className="overflow-x-auto border-t border-border/70">
-              <table className="w-full min-w-[620px] text-[13px]">
-                <thead>
-                  <tr className="text-xs text-muted-foreground">
-                    <th rowSpan={2} className="sticky left-0 z-10 bg-card px-4 py-2.5 text-left align-bottom font-normal">Phòng</th>
-                    {showElectric && <th colSpan={2} className="px-4 py-2.5 text-right font-medium text-foreground">Điện (kWh)</th>}
-                    {showWater && <th colSpan={2} className="px-4 py-2.5 text-right font-medium text-foreground">Nước (m³)</th>}
-                    <th rowSpan={2} className="w-10 px-2 py-2.5" aria-label="Thao tác" />
-                  </tr>
-                  <tr className="text-xs text-muted-foreground">
-                    {showElectric && <><th className="w-36 px-4 pb-2 text-right font-normal">Số chốt</th><th className="w-36 px-4 pb-2 text-right font-normal">Dùng</th></>}
-                    {showWater && <><th className="w-36 px-4 pb-2 text-right font-normal">Số chốt</th><th className="w-36 px-4 pb-2 text-right font-normal">Dùng</th></>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {shownRows.map((row) => (
-                    <tr key={row.roomId} className="border-t border-border/60">
-                      <td className="sticky left-0 z-10 bg-card px-4 py-2.5">
-                        <div className="font-medium tabular-nums text-foreground">{row.roomCode}</div>
-                        <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
-                          {row.floor ? <span>Tầng {row.floor} · </span> : null}
-                          {row.occupied
-                            ? <span className="inline-flex items-center gap-1 text-primary"><span className="size-1.5 rounded-full bg-primary" />Đang ở</span>
-                            : <span>Trống</span>}
-                        </div>
-                      </td>
-                      {showElectric && utilityCells(row, row.electric, 'electric')}
-                      {showWater && utilityCells(row, row.water, 'water')}
-                      <td className="px-2 py-2.5 text-right">
-                        {(row.electric || row.water) && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger aria-label={`Thao tác phòng ${row.roomCode}`} className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground">
-                              <MoreHorizontal className="size-4" />
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-52">
-                              {row.electric && <DropdownMenuItem onClick={() => setReplacing({ roomId: row.roomId, roomCode: row.roomCode, utility: 'electric' })}>Thay đồng hồ điện</DropdownMenuItem>}
-                              {row.water && <DropdownMenuItem onClick={() => setReplacing({ roomId: row.roomId, roomCode: row.roomCode, utility: 'water' })}>Thay đồng hồ nước</DropdownMenuItem>}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {feeRows.length > 0 && (
-            <div className="border-t border-border/70">
-              <div className="flex items-baseline justify-between px-4 pb-1 pt-3">
-                <h3 className="text-xs font-semibold text-foreground">Đồng hồ phụ</h3>
-                <span className="text-[11px] tabular-nums text-muted-foreground">{feeRows.length} đồng hồ</span>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[560px] text-[13px]">
+          {items.length > 0 && (
+            <>
+              <div className="hidden overflow-x-auto border-t border-border/70 lg:block">
+                <table className="w-full text-[13px]">
                   <thead>
                     <tr className="text-xs text-muted-foreground">
-                      <th className="px-4 py-2 text-left font-normal">Phòng</th>
-                      <th className="px-4 py-2 text-left font-normal">Đồng hồ</th>
-                      <th className="px-4 py-2 text-right font-normal">Cũ</th>
-                      <th className="px-4 py-2 text-right font-normal">Mới</th>
-                      <th className="px-4 py-2 text-right font-normal">Dùng</th>
+                      <th className="px-4 py-2.5 text-left font-normal">Phòng</th>
+                      <th className="px-4 py-2.5 text-left font-normal">Đồng hồ</th>
+                      <th className="px-4 py-2.5 text-right font-normal">Số đầu kỳ<div className="text-[11px] text-muted-foreground/80">chốt {openingLabel}</div></th>
+                      <th className="px-4 py-2.5 text-right font-medium text-foreground">Số cuối kỳ<div className="text-[11px] font-normal text-muted-foreground/80">{closingLabel}</div></th>
+                      <th className="px-4 py-2.5 text-right font-normal">Tiêu thụ</th>
+                      <th className="w-10 px-2 py-2.5" aria-label="Thao tác" />
                     </tr>
                   </thead>
                   <tbody>
-                    {feeRows.map(({ room, name, cell }) => {
-                      const error = errors[cell.meterId]
-                      const value = values[cell.meterId] ?? (cell.current != null ? String(cell.current) : '')
-                      const typed = values[cell.meterId] !== undefined && values[cell.meterId].trim() !== ''
-                      const usage = typed ? Number(values[cell.meterId]) - cell.previous : cell.usage
-                      return (
-                        <tr key={cell.meterId} className="border-t border-border/60">
-                          <td className="px-4 py-2.5 font-medium tabular-nums text-foreground">{room.roomCode}</td>
-                          <td className="px-4 py-2.5 text-foreground">{name}</td>
-                          <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{fmt(cell.previous)}</td>
-                          <td className="px-4 py-2.5 text-right">
-                            <input
-                              ref={(element) => { refs.current[cell.meterId] = element }}
-                              aria-label={`${name} phòng ${room.roomCode}`}
-                              inputMode="numeric"
-                              enterKeyHint="next"
-                              value={value}
-                              onChange={(event) => setValues({ ...values, [cell.meterId]: event.target.value })}
-                              onKeyDown={(event) => onKey(event, cell.meterId)}
-                              className={cn(
-                                'h-8 w-28 rounded-lg border border-border/80 bg-card px-2 text-right text-[13px] tabular-nums text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20',
-                                error && 'border-destructive bg-destructive/5',
-                              )}
-                            />
-                            {error && <div className="mt-0.5 text-[11px] text-destructive">{error}</div>}
-                          </td>
-                          <td className="px-4 py-2.5 text-right tabular-nums text-foreground">{usage != null && Number.isFinite(usage) ? fmt(usage) : '—'}</td>
-                        </tr>
-                      )
-                    })}
+                    {items.map((item) => (
+                      <tr key={item.key} className={cn('border-t border-border/60', item.first && 'border-t-border')}>
+                        <td className="px-4 py-2.5 align-top">{item.first ? roomInfo(item.room) : null}</td>
+                        <td className="px-4 py-2.5 align-top">
+                          <div className="font-medium text-foreground">{item.label}</div>
+                          {item.cell?.serial && <div className="mt-0.5 text-[11px] text-muted-foreground">{item.cell.serial}</div>}
+                        </td>
+                        {item.cell ? (
+                          <>
+                            <td className="px-4 py-2.5 text-right align-top tabular-nums text-muted-foreground"><div className="pt-2">{fmt(item.cell.previous)}</div></td>
+                            <td className="px-4 py-2.5 text-right align-top">{closingInput(item)}</td>
+                            <td className="px-4 py-2.5 text-right align-top tabular-nums text-foreground">
+                              <div className="pt-2">{usageOf(item.cell) != null ? <>{fmt(usageOf(item.cell)!)}{item.unit && <span className="ml-1 text-[11px] text-muted-foreground">{item.unit}</span>}</> : '—'}</div>
+                              {flags(item.cell)}
+                            </td>
+                          </>
+                        ) : <td colSpan={3} className="px-4 py-2.5 text-right text-xs text-muted-foreground">Chưa có đồng hồ</td>}
+                        <td className="px-2 py-2.5 text-right align-top">{rowMenu(item)}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
-            </div>
+
+              <ul className="divide-y divide-border/60 border-t border-border/70 lg:hidden">
+                {items.map((item) => (
+                  <li key={item.key} className="space-y-2 px-4 py-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="text-sm font-medium text-foreground"><span className="tabular-nums">Phòng {item.room.roomCode}</span> · {item.label}</div>
+                        <div className="mt-0.5 text-[11px] text-muted-foreground">{item.room.occupied ? 'Đang ở' : 'Trống'}{item.cell?.serial ? ` · ${item.cell.serial}` : ''}</div>
+                      </div>
+                      {rowMenu(item)}
+                    </div>
+                    {item.cell ? (
+                      <div className="grid grid-cols-3 items-start gap-2 text-xs">
+                        <div><div className="text-muted-foreground">Số đầu kỳ</div><div className="mt-1 h-9 pt-2 tabular-nums text-foreground">{fmt(item.cell.previous)}</div></div>
+                        <div><div className="font-medium text-foreground">Số cuối kỳ</div><div className="mt-1">{closingInput(item)}</div></div>
+                        <div className="text-right"><div className="text-muted-foreground">Tiêu thụ</div><div className="mt-1 h-9 pt-2 tabular-nums text-foreground">{usageOf(item.cell) != null ? fmt(usageOf(item.cell)!) : '—'}</div>{flags(item.cell)}</div>
+                      </div>
+                    ) : <div className="text-xs text-muted-foreground">Chưa có đồng hồ</div>}
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
 
           {feeFilter && feeRows.length === 0 && (
