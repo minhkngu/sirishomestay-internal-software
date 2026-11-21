@@ -136,14 +136,14 @@ test('tạo hoá đơn lẻ từ popup: toà → phòng → tháng → xem trư�
   await login(page, /^Admin/)
   await page.goto('/invoices')
   await page.waitForLoadState('networkidle')
-  await page.getByRole('button', { name: 'Tạo hoá đơn lẻ' }).click()
+  await page.getByRole('link', { name: 'Tạo hoá đơn lẻ' }).click()
   await page.getByLabel('Toà', { exact: true }).click()
   await page.getByRole('option').first().click()
   await page.getByLabel('Phòng', { exact: true }).click()
   await page.getByRole('option').first().click()
   // Chọn xong tháng thì hoá đơn nháp được tạo và mở ra để sửa
   await page.getByLabel('Tháng').fill('2031-07')
-  await expect(page).toHaveURL(/\/invoices\/[a-f0-9-]+(\?new=1)?$/)
+  await expect(page.getByRole('button', { name: 'Lưu thay đổi' })).toBeVisible()
   await expect(page.getByText('Nháp').first()).toBeVisible()
 })
 

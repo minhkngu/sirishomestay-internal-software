@@ -8,7 +8,6 @@ import { assertCan } from '@/domain/access'
 import { listInvoices } from '@/server/invoices/service'
 import { getAccessContext } from '@/server/session'
 import { InvoiceList } from '@/features/invoices/components/invoice-list'
-import { SingleInvoiceDialog } from '@/features/invoices/components/single-invoice-dialog'
 
 export default async function InvoicesPage() {
   const ctx = await getAccessContext()
@@ -21,7 +20,7 @@ export default async function InvoicesPage() {
         title="Hoá đơn"
         action={
           <>
-            <SingleInvoiceDialog facilities={facs.map((f) => ({ id: f.id, name: f.name }))} />
+            <Link href="/invoices/new" className={buttonVariants({ variant: 'outline' })}>Tạo hoá đơn lẻ</Link>
             <Link href="/invoices/generate" className={buttonVariants({ variant: 'default' })}>
               Tạo hoá đơn hàng loạt
             </Link>
