@@ -6,7 +6,7 @@ import type { DueRule, Proration } from '@/domain/types'
 import { toActionResult } from '@/lib/action-result'
 import { getAccessContext } from '@/server/session'
 import { getStorage } from '@/server/storage'
-import { saveInvoiceFeeQuantities, addPayment, approveInvoice, createDraftForLease, createDrafts, deleteInvoice, discardUntouchedDraft, exportReceipt, listInvoiceableLeases, previewBatch, previewLease, leaseDebt, recordLeasePayment, removePayment, setInvoiceDueDate, setInvoiceNote, setLineTime, setPeriod, unapproveInvoice, updateInvoiceMeterReading, updateInvoiceOpeningReading, updateLines } from './service'
+import { saveInvoiceFeeQuantities, addPayment, approveInvoice, createDraftForLease, createDrafts, createInvoiceFromEditor, deleteInvoice, exportReceipt, listInvoiceableLeases, previewBatch, previewLease, leaseDebt, recordLeasePayment, removePayment, setInvoiceDueDate, setInvoiceNote, setLineTime, setPeriod, unapproveInvoice, updateInvoiceMeterReading, updateInvoiceOpeningReading, updateLines } from './service'
 
 const refresh = () => { revalidatePath('/invoices', 'layout'); revalidatePath('/contracts', 'layout'); revalidatePath('/cashbook') }
 export async function previewBatchAction(input: { facilityId: string; period: string }) {
@@ -33,10 +33,10 @@ export async function deleteInvoiceAction(id: string) {
   const ctx = await getAccessContext()
   return toActionResult(async () => { await deleteInvoice(db, ctx, id); refresh(); return {} })
 }
-/** Đóng popup hoá đơn vừa tạo mà chưa lưu gì thì bỏ nháp đó. */
-export async function discardNewDraftAction(id: string) {
+/** Lưu hoá đơn mới từ giao diện sửa: lúc này hoá đơn mới thật sự được tạo. */
+export async function createInvoiceFromEditorAction(input: { leaseId: string; period: string; lines: Array<{ type: string; description: string; quantity: number; unitPrice: number; meta?: Record<string, unknown> | null }>; dueDate?: string; note?: string }) {
   const ctx = await getAccessContext()
-  return toActionResult(async () => { const discarded = await discardUntouchedDraft(db, ctx, id); refresh(); return { discarded } })
+  return toActionResult(async () => { const r = await createInvoiceFromEditor(db, ctx, input); refresh(); return r })
 }
 export async function updateInvoiceOpeningReadingAction(invoiceId: string, input: { leaseFeeId: string; period: string; value: number }) {
   const ctx = await getAccessContext()

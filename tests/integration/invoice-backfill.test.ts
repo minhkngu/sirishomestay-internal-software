@@ -4,7 +4,7 @@ import { depositEntries, facilities, invoiceLines, invoices, leases, rooms, tena
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
-import { createDraftForLease, createDrafts, discardUntouchedDraft, setInvoiceNote } from '@/server/invoices/service'
+import { createDraftForLease, createDrafts, createInvoiceFromEditor, previewNewInvoice } from '@/server/invoices/service'
 import { createTestDb } from '../helpers/db'
 
 const context = (permissions: Permission[], facilityId: string): AccessContext => ({ userId: crypto.randomUUID(), email: 'test@example.com', fullName: 'Test', permissions: new Set(permissions), facilityIds: new Set([facilityId]), isAdmin: false })
@@ -38,14 +38,16 @@ describe('lập hoá đơn tháng cũ', () => {
   it('tháng trước ngày bắt đầu hợp đồng thì từ chối', async () => {
     await expect(createDraftForLease(db, ctx(), { leaseId, period: '2025-11' })).rejects.toThrow(ValidationError)
   })
-  it('bỏ nháp vừa tạo khi chưa lưu gì, giữ lại khi đã sửa', async () => {
-    const fresh = await createDraftForLease(db, ctx(), { leaseId, period: '2026-10' })
-    expect(await discardUntouchedDraft(db, ctx(), fresh.id)).toBe(true)
-    expect(await db.select().from(invoices).where(eq(invoices.id, fresh.id))).toHaveLength(0)
-    const edited = await createDraftForLease(db, ctx(), { leaseId, period: '2026-10' })
-    await setInvoiceNote(db, ctx(), edited.id, 'đã sửa')
-    expect(await discardUntouchedDraft(db, ctx(), edited.id)).toBe(false)
-    expect(await db.select().from(invoices).where(eq(invoices.id, edited.id))).toHaveLength(1)
+  it('xem trước không tạo hoá đơn; chỉ khi lưu từ giao diện sửa mới tạo, kèm thay đổi', async () => {
+    const preview = await previewNewInvoice(db, ctx(), { leaseId, period: '2026-10' })
+    expect(preview.lines.some(l => l.type === 'rent')).toBe(true)
+    expect(await db.select().from(invoices).where(eq(invoices.leaseId, leaseId))).toHaveLength(1)
+    const lines = preview.lines.map(l => ({ type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta: (l.meta ?? null) as Record<string, unknown> | null }))
+    const { id } = await createInvoiceFromEditor(db, ctx(), { leaseId, period: '2026-10', lines: [...lines, { type: 'adjustment', description: 'Phát sinh thử', quantity: 1, unitPrice: 50000, meta: { kind: 'surcharge' } }], note: 'ghi chú thử' })
+    const saved = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, id))
+    expect(saved.filter(l => l.type === 'rent')).toHaveLength(1)
+    expect(saved.find(l => l.description === 'Phát sinh thử')?.amount).toBe(50000)
+    expect((await db.select().from(invoices).where(eq(invoices.id, id)))[0].note).toBe('ghi chú thử')
   })
 })
 

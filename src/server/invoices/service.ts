@@ -224,6 +224,40 @@ export async function createDraftForLease(db: DB, ctx: AccessContext, input: { l
   }
   return created[0]
 }
+/** Xem trước hoá đơn sắp lập cho một hợp đồng và một tháng, kèm thông tin phòng, bên thuê. Không ghi gì vào cơ sở dữ liệu. */
+export async function previewNewInvoice(db: DB, ctx: AccessContext, input: { leaseId: string; period: string }) {
+  const item = await previewLease(db, ctx, input)
+  const [info] = await db.select({ code: leases.code, roomCode: rooms.code, facilityId: rooms.facilityId, kind: tenants.kind, fullName: tenants.fullName, companyName: tenants.companyName }).from(leases).innerJoin(rooms, eq(rooms.id, leases.roomId)).innerJoin(tenants, eq(tenants.id, leases.tenantId)).where(eq(leases.id, input.leaseId))
+  return { ...item, leaseCode: info.code, roomCode: info.roomCode, facilityId: info.facilityId, tenantName: displayName(info) }
+}
+
+/**
+ * Lập hoá đơn từ giao diện sửa khi người dùng bấm Lưu: tạo bản nháp rồi áp các thay đổi (dòng, hạn, ghi chú).
+ * Dòng hợp đồng (tiền phòng, phí) được ghép với dòng vừa sinh theo loại và phí hợp đồng; dòng khác là dòng mới.
+ * Lỗi giữa chừng thì xoá bản nháp vừa tạo để không để lại hoá đơn dở.
+ */
+export async function createInvoiceFromEditor(db: DB, ctx: AccessContext, input: { leaseId: string; period: string; lines: Array<{ type: string; description: string; quantity: number; unitPrice: number; meta?: Record<string, unknown> | null }>; dueDate?: string; note?: string }): Promise<{ id: string }> {
+  const inv = await createDraftForLease(db, ctx, { leaseId: input.leaseId, period: input.period })
+  try {
+    const made = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, inv.id))
+    const used = new Set<string>()
+    const keyOf = (type: string, meta: Record<string, unknown> | null | undefined) => `${type}|${typeof meta?.leaseFeeId === 'string' ? meta.leaseFeeId : ''}|${typeof meta?.oneOffId === 'string' ? meta.oneOffId : ''}|${typeof meta?.pendingId === 'string' ? meta.pendingId : ''}`
+    const mapped = input.lines.filter(l => l.type !== 'tax').map(l => {
+      const key = keyOf(l.type, l.meta)
+      const match = key !== `${l.type}|||` ? made.find(m => !used.has(m.id) && keyOf(m.type, m.meta as Record<string, unknown> | null) === key) : undefined
+      if (match) used.add(match.id)
+      return { ...l, id: match?.id }
+    })
+    const tax = input.lines.filter(l => l.type === 'tax')
+    await updateLines(db, ctx, inv.id, [...mapped, ...tax])
+    if (input.dueDate) await setInvoiceDueDate(db, ctx, inv.id, input.dueDate)
+    if (input.note?.trim()) await setInvoiceNote(db, ctx, inv.id, input.note)
+    return { id: inv.id }
+  } catch (e) {
+    await deleteInvoice(db, ctx, inv.id).catch(() => undefined)
+    throw e
+  }
+}
 export function invoiceStatus(total: number, paid: number, status: string, dueDate: string | null, today: string): string {
   if (status === 'draft') return 'draft'
   const state = settlementState(total, paid)
@@ -457,26 +491,6 @@ export async function deleteInvoice(db: DB, ctx: AccessContext, id: string): Pro
     if ((await tx.select({ id: payments.id }).from(payments).where(eq(payments.invoiceId, id))).length) throw new ValidationError('Gỡ các khoản đã thu trước khi xoá')
     await tx.update(oneOffCharges).set({ invoiceId: null }).where(eq(oneOffCharges.invoiceId, id)); await tx.update(pendingAdjustments).set({ invoiceId: null }).where(eq(pendingAdjustments.invoiceId, id))
     await tx.delete(invoices).where(eq(invoices.id, id)); await recordAudit(tx, ctx, { action: 'delete', entity: 'invoice', entityId: id, facilityId: inv.facilityId, summary: `Xoá hoá đơn ${inv.code}`, before: inv })
-  })
-}
-
-/**
- * Bỏ bản nháp vừa tạo trong popup mà chưa ai lưu gì: nháp, chưa có khoản thu, chưa có nhật ký nào ngoài lúc tạo.
- * Xoá cả dòng nhật ký tạo vì hoá đơn này coi như chưa từng được lưu. Đã sửa, đã duyệt thì giữ nguyên.
- */
-export async function discardUntouchedDraft(db: DB, ctx: AccessContext, id: string): Promise<boolean> {
-  return db.transaction(async tx0 => {
-    const tx = tx0 as unknown as DB
-    const inv = await getInvoice(tx, ctx, id).catch(() => null)
-    if (!inv || inv.status !== 'draft') return false
-    assertCan(ctx, 'billing', inv.facilityId)
-    if ((await tx.select({ id: payments.id }).from(payments).where(eq(payments.invoiceId, id))).length) return false
-    const logs = await tx.select({ id: auditLogs.id, action: auditLogs.action }).from(auditLogs).where(and(eq(auditLogs.entity, 'invoice'), eq(auditLogs.entityId, id)))
-    if (logs.some(l => l.action !== 'create')) return false
-    await tx.update(oneOffCharges).set({ invoiceId: null }).where(eq(oneOffCharges.invoiceId, id)); await tx.update(pendingAdjustments).set({ invoiceId: null }).where(eq(pendingAdjustments.invoiceId, id))
-    await tx.delete(invoices).where(eq(invoices.id, id))
-    if (logs.length) await tx.delete(auditLogs).where(inArray(auditLogs.id, logs.map(l => l.id)))
-    return true
   })
 }
 

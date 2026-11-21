@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import {
   Check,
@@ -28,6 +28,7 @@ import {
   setInvoiceNoteAction,
   updateInvoiceMeterReadingAction,
   updateInvoiceOpeningReadingAction,
+  createInvoiceFromEditorAction,
   updateLinesAction,
 } from '@/server/invoices/actions'
 
@@ -60,7 +61,9 @@ type Props = {
   beforeLines?: React.ReactNode
   meterPanels?: MeterPanel[]
   addFee?: AddFee
-  id: string
+  /** Có id: hoá đơn đã lưu. Không có id (newInvoice): bản xem trước, bấm Lưu thay đổi mới tạo hoá đơn. */
+  id?: string
+  newInvoice?: { leaseId: string; period: string }
   status: string
   start: string
   end: string
@@ -243,36 +246,48 @@ export function InvoiceEditor(p: Props) {
   const stagedFor = (leaseFeeId: string) => Object.fromEntries(Object.entries(staged).filter(([key]) => key.startsWith(`${leaseFeeId}|`)).map(([key, value]) => [key.split('|')[1], value]))
   /** Lưu một lượt mọi thông tin của hoá đơn: chỉ số đã điền, các dòng (kể cả thời gian, số lượng) và hạn thanh toán. */
   const persist = async (extra?: { staged: Record<string, string>; opening: Record<string, string> }): Promise<string | null> => {
+    const taxLine = validRate > 0 ? [{ type: 'tax', description: `Thuế ${validRate}%`, quantity: 1, unitPrice: tax, meta: { rate: validRate } }] : []
+    // Hoá đơn mới: lúc bấm Lưu mới thật sự tạo, rồi mở hoá đơn vừa lưu
+    if (!p.id) {
+      if (!p.newInvoice) return 'Thiếu thông tin hợp đồng và tháng'
+      const created = await createInvoiceFromEditorAction({ leaseId: p.newInvoice.leaseId, period: p.newInvoice.period, lines: [...lines.map((l) => ({ type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta: l.meta })), ...taxLine], dueDate: due || undefined, note: note.trim() || undefined })
+      if (!created.ok) return created.error ?? 'Không tạo được hoá đơn'
+      createdId.current = created.data.id
+      return null
+    }
+    const id = p.id
     const readings = { ...staged, ...(extra?.staged ?? {}) }
     const openings = { ...stagedOpening, ...(extra?.opening ?? {}) }
     // Các dòng lưu trước, chỉ số lưu sau để tiền điện nước tính lại từ chỉ số mới nhất
-    const r = await updateLinesAction(p.id, [...lines.map((l) => ({ id: l.id, type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta: l.meta })), ...(validRate > 0 ? [{ type: 'tax', description: `Thuế ${validRate}%`, quantity: 1, unitPrice: tax, meta: { rate: validRate } }] : [])])
+    const r = await updateLinesAction(id, [...lines.map((l) => ({ id: l.id, type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta: l.meta })), ...taxLine])
     if (!r.ok) return r.error ?? 'Không lưu được các dòng'
     if (due && due !== (p.dueDateIso ?? '')) {
-      const d = await setInvoiceDueDateAction(p.id, due)
+      const d = await setInvoiceDueDateAction(id, due)
       if (!d.ok) return d.error ?? 'Không lưu được hạn thanh toán'
     }
     if (note.trim() !== p.note) {
-      const n = await setInvoiceNoteAction(p.id, note)
+      const n = await setInvoiceNoteAction(id, note)
       if (!n.ok) return n.error ?? 'Không lưu được ghi chú'
     }
     for (const [key, value] of Object.entries(openings)) {
       const [leaseFeeId, period] = key.split('|')
-      const o = await updateInvoiceOpeningReadingAction(p.id, { leaseFeeId, period, value: Number(value) })
+      const o = await updateInvoiceOpeningReadingAction(id, { leaseFeeId, period, value: Number(value) })
       if (!o.ok) return o.error ?? 'Không lưu được số đầu kỳ'
       setStagedOpening((cur) => { const next = { ...cur }; delete next[key]; return next })
     }
     for (const [key, value] of Object.entries(readings)) {
       const [leaseFeeId, period] = key.split('|')
-      const m = await updateInvoiceMeterReadingAction(p.id, { leaseFeeId, period, value: Number(value) })
+      const m = await updateInvoiceMeterReadingAction(id, { leaseFeeId, period, value: Number(value) })
       if (!m.ok) return m.error ?? 'Không lưu được chỉ số'
       setStaged((cur) => { const next = { ...cur }; delete next[key]; return next })
     }
     return null
   }
+  const createdId = useRef<string | null>(null)
   const saveAll = (extra?: { staged: Record<string, string>; opening: Record<string, string> }) => start(async () => {
     const error = await persist(extra)
     if (error) { toast.error(error); router.refresh(); return }
+    if (createdId.current) { toast.success('Đã tạo hoá đơn'); router.replace(`/invoices/${createdId.current}`); return }
     toast.success('Đã lưu hoá đơn')
     router.refresh()
   })
@@ -297,7 +312,7 @@ export function InvoiceEditor(p: Props) {
               <Check className="size-3.5" />
               <span>Lưu thay đổi</span>
             </Button>
-            {!approved && (
+            {!approved && p.id && (
               <Button
                 size="sm"
                 variant="outline"
@@ -305,7 +320,7 @@ export function InvoiceEditor(p: Props) {
                 onClick={() => start(async () => {
                   const error = await persist()
                   if (error) { toast.error(error); router.refresh(); return }
-                  const r = await approveInvoiceAction(p.id, due ? { dueDate: due } : {})
+                  const r = await approveInvoiceAction(p.id!, due ? { dueDate: due } : {})
                   if (!r.ok) { toast.error(r.error); router.refresh(); return }
                   toast.success('Đã duyệt hoá đơn')
                   router.refresh()
