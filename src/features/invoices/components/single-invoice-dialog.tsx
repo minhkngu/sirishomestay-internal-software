@@ -12,7 +12,7 @@ import { createDraftForLeaseAction, listInvoiceableLeasesAction } from '@/server
 type LeaseOption = { leaseId: string; roomCode: string; tenantName: string }
 
 /** Popup tạo một hoá đơn nháp cho một phòng: Toà → Phòng → Tháng, tạo. */
-export function SingleInvoiceDialog({ facilities, defaultPeriod }: { facilities: { id: string; name: string }[]; defaultPeriod: string }) {
+export function SingleInvoiceDialog({ facilities }: { facilities: { id: string; name: string }[] }) {
   const router = useRouter()
   const pathname = usePathname()
   const [openingId, setOpeningId] = useState<string | null>(null)
@@ -21,7 +21,7 @@ export function SingleInvoiceDialog({ facilities, defaultPeriod }: { facilities:
   const [facilityId, setFacilityId] = useState('')
   const [leases, setLeases] = useState<LeaseOption[]>([])
   const [leaseId, setLeaseId] = useState('')
-  const [period, setPeriod] = useState(defaultPeriod)
+  const [period, setPeriod] = useState('')
   const [error, setError] = useState('')
 
   const reset = () => setError('')
@@ -36,7 +36,7 @@ export function SingleInvoiceDialog({ facilities, defaultPeriod }: { facilities:
   const editorShown = !!openingId && pathname.endsWith(openingId)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
-  const create = (lease = leaseId, month = period) => start(async () => {
+  const create = (lease: string, month: string) => start(async () => {
     const r = await createDraftForLeaseAction({ leaseId: lease, period: month })
     if (!r.ok) { setError(r.error); return }
     toast.success('Đã tạo hoá đơn nháp')
@@ -47,11 +47,10 @@ export function SingleInvoiceDialog({ facilities, defaultPeriod }: { facilities:
 
   const facilityItems = facilities.map((f) => ({ value: f.id, label: f.name }))
   const leaseItems = leases.map((l) => ({ value: l.leaseId, label: `Phòng ${l.roomCode} · ${l.tenantName}` }))
-  const canCreate = !!leaseId && !!period
 
   return (
     <>
-      <Button variant="outline" onClick={() => { setOpeningId(null); setOpen(true) }}>Tạo hoá đơn lẻ</Button>
+      <Button variant="outline" onClick={() => { setOpeningId(null); setPeriod(''); setLeaseId(''); setFacilityId(''); setLeases([]); setError(''); setOpen(true) }}>Tạo hoá đơn lẻ</Button>
       <FormDialog open={open && !editorShown} onOpenChange={(o) => { if (!openingId) setOpen(o) }} title={openingId ? "Hoá đơn" : "Tạo hoá đơn lẻ"} description={openingId ? undefined : "Chọn toà, phòng có khách, rồi chọn tháng để tạo và sửa hoá đơn."} size={openingId ? "xl" : "md"}>
         {openingId ? (
           <div className="space-y-3 py-2" aria-busy="true"><div className="h-8 w-1/3 rounded-lg bg-muted" /><div className="h-24 rounded-xl bg-muted/70" /><div className="h-40 rounded-xl bg-muted/70" /></div>
@@ -84,9 +83,6 @@ export function SingleInvoiceDialog({ facilities, defaultPeriod }: { facilities:
             </div>
           </div>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-          <div className="flex items-center justify-end gap-3">
-            <Button type="button" disabled={pending || !canCreate} onClick={() => create()}>{pending ? 'Đang tạo…' : 'Tạo hoá đơn'}</Button>
-          </div>
         </div>
         )}
       </FormDialog>
