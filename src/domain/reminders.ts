@@ -21,6 +21,12 @@ export type ReminderSettings = { visaWarningDays: number; contractWarningDays: n
 export const MAX_ITEMS = 8
 
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000)
+/** Ngày kết thúc hợp đồng là sáng khách dọn đi (ở hết ngày liền trước): đến ngày đó là khẩn, quá ngày đó là quá hạn. */
+const departureNote = (endDate: string, today: string) => {
+  const left = daysBetween(today, endDate)
+  return left > 0 ? `dọn đi sáng ${formatDateVN(endDate)}` : left === 0 ? 'dọn đi sáng nay' : `quá hạn ${-left} ngày (dọn đi sáng ${formatDateVN(endDate)})`
+}
+
 export function buildReminders(s: Snapshot, ctx: AccessContext, today: string, settings: ReminderSettings): Reminder[] {
   const out: Reminder[] = []
   const add = (kind: ReminderKind, title: string, href: string, items: ReminderItem[]) => { if (items.length) out.push({ kind, title, count: items.length, href, items: items.slice(0, MAX_ITEMS) }) }
@@ -38,7 +44,7 @@ export function buildReminders(s: Snapshot, ctx: AccessContext, today: string, s
   add('contracts_ending', 'Hợp đồng sắp hết hạn', '/contracts?view=expiring', s.leases
     .filter(l => ok('tenants_contracts', l.facilityId) && !l.followedUp && l.endDate <= addDays(today, settings.contractWarningDays))
     .sort((a, b) => a.endDate.localeCompare(b.endDate))
-    .map(l => ({ label: `${l.code} · phòng ${l.roomCode}`, sub: `${l.tenantName} · hết hạn ${formatDateVN(l.endDate)}`, href: `/contracts/${l.id}`, severity: l.endDate < today ? 'danger' as const : 'warning' as const })))
+    .map(l => ({ label: `${l.code} · phòng ${l.roomCode}`, sub: `${l.tenantName} · ${departureNote(l.endDate, today)}`, href: `/contracts/${l.id}`, severity: l.endDate <= today ? 'danger' as const : 'warning' as const })))
   add('unsigned', 'Hợp đồng chưa ký', '/contracts?view=unsigned', s.leases
     .filter(l => ok('tenants_contracts', l.facilityId) && l.signStatus !== 'signed')
     .map(l => ({ label: `${l.code} · phòng ${l.roomCode}`, sub: l.tenantName, href: `/contracts/${l.id}`, severity: 'info' as const })))
