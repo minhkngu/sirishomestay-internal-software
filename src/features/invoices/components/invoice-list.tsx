@@ -1,7 +1,10 @@
 'use client'
 
-import { useMemo } from 'react'
-import Link from 'next/link'
+import { useMemo, useState, useTransition } from 'react'
+import { toast } from 'sonner'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { exportDocumentAction } from '@/server/templates/actions'
+import { InvoiceRowActions } from './invoice-row-actions'
 import { FacilityFilter } from '@/components/list/facility-filter'
 import { Pager } from '@/components/list/pager'
 import { ParamChips } from '@/components/list/param-chips'
@@ -24,6 +27,13 @@ export function InvoiceList({ invoices, facilities }: { invoices: InvoiceRow[]; 
   const period = /^\d{4}-\d{2}$/.test(rawPeriod) ? rawPeriod : ''
   const allowed = useMemo(() => facilities.map((f) => f.id), [facilities])
   const selected = useFacilitySelection(allowed)
+  const [pdf, setPdf] = useState<{ url: string; code: string } | null>(null)
+  const [opening, startOpen] = useTransition()
+  const openPdf = (i: InvoiceRow) => startOpen(async () => {
+    const r = await exportDocumentAction({ docType: i.kind === 'termination' ? 'invoice_termination' : 'invoice_monthly', entityId: i.id, format: 'pdf' })
+    if (!r.ok) toast.error(r.error)
+    else setPdf({ url: `/api/files/${r.data.fileId}?inline=1`, code: i.code })
+  })
   const names = useMemo(() => Object.fromEntries(facilities.map((f) => [f.id, f.name])), [facilities])
 
   const scoped = useMemo(
@@ -55,7 +65,7 @@ export function InvoiceList({ invoices, facilities }: { invoices: InvoiceRow[]; 
 
       {/* Invoices Table */}
       <div className="overflow-x-auto rounded-2xl border border-border/80 bg-card shadow-2xs">
-        <table className="w-full min-w-[860px] text-xs">
+        <table className="w-full min-w-[1000px] text-xs">
           <thead className="border-b border-border/60 bg-muted/40 text-left">
             <tr>
               <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Mã</th>
@@ -69,18 +79,22 @@ export function InvoiceList({ invoices, facilities }: { invoices: InvoiceRow[]; 
               <th className="p-3 text-right font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Đã thu</th>
               <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Hạn</th>
               <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Trạng thái</th>
+              <th className="p-3 text-right font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50">
             {pageRows.map((i) => (
               <tr key={i.id} className="transition-colors hover:bg-muted/30">
                 <td className="p-3 whitespace-nowrap">
-                  <Link
-                    className="font-semibold text-primary hover:underline underline-offset-2"
-                    href={`/invoices/${i.id}`}
+                  <button
+                    type="button"
+                    disabled={opening}
+                    title="Xem bản PDF"
+                    className="font-semibold text-primary hover:underline underline-offset-2 disabled:opacity-60"
+                    onClick={() => openPdf(i)}
                   >
                     {i.code}
-                  </Link>
+                  </button>
                 </td>
                 <td className="p-3 font-medium text-foreground whitespace-nowrap">{i.roomCode}</td>
                 {facilities.length > 1 && <td className="p-3 text-muted-foreground whitespace-nowrap">{names[i.facilityId]}</td>}
@@ -106,12 +120,13 @@ export function InvoiceList({ invoices, facilities }: { invoices: InvoiceRow[]; 
                     {invoiceStatusLabel(i.state)}
                   </StatusDot>
                 </td>
+                <td className="p-3 whitespace-nowrap"><InvoiceRowActions id={i.id} code={i.code} draft={i.state === 'draft'} /></td>
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
                 <td
-                  colSpan={facilities.length > 1 ? 9 : 8}
+                  colSpan={facilities.length > 1 ? 10 : 9}
                   className="p-8 text-center text-xs text-muted-foreground"
                 >
                   Không có hoá đơn nào
@@ -122,6 +137,12 @@ export function InvoiceList({ invoices, facilities }: { invoices: InvoiceRow[]; 
         </table>
       </div>
       <Pager {...pager} />
+      <Dialog open={!!pdf} onOpenChange={(open) => { if (!open) setPdf(null) }}>
+        <DialogContent className="w-[min(95vw,960px)] max-w-none sm:max-w-none rounded-2xl">
+          <DialogTitle>Hoá đơn {pdf?.code}</DialogTitle>
+          {pdf && <iframe title={`Hoá đơn ${pdf.code} PDF`} src={pdf.url} className="h-[75vh] w-full rounded-xl border border-border/80" />}
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
