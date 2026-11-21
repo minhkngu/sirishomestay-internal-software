@@ -13,6 +13,7 @@ import type { Addendum, ContractFee, Invoice, MeterReading, DueRule, InvoiceLine
 import { finalizeTermination } from '@/server/addenda/finalize'
 import { recordAudit, recordAuditBatch } from '@/server/audit'
 import { registerExportOwnerResolver } from '@/server/files/owners'
+import { applyReadings } from '@/server/meters/service'
 import { getSettings } from '@/server/settings/service'
 import { registerPdfLoader } from '@/server/templates/service'
 import { resolveBankAccount } from '@/domain/vietqr'
@@ -225,20 +226,60 @@ export async function saveInvoiceFeeQuantities(db: DB, ctx: AccessContext, invoi
   })
 }
 
+/** Tính lại các dòng phí theo đồng hồ của hoá đơn nháp từ bảng chỉ số; thiếu chỉ số thì báo lỗi. */
+async function refreshMeterLines(tx: DB, inv: InvoiceRow, lease: Lease): Promise<void> {
+  const calculated = await calculate(tx, lease, inv.facilityId, inv.periodStart.slice(0, 7), { start: inv.periodStart, end: inv.periodEnd, coefficient: inv.coefficient ?? undefined }, inv.fullMonth, inv.proration as Proration | undefined, inv.id)
+  const missing = calculated.warnings.filter(w => w.startsWith('Chưa') || lease.fees.some(f => w.startsWith(`${f.name}:`)))
+  if (missing.length) throw new ValidationError(missing.join('; '))
+  for (const fee of lease.fees.filter(f => f.quantitySource === 'meter' && f.leaseFeeId)) {
+    await tx.delete(invoiceLines).where(and(eq(invoiceLines.invoiceId, inv.id), sql`${invoiceLines.meta}->>'leaseFeeId' = ${fee.leaseFeeId}`))
+    const line = calculated.lines.find(l => l.meta?.leaseFeeId === fee.leaseFeeId)
+    if (line) await tx.insert(invoiceLines).values({ ...line, invoiceId: inv.id })
+  }
+}
+const meterReadingEditSchema = z.object({ leaseFeeId: z.uuid(), value: z.number().int().safe().nonnegative().max(2_147_483_647) })
+const prevMonthOf = (ym: string) => { const [y, m] = ym.split('-').map(Number); return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}` }
+const nextMonthOf = (ym: string) => { const [y, m] = ym.split('-').map(Number); return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}` }
+/**
+ * Sửa chỉ số chốt của tháng trước ngay trong hoá đơn nháp: ghi thẳng vào bảng chỉ số (cùng kiểm tra như tab Chỉ số)
+ * rồi tính lại dòng phí theo đồng hồ. Đồng hồ thay giữa tháng hoặc có chỉ số bàn giao thì phải sửa ở tab Chỉ số.
+ */
+export async function updateInvoiceMeterReading(db: DB, ctx: AccessContext, invoiceId: string, input: { leaseFeeId: string; value: number }): Promise<void> {
+  const data = parse(meterReadingEditSchema, input)
+  await db.transaction(async tx0 => {
+    const tx = tx0 as unknown as DB
+    await tx.select({ id: invoices.id }).from(invoices).where(eq(invoices.id, invoiceId)).for('update')
+    const inv = await getInvoice(tx, ctx, invoiceId)
+    assertCan(ctx, 'meters', inv.facilityId)
+    if (inv.status !== 'draft' || inv.kind !== 'monthly') throw new ValidationError('Chỉ sửa chỉ số trong hoá đơn tháng còn nháp')
+    const [fee] = await tx.select().from(leaseFeeSnapshots).where(and(eq(leaseFeeSnapshots.id, data.leaseFeeId), eq(leaseFeeSnapshots.leaseId, inv.leaseId)))
+    if (!fee || fee.quantitySource !== 'meter') throw new ValidationError('Phí không thuộc hợp đồng hoặc không tính theo đồng hồ')
+    const [link] = await tx.select({ meterId: leaseFeeMeters.meterId }).from(leaseFeeMeters).where(eq(leaseFeeMeters.leaseFeeId, fee.id))
+    if (!link) throw new ValidationError('Phí chưa gắn đồng hồ')
+    const [meter] = await tx.select().from(meters).where(eq(meters.id, link.meterId))
+    const invoiceMonth = inv.periodStart.slice(0, 7), period = prevMonthOf(invoiceMonth)
+    const from = `${period}-01`, to = `${period}-${String(new Date(Date.UTC(Number(period.slice(0, 4)), Number(period.slice(5)), 0)).getUTCDate()).padStart(2, '0')}`
+    const sameKind = (await tx.select().from(meters).where(eq(meters.roomId, meter.roomId))).filter(m => meter.utility === 'fee' ? m.id === meter.id : m.utility === meter.utility)
+    const handover = await tx.select({ id: meterReadings.id }).from(meterReadings).where(and(eq(meterReadings.meterId, meter.id), eq(meterReadings.kind, 'handover'), sql`${meterReadings.readOn} >= ${from}`, sql`${meterReadings.readOn} <= ${to}`)).limit(1)
+    const replaced = sameKind.some(m => m.id !== meter.id && ((m.removedOn && m.removedOn >= from) || m.installedOn >= from))
+    if (meter.removedOn || replaced || handover.length) throw new ValidationError('Đồng hồ có thay đổi hoặc chỉ số bàn giao trong tháng, hãy sửa ở tab Chỉ số')
+    const [later] = await tx.select({ id: invoices.id }).from(invoices).where(and(eq(invoices.leaseId, inv.leaseId), eq(invoices.status, 'approved'), sql`to_char(${invoices.periodStart}::date, 'YYYY-MM') = ${nextMonthOf(invoiceMonth)}`)).limit(1)
+    if (later) throw new ValidationError('Hoá đơn tháng sau đã duyệt và dùng chỉ số này, không sửa được')
+    const [current] = await tx.select().from(meterReadings).where(and(eq(meterReadings.meterId, meter.id), eq(meterReadings.period, period), eq(meterReadings.kind, 'monthly')))
+    const result = await applyReadings(tx, ctx, period, [{ meterId: meter.id, value: data.value, readOn: current?.readOn ?? to }])
+    if (result.errors.length) throw new ValidationError(result.errors[0].message)
+    await refreshMeterLines(tx, inv, await leaseData(tx, inv.leaseId))
+    await tx.update(invoices).set({ updatedAt: new Date() }).where(eq(invoices.id, invoiceId))
+    await recordAudit(tx, ctx, { action: 'update', entity: 'invoice', entityId: invoiceId, facilityId: inv.facilityId, summary: `Sửa chỉ số ${fee.name} tháng ${period} trong hoá đơn`, before: { value: current?.value ?? null }, after: { value: data.value, period } })
+  })
+}
 export async function approveInvoice(db: DB, ctx: AccessContext, id: string, input: { dueRule?: DueRule; dueDate?: string; approvedOn?: string }) {
   const valid = z.object({ dueRule: z.discriminatedUnion('kind', [z.object({ kind: z.literal('day_of_next_month'), day: z.number().int().min(1).max(31) }), z.object({ kind: z.literal('day_of_invoice_month'), day: z.number().int().min(1).max(31) }), z.object({ kind: z.literal('days_after_approval'), days: z.number().int().min(0).max(90) })]).optional(), dueDate: z.iso.date().optional(), approvedOn: z.iso.date().optional() }).parse(input)
   return db.transaction(async tx0 => {
     const tx = tx0 as unknown as DB; await tx.select({ id: invoices.id }).from(invoices).where(eq(invoices.id, id)).for('update'); const before = await getInvoice(tx, ctx, id); if (before.status !== 'draft') throw new ValidationError('Hoá đơn đã được duyệt')
     const [lease, settings] = await Promise.all([leaseData(tx, before.leaseId), getSettings(tx)])
     if (before.kind === 'monthly') {
-      const calculated = await calculate(tx, lease, before.facilityId, before.periodStart.slice(0, 7), { start: before.periodStart, end: before.periodEnd, coefficient: before.coefficient ?? undefined }, before.fullMonth, before.proration as Proration | undefined, before.id)
-      const missing = calculated.warnings.filter(w => w.startsWith('Chưa') || lease.fees.some(f => w.startsWith(`${f.name}:`)))
-      if (missing.length) throw new ValidationError(missing.join('; '))
-      for (const fee of lease.fees.filter(f => f.quantitySource === 'meter' && f.leaseFeeId)) {
-        await tx.delete(invoiceLines).where(and(eq(invoiceLines.invoiceId, id), sql`${invoiceLines.meta}->>'leaseFeeId' = ${fee.leaseFeeId}`))
-        const line = calculated.lines.find(l => l.meta?.leaseFeeId === fee.leaseFeeId)
-        if (line) await tx.insert(invoiceLines).values({ ...line, invoiceId: id })
-      }
+      await refreshMeterLines(tx, before, lease)
     }
     const rule = valid.dueRule ?? lease.dueRule ?? settings.dueRule
     const dueDate = valid.dueDate ?? (rule.kind === 'day_of_invoice_month' && before.dueDate ? before.dueDate : computeDueDate(rule, valid.approvedOn ?? todayVN(), before.periodStart.slice(0, 7)))

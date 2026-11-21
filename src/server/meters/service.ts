@@ -101,8 +101,13 @@ export type ReadingError = { meterId: string; message: string }
 
 /** Lưu nhiều chỉ số; dòng sai được báo lỗi theo từng dòng, các dòng hợp lệ vẫn lưu. */
 export async function saveReadings(db: DB, ctx: AccessContext, period: string, rows: ReadingInput[]): Promise<{ saved: number; errors: ReadingError[] }> {
+  return db.transaction(async (tx) => applyReadings(tx as unknown as DB, ctx, period, rows))
+}
+
+/** Lõi của `saveReadings` chạy trong transaction của người gọi (vd. sửa chỉ số ngay trong hoá đơn). */
+export async function applyReadings(tx: DB, ctx: AccessContext, period: string, rows: ReadingInput[]): Promise<{ saved: number; errors: ReadingError[] }> {
   const [start, end] = periodRange(period)
-  return db.transaction(async (tx) => {
+  {
     const ids = [...new Set(rows.map((r) => r.meterId))]
     const found = ids.length ? await tx.select({ m: meters, facilityId: rooms.facilityId, roomCode: rooms.code }).from(meters).innerJoin(rooms, eq(rooms.id, meters.roomId)).where(inArray(meters.id, ids)) : []
     if (found.length !== ids.length) throw new NotFoundError()
@@ -137,7 +142,7 @@ export async function saveReadings(db: DB, ctx: AccessContext, period: string, r
       await recordAudit(tx, ctx, { action: 'update', entity: 'meter_readings', facilityId, summary: `Ghi chỉ số kỳ ${period} (${n} đồng hồ)`, after: { period, count: n } })
     }
     return { saved, errors }
-  })
+  }
 }
 
 /** Tạo sẵn công tơ điện và nước (chỉ số đầu 0) cho các phòng vừa tạo; mỗi phòng luôn có đủ hai công tơ này. */

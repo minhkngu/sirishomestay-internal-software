@@ -6,7 +6,7 @@ import type { DueRule, Proration } from '@/domain/types'
 import { toActionResult } from '@/lib/action-result'
 import { getAccessContext } from '@/server/session'
 import { getStorage } from '@/server/storage'
-import { saveInvoiceFeeQuantities, addPayment, approveInvoice, createDraftForLease, createDrafts, deleteInvoice, exportReceipt, listInvoiceableLeases, previewBatch, previewLease, removePayment, setPeriod, updateLines } from './service'
+import { saveInvoiceFeeQuantities, addPayment, approveInvoice, createDraftForLease, createDrafts, deleteInvoice, exportReceipt, listInvoiceableLeases, previewBatch, previewLease, removePayment, setPeriod, updateInvoiceMeterReading, updateLines } from './service'
 
 const refresh = () => { revalidatePath('/invoices', 'layout'); revalidatePath('/contracts', 'layout') }
 export async function previewBatchAction(input: { facilityId: string; period: string }) {
@@ -62,4 +62,9 @@ export async function previewLeaseAction(input: { leaseId: string; period: strin
 export async function createDraftForLeaseAction(input: { leaseId: string; period: string }) {
   const ctx = await getAccessContext()
   return toActionResult(async () => { const inv = await createDraftForLease(db, ctx, input); refresh(); return { id: inv.id } })
+}
+
+export async function updateInvoiceMeterReadingAction(invoiceId: string, input: { leaseFeeId: string; value: number }) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => { await updateInvoiceMeterReading(db, ctx, invoiceId, input); refresh(); revalidatePath('/meters'); return {} })
 }

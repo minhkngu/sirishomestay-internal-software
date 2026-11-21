@@ -28,6 +28,7 @@ import {
   approveInvoiceAction,
   deleteInvoiceAction,
   setPeriodAction,
+  updateInvoiceMeterReadingAction,
   updateLinesAction,
 } from '@/server/invoices/actions'
 
@@ -63,6 +64,32 @@ type Props = {
   fullMonth: boolean
   dueDate: string | null
   lines: Line[]
+}
+
+type Segment = { start: number; end: number }
+/** Dòng phí theo đồng hồ: sửa chỉ số chốt cuối tháng trước ngay tại hoá đơn, ghi ngược về tab Chỉ số. */
+function MeterReadingEdit({ invoiceId, meta }: { invoiceId: string; meta: Record<string, unknown> | null }) {
+  const router = useRouter()
+  const [pending, start] = useTransition()
+  const segments = (meta?.segments as Segment[] | undefined) ?? []
+  const leaseFeeId = meta?.leaseFeeId
+  const [value, setValue] = useState(String(segments[0]?.end ?? ''))
+  const [error, setError] = useState('')
+  if (typeof leaseFeeId !== 'string' || segments.length === 0) return null
+  if (segments.length > 1) return <p className="mt-1.5 text-[11px] text-muted-foreground">Có nhiều đoạn đồng hồ trong tháng: sửa ở tab Chỉ số.</p>
+  const save = () => start(async () => {
+    const r = await updateInvoiceMeterReadingAction(invoiceId, { leaseFeeId, value: Number(value) })
+    if (!r.ok) { setError(r.error); return }
+    setError(''); toast.success('Đã cập nhật chỉ số và tính lại hoá đơn'); router.refresh()
+  })
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+      <span>Chỉ số {segments[0].start.toLocaleString('vi-VN')} →</span>
+      <input aria-label="Chỉ số chốt mới" inputMode="numeric" value={value} onChange={(e) => setValue(e.target.value)} className="h-7 w-24 rounded-lg border border-border/80 bg-background px-2 text-right tabular-nums text-foreground" />
+      <Button type="button" size="sm" variant="outline" disabled={pending || value.trim() === '' || !/^\d+$/.test(value.trim())} onClick={save} className="h-7 rounded-lg text-[11px]">Cập nhật chỉ số</Button>
+      {error && <span role="alert" className="w-full text-destructive">{error}</span>}
+    </div>
+  )
 }
 
 /** Bảng dòng sửa trực tiếp, sửa kỳ/hệ số, duyệt và xoá. Hoá đơn đã duyệt vẫn sửa được (có ghi nhật ký). */
@@ -247,6 +274,7 @@ export function InvoiceEditor(p: Props) {
                       onChange={(e) => set(i, { description: e.target.value })}
                       className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
                     />
+                    {p.status === 'draft' && <MeterReadingEdit invoiceId={p.id} meta={l.meta} />}
                   </td>
                   <td className="p-2.5">
                     <input
