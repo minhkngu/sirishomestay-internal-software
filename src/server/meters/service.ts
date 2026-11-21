@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { facilities, invoices, leaseFeeMeters, leaseFeeSnapshots, leases, meterReadings, meters, rooms } from '@/db'
 import type { DB } from '@/db/client'
-import { assertCan, type AccessContext } from '@/domain/access'
+import { assertCan, can, type AccessContext } from '@/domain/access'
 import { daysInMonth } from '@/domain/dates'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { meterUsage, suggestFinalReading } from '@/domain/meters'
@@ -412,4 +412,16 @@ export async function deleteMeterReadings(db: DB, ctx: AccessContext, ids: strin
     }
   }
   return { deleted, skipped: unique.length - deleted }
+}
+
+/** Đồng hồ của các phí tính theo đồng hồ trong một hợp đồng, kèm chỉ số đầu: chỉ số bàn giao sớm nhất, không có thì chỉ số lúc lắp. Khoá theo id dòng phí hợp đồng. */
+export async function listLeaseMeterInitials(db: DB, ctx: AccessContext, leaseId: string): Promise<Record<string, { meterCode: string | null; value: number; readOn: string }>> {
+  const links = await db.select({ leaseFeeId: leaseFeeMeters.leaseFeeId, meterId: leaseFeeMeters.meterId, code: meters.code, startReading: meters.startReading, installedOn: meters.installedOn, facilityId: rooms.facilityId })
+    .from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).innerJoin(meters, eq(meters.id, leaseFeeMeters.meterId)).innerJoin(rooms, eq(rooms.id, meters.roomId))
+    .where(eq(leaseFeeSnapshots.leaseId, leaseId))
+  if (links.length === 0) return {}
+  // Chỉ người có quyền Chỉ số của toà mới thấy số này; người khác xem hợp đồng bình thường, không có phần chỉ số
+  if (!can(ctx, 'meters', links[0].facilityId)) return {}
+  const handovers = await db.select({ meterId: meterReadings.meterId, readOn: meterReadings.readOn, value: meterReadings.value }).from(meterReadings).where(and(inArray(meterReadings.meterId, links.map(l => l.meterId)), eq(meterReadings.kind, 'handover'))).orderBy(asc(meterReadings.readOn))
+  return Object.fromEntries(links.map(l => { const h = handovers.find(x => x.meterId === l.meterId); return [l.leaseFeeId, { meterCode: l.code, value: h?.value ?? l.startReading, readOn: h?.readOn ?? l.installedOn }] }))
 }
