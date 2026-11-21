@@ -201,7 +201,7 @@ export async function createDraftForLease(db: DB, ctx: AccessContext, input: { l
   const created = await createDraftsCore(db, ctx, { facilityId, period }, leaseId)
   if (!created.length) {
     const [last] = await db.select({ end: sql<string>`max(${invoices.periodEnd})::text` }).from(invoices).where(eq(invoices.leaseId, leaseId))
-    const [clash] = await db.select({ id: invoices.id }).from(invoices).where(and(eq(invoices.leaseId, leaseId), sql`${invoices.periodStart} <= ${`${period}-31`}`, sql`${invoices.periodEnd} >= ${`${period}-01`}`)).limit(1)
+    const [clash] = await db.select({ id: invoices.id }).from(invoices).where(and(eq(invoices.leaseId, leaseId), sql`${invoices.periodStart} <= ${`${period}-${String(daysInMonth(period)).padStart(2, '0')}`}`, sql`${invoices.periodEnd} >= ${`${period}-01`}`)).limit(1)
     throw new ValidationError(clash ? 'Hợp đồng đã có hoá đơn trong tháng này' : last?.end ? `Hợp đồng đã được lập hoá đơn tới ${last.end}` : 'Hợp đồng không có hiệu lực trong kỳ này')
   }
   return created[0]

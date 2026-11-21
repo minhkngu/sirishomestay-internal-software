@@ -36,7 +36,7 @@ export async function deleteInvoiceAction(id: string) {
 /** Đóng popup hoá đơn vừa tạo mà chưa lưu gì thì bỏ nháp đó. */
 export async function discardNewDraftAction(id: string) {
   const ctx = await getAccessContext()
-  return toActionResult(async () => ({ discarded: await discardUntouchedDraft(db, ctx, id).then(r => { refresh(); return r }) }))
+  return toActionResult(async () => { const discarded = await discardUntouchedDraft(db, ctx, id); refresh(); return { discarded } })
 }
 export async function addPaymentAction(id: string, input: { paidOn: string; amount: number; method: 'cash' | 'transfer' | 'other'; note?: string }) {
   const ctx = await getAccessContext()
