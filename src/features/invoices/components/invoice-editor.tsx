@@ -27,6 +27,7 @@ import {
   approveInvoiceAction,
   deleteInvoiceAction,
   setInvoiceDueDateAction,
+  setInvoiceNoteAction,
   updateInvoiceMeterReadingAction,
   updateLinesAction,
 } from '@/server/invoices/actions'
@@ -75,6 +76,8 @@ type Props = {
   dueDefaultLabel: string
   /** Hạn mặc định theo Cài đặt, tính sẵn thành ngày cụ thể (YYYY-MM-DD). */
   dueDefaultIso: string
+  /** Ghi chú cho khách, in trên hoá đơn. */
+  note: string
   lines: Line[]
 }
 
@@ -118,7 +121,7 @@ function LineTime({ line, defaultFrom, defaultTo, fullMonth, proration, editable
     </div>
   )
 }
-type MeterPanel = { leaseFeeId: string; name: string; unit: string; rows: Array<{ period: string; readOn: string | null; value: number | null }> }
+type MeterPanel = { leaseFeeId: string; name: string; unit: string; rows: Array<{ period: string; readOn: string | null; value: number | null; /** Số đầu kỳ: chỉ số gần nhất trước tháng này; null khi chưa có. */ opening: number | null }> }
 const periodLabel = (period: string) => `${period.slice(5)}/${period.slice(0, 4)}`
 const NEW_READING = '__new'
 /** Chỉ số đã chốt của đồng hồ: danh sách các tháng, thêm dòng "Chốt chỉ số" cuối danh sách; chọn một dòng mở popup điền số (ghi ngược về tab Chỉ số). */
@@ -130,6 +133,11 @@ function MeterReadingsPanel({ panel, editable, consumption, staged, onStage }: {
   const rowLabel = (r: MeterPanel['rows'][number]) => staged[r.period] !== undefined ? `Tháng ${periodLabel(r.period)} · ${Number(staged[r.period]).toLocaleString('vi-VN')} (chưa lưu)` : `Tháng ${periodLabel(r.period)} · ${r.value == null ? 'chưa chốt' : r.value.toLocaleString('vi-VN')}`
   const items = [...panel.rows.map((r) => ({ value: r.period, label: rowLabel(r) })), ...(editable ? [{ value: NEW_READING, label: '＋ Chốt chỉ số' }] : [])]
   const row = panel.rows.find((r) => r.period === period)
+  // Số đầu kỳ: nếu tháng liền trước đang được điền (chưa lưu) thì lấy số đó
+  const prevRow = row ? panel.rows[panel.rows.indexOf(row) - 1] : undefined
+  const opening = row ? (prevRow && staged[prevRow.period] !== undefined ? Number(staged[prevRow.period]) : row.opening) : null
+  const closing = /^\d+$/.test(text.trim()) ? Number(text.trim()) : null
+  const tooLow = closing !== null && opening !== null && closing < opening
   const open = (value: string) => {
     const target = value === NEW_READING ? (panel.rows.find((r) => r.value == null) ?? last).period : value
     const found = panel.rows.find((r) => r.period === target) ?? last
@@ -159,13 +167,22 @@ function MeterReadingsPanel({ panel, editable, consumption, staged, onStage }: {
                 </Select>
               </div>
             )}
-            <div className="space-y-1.5">
-              <Label htmlFor="meter-reading-value">Chỉ số ({panel.unit})</Label>
-              <Input id="meter-reading-value" inputMode="numeric" value={text} onChange={(e) => setText(e.target.value)} className="h-9 text-right tabular-nums" />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="meter-reading-open">Số đầu kỳ ({panel.unit})</Label>
+                <Input id="meter-reading-open" readOnly disabled value={opening === null ? '—' : opening.toLocaleString('vi-VN')} className="h-9 text-right tabular-nums" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="meter-reading-value">Số cuối kỳ ({panel.unit})</Label>
+                <Input id="meter-reading-value" inputMode="numeric" value={text} onChange={(e) => setText(e.target.value)} className="h-9 text-right tabular-nums" />
+              </div>
             </div>
+            <p className={tooLow ? 'text-sm text-destructive' : 'text-sm text-muted-foreground'}>
+              {tooLow ? 'Số cuối kỳ không được nhỏ hơn số đầu kỳ.' : <>Tiêu thụ: <span className="font-medium tabular-nums text-foreground">{closing !== null && opening !== null ? (closing - opening).toLocaleString('vi-VN') : '—'} {panel.unit}</span></>}
+            </p>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="ghost" onClick={() => setPeriod(null)}>Huỷ</Button>
-              <Button type="button" disabled={!/^\d+$/.test(text.trim()) || (row.value != null && staged[row.period] === undefined && text.trim() === String(row.value))} onClick={apply}>Áp dụng</Button>
+              <Button type="button" disabled={!/^\d+$/.test(text.trim()) || tooLow || (row.value != null && staged[row.period] === undefined && text.trim() === String(row.value))} onClick={apply}>Áp dụng</Button>
             </div>
           </div>
         </FormDialog>
@@ -182,6 +199,7 @@ export function InvoiceEditor(p: Props) {
   const taxLine = p.lines.find((l) => l.type === 'tax')
   const [taxRate, setTaxRate] = useState(typeof taxLine?.meta?.rate === 'number' ? String(taxLine.meta.rate) : '')
   const [due, setDue] = useState(p.dueDateIso ?? p.dueDefaultIso)
+  const [note, setNote] = useState(p.note)
   const [pickingFee, setPickingFee] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [createdFees, setCreatedFees] = useState<FeeOption[]>([])
@@ -223,6 +241,10 @@ export function InvoiceEditor(p: Props) {
     if (due && due !== (p.dueDateIso ?? '')) {
       const d = await setInvoiceDueDateAction(p.id, due)
       if (!d.ok) return d.error ?? 'Không lưu được hạn thanh toán'
+    }
+    if (note.trim() !== p.note) {
+      const n = await setInvoiceNoteAction(p.id, note)
+      if (!n.ok) return n.error ?? 'Không lưu được ghi chú'
     }
     return null
   }
@@ -459,6 +481,10 @@ export function InvoiceEditor(p: Props) {
         </dl>
       </section>
 
+      <section className="space-y-2 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
+        <label htmlFor="invoice-note" className="block text-sm font-semibold tracking-tight text-foreground">Ghi chú cho khách</label>
+        <textarea id="invoice-note" rows={3} maxLength={1000} placeholder="Nội dung này được in trên hoá đơn gửi khách" value={note} onChange={(e) => setNote(e.target.value)} className="w-full rounded-lg border border-border/80 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30" />
+      </section>
       <ConfirmDialog
         open={deleting}
         onOpenChange={setDeleting}

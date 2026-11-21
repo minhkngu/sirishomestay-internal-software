@@ -6,6 +6,8 @@ export type InvoicePdfData = {
   tenant: { name: string; phone: string | null; kind?: 'foreign' | 'vietnamese' | 'company'; idDocument?: string | null; taxCode?: string | null; email?: string | null }
   lines: { description: string; quantity: number; unitLabel: string; unitPrice: number; amount: number }[]
   total: number; paid: number; bank: BankAccount | null
+  /** Ghi chú nhân viên viết cho khách, in trên hoá đơn. */
+  note?: string
 }
 export type ReceiptPdfData = {
   code: string; invoiceCode: string; paidOn: string; amount: number; method: string; receivedBy: string

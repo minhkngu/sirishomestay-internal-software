@@ -334,6 +334,17 @@ export async function setLineTime(db: DB, ctx: AccessContext, invoiceId: string,
     await recordAudit(tx, ctx, { action: 'update', entity: 'invoice', entityId: invoiceId, facilityId: inv.facilityId, summary: `Sửa thời gian, hệ số dòng ${line.description}`, before: line, after })
   })
 }
+/** Ghi chú cho khách, in trên hoá đơn (sửa được cả khi đã duyệt, có nhật ký). */
+export async function setInvoiceNote(db: DB, ctx: AccessContext, id: string, note: string): Promise<void> {
+  const text = parse(z.string().max(1000, 'Ghi chú tối đa 1000 ký tự'), note.trim())
+  await db.transaction(async tx0 => {
+    const tx = tx0 as unknown as DB
+    const before = await getInvoice(tx, ctx, id)
+    if (before.note === text) return
+    const [after] = await tx.update(invoices).set({ note: text, updatedAt: new Date() }).where(eq(invoices.id, id)).returning()
+    await recordAudit(tx, ctx, { action: 'update', entity: 'invoice', entityId: id, facilityId: before.facilityId, summary: 'Sửa ghi chú hoá đơn', before: { note: before.note }, after: { note: after.note } })
+  })
+}
 /** Sửa hạn thanh toán trực tiếp trên hoá đơn (nháp hoặc đã duyệt). */
 export async function setInvoiceDueDate(db: DB, ctx: AccessContext, id: string, dueDate: string): Promise<void> {
   const date = parse(z.iso.date(), dueDate)
@@ -559,7 +570,10 @@ export async function getInvoiceDetail(db: DB, ctx: AccessContext, id: string) {
   const meterFees = inv.kind === 'monthly' ? await db.select({ leaseFeeId: leaseFeeSnapshots.id, name: leaseFeeSnapshots.name, unit: leaseFeeSnapshots.unit, meterId: leaseFeeMeters.meterId }).from(leaseFeeSnapshots).innerJoin(leaseFeeMeters, eq(leaseFeeMeters.leaseFeeId, leaseFeeSnapshots.id)).where(and(eq(leaseFeeSnapshots.leaseId, inv.leaseId), eq(leaseFeeSnapshots.quantitySource, 'meter'))) : []
   const periods = recentPeriods(inv.periodStart.slice(0, 7))
   const monthly = meterFees.length ? await db.select().from(meterReadings).where(and(inArray(meterReadings.meterId, meterFees.map(f => f.meterId)), eq(meterReadings.kind, 'monthly'), inArray(meterReadings.period, periods))) : []
-  const meterPanels = meterFees.map(f => ({ leaseFeeId: f.leaseFeeId, name: f.name, unit: f.unit, rows: periods.map(period => { const r = monthly.find(x => x.meterId === f.meterId && x.period === period); return { period, readOn: r?.readOn ?? null, value: r?.value ?? null } }) }))
+  // Số đầu kỳ của mỗi tháng = chỉ số gần nhất của đồng hồ trước ngày 1 của tháng đó (số chốt tháng trước, hoặc số ban đầu / bàn giao)
+  const earlier = meterFees.length ? await db.select({ meterId: meterReadings.meterId, readOn: meterReadings.readOn, value: meterReadings.value }).from(meterReadings).where(and(inArray(meterReadings.meterId, meterFees.map(f => f.meterId)), sql`${meterReadings.readOn} < ${`${periods[periods.length - 1]}-01`}`)) : []
+  const openingOf = (meterId: string, period: string) => earlier.filter(x => x.meterId === meterId && x.readOn < `${period}-01`).sort((a, b) => (a.readOn < b.readOn ? 1 : -1))[0]?.value ?? null
+  const meterPanels = meterFees.map(f => ({ leaseFeeId: f.leaseFeeId, name: f.name, unit: f.unit, rows: periods.map(period => { const r = monthly.find(x => x.meterId === f.meterId && x.period === period); return { period, readOn: r?.readOn ?? null, value: r?.value ?? null, opening: openingOf(f.meterId, period) } }) }))
   const total = lines.reduce((n, l) => n + l.amount, 0), paid = pays.reduce((n, p) => n + p.amount, 0)
   return { invoice: inv, meterPanels, leaseFeeTypeIds: leaseFees.flatMap(f => f.feeTypeId ? [f.feeTypeId] : []), lines, payments: pays, periodFees: periodFees.map(f => ({ id: f.id, name: f.name, unit: f.unit, unitPrice: f.unitPrice, quantity: quantities.find(q => q.leaseFeeId === f.id)?.quantity ?? null })), total, paid, state: invoiceStatus(total, paid, inv.status, inv.dueDate, todayVN()), ...row }
 }
@@ -577,7 +591,7 @@ for (const [docType, kind] of [['invoice_monthly', 'monthly'], ['invoice_termina
     const [row] = await db.select({ tenant: tenants, facility: facilities }).from(leases).innerJoin(tenants, eq(tenants.id, leases.tenantId)).innerJoin(facilities, eq(facilities.id, d.invoice.facilityId)).where(eq(leases.id, d.invoice.leaseId))
     const settings = await getSettings(db)
     const template = await resolveInvoiceTemplate(db, id)
-    return { facilityId: d.invoice.facilityId, baseName: d.invoice.code, render: () => { const data = { kind, code: d.invoice.code, issueDate: d.invoice.issueDate, periodStart: d.invoice.periodStart, periodEnd: d.invoice.periodEnd, dueDate: d.invoice.dueDate, facility: { name: row.facility.name, address: row.facility.address }, room: d.roomCode, tenant: { name: row.tenant.fullName || row.tenant.companyName || '', phone: row.tenant.phone, kind: row.tenant.kind, idDocument: row.tenant.kind === 'foreign' ? row.tenant.passportNumber : row.tenant.idNumber, taxCode: row.tenant.taxCode, email: row.tenant.email }, lines: d.lines.map(pdfLine), total: d.total, paid: d.paid, bank: resolveBankAccount(row.facility.bankAccount, settings.bankAccount)  }; return template.html ? renderInvoiceFromTemplate(data, template.html) : renderInvoicePdf(data, template.config) } }
+    return { facilityId: d.invoice.facilityId, baseName: d.invoice.code, render: () => { const data = { kind, code: d.invoice.code, issueDate: d.invoice.issueDate, periodStart: d.invoice.periodStart, periodEnd: d.invoice.periodEnd, dueDate: d.invoice.dueDate, facility: { name: row.facility.name, address: row.facility.address }, room: d.roomCode, tenant: { name: row.tenant.fullName || row.tenant.companyName || '', phone: row.tenant.phone, kind: row.tenant.kind, idDocument: row.tenant.kind === 'foreign' ? row.tenant.passportNumber : row.tenant.idNumber, taxCode: row.tenant.taxCode, email: row.tenant.email }, lines: d.lines.map(pdfLine), total: d.total, paid: d.paid, bank: resolveBankAccount(row.facility.bankAccount, settings.bankAccount), note: d.invoice.note }; return template.html ? renderInvoiceFromTemplate(data, template.html) : renderInvoicePdf(data, template.config) } }
   })
 }
 // Bản xuất hoá đơn / phiếu thu: tìm cơ sở theo hoá đơn hoặc khoản thu gốc

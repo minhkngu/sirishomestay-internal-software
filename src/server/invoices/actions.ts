@@ -6,7 +6,7 @@ import type { DueRule, Proration } from '@/domain/types'
 import { toActionResult } from '@/lib/action-result'
 import { getAccessContext } from '@/server/session'
 import { getStorage } from '@/server/storage'
-import { saveInvoiceFeeQuantities, addPayment, approveInvoice, createDraftForLease, createDrafts, deleteInvoice, exportReceipt, listInvoiceableLeases, previewBatch, previewLease, leaseDebt, recordLeasePayment, removePayment, setInvoiceDueDate, setLineTime, setPeriod, unapproveInvoice, updateInvoiceMeterReading, updateLines } from './service'
+import { saveInvoiceFeeQuantities, addPayment, approveInvoice, createDraftForLease, createDrafts, deleteInvoice, exportReceipt, listInvoiceableLeases, previewBatch, previewLease, leaseDebt, recordLeasePayment, removePayment, setInvoiceDueDate, setInvoiceNote, setLineTime, setPeriod, unapproveInvoice, updateInvoiceMeterReading, updateLines } from './service'
 
 const refresh = () => { revalidatePath('/invoices', 'layout'); revalidatePath('/contracts', 'layout'); revalidatePath('/cashbook') }
 export async function previewBatchAction(input: { facilityId: string; period: string }) {
@@ -74,6 +74,10 @@ export async function unapproveInvoiceAction(id: string) {
   return toActionResult(async () => { await unapproveInvoice(db, ctx, id); refresh(); return {} })
 }
 
+export async function setInvoiceNoteAction(id: string, note: string) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => { await setInvoiceNote(db, ctx, id, note); refresh(); return {} })
+}
 export async function setInvoiceDueDateAction(id: string, dueDate: string) {
   const ctx = await getAccessContext()
   return toActionResult(async () => { await setInvoiceDueDate(db, ctx, id, dueDate); refresh(); return {} })
