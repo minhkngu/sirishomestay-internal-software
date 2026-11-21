@@ -34,7 +34,7 @@ export async function deleteInvoiceAction(id: string) {
   return toActionResult(async () => { await deleteInvoice(db, ctx, id); refresh(); return {} })
 }
 /** Lưu hoá đơn mới từ giao diện sửa: lúc này hoá đơn mới thật sự được tạo. */
-export async function createInvoiceFromEditorAction(input: { leaseId: string; period: string; lines: Array<{ type: string; description: string; quantity: number; unitPrice: number; meta?: Record<string, unknown> | null }>; dueDate?: string; note?: string }) {
+export async function createInvoiceFromEditorAction(input: { leaseId: string; period: string; lines: Array<{ type: string; description: string; quantity: number; unitPrice: number; meta?: Record<string, unknown> | null }>; dueDate?: string; note?: string; readings?: Array<{ leaseFeeId: string; period: string; value: number }>; openings?: Array<{ leaseFeeId: string; period: string; value: number }> }) {
   const ctx = await getAccessContext()
   return toActionResult(async () => { const r = await createInvoiceFromEditor(db, ctx, input); refresh(); return r })
 }
