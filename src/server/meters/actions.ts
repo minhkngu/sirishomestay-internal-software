@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/db/client'
 import { toActionResult } from '@/lib/action-result'
 import { getAccessContext } from '@/server/session'
-import { addRoomMeter, replaceMeter, saveReadings, suggestMeterFinalReading, type ReadingInput } from './service'
+import { addRoomMeter, deleteMeterReading, replaceMeter, saveReadings, updateMeterReading, suggestMeterFinalReading, type ReadingInput } from './service'
 
 export async function saveReadingsAction(period: string, rows: ReadingInput[]) {
   const ctx = await getAccessContext()
@@ -24,4 +24,14 @@ export async function suggestFinalReadingAction(roomId: string, utility: 'electr
 export async function addRoomMeterAction(roomId: string, input: { name: string; startReading: number; installedOn: string; serial?: string }) {
   const ctx = await getAccessContext()
   return toActionResult(async () => { const r = await addRoomMeter(db, ctx, roomId, input); revalidatePath('/meters'); return r })
+}
+
+export async function updateMeterReadingAction(id: string, input: { value: number; readOn: string }) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => { await updateMeterReading(db, ctx, id, input); revalidatePath('/meters'); revalidatePath('/invoices', 'layout'); return {} })
+}
+
+export async function deleteMeterReadingAction(id: string) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => { await deleteMeterReading(db, ctx, id); revalidatePath('/meters'); revalidatePath('/invoices', 'layout'); return {} })
 }

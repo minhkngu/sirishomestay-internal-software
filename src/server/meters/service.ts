@@ -1,11 +1,10 @@
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
-import { facilities, leaseFeeMeters, leaseFeeSnapshots, leases, meterReadings, meters, rooms } from '@/db'
+import { facilities, invoices, leaseFeeMeters, leaseFeeSnapshots, leases, meterReadings, meters, rooms } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { daysInMonth } from '@/domain/dates'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { meterUsage, suggestFinalReading } from '@/domain/meters'
-import { buildMonthlyCells, type MonthlyCell } from '@/domain/meters-monthly'
 import type { Meter, MeterReading, Utility } from '@/domain/types'
 import { recordAudit } from '@/server/audit'
 
@@ -96,6 +95,22 @@ export async function listReadingSheet(db: DB, ctx: AccessContext, facilityId: s
   return { rows, progress: { recorded: withElectric.filter((r) => r.electric!.current != null).length, total: withElectric.length } }
 }
 
+/**
+ * Chỉ số tháng P là số cuối của hoá đơn tháng P+1 và số đầu của hoá đơn tháng P+2: hoá đơn tháng đã duyệt thì khoá hai kỳ đó.
+ * Trả về mã hoá đơn đang khoá theo phòng và kỳ.
+ */
+async function lockedReadings(tx: Pick<DB, 'select'>, roomIds: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  if (roomIds.length === 0) return out
+  const approved = await tx.select({ roomId: leases.roomId, code: invoices.code, periodStart: invoices.periodStart }).from(invoices).innerJoin(leases, eq(leases.id, invoices.leaseId)).where(and(inArray(leases.roomId, roomIds), eq(invoices.status, 'approved'), eq(invoices.kind, 'monthly')))
+  for (const a of approved) {
+    const month = a.periodStart.slice(0, 7)
+    for (const p of [shiftPeriod(month, -1), shiftPeriod(month, -2)]) if (!out.has(`${a.roomId}|${p}`)) out.set(`${a.roomId}|${p}`, a.code)
+  }
+  return out
+}
+const lockMessage = (code: string) => `Chỉ số đã dùng trong hoá đơn ${code} đã duyệt, bỏ duyệt hoá đơn trước khi đổi`
+
 export type ReadingInput = { meterId: string; value: number; readOn: string }
 export type ReadingError = { meterId: string; message: string }
 
@@ -113,6 +128,7 @@ export async function applyReadings(tx: DB, ctx: AccessContext, period: string, 
     if (found.length !== ids.length) throw new NotFoundError()
     for (const f of found) assertCan(ctx, 'meters', f.facilityId)
     const existing = ids.length ? await tx.select().from(meterReadings).where(inArray(meterReadings.meterId, ids)) : []
+    const locked = await lockedReadings(tx, [...new Set(found.map((f) => f.m.roomId))])
 
     const errors: ReadingError[] = []
     let saved = 0
@@ -122,6 +138,8 @@ export async function applyReadings(tx: DB, ctx: AccessContext, period: string, 
       const m = info.m
       const fail = (message: string) => errors.push({ meterId: row.meterId, message })
       if (!Number.isInteger(row.value) || row.value < 0) { fail('Chỉ số không hợp lệ'); continue }
+      const lockedBy = locked.get(`${m.roomId}|${period}`)
+      if (lockedBy) { fail(lockMessage(lockedBy)); continue }
       if (row.readOn < start || row.readOn > end) { fail('Ngày ghi không thuộc kỳ này'); continue }
       if (m.installedOn > row.readOn) { fail('Đồng hồ chưa được lắp vào ngày này'); continue }
       if (m.removedOn) { fail('Đồng hồ này đã được gỡ, hãy ghi trên đồng hồ mới'); continue }
@@ -271,7 +289,7 @@ export type MeterOverviewRow = {
   finalReadingEstimated: boolean; estimateNote: string | null
   /** Chỉ số mới nhất theo ngày ghi (chốt tháng hoặc bàn giao), null nếu chưa có. */
   lastReading: { value: number; readOn: string } | null
-  readings: { period: string; kind: 'monthly' | 'handover'; readOn: string; value: number }[]
+  readings: { id: string; period: string; kind: 'monthly' | 'handover'; readOn: string; value: number }[]
 }
 
 /** Danh sách đồng hồ của một cơ sở kèm dòng phí, hợp đồng đang hiệu lực và lịch sử chỉ số (mới nhất trước). */
@@ -302,35 +320,71 @@ export async function listMeterOverview(db: DB, ctx: AccessContext, facilityId: 
       serial: meter.serial, startReading: meter.startReading, installedOn: meter.installedOn, removedOn: meter.removedOn,
       finalReadingEstimated: meter.finalReadingEstimated, estimateNote: meter.estimateNote,
       lastReading: (readingsByMeter.get(meter.id) ?? [])[0] ? { value: readingsByMeter.get(meter.id)![0].value, readOn: readingsByMeter.get(meter.id)![0].readOn } : null,
-      readings: (readingsByMeter.get(meter.id) ?? []).map(r => ({ period: r.period, kind: r.kind as 'monthly' | 'handover', readOn: r.readOn, value: r.value })),
+      readings: (readingsByMeter.get(meter.id) ?? []).map(r => ({ id: r.id, period: r.period, kind: r.kind as 'monthly' | 'handover', readOn: r.readOn, value: r.value })),
     }
   })
   return rows.sort((a, b) => (a.floor ?? '').localeCompare(b.floor ?? '') || a.roomCode.localeCompare(b.roomCode) || Number(a.removedOn !== null) - Number(b.removedOn !== null) || (a.feeName ?? '').localeCompare(b.feeName ?? ''))
 }
 
-export type MonthlyRow = { roomId: string; roomCode: string; floor: string | null; electric: MonthlyCell[]; water: MonthlyCell[] }
 
-/** Bảng chỉ số theo tháng của một toà: mỗi phòng đang dùng một hàng, `months` kỳ kết thúc ở `endPeriod` (tối đa 12). */
-export async function listMonthlyReadings(db: DB, ctx: AccessContext, facilityId: string, endPeriod: string, months = 6): Promise<{ periods: string[]; rows: MonthlyRow[] }> {
+export type ReadingHistoryRow = {
+  id: string; meterId: string; roomId: string; roomCode: string; floor: string | null
+  /** Tên loại đồng hồ (đã bỏ mã trong ngoặc) để lọc và hiển thị. */
+  meterName: string; meterCode: string | null; unit: string | null
+  kind: 'monthly' | 'handover'; period: string; readOn: string
+  opening: number; closing: number; usage: number
+  /** Mã hoá đơn đã duyệt đang dùng chỉ số này; có thì không sửa, xoá được. */
+  lockedBy: string | null
+}
+
+const typeName = (name: string) => name.replace(/\s*\([^)]*\)\s*$/, '').trim()
+
+/** Lịch sử chốt chỉ số của một toà từ tháng `from` đến tháng `to`: mỗi dòng một lần chốt, kèm số đầu, số cuối, ngày chốt. Mới nhất trước. */
+export async function listReadingHistory(db: DB, ctx: AccessContext, facilityId: string, from: string, to: string): Promise<ReadingHistoryRow[]> {
   assertCan(ctx, 'meters', facilityId)
-  periodRange(endPeriod)
-  const count = Math.min(Math.max(Math.trunc(months), 1), 12)
-  const periods = Array.from({ length: count }, (_, i) => shiftPeriod(endPeriod, i - (count - 1)))
-  const windowStart = `${periods[0]}-01`
-  const windowEnd = periodRange(endPeriod)[1]
-  const inFacility = and(eq(rooms.facilityId, facilityId), eq(rooms.isActive, true))
-  const [roomRows, meterRows, windowReadings, baseline] = await Promise.all([
-    db.select().from(rooms).where(inFacility).orderBy(asc(rooms.floor), asc(rooms.code)),
-    db.select({ m: meters }).from(meters).innerJoin(rooms, eq(rooms.id, meters.roomId)).where(and(inFacility, inArray(meters.utility, ['electric', 'water']))),
-    db.select({ r: meterReadings }).from(meterReadings).innerJoin(meters, eq(meters.id, meterReadings.meterId)).innerJoin(rooms, eq(rooms.id, meters.roomId)).where(and(inFacility, sql`${meterReadings.readOn} >= ${windowStart}`, sql`${meterReadings.readOn} <= ${windowEnd}`)),
-    db.selectDistinctOn([meterReadings.meterId], { r: meterReadings }).from(meterReadings).innerJoin(meters, eq(meters.id, meterReadings.meterId)).innerJoin(rooms, eq(rooms.id, meters.roomId)).where(and(inFacility, sql`${meterReadings.readOn} < ${windowStart}`)).orderBy(meterReadings.meterId, sql`${meterReadings.readOn} desc`),
-  ])
-  const allMeters = meterRows.map((x) => toMeter(x.m))
-  const allReadings = [...baseline, ...windowReadings].map((x) => toReading(x.r))
-  const forUtility = (roomId: string, utility: Utility) => {
-    const ms = allMeters.filter((m) => m.roomId === roomId && m.utility === utility)
-    const ids = new Set(ms.map((m) => m.id))
-    return buildMonthlyCells(periods, ms, allReadings.filter((r) => ids.has(r.meterId)))
+  periodRange(from); periodRange(to)
+  const overview = await listMeterOverview(db, ctx, facilityId)
+  const locked = await lockedReadings(db, [...new Set(overview.map((o) => o.roomId))])
+  const rows: ReadingHistoryRow[] = []
+  for (const m of overview) {
+    const asc = [...m.readings].sort((a, b) => (a.readOn < b.readOn ? -1 : a.readOn > b.readOn ? 1 : 0))
+    let prev = m.startReading
+    for (const r of asc) {
+      if (r.period >= from && r.period <= to) {
+        rows.push({ id: r.id, meterId: m.meterId, roomId: m.roomId, roomCode: m.roomCode, floor: m.floor, meterName: typeName(m.meterName), meterCode: m.meterCode, unit: m.unit, kind: r.kind, period: r.period, readOn: r.readOn, opening: prev, closing: r.value, usage: Math.max(r.value - prev, 0), lockedBy: r.kind === 'monthly' ? (locked.get(`${m.roomId}|${r.period}`) ?? null) : null })
+      }
+      prev = r.value
+    }
   }
-  return { periods, rows: roomRows.map((r) => ({ roomId: r.id, roomCode: r.code, floor: r.floor, electric: forUtility(r.id, 'electric'), water: forUtility(r.id, 'water') })) }
+  return rows.sort((a, b) => (a.readOn < b.readOn ? 1 : a.readOn > b.readOn ? -1 : 0) || a.roomCode.localeCompare(b.roomCode, 'vi', { numeric: true }) || a.meterName.localeCompare(b.meterName, 'vi'))
+}
+
+async function readingForEdit(tx: DB, ctx: AccessContext, id: string) {
+  const [found] = await tx.select({ r: meterReadings, m: meters, facilityId: rooms.facilityId, roomCode: rooms.code }).from(meterReadings).innerJoin(meters, eq(meters.id, meterReadings.meterId)).innerJoin(rooms, eq(rooms.id, meters.roomId)).where(eq(meterReadings.id, id))
+  if (!found) throw new NotFoundError()
+  assertCan(ctx, 'meters', found.facilityId)
+  if (found.r.kind !== 'monthly') throw new ValidationError('Chỉ số bàn giao sửa ở biên bản bàn giao, không sửa ở đây')
+  const lockedBy = (await lockedReadings(tx, [found.m.roomId])).get(`${found.m.roomId}|${found.r.period}`)
+  if (lockedBy) throw new ValidationError(lockMessage(lockedBy))
+  return found
+}
+
+/** Sửa số chốt và ngày chốt của một kỳ cũ; cùng kiểm tra với lúc ghi (không nhỏ hơn kỳ trước, không lớn hơn kỳ sau), chặn khi hoá đơn dùng nó đã duyệt. */
+export async function updateMeterReading(db: DB, ctx: AccessContext, id: string, input: { value: number; readOn: string }): Promise<void> {
+  await db.transaction(async (tx0) => {
+    const tx = tx0 as unknown as DB
+    const f = await readingForEdit(tx, ctx, id)
+    const result = await applyReadings(tx, ctx, f.r.period, [{ meterId: f.m.id, value: input.value, readOn: input.readOn }])
+    if (result.errors.length) throw new ValidationError(result.errors[0].message)
+  })
+}
+
+/** Xoá một lần chốt tháng (không xoá chỉ số bàn giao), chặn khi hoá đơn dùng nó đã duyệt. */
+export async function deleteMeterReading(db: DB, ctx: AccessContext, id: string): Promise<void> {
+  await db.transaction(async (tx0) => {
+    const tx = tx0 as unknown as DB
+    const f = await readingForEdit(tx, ctx, id)
+    await tx.delete(meterReadings).where(eq(meterReadings.id, id))
+    await recordAudit(tx, ctx, { action: 'delete', entity: 'meter_readings', entityId: id, facilityId: f.facilityId, summary: `Xoá chỉ số ${f.r.period} đồng hồ phòng ${f.roomCode}`, before: f.r })
+  })
 }

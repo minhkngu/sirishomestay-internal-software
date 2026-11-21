@@ -6,9 +6,10 @@ import { daysInMonth, todayVN } from '@/domain/dates'
 import { cn } from '@/lib/utils'
 import { getAccessContext } from '@/server/session'
 import { listFacilities } from '@/server/facilities/service'
-import { listMeterOverview, listMonthlyReadings, listReadingSheet } from '@/server/meters/service'
+import { listMeterOverview, listReadingHistory, listReadingSheet } from '@/server/meters/service'
+import { listMeterTypes } from '@/server/meter-types/service'
 import { MeterList } from '@/features/meters/components/meter-list'
-import { MonthlyTable } from '@/features/meters/components/monthly-table'
+import { ReadingHistory } from '@/features/meters/components/reading-history'
 import { AddMeterButton } from '@/features/meters/components/add-meter-dialog'
 import { ReadingGrid } from '@/features/meters/components/reading-grid'
 import { MeterFilters } from '@/features/meters/components/meter-filters'
@@ -37,11 +38,11 @@ function uniqueRooms(rows: Array<{ roomId: string; roomCode: string }>) {
     .sort((a, b) => a.label.localeCompare(b.label, 'vi', { numeric: true }))
 }
 
-export default async function MetersPage({ searchParams }: { searchParams: Promise<{ facility?: string; period?: string; tab?: string; room?: string; meter?: string; view?: string }> }) {
+export default async function MetersPage({ searchParams }: { searchParams: Promise<{ facility?: string; period?: string; from?: string; to?: string; tab?: string; room?: string; meter?: string; view?: string }> }) {
   return <RequirePermission perm="meters"><Meters searchParams={searchParams} /></RequirePermission>
 }
 
-async function Meters({ searchParams }: { searchParams: Promise<{ facility?: string; period?: string; tab?: string; room?: string; meter?: string; view?: string }> }) {
+async function Meters({ searchParams }: { searchParams: Promise<{ facility?: string; period?: string; from?: string; to?: string; tab?: string; room?: string; meter?: string; view?: string }> }) {
   const sp = await searchParams
   const ctx = await getAccessContext()
   const facs = await listFacilities(db, ctx)
@@ -52,24 +53,32 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
   const tab: Tab = sp.tab === 'meters' ? 'meters' : 'readings'
   const history = tab === 'readings' && (sp.view === 'history' || sp.tab === 'monthly')
   const sheet = tab === 'readings' && !history && facilityId ? await listReadingSheet(db, ctx, facilityId, period) : null
-  const monthly = history && facilityId ? await listMonthlyReadings(db, ctx, facilityId, period) : null
+  const shift = (ym: string, delta: number) => { const [y, m] = ym.split('-').map(Number); const t = y * 12 + (m - 1) + delta; return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, '0')}` }
+  const monthRe = /^\d{4}-(0[1-9]|1[0-2])$/
+  const to = monthRe.test(sp.to ?? '') ? sp.to! : today.slice(0, 7)
+  const from = monthRe.test(sp.from ?? '') && sp.from! <= to ? sp.from! : shift(to, -5)
+  const [historyRows, meterTypes] = await Promise.all([
+    history && facilityId ? listReadingHistory(db, ctx, facilityId, from, to) : Promise.resolve(null),
+    listMeterTypes(db),
+  ])
   const overview = tab === 'meters' && facilityId ? await listMeterOverview(db, ctx, facilityId) : []
   const end = `${period}-${String(daysInMonth(period)).padStart(2, '0')}`
   const readOn = today.startsWith(period) ? today : end
 
   const readingRows = sheet?.rows ?? []
-  const monthlyRows = monthly?.rows ?? []
-  const roomOptions = tab === 'readings' ? uniqueRooms(history ? monthlyRows : readingRows) : uniqueRooms(overview)
+  const historyAll = historyRows ?? []
+  const roomOptions = tab === 'readings' ? uniqueRooms(history ? historyAll : readingRows) : uniqueRooms(overview)
   const roomId = roomOptions.some((room) => room.value === sp.room) ? sp.room! : ''
 
   const scopedReadings = readingRows.filter((row) => !roomId || row.roomId === roomId)
-  const scopedMonthly = monthlyRows.filter((row) => !roomId || row.roomId === roomId)
   const scopedOverview = overview.filter((row) => !roomId || row.roomId === roomId)
 
-  const meterTypes = tab === 'readings' ? (history ? ['Điện', 'Nước'] : readingMeterTypes(scopedReadings))
-    : sortMeterTypes(scopedOverview.map((row) => row.meterName))
-  const meter = meterTypes.includes(sp.meter ?? '') ? sp.meter! : ''
-  const meterOptions = [{ value: '', label: history ? 'Cả điện và nước' : 'Tất cả đồng hồ' }, ...meterTypes.map((type) => ({ value: type, label: type }))]
+  // Bộ lọc luôn liệt kê mọi loại đồng hồ trong Cài đặt, thêm các tên loại đang có ở dữ liệu nhưng chưa khai báo
+  const present = tab === 'readings' ? (history ? historyAll.map((row) => row.meterName) : readingMeterTypes(scopedReadings)) : scopedOverview.map((row) => row.meterName)
+  const typeNames = sortMeterTypes([...meterTypes.map((t) => t.name), ...present])
+  const meter = typeNames.includes(sp.meter ?? '') ? sp.meter! : ''
+  const meterOptions = [{ value: '', label: 'Tất cả loại đồng hồ' }, ...typeNames.map((type) => ({ value: type, label: type }))]
+  const unitByType = Object.fromEntries(meterTypes.map((t) => [t.name, t.unit]))
 
   const periodOptions = periodChoices(today)
   if (!periodOptions.some((option) => option.value === period)) periodOptions.unshift({ value: period, label: periodLabel(period) })
@@ -77,7 +86,7 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
   const clearParams = new URLSearchParams({ tab })
   if (facilityId) clearParams.set('facility', facilityId)
   if (tab !== 'meters') clearParams.set('period', period)
-  if (history) clearParams.set('view', 'history')
+  if (history) { clearParams.set('view', 'history'); clearParams.set('from', from); clearParams.set('to', to) }
   const clearFiltersHref = `/meters?${clearParams.toString()}`
 
   function tabHref(next: Tab) {
@@ -91,7 +100,7 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
   const viewHref = (view: 'sheet' | 'history') => {
     const params = new URLSearchParams({ tab: 'readings', period })
     if (facilityId) params.set('facility', facilityId)
-    if (view === 'history') params.set('view', 'history')
+    if (view === 'history') { params.set('view', 'history'); params.set('from', from); params.set('to', to) }
     return `/meters?${params.toString()}`
   }
 
@@ -99,7 +108,7 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Chỉ số" action={tab === 'meters' && facilityId ? <AddMeterButton rooms={addMeterRooms} /> : undefined} />
+      <PageHeader title="Chỉ số" action={tab === 'meters' && facilityId ? <AddMeterButton rooms={addMeterRooms} types={meterTypes.filter((t) => !t.isSystem).map((t) => ({ name: t.name, unit: t.unit }))} /> : undefined} />
       <p className="-mt-2 text-sm text-muted-foreground">Chốt chỉ số điện, nước và đồng hồ phụ hằng tháng để làm hoá đơn; quản lý đồng hồ.</p>
 
       <nav aria-label="Mục chỉ số" className="flex items-center gap-0.5 overflow-x-auto border-b border-border/70">
@@ -132,19 +141,20 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
             periodOptions={periodOptions}
             period={period}
             showPeriod={tab !== 'meters'}
+            range={history ? { from, to } : undefined}
           />
 
           {tab === 'readings' && (
             <div className="flex items-center gap-0.5" role="group" aria-label="Cách xem chỉ số">
               <Link href={viewHref('sheet')} aria-current={!history ? 'page' : undefined} className={cn('rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors', !history ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground')}>Chốt tháng này</Link>
-              <Link href={viewHref('history')} aria-current={history ? 'page' : undefined} className={cn('rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors', history ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground')}>Xem nhiều tháng</Link>
+              <Link href={viewHref('history')} aria-current={history ? 'page' : undefined} className={cn('rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors', history ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground')}>Lịch sử</Link>
             </div>
           )}
 
           {tab === 'readings' && !history ? (
-            sheet ? <ReadingGrid key={`${facilityId}-${period}`} rows={scopedReadings} period={period} readOn={readOn} meterFilter={meter} roomFiltered={Boolean(roomId)} clearFiltersHref={roomId || meter ? clearFiltersHref : undefined} /> : <EmptyData />
+            sheet ? <ReadingGrid key={`${facilityId}-${period}`} rows={scopedReadings} period={period} readOn={readOn} meterFilter={meter} unitByType={unitByType} roomFiltered={Boolean(roomId)} clearFiltersHref={roomId || meter ? clearFiltersHref : undefined} /> : <EmptyData />
           ) : tab === 'readings' ? (
-            monthly ? <MonthlyTable periods={monthly.periods} rows={scopedMonthly} utility={meter} /> : <EmptyData />
+            historyRows ? <ReadingHistory rows={historyAll.filter((row) => (!roomId || row.roomId === roomId) && (!meter || row.meterName === meter))} /> : <EmptyData />
           ) : (
             <MeterList rows={meter ? scopedOverview.filter((row) => row.meterName === meter) : scopedOverview} />
           )}

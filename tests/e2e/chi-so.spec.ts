@@ -18,7 +18,7 @@ test('menu Chỉ số và trang có hai tab Chốt chỉ số, Đồng hồ', as
   await expect(page.getByLabel('Kỳ ghi')).toBeVisible()
   await expect(page.getByRole('link', { name: 'Chốt chỉ số', exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Theo tháng', exact: true })).toHaveCount(0)
-  await page.getByRole('link', { name: 'Xem nhiều tháng', exact: true }).click()
+  await page.getByRole('link', { name: 'Lịch sử', exact: true }).click()
   await expect(page).toHaveURL(/view=history/)
   await page.getByRole('link', { name: 'Đồng hồ', exact: true }).click()
   await expect(page).toHaveURL(/tab=meters/)

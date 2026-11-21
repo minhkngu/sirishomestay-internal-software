@@ -288,6 +288,13 @@
       "when": 1795257436830,
       "tag": "0040_handy_vulcan",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1795277838953,
+      "tag": "0041_shallow_owl",
+      "breakpoints": true
     }
   ]
 }

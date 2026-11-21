@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AmenitySettings, type AmenityRow } from '@/features/settings/components/amenity-settings'
+import { MeterTypeSettings, type MeterTypeRow } from '@/features/settings/components/meter-type-settings'
 import { FeeSettings } from '@/features/settings/components/fee-settings'
 import { Msg, useRun } from '@/features/settings/components/use-run'
 import { updateSettingsAction } from '@/server/settings/actions'
@@ -16,7 +17,7 @@ type Fac = { id: string; name: string }
 type Unit = { id: string; name: string }
 type FeeT = { id: string; name: string; unitId: string; defaultPrice: number; billing: string; quantityFrom: string; isActive: boolean }
 
-type Props = { defaults: Record<string, string[]>; prices: Record<string, Record<string, number>>; settings: Settings; facilities: Fac[]; units: Unit[]; feeTypes: FeeT[]; amenities: AmenityRow[] }
+type Props = { defaults: Record<string, string[]>; prices: Record<string, Record<string, number>>; settings: Settings; facilities: Fac[]; units: Unit[]; feeTypes: FeeT[]; amenities: AmenityRow[]; meterTypes: MeterTypeRow[] }
 
 function GeneralTab({ s }: { s: Settings }) {
   const { pending, error, ok, run } = useRun()
@@ -65,16 +66,18 @@ function BankAccountTab({ settings }: { settings: Settings }) {
   </div>
 }
 
-export function SettingsTabs({ settings, facilities, units, feeTypes, prices, defaults, amenities }: Props) {
+export function SettingsTabs({ settings, facilities, units, feeTypes, prices, defaults, amenities, meterTypes }: Props) {
   return (
     <Tabs defaultValue="general">
       <TabsList>
         <TabsTrigger value="general">Chung</TabsTrigger>
         <TabsTrigger value="fees">Phí dịch vụ</TabsTrigger>
+        <TabsTrigger value="meter-types">Loại đồng hồ</TabsTrigger>
         <TabsTrigger value="amenities">Tiện ích</TabsTrigger>
         <TabsTrigger value="bank">Tài khoản nhận tiền</TabsTrigger>
       </TabsList>
       <TabsContent value="general"><GeneralTab s={settings} /></TabsContent>
+      <TabsContent value="meter-types"><MeterTypeSettings types={meterTypes} /></TabsContent>
       <TabsContent value="amenities"><AmenitySettings amenities={amenities} /></TabsContent>
       <TabsContent value="bank"><BankAccountTab settings={settings} /></TabsContent>
       <TabsContent value="fees"><FeeSettings defaults={defaults} units={units} feeTypes={feeTypes} facilities={facilities} prices={prices} /></TabsContent>

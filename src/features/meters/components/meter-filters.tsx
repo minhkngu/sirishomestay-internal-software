@@ -78,6 +78,7 @@ export function MeterFilters({
   periodOptions,
   period,
   showPeriod,
+  range,
 }: {
   facilities: Option[]
   facilityId: string
@@ -88,6 +89,8 @@ export function MeterFilters({
   periodOptions: Option[]
   period: string
   showPeriod: boolean
+  /** Chế độ lịch sử: lọc từ tháng – đến tháng thay cho ô Kỳ ghi. */
+  range?: { from: string; to: string }
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -116,7 +119,17 @@ export function MeterFilters({
       <FilterField label="Đồng hồ" className="sm:w-40">
         <FilterSelect label="Đồng hồ" value={meter} options={meters} onChange={(value) => update({ meter: value || null })} />
       </FilterField>
-      {showPeriod && (
+      {range && (
+        <>
+          <FilterField label="Từ tháng" className="sm:w-40">
+            <input type="month" aria-label="Từ tháng" value={range.from} max={range.to} onChange={(e) => e.target.value && update({ from: e.target.value })} className="h-9 w-full rounded-xl border border-input bg-card px-3 text-[13px]" />
+          </FilterField>
+          <FilterField label="Đến tháng" className="sm:w-40">
+            <input type="month" aria-label="Đến tháng" value={range.to} min={range.from} onChange={(e) => e.target.value && update({ to: e.target.value })} className="h-9 w-full rounded-xl border border-input bg-card px-3 text-[13px]" />
+          </FilterField>
+        </>
+      )}
+      {showPeriod && !range && (
         <FilterField label="Kỳ ghi" className="sm:w-40">
           <FilterSelect label="Kỳ ghi" value={period} options={periodOptions} onChange={(value) => update({ period: value })} />
         </FilterField>

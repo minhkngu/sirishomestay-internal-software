@@ -50,3 +50,13 @@ export const leaseFeeMeters = pgTable('lease_fee_meters', {
   leaseFeeId: uuid('lease_fee_id').primaryKey().references(() => leaseFeeSnapshots.id, { onDelete: 'cascade' }),
   meterId: uuid('meter_id').notNull().references(() => meters.id),
 }).enableRLS()
+
+/** Loại đồng hồ quản lý trong Cài đặt (Điện, Nước, Máy giặt...): tên và đơn vị; dùng để thêm đồng hồ và lọc chỉ số. */
+export const meterTypes = pgTable('meter_types', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  unit: text('unit').notNull().default(''),
+  /** Điện, Nước có sẵn: không đổi tên, không xoá. */
+  isSystem: boolean('is_system').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex('meter_types_name_unique').on(sql`lower(${t.name})`)])

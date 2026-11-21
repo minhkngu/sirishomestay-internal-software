@@ -12,7 +12,7 @@ import { todayVN } from '@/domain/dates'
 import { addRoomMeterAction } from '@/server/meters/actions'
 
 /** Thêm một đồng hồ (loại khác) cho phòng. Đồng hồ điện, nước mặc định đã có sẵn; không có thao tác xoá đồng hồ. */
-export function AddMeterButton({ rooms }: { rooms: { id: string; code: string }[] }) {
+export function AddMeterButton({ rooms, types }: { rooms: { id: string; code: string }[]; types: { name: string; unit: string }[] }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [pending, start] = useTransition()
@@ -27,7 +27,7 @@ export function AddMeterButton({ rooms }: { rooms: { id: string; code: string }[
     e.preventDefault()
     setError(null)
     if (!roomId) { setError('Chọn phòng'); return }
-    if (!name.trim()) { setError('Nhập tên đồng hồ'); return }
+    if (!name.trim()) { setError('Chọn loại đồng hồ'); return }
     if (!/^\d+$/.test(startReading.trim())) { setError('Nhập chỉ số đầu là số nguyên không âm'); return }
     start(async () => {
       const r = await addRoomMeterAction(roomId, { name: name.trim(), startReading: Number(startReading), installedOn, serial: serial.trim() || undefined })
@@ -40,7 +40,7 @@ export function AddMeterButton({ rooms }: { rooms: { id: string; code: string }[
   return (
     <>
       <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>Thêm đồng hồ</Button>
-      <FormDialog open={open} onOpenChange={setOpen} title="Thêm đồng hồ" description="Thêm đồng hồ khác cho phòng, đặt tên để dễ chọn khi gắn phí. Đồng hồ Điện và Nước đã có sẵn." size="sm">
+      <FormDialog open={open} onOpenChange={setOpen} title="Thêm đồng hồ" description="Thêm đồng hồ khác cho phòng theo loại đã khai báo trong Cài đặt. Đồng hồ Điện và Nước đã có sẵn." size="sm">
         <form onSubmit={submit} className="space-y-3">
           <div className="space-y-1"><Label htmlFor="add-meter-room">Phòng</Label>
             <Select value={roomId} onValueChange={(next) => setRoomId(String(next ?? ''))} items={[{ value: '', label: 'Chọn phòng' }, ...rooms.map((room) => ({ value: room.id, label: room.code }))]}>
@@ -53,7 +53,16 @@ export function AddMeterButton({ rooms }: { rooms: { id: string; code: string }[
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1"><Label htmlFor="add-meter-name">Tên đồng hồ</Label><Input id="add-meter-name" placeholder="Ví dụ: Máy giặt" value={name} onChange={(e) => setName(e.target.value)} /></div>
+          <div className="space-y-1"><Label htmlFor="add-meter-name">Loại đồng hồ</Label>
+            <Select value={name} onValueChange={(next) => setName(String(next ?? ''))} items={[{ value: '', label: 'Chọn loại' }, ...types.map((t) => ({ value: t.name, label: t.unit ? `${t.name} (${t.unit})` : t.name }))]}>
+              <SelectTrigger id="add-meter-name" aria-label="Loại đồng hồ" className="h-9 w-full justify-between bg-card text-[13px] font-normal"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Chọn loại</SelectItem>
+                {types.map((t) => <SelectItem key={t.name} value={t.name}>{t.unit ? `${t.name} (${t.unit})` : t.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">Thêm loại mới ở Cài đặt → Loại đồng hồ.</p>
+          </div>
           <div className="space-y-1"><Label htmlFor="add-meter-serial">Số seri (nếu có)</Label><Input id="add-meter-serial" value={serial} onChange={(e) => setSerial(e.target.value)} /></div>
           <div className="space-y-1"><Label htmlFor="add-meter-start">Chỉ số đầu</Label><Input id="add-meter-start" inputMode="numeric" value={startReading} onChange={(e) => setStartReading(e.target.value)} /></div>
           <DateField id="add-meter-date" label="Ngày lắp" value={installedOn} onValueChange={setInstalledOn} />

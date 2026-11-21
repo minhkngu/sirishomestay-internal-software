@@ -16,7 +16,7 @@ export type GridRow = { roomId: string; roomCode: string; floor?: string | null;
 
 const fmt = (value: number) => value.toLocaleString('vi-VN')
 
-export function ReadingGrid({ rows, period, readOn, meterFilter, roomFiltered = false, clearFiltersHref }: { rows: GridRow[]; period: string; readOn: string; meterFilter: string; roomFiltered?: boolean; clearFiltersHref?: string }) {
+export function ReadingGrid({ rows, period, readOn, meterFilter, unitByType = {}, roomFiltered = false, clearFiltersHref }: { rows: GridRow[]; period: string; readOn: string; meterFilter: string; unitByType?: Record<string, string>; roomFiltered?: boolean; clearFiltersHref?: string }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [values, setValues] = useState<Record<string, string>>({})
@@ -80,7 +80,7 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, roomFiltered = 
     const list: Omit<Item, 'first'>[] = [
       ...(showElectric ? [{ key: `${row.roomId}-e`, room: row, label: 'Điện', unit: 'kWh', utility: 'electric' as const, cell: row.electric }] : []),
       ...(showWater ? [{ key: `${row.roomId}-w`, room: row, label: 'Nước', unit: 'm³', utility: 'water' as const, cell: row.water }] : []),
-      ...visibleFeeMeters(row).map((fee) => ({ key: fee.cell.meterId, room: row, label: meterTypeName(fee.name), unit: '', cell: fee.cell })),
+      ...visibleFeeMeters(row).map((fee) => ({ key: fee.cell.meterId, room: row, label: meterTypeName(fee.name), unit: unitByType[meterTypeName(fee.name)] ?? '', cell: fee.cell })),
     ]
     return list.map((item, i) => ({ ...item, first: i === 0 }))
   })
