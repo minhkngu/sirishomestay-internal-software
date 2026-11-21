@@ -4,7 +4,8 @@ import { notFound } from 'next/navigation'
 import { ArrowLeft, Calendar, FileText, Home, User } from 'lucide-react'
 import { db } from '@/db/client'
 import { NotFoundError } from '@/domain/errors'
-import { formatDateVN } from '@/domain/dates'
+import { formatDateVN, todayVN } from '@/domain/dates'
+import { computeDueDate } from '@/domain/due-date'
 import { formatVND } from '@/domain/money'
 import { InvoiceFeeQuantities } from '@/features/invoices/components/invoice-fee-quantities'
 import { InvoiceEditorWithFees } from './invoice-editor-with-fees'
@@ -124,6 +125,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         dueDate={inv.dueDate ? formatDateVN(inv.dueDate) : null}
         dueDateIso={inv.dueDate}
         dueDefaultLabel={dueDefaultLabel}
+        dueDefaultIso={computeDueDate(dueRule, todayVN(), inv.periodStart.slice(0, 7))}
         lines={d.lines.map((l) => ({
           id: l.id,
           amount: l.amount,

@@ -73,6 +73,8 @@ type Props = {
   dueDateIso: string | null
   /** Quy tắc hạn mặc định trong Cài đặt, viết thành câu. */
   dueDefaultLabel: string
+  /** Hạn mặc định theo Cài đặt, tính sẵn thành ngày cụ thể (YYYY-MM-DD). */
+  dueDefaultIso: string
   lines: Line[]
 }
 
@@ -179,7 +181,7 @@ export function InvoiceEditor(p: Props) {
   const [lines, setLines] = useState<EditorLine[]>(p.lines.filter((l) => l.type !== 'tax').map((l) => ({ ...l, unitPriceText: String(l.unitPrice) })))
   const taxLine = p.lines.find((l) => l.type === 'tax')
   const [taxRate, setTaxRate] = useState(typeof taxLine?.meta?.rate === 'number' ? String(taxLine.meta.rate) : '')
-  const [due, setDue] = useState(p.dueDateIso ?? '')
+  const [due, setDue] = useState(p.dueDateIso ?? p.dueDefaultIso)
   const [pickingFee, setPickingFee] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [createdFees, setCreatedFees] = useState<FeeOption[]>([])
@@ -243,7 +245,7 @@ export function InvoiceEditor(p: Props) {
             <label htmlFor="invoice-due" className="block text-xs font-medium text-muted-foreground">Hạn thanh toán</label>
             <div className="flex flex-wrap items-center gap-2.5">
               <input id="invoice-due" type="date" value={due} onChange={(e) => setDue(e.target.value)} className="h-9 rounded-lg border border-border/80 bg-background px-2.5 text-sm font-semibold tabular-nums text-foreground focus:border-primary focus:outline-none" />
-              <span className="text-xs text-muted-foreground">Mặc định theo Cài đặt: {p.dueDefaultLabel}</span>
+              <span className="text-xs text-muted-foreground">Mặc định theo Cài đặt: <strong className="font-semibold text-foreground">{formatDateVN(p.dueDefaultIso)}</strong> ({p.dueDefaultLabel})</span>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
