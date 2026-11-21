@@ -32,11 +32,11 @@ export function FeePickerDialog({ open, onOpenChange, feeTypes, usedTypeIds, fac
     const q = norm(query.trim())
     return feeTypes.filter(f => (!source || (source === 'manual' ? f.quantityFrom === 'manual' || f.quantityFrom === 'period_input' : f.quantityFrom === source)) && (!q || norm(`${f.name} ${f.unit}`).includes(q)))
   }, [feeTypes, query, source])
-  return <FormDialog open={open} onOpenChange={onOpenChange} title="Chọn phí dịch vụ" description={description} size="md">
+  return <FormDialog open={open} onOpenChange={onOpenChange} title="Chọn phí dịch vụ" description={description} size="sm">
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <Input aria-label="Tìm phí" placeholder="Tìm tên phí hoặc đơn vị" value={query} onChange={e => setQuery(e.target.value)} className="h-9 min-w-48 flex-1" />
-        <div className="w-52">
+        <Input aria-label="Tìm phí" placeholder="Tìm tên phí hoặc đơn vị" value={query} onChange={e => setQuery(e.target.value)} className="h-9 min-w-36 flex-1" />
+        <div className="w-40">
           <Select value={source} onValueChange={(next) => setSource(next == null ? '' : String(next))} items={FILTERS}>
             <SelectTrigger aria-label="Lọc theo cách tính" className="h-9 w-full justify-between bg-card text-[13px] font-normal"><SelectValue /></SelectTrigger>
             <SelectContent>{FILTERS.map((o) => <SelectItem key={o.value || '__all__'} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
@@ -48,11 +48,11 @@ export function FeePickerDialog({ open, onOpenChange, feeTypes, usedTypeIds, fac
         <p className="text-xs text-muted-foreground">Dùng đúng biểu mẫu “Thêm loại phí” của Cài đặt: phí tạo ở đây cũng được lưu vào Cài đặt và thêm vào hợp đồng này.</p>
         {renderCreateFee({ onDone: () => setCreating(false) })}
       </div>}
-      <ul className="space-y-2">
+      <ul className="max-h-[42vh] space-y-1.5 overflow-y-auto pr-1">
         {shown.map(f => {
           const added = f.quantityFrom !== 'meter' && usedTypeIds.has(f.id)
           const price = resolveFeePrice(f.defaultPrice, f.prices, facilityId ?? null)
-          return <li key={f.id} className="flex items-center justify-between gap-3 rounded-xl border border-border/70 px-3.5 py-2.5">
+          return <li key={f.id} className="flex items-center justify-between gap-3 rounded-xl border border-border/70 px-3 py-2">
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{f.name}</p>
               <p className="text-xs text-muted-foreground">{f.unit} · {SOURCE_LABEL[f.quantityFrom] ?? f.quantityFrom} · <span className="tabular-nums">{formatVND(price)}</span></p>
