@@ -684,7 +684,11 @@ registerPdfLoader('receipt', async (db, ctx, id) => {
 async function buildMeterPanels(db: DB, leaseId: string, periodStart: string, monthly_: boolean) {
   const meterFees = monthly_ ? await db.select({ leaseFeeId: leaseFeeSnapshots.id, name: leaseFeeSnapshots.name, unit: leaseFeeSnapshots.unit, meterId: leaseFeeMeters.meterId }).from(leaseFeeSnapshots).innerJoin(leaseFeeMeters, eq(leaseFeeMeters.leaseFeeId, leaseFeeSnapshots.id)).where(and(eq(leaseFeeSnapshots.leaseId, leaseId), eq(leaseFeeSnapshots.quantitySource, 'meter'))) : []
   const periods = recentPeriods(periodStart.slice(0, 7))
-  const meterStart = new Map((meterFees.length ? await db.select({ id: meters.id, startReading: meters.startReading }).from(meters).where(inArray(meters.id, meterFees.map(f => f.meterId))) : []).map(m => [m.id, m.startReading]))
+  const meterRows = meterFees.length ? await db.select({ id: meters.id, startReading: meters.startReading, installedOn: meters.installedOn }).from(meters).where(inArray(meters.id, meterFees.map(f => f.meterId))) : []
+  const meterStart = new Map(meterRows.map(m => [m.id, m.startReading]))
+  // Chỉ số ban đầu ghi ở hợp đồng: chỉ số bàn giao sớm nhất của đồng hồ, không có thì chỉ số đầu khi lắp đồng hồ
+  const handovers = meterFees.length ? await db.select({ meterId: meterReadings.meterId, readOn: meterReadings.readOn, value: meterReadings.value }).from(meterReadings).where(and(inArray(meterReadings.meterId, meterFees.map(f => f.meterId)), eq(meterReadings.kind, 'handover'))).orderBy(asc(meterReadings.readOn)) : []
+  const initialOf = (meterId: string) => { const h = handovers.find(x => x.meterId === meterId); const m = meterRows.find(x => x.id === meterId); return h ? { value: h.value, readOn: h.readOn } : m ? { value: m.startReading, readOn: m.installedOn } : null }
   const monthly = meterFees.length ? await db.select().from(meterReadings).where(and(inArray(meterReadings.meterId, meterFees.map(f => f.meterId)), eq(meterReadings.kind, 'monthly'), inArray(meterReadings.period, periods))) : []
   // Số đầu kỳ của mỗi tháng = chỉ số gần nhất của đồng hồ trước ngày 1 của tháng đó (số chốt tháng trước, hoặc số ban đầu / bàn giao)
   const earlier = meterFees.length ? await db.select({ meterId: meterReadings.meterId, readOn: meterReadings.readOn, value: meterReadings.value, kind: meterReadings.kind }).from(meterReadings).where(and(inArray(meterReadings.meterId, meterFees.map(f => f.meterId)), sql`${meterReadings.readOn} < ${`${periods[periods.length - 1]}-01`}`)) : []
@@ -692,7 +696,7 @@ async function buildMeterPanels(db: DB, leaseId: string, periodStart: string, mo
   /** Nguồn số đầu kỳ: chốt tháng trước, chỉ số bàn giao, hay chỉ số ban đầu của đồng hồ (chưa có lần chốt nào). */
   const openingSource = (meterId: string, period: string): 'monthly' | 'handover' | 'start' => { const r = openingRow(meterId, period); return !r ? 'start' : r.kind === 'handover' ? 'handover' : 'monthly' }
   const openingOf = (meterId: string, period: string) => openingRow(meterId, period)?.value ?? meterStart.get(meterId) ?? null
-  const meterPanels = meterFees.map(f => ({ leaseFeeId: f.leaseFeeId, name: f.name, unit: f.unit, rows: periods.map(period => { const r = monthly.find(x => x.meterId === f.meterId && x.period === period); return { period, readOn: r?.readOn ?? null, value: r?.value ?? null, opening: openingOf(f.meterId, period), openingSource: openingSource(f.meterId, period) } }) }))
+  const meterPanels = meterFees.map(f => ({ leaseFeeId: f.leaseFeeId, name: f.name, unit: f.unit, initial: initialOf(f.meterId), rows: periods.map(period => { const r = monthly.find(x => x.meterId === f.meterId && x.period === period); return { period, readOn: r?.readOn ?? null, value: r?.value ?? null, opening: openingOf(f.meterId, period), openingSource: openingSource(f.meterId, period) } }) }))
   return meterPanels
 }
 export async function getInvoiceDetail(db: DB, ctx: AccessContext, id: string) {

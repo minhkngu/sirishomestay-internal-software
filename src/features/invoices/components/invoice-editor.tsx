@@ -125,7 +125,7 @@ function LineTime({ line, defaultFrom, defaultTo, fullMonth, proration, editable
     </div>
   )
 }
-type MeterPanel = { leaseFeeId: string; name: string; unit: string; rows: Array<{ period: string; readOn: string | null; value: number | null; /** Số đầu kỳ: chỉ số gần nhất trước tháng này; null khi chưa có. */ opening: number | null; /** Số đầu đến từ chốt tháng trước, chỉ số bàn giao, hay chỉ số ban đầu của đồng hồ. */ openingSource: 'monthly' | 'handover' | 'start' }> }
+type MeterPanel = { leaseFeeId: string; name: string; unit: string; /** Chỉ số ban đầu ghi ở hợp đồng (bàn giao hoặc lúc lắp đồng hồ). */ initial?: { value: number; readOn: string } | null; rows: Array<{ period: string; readOn: string | null; value: number | null; /** Số đầu kỳ: chỉ số gần nhất trước tháng này; null khi chưa có. */ opening: number | null; /** Số đầu đến từ chốt tháng trước, chỉ số bàn giao, hay chỉ số ban đầu của đồng hồ. */ openingSource: 'monthly' | 'handover' | 'start' }> }
 const periodLabel = (period: string) => `${period.slice(5)}/${period.slice(0, 4)}`
 const NEW_READING = '__new'
 /** Chỉ số đã chốt của đồng hồ: danh sách các tháng, thêm dòng "Chốt chỉ số" cuối danh sách; chọn một dòng mở popup điền số (ghi ngược về tab Chỉ số). */
@@ -180,7 +180,13 @@ function MeterReadingsPanel({ panel, editable, consumption, staged, onStage, sta
         <SelectTrigger aria-label={`Chỉ số đã chốt ${panel.name}`} className="h-8 w-full rounded-lg border-border/80 bg-background text-xs"><SelectValue placeholder={rowLabel(last)} /></SelectTrigger>
         <SelectContent>{items.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
       </Select>
-      <p className="mt-1.5">Tiêu thụ: <span className="font-medium tabular-nums text-foreground">{consumption.toLocaleString('vi-VN')} {panel.unit}</span>{Object.keys(staged).length > 0 && ' (tính lại sau khi lưu)'}</p>
+      {(() => {
+        // Số đầu kỳ (chỉ số ban đầu ghi ở hợp đồng, bàn giao, hoặc chốt tháng trước) và số cuối của tháng đang chốt
+        const o = openingOf(last)
+        const c = staged[last.period] !== undefined ? Number(staged[last.period]) : last.value
+        return <p className="mt-1.5 tabular-nums">{panel.initial && <><span>Chỉ số ban đầu <span className="font-medium text-foreground">{panel.initial.value.toLocaleString('vi-VN')}</span> ({formatDateVN(panel.initial.readOn)})</span><br /></>}Số đầu kỳ <span className="font-medium text-foreground">{o == null ? '—' : o.toLocaleString('vi-VN')}</span> · Số cuối kỳ <span className="font-medium text-foreground">{c == null ? '—' : c.toLocaleString('vi-VN')}</span></p>
+      })()}
+      <p className="mt-0.5">Tiêu thụ: <span className="font-medium tabular-nums text-foreground">{consumption.toLocaleString('vi-VN')} {panel.unit}</span>{Object.keys(staged).length > 0 && ' (tính lại sau khi lưu)'}</p>
       {row && (
         <FormDialog open onOpenChange={(o) => { if (!o) setPeriod(null) }} title={`Chốt chỉ số ${panel.name}`} description={`Tháng ${periodLabel(row.period)}${row.value == null ? ' · chưa chốt' : ` · đang là ${row.value.toLocaleString('vi-VN')}`}. Bấm Lưu để lưu luôn số này (cùng các thay đổi khác của hoá đơn), ghi về tab Chỉ số và tính lại tiền.`} size="sm">
           <div className="space-y-4 pb-1">
