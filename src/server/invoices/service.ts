@@ -220,7 +220,7 @@ export async function saveInvoiceFeeQuantities(db: DB, ctx: AccessContext, invoi
       if (!Number.isSafeInteger(item.quantity * fee.unitPrice)) throw new ValidationError('Thành tiền vượt giới hạn cho phép')
       await tx.insert(invoiceFeeQuantities).values({ invoiceId, ...item }).onConflictDoUpdate({ target: [invoiceFeeQuantities.invoiceId, invoiceFeeQuantities.leaseFeeId], set: { quantity: item.quantity } })
       await tx.delete(invoiceLines).where(and(eq(invoiceLines.invoiceId, invoiceId), sql`${invoiceLines.meta}->>'leaseFeeId' = ${fee.id}`))
-      await tx.insert(invoiceLines).values({ invoiceId, type: 'fee', description: `${fee.name} kỳ ${inv.periodStart.slice(0, 7)}`, quantity: item.quantity, unitPrice: fee.unitPrice, amount: item.quantity * fee.unitPrice, meta: { leaseFeeId: fee.id, unit: fee.unit, period: inv.periodStart.slice(0, 7) } })
+      await tx.insert(invoiceLines).values({ invoiceId, type: 'fee', description: fee.name, quantity: item.quantity, unitPrice: fee.unitPrice, amount: item.quantity * fee.unitPrice, meta: { leaseFeeId: fee.id, unit: fee.unit, period: inv.periodStart.slice(0, 7) } })
     }
     await tx.update(invoices).set({ updatedAt: new Date() }).where(eq(invoices.id, invoiceId))
     await recordAudit(tx, ctx, { action: 'update', entity: 'invoice', entityId: invoiceId, facilityId: inv.facilityId, summary: 'Cập nhật số lượng phí theo kỳ', after: data })

@@ -229,7 +229,7 @@ describe('buildMonthlyInvoice', () => {
     const r = buildMonthlyInvoice({ ...base, lease: lease({ ...t, occupantIds: ['t1', 't2'] }), readings: [{ meterId: 'me', period: '2026-11', kind: 'handover', readOn: '2026-11-15', value: 120 }] })
     const electric = r.lines.find((l) => l.meta?.leaseFeeId === 'e1')
     expect(electric).toMatchObject({ quantity: 0, unitPrice: 3500, amount: 0 })
-    expect(electric!.description).toContain('120 → 120')
+    expect(electric!.description).toBe('Điện')
     expect(r.warnings).toEqual([])
   })
   it('hoá đơn sau kỳ ký: đồng hồ cũ đã gỡ trước ngày bắt đầu không chặn hoá đơn', () => {
@@ -276,7 +276,7 @@ describe('buildFirstInvoice: phí theo đồng hồ', () => {
     const t = contractTermsAt(lease({ fees: [fee({ feeTypeId: null, leaseFeeId: 'e1', name: 'Điện', unit: 'kWh', quantitySource: 'meter', billing: 'per_occurrence', quantityFrom: 'manual', unitPrice: 3500 })] }), [], '2026-11-15')
     const lines = buildFirstInvoice(t, '2026-11-15', 'days_30', 9_000_000, [{ leaseFeeId: 'e1', reading: 120 }])
     expect(lines.find((l) => l.meta?.leaseFeeId === 'e1')).toMatchObject({ quantity: 0, unitPrice: 3500, amount: 0 })
-    expect(lines.find((l) => l.meta?.leaseFeeId === 'e1')!.description).toContain('120 → 120')
+    expect(lines.find((l) => l.meta?.leaseFeeId === 'e1')!.description).toBe('Điện')
     expect(buildFirstInvoice(t, '2026-11-15', 'days_30', 9_000_000).some((l) => l.meta?.leaseFeeId === 'e1')).toBe(false)
   })
 })

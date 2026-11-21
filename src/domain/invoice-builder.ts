@@ -30,7 +30,7 @@ function rentAndFixedLines(terms: LeaseTerms, from: ISODate, to: ISODate, sum: n
   for (const f of terms.fees.filter((x) => (x.billing === 'monthly_fixed' || x.quantitySource === 'occupants' || x.quantitySource === 'room') && x.quantitySource !== 'meter' && x.quantitySource !== 'period_input')) {
     const qty = f.quantitySource === 'room' ? 1 : f.quantitySource === 'occupants' || (!f.quantitySource && f.quantityFrom === 'occupants') ? occupantsCount : f.quantity
     lines.push({
-      type: 'fee', description: `${f.name} (${qty} ${f.unit}) ${label}`, quantity: qty, unitPrice: f.unitPrice,
+      type: 'fee', description: f.name, quantity: qty, unitPrice: f.unitPrice,
       amount: Math.round(qty * f.unitPrice * sum), meta: { feeTypeId: f.feeTypeId, leaseFeeId: f.leaseFeeId, unit: f.unit, from, to, coefficient: round4(sum) },
     })
   }
@@ -87,7 +87,8 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): { lines: Invoic
         const fraction = prorateFraction(segment.from, segment.to, input.proration)
         const coefficient = input.overridePeriod?.coefficient != null || input.fullMonth ? sum * fraction / totalFraction : fraction
         const segmentLines = rentAndFixedLines(segment.terms, segment.from, segment.to, coefficient, segment.terms.occupantIds.length)
-        segmentLines.forEach(line => { line.description += ` — phòng ${segment.terms.roomId}` })
+        // Chỉ dòng tiền phòng ghi thêm phòng; dòng phí giữ đúng tên phí trong Cài đặt
+        segmentLines.forEach(line => { if (line.type === 'rent') line.description += ` — phòng ${segment.terms.roomId}` })
         lines.push(...segmentLines)
       }
     }
@@ -102,13 +103,13 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): { lines: Invoic
     if (f.quantitySource === 'period_input') {
       const item = input.periodQuantities?.find(x => x.leaseFeeId === f.leaseFeeId && x.period === period)
       if (!item) { warnings.push(`Chưa nhập số lượng ${f.name} kỳ ${period}`); continue }
-      lines.push({ type: 'fee', description: `${f.name} kỳ ${period}`, quantity: item.quantity, unitPrice: f.unitPrice, amount: item.quantity * f.unitPrice, meta: { leaseFeeId: f.leaseFeeId, period, unit: f.unit } })
+      lines.push({ type: 'fee', description: f.name, quantity: item.quantity, unitPrice: f.unitPrice, amount: item.quantity * f.unitPrice, meta: { leaseFeeId: f.leaseFeeId, period, unit: f.unit } })
     }
     if (f.quantitySource === 'meter' && terms.startDate >= monthStart && terms.startDate <= monthEnd) {
       // Kỳ ký hợp đồng: chưa dùng, chỉ số đầu và cuối đều là chỉ số ghi lúc ký
       const link = input.feeMeterLinks?.find(x => x.leaseFeeId === f.leaseFeeId)
       const start = input.readings.find(r => r.meterId === link?.meterId && r.kind === 'handover' && r.readOn === terms.startDate)
-      if (start) lines.push({ type: 'fee', description: `${f.name} (chỉ số ${start.value} → ${start.value})`, quantity: 0, unitPrice: f.unitPrice, amount: 0, meta: { leaseFeeId: f.leaseFeeId, unit: f.unit } })
+      if (start) lines.push({ type: 'fee', description: f.name, quantity: 0, unitPrice: f.unitPrice, amount: 0, meta: { leaseFeeId: f.leaseFeeId, unit: f.unit } })
       continue
     }
     if (f.quantitySource === 'meter' && terms.startDate <= prevEnd && terms.endDate >= prevStart) {
@@ -119,7 +120,7 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): { lines: Invoic
         const total = meterFeeUsage({ lease: input.lease, addenda: input.addenda, linked, meters: input.meters, readings: input.readings, from: prevStart, to: prevEnd, startDate: terms.startDate })
         if (total.missing.length) { warnings.push(`Chưa ghi chỉ số ${f.name} tháng ${mmYYYY(prev)}`); continue }
         lines.push({
-          type: 'fee', description: `${f.name} tháng ${mmYYYY(prev)} (${total.usage} ${f.unit})${total.segments.some((x) => x.estimated) ? ' (ước tính)' : ''}`,
+          type: 'fee', description: f.name,
           quantity: total.usage, unitPrice: f.unitPrice, amount: Math.round(total.usage * f.unitPrice), meta: { leaseFeeId: f.leaseFeeId, unit: f.unit, segments: total.segments },
         })
       } catch (e) {
@@ -158,7 +159,7 @@ export function buildFirstInvoice(terms: LeaseTerms, startDate: ISODate, prorati
   for (const f of terms.fees.filter((x) => x.quantitySource === 'meter' && x.leaseFeeId)) {
     const start = meterStarts.find((x) => x.leaseFeeId === f.leaseFeeId)
     if (!start) continue
-    lines.push({ type: 'fee', description: `${f.name} (chỉ số ${start.reading} → ${start.reading})`, quantity: 0, unitPrice: f.unitPrice, amount: 0, meta: { leaseFeeId: f.leaseFeeId, unit: f.unit } })
+    lines.push({ type: 'fee', description: f.name, quantity: 0, unitPrice: f.unitPrice, amount: 0, meta: { leaseFeeId: f.leaseFeeId, unit: f.unit } })
   }
   return lines
 }

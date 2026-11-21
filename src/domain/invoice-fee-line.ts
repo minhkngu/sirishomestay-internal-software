@@ -7,7 +7,7 @@ export function feeLineFromType(
 ) {
   return {
     type: 'one_off',
-    description: `${fee.name} (${fee.unit})`,
+    description: fee.name,
     quantity: 1,
     unitPrice: resolveFeePrice(fee.defaultPrice, fee.prices, facilityId),
     meta: { feeTypeId: fee.id },

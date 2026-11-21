@@ -325,7 +325,7 @@ describe('contracts', () => {
     await updateFeeType(db, admin, feePerson, { name: 'ABC', quantityFrom: 'meter' })
     const meter = await mkMeter(r301)
     const { firstInvoiceLines } = await createLease(db, lan(), snapshot([meterFee(meter.id, { initialReading: 123 })]))
-    expect(firstInvoiceLines.find(l => l.description.startsWith('ABC'))).toMatchObject({ quantity: 0, amount: 0, description: 'ABC (chỉ số 123 → 123)' })
+    expect(firstInvoiceLines.find(l => l.description.startsWith('ABC'))).toMatchObject({ quantity: 0, amount: 0, description: 'ABC' })
   })
 
   it('đồng hồ của hợp đồng đã kết thúc dùng lại được cho hợp đồng mới, thêm chỉ số bàn giao mới', async () => {
