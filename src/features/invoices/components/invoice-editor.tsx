@@ -45,6 +45,8 @@ type Line = {
 
 type EditorLine = Line & { unitPriceText: string }
 /** Dòng tiền phòng và phí hợp đồng lấy từ hợp đồng nên không sửa mô tả, SL, đơn giá và không xoá ở đây. */
+/** Dòng "Tiền cọc còn thiếu" tính từ hợp đồng: không sửa mô tả, đơn giá, số lượng (xoá được nếu đã thu cọc riêng). */
+const isDepositLine = (l: Line) => l.type === 'deposit'
 const isLocked = (l: Line) => l.type === 'rent' || typeof l.meta?.leaseFeeId === 'string'
 /** Phí ngoài hợp đồng thêm vào hoá đơn từ loại phí trong Cài đặt: mô tả cố định theo tên phí, có thời gian và hệ số riêng. */
 const isAddedFee = (l: Line) => l.type === 'one_off' && typeof l.meta?.feeTypeId === 'string' && typeof l.meta?.leaseFeeId !== 'string'
@@ -366,13 +368,13 @@ export function InvoiceEditor(p: Props) {
                   <td className="p-2.5">
                     <input
                       value={isMeterLine(l) ? (p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId)?.name ?? l.description) : isLocked(l) ? l.description.replace(/ — phòng [0-9a-f-]{36}$/i, '') : l.description}
-                      disabled={isLocked(l) || isAddedFee(l)}
+                      disabled={isLocked(l) || isAddedFee(l) || isDepositLine(l)}
                       onChange={(e) => set(i, { description: e.target.value })}
                       className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 disabled:cursor-not-allowed disabled:border-transparent disabled:bg-transparent disabled:px-0 disabled:text-foreground"
                     />
                     <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted-foreground">
                       <span className="shrink-0">Đơn giá</span>
-                      {isLocked(l) || isAddedFee(l)
+                      {isLocked(l) || isAddedFee(l) || isDepositLine(l)
                         ? <span className="font-medium tabular-nums text-foreground">{formatVND(l.unitPrice)}</span>
                         : <MoneyInput
                             allowNegative
@@ -396,6 +398,7 @@ export function InvoiceEditor(p: Props) {
                           step="any"
                           min={0}
                           aria-label="Số lượng"
+                          disabled={isDepositLine(l)}
                           value={l.quantity}
                           onChange={(e) => set(i, qtyPatch(l, Number(e.target.value)))}
                           className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"

@@ -538,6 +538,9 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
     const snapIds = [...new Set(data.flatMap(l => { const m = l.meta as { leaseFeeId?: unknown } | null | undefined; return typeof m?.leaseFeeId === 'string' ? [m.leaseFeeId] : [] }))]
     const snaps = snapIds.length ? await tx.select({ id: leaseFeeSnapshots.id, name: leaseFeeSnapshots.name, quantitySource: leaseFeeSnapshots.quantitySource }).from(leaseFeeSnapshots).where(inArray(leaseFeeSnapshots.id, snapIds)) : []
     const next = data.filter(l => l.type !== 'tax').map(l => {
+      // Dòng cọc còn thiếu giữ mô tả, đơn giá, số lượng đã lưu
+      const savedDeposit = l.type === 'deposit' && l.id ? old.find(previous => previous.id === l.id && previous.type === 'deposit') : undefined
+      if (savedDeposit) return { invoiceId: id, type: savedDeposit.type, description: savedDeposit.description, quantity: savedDeposit.quantity, unitPrice: savedDeposit.unitPrice, amount: savedDeposit.amount, meta: savedDeposit.meta }
       const meta = l.meta as { feeTypeId?: unknown; leaseFeeId?: unknown; coefficient?: unknown; from?: unknown; to?: unknown; coefficientOverride?: unknown } | null
       const protectedFee = inv.kind === 'monthly' && (typeof meta?.leaseFeeId === 'string' || l.type === 'rent') ? old.find(previous => previous.id === l.id) : undefined
       if (protectedFee) {
