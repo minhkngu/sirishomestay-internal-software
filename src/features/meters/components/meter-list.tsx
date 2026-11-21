@@ -9,13 +9,14 @@ export function MeterList({ rows }: { rows: MeterOverviewRow[] }) {
     <div className="overflow-x-auto rounded-2xl border border-border/80 bg-card shadow-2xs">
       <table className="w-full text-sm">
         <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
-          <tr><th className="p-3">Phòng</th><th className="p-3">Tên đồng hồ</th><th className="p-3">Dòng phí</th><th className="p-3">Hợp đồng</th><th className="p-3">Số seri</th><th className="p-3">Chỉ số đầu</th><th className="p-3">Trạng thái</th><th className="p-3">Lịch sử</th></tr>
+          <tr><th className="p-3">Phòng</th><th className="p-3">Tên đồng hồ</th><th className="p-3">Mã</th><th className="p-3">Dòng phí</th><th className="p-3">Hợp đồng</th><th className="p-3">Số seri</th><th className="p-3">Chỉ số đầu</th><th className="p-3">Trạng thái</th><th className="p-3">Lịch sử</th></tr>
         </thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r.meterId} className="border-t align-top">
               <td className="p-3">{r.roomCode}</td>
               <td className="p-3 font-medium">{r.meterName}</td>
+              <td className="p-3 text-xs text-muted-foreground tabular-nums">{r.meterCode ?? '—'}</td>
               <td className="p-3">{r.leaseCode ? (r.feeName ?? '—') : '—'}{r.leaseCode && r.unit ? <span className="text-muted-foreground"> ({r.unit})</span> : null}</td>
               <td className="p-3">{r.leaseCode ?? '—'}</td>
               <td className="p-3">{r.serial ?? '—'}</td>

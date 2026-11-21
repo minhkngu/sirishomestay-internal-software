@@ -133,7 +133,7 @@ describe('meters', () => {
     it('addRoomMeter thêm đồng hồ có tên cho phòng và cần quyền đồng hồ của cơ sở', async () => {
       const created = await addRoomMeter(db, hung(), r101, { name: ' Máy giặt ', startReading: 5, installedOn: '2026-10-01', serial: ' X1 ' })
       const [row] = await db.select().from(meters).where(eq(meters.id, created.id))
-      expect(row).toMatchObject({ roomId: r101, name: 'Máy giặt', utility: 'fee', serial: 'X1', startReading: 5, removedOn: null })
+      expect(row).toMatchObject({ roomId: r101, name: 'Máy giặt', utility: 'fee', serial: 'X1', startReading: 5, removedOn: null, code: 'DH-BT-101-03' }) // phòng đã có 2 đồng hồ
       await expect(addRoomMeter(db, ctxOf(['meters'], [fb]), r101, { name: 'Máy sấy', startReading: 0, installedOn: '2026-10-01' })).rejects.toThrow(NotFoundError)
     })
 
@@ -147,10 +147,11 @@ describe('meters', () => {
     it('đồng hồ mặc định có tên Điện, Nước và thay đồng hồ giữ nguyên tên', async () => {
       const [room] = await db.insert(rooms).values({ facilityId: fa, code: '301' }).returning()
       await createDefaultMeters(db, [room.id], '2026-10-01')
-      expect((await db.select().from(meters).where(eq(meters.roomId, room.id))).map((x) => x.name).sort()).toEqual(['Nước', 'Điện'])
+      expect((await db.select().from(meters).where(eq(meters.roomId, room.id))).map((x) => [x.name, x.code]).sort()).toEqual([['Nước', 'DH-BT-301-02'], ['Điện', 'DH-BT-301-01']])
       await replaceMeter(db, hung(), room.id, 'electric', { removedOn: '2026-10-20', finalReading: 0, startReading: 0 })
       const active = (await db.select().from(meters).where(eq(meters.roomId, room.id))).filter((x) => x.removedOn === null)
       expect(active.map((x) => x.name).sort()).toEqual(['Nước', 'Điện'])
+      expect(active.find((x) => x.name === 'Điện')!.code).toBe('DH-BT-301-03') // đồng hồ mới nối tiếp số thứ tự của phòng
     })
   })
 
