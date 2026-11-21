@@ -49,12 +49,12 @@ export function SingleInvoiceDialog({ facilities, defaultPeriod }: { facilities:
   const facilityItems = facilities.map((f) => ({ value: f.id, label: f.name }))
   const leaseItems = leases.map((l) => ({ value: l.leaseId, label: `Phòng ${l.roomCode} · ${l.tenantName}` }))
   const total = preview?.lines.reduce((n, l) => n + l.amount, 0) ?? 0
-  const canCreate = !!preview?.period
+  const canCreate = !!leaseId && !!period && (!preview || !!preview.period)
 
   return (
     <>
       <Button variant="outline" onClick={() => setOpen(true)}>Tạo hoá đơn lẻ</Button>
-      <FormDialog open={open} onOpenChange={setOpen} title="Tạo hoá đơn lẻ" description="Chọn toà, phòng và tháng, xem trước rồi tạo hoá đơn nháp." size="md">
+      <FormDialog open={open} onOpenChange={setOpen} title="Tạo hoá đơn lẻ" description="Chọn toà, phòng và tháng rồi tạo hoá đơn nháp; có thể xem trước nếu muốn." size="md">
         <div className="space-y-4 pb-1">
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
@@ -76,7 +76,7 @@ export function SingleInvoiceDialog({ facilities, defaultPeriod }: { facilities:
               <input id="single-invoice-period" type="month" value={period} onChange={(e) => { setPeriod(e.target.value); reset() }} className="h-9 w-full rounded-lg border border-border/80 bg-background px-2 text-sm" />
             </div>
           </div>
-          <Button type="button" variant="outline" disabled={pending || !leaseId || !period} onClick={run}>{pending && !preview ? 'Đang tính…' : 'Xem trước'}</Button>
+          <Button type="button" variant="outline" disabled={pending || !leaseId || !period} onClick={run}>{pending && !preview ? 'Đang tính…' : 'Xem trước (không bắt buộc)'}</Button>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           {preview && (
             <div className="space-y-2 rounded-xl border border-border/70 p-3.5 text-sm">
@@ -96,8 +96,7 @@ export function SingleInvoiceDialog({ facilities, defaultPeriod }: { facilities:
             </div>
           )}
           <div className="flex items-center justify-end gap-3">
-            {!preview && <span className="text-xs text-muted-foreground">Bấm Xem trước để tạo hoá đơn</span>}
-            <Button type="button" disabled={pending || !canCreate} onClick={create}>{pending && preview ? 'Đang tạo…' : 'Tạo hoá đơn'}</Button>
+            <Button type="button" disabled={pending || !canCreate} onClick={create}>{pending ? 'Đang tạo…' : 'Tạo hoá đơn'}</Button>
           </div>
         </div>
       </FormDialog>
