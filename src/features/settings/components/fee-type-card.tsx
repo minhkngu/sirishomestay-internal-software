@@ -8,7 +8,7 @@ import { FeeFacilitiesDialog } from '@/features/settings/components/fee-faciliti
 import { FeeTypeForm } from '@/features/settings/components/fee-type-form'
 import { Msg, useRun } from '@/features/settings/components/use-run'
 import { formatVND } from '@/domain/money'
-import { archiveFeeTypeAction, updateFeeTypeAction } from '@/server/fees/actions'
+import { archiveFeeTypeAction, deleteFeeTypeAction, updateFeeTypeAction } from '@/server/fees/actions'
 
 type FacilityOption = { id: string; name: string }
 
@@ -35,6 +35,11 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
   function archive() {
     if (!window.confirm(`Lưu trữ phí ${fee.name}?`)) return
     run(() => archiveFeeTypeAction(fee.id), 'Đã lưu trữ')
+  }
+
+  function remove() {
+    if (!window.confirm(`Xoá hẳn phí ${fee.name}? Không thể hoàn tác. Phí đã dùng trong hợp đồng thì chỉ có thể lưu trữ.`)) return
+    run(() => deleteFeeTypeAction(fee.id), 'Đã xoá')
   }
 
   return (
@@ -73,6 +78,7 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
             <>
               <Button size="sm" variant="outline" aria-label={`Sửa phí ${fee.name}`} onClick={() => setEditing(true)}>Sửa</Button>
               <Button size="sm" variant="outline" disabled={pending} onClick={archive}>Lưu trữ</Button>
+              <Button size="sm" variant="outline" disabled={pending} aria-label={`Xoá phí ${fee.name}`} onClick={remove}>Xoá</Button>
             </>
           )}
         </div>
