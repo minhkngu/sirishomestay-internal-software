@@ -16,7 +16,7 @@ import { summarize, type LedgerRow } from '@/domain/cashbook'
 import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { cn } from '@/lib/utils'
-import { deleteExpenseAction } from '@/server/cashbook/actions'
+import { deleteExpenseAction, deletePaymentAction } from '@/server/cashbook/actions'
 import { DepositDialog, CollectRentDialog, DepositDoneDialog, type LeaseTarget } from './lease-dialogs'
 import { ExpenseDialog, type ExpenseDraft, type RoomOption } from './expense-dialog'
 
@@ -63,9 +63,9 @@ export function CashbookList({ rows, depositHeld, facilities, rooms, leases, exp
   const { pageRows, pager } = usePager(filtered, 'cashbook', `${kind}|${month}|${text}|${selected.join(',')}`)
 
   const remove = async (row: LedgerRow) => {
-    const r = await deleteExpenseAction(row.id)
+    const r = row.source === 'payment' ? await deletePaymentAction(row.id) : await deleteExpenseAction(row.id)
     if (!r.ok) { toast.error(r.error); return }
-    toast.success('Đã xoá khoản chi')
+    toast.success(row.source === 'payment' ? 'Đã xoá khoản thu' : 'Đã xoá khoản chi')
     router.refresh()
   }
 
@@ -76,6 +76,8 @@ export function CashbookList({ rows, depositHeld, facilities, rooms, leases, exp
         <Button type="button" variant="ghost" size="icon-sm" aria-label="Xoá khoản chi" title="Xoá" onClick={() => setRemoving(r)}><Trash2 className="size-4" /></Button>
       </div>
     )
+    : r.source === 'payment'
+      ? <div className="flex justify-end"><Button type="button" variant="ghost" size="icon-sm" aria-label="Xoá khoản thu" title="Xoá khoản thu" onClick={() => setRemoving(r)}><Trash2 className="size-4" /></Button></div>
     : r.source === 'deposit' && r.status === 'pending'
       ? <Button type="button" variant="outline" size="sm" onClick={() => setConfirming(r)}><Check className="size-4" />Xác nhận</Button>
       : null
@@ -163,7 +165,7 @@ export function CashbookList({ rows, depositHeld, facilities, rooms, leases, exp
       {dialog === 'rent' && <CollectRentDialog open onOpenChange={(o) => !o && setDialog(null)} leases={leases} />}
       {dialog === 'deposit' && <DepositDialog open onOpenChange={(o) => !o && setDialog(null)} leases={leases} />}
       {confirming && <DepositDoneDialog open onOpenChange={(o) => !o && setConfirming(null)} id={confirming.id} label={confirming.label} amount={confirming.amount} />}
-      <ConfirmDialog open={!!removing} onOpenChange={(o) => !o && setRemoving(null)} title="Xoá khoản chi?" description="Khoản chi sẽ bị gỡ khỏi sổ quỹ, có ghi nhật ký." confirmLabel="Xoá" destructive onConfirm={() => removing && remove(removing)} />
+      <ConfirmDialog open={!!removing} onOpenChange={(o) => !o && setRemoving(null)} title={removing?.source === 'payment' ? 'Xoá khoản thu?' : 'Xoá khoản chi?'} description={removing?.source === 'payment' ? 'Khoản thu bị gỡ, dư nợ hoá đơn tăng lại. Có ghi nhật ký.' : 'Khoản chi sẽ bị gỡ khỏi sổ quỹ, có ghi nhật ký.'} confirmLabel="Xoá" destructive onConfirm={() => removing && remove(removing)} />
     </>
   )
 }

@@ -6,7 +6,7 @@ import type { AccessContext, Permission } from '@/domain/access'
 import { summarize } from '@/domain/cashbook'
 import { ForbiddenError, ValidationError } from '@/domain/errors'
 import { addExpense, deleteExpense, listCashbook, listLeaseTargets, updateExpense } from '@/server/cashbook/service'
-import { approveInvoice, createDrafts, recordLeasePayment } from '@/server/invoices/service'
+import { approveInvoice, createDrafts, recordLeasePayment, removePayment } from '@/server/invoices/service'
 import { createTestDb } from '../helpers/db'
 
 const context = (permissions: Permission[], facilityIds: string[]): AccessContext => ({ userId: crypto.randomUUID(), email: 'test@example.com', fullName: 'Test', permissions: new Set(permissions), facilityIds: new Set(facilityIds), isAdmin: false })
@@ -58,6 +58,15 @@ describe('sổ quỹ thu chi', () => {
     expect((await listCashbook(db, ctx(), {})).rows).toHaveLength(0)
     const logs = await db.select().from(auditLogs).where(eq(auditLogs.entity, 'expense'))
     expect(logs.map(l => l.action).sort()).toEqual(['create', 'delete', 'update'])
+  })
+  it('xoá khoản thu khỏi sổ quỹ làm dư nợ tăng lại; thiếu quyền cơ sở thì từ chối', async () => {
+    const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-08' }); await approveInvoice(db, ctx(), inv.id, {})
+    await recordLeasePayment(db, ctx(), leaseId, { paidOn: '2026-08-10', amount: 4000000, method: 'cash' })
+    const [pay] = (await listCashbook(db, ctx(), {})).rows.filter(r => r.source === 'payment')
+    await expect(removePayment(db, context(['billing'], [otherId]), pay.id)).rejects.toThrow(ForbiddenError)
+    await removePayment(db, ctx(), pay.id)
+    expect((await listCashbook(db, ctx(), {})).rows.filter(r => r.source === 'payment')).toHaveLength(0)
+    expect((await listLeaseTargets(db, ctx()))[0].debt).toBe(9000000)
   })
   it('liệt kê hợp đồng đang thuê kèm dư nợ', async () => {
     const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-08' }); await approveInvoice(db, ctx(), inv.id, {})

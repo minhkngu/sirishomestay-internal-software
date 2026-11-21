@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { auditLogs, facilities, invoices, leases, rooms, tenants } from '@/db'
+import { auditLogs, contractVersions, depositEntries, facilities, invoices, leases, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ForbiddenError, ValidationError } from '@/domain/errors'
@@ -33,9 +33,28 @@ describe('bỏ duyệt hoá đơn', () => {
     await expect(unapproveInvoice(db, ctx(), invoiceId)).rejects.toThrow(ValidationError)
     expect(await status()).toBe('approved')
   })
-  it('hoá đơn thanh lý không cho bỏ duyệt', async () => {
+  it('hoá đơn thanh lý bỏ duyệt được và đưa hợp đồng về trước thanh lý', async () => {
+    const [lease] = await db.select().from(leases)
     await db.update(invoices).set({ kind: 'termination' }).where(eq(invoices.id, invoiceId))
+    await db.update(leases).set({ status: 'ended', endDate: '2026-12-20' }).where(eq(leases.id, lease.id))
+    await db.insert(contractVersions).values({ contractId: lease.id, kind: 'lease', operation: 'termination', sequence: 1, actorId: crypto.randomUUID(), snapshot: { contract: { status: 'active', endDate: '2027-12-31' }, terminationFinalized: true, retention: [] } })
+    await db.insert(depositEntries).values([
+      { leaseId: lease.id, date: '2026-12-20', type: 'forfeit', amount: 1000, status: 'done', note: 'Mất cọc khi thanh lý' },
+      { leaseId: lease.id, date: '2026-12-20', type: 'deduct', amount: 2000, status: 'done', note: 'Trừ vào hoá đơn thanh lý' },
+      { leaseId: lease.id, date: '2026-01-01', type: 'collect', amount: 9000000, status: 'done', note: 'Cọc' },
+    ])
+    await unapproveInvoice(db, ctx(), invoiceId)
+    expect(await status()).toBe('draft')
+    const [after] = await db.select().from(leases)
+    expect(after).toMatchObject({ status: 'active', endDate: '2027-12-31' })
+    expect((await db.select().from(depositEntries)).map(e => e.type)).toEqual(['collect'])
+  })
+  it('hoá đơn thanh lý thiếu lịch sử thanh lý thì từ chối, vẫn là đã duyệt', async () => {
+    const [lease] = await db.select().from(leases)
+    await db.update(invoices).set({ kind: 'termination' }).where(eq(invoices.id, invoiceId))
+    await db.update(leases).set({ status: 'ended' }).where(eq(leases.id, lease.id))
     await expect(unapproveInvoice(db, ctx(), invoiceId)).rejects.toThrow(ValidationError)
+    expect(await status()).toBe('approved')
   })
   it('hoá đơn nháp thì từ chối', async () => {
     await unapproveInvoice(db, ctx(), invoiceId)

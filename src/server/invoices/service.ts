@@ -11,7 +11,7 @@ import { midPeriodAdjustments } from '@/domain/adjustments'
 import { fullMonthCoefficient, prorateFraction } from '@/domain/proration'
 import { buildMonthlyInvoice, nextBillingPeriod, settlementState } from '@/domain/invoice-builder'
 import type { Addendum, ContractFee, Invoice, MeterReading, DueRule, InvoiceLineInput, Lease, Meter, OneOffCharge, PendingAdjustment, Proration } from '@/domain/types'
-import { finalizeTermination } from '@/server/addenda/finalize'
+import { finalizeTermination, reverseTermination } from '@/server/addenda/finalize'
 import { recordAudit, recordAuditBatch } from '@/server/audit'
 import { registerExportOwnerResolver } from '@/server/files/owners'
 import { applyReadings } from '@/server/meters/service'
@@ -351,9 +351,9 @@ export async function unapproveInvoice(db: DB, ctx: AccessContext, id: string): 
     await tx.select({ id: invoices.id }).from(invoices).where(eq(invoices.id, id)).for('update')
     const before = await getInvoice(tx, ctx, id)
     if (before.status !== 'approved') throw new ValidationError('Chỉ bỏ duyệt hoá đơn đã duyệt')
-    if (before.kind === 'termination') throw new ValidationError('Không bỏ duyệt hoá đơn thanh lý')
     if ((await tx.select({ id: payments.id }).from(payments).where(eq(payments.invoiceId, id)).limit(1)).length) throw new ValidationError('Gỡ các khoản đã thu trước khi bỏ duyệt')
     const [after] = await tx.update(invoices).set({ status: 'draft', updatedAt: new Date() }).where(eq(invoices.id, id)).returning()
+    if (before.kind === 'termination') await reverseTermination(tx, ctx, before)
     const [lease, settings] = await Promise.all([leaseData(tx, before.leaseId), getSettings(tx)])
     await syncPendingAdjustments(tx, lease, await loadAddenda(tx, lease.id), settings.proration)
     await recordAudit(tx, ctx, { action: 'update', entity: 'invoice', entityId: id, facilityId: before.facilityId, summary: 'Bỏ duyệt hoá đơn', before, after })
