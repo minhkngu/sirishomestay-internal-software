@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { formatDateVN } from '@/domain/dates'
-import { deleteMeterReadingAction, updateMeterReadingAction } from '@/server/meters/actions'
+import { deleteMeterReadingAction, deleteMeterReadingsAction, updateMeterReadingAction } from '@/server/meters/actions'
 import type { ReadingHistoryRow } from '@/server/meters/service'
 
 const fmt = (value: number) => value.toLocaleString('vi-VN')
@@ -26,6 +26,24 @@ export function ReadingHistory({ rows }: { rows: ReadingHistoryRow[] }) {
   const [readOn, setReadOn] = useState('')
   const [deleting, setDeleting] = useState<ReadingHistoryRow | null>(null)
   const [error, setError] = useState('')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const selectable = rows.filter((r) => !r.lockedBy)
+  const chosen = selectable.filter((r) => selected.has(r.id))
+  const allChosen = selectable.length > 0 && chosen.length === selectable.length
+  const toggle = (id: string) => setSelected((cur) => { const next = new Set(cur); if (next.has(id)) next.delete(id); else next.add(id); return next })
+  const toggleAll = () => setSelected(allChosen ? new Set() : new Set(selectable.map((r) => r.id)))
+  const removeMany = () => {
+    const ids = chosen.map((r) => r.id)
+    start(async () => {
+      const r = await deleteMeterReadingsAction(ids)
+      setBulkDeleting(false)
+      if (!r.ok) { toast.error(r.error); return }
+      setSelected(new Set())
+      toast.success(`Đã xoá ${r.data.deleted} lần chốt${r.data.skipped ? `, bỏ qua ${r.data.skipped} dòng đã khoá` : ''}`)
+      router.refresh()
+    })
+  }
 
   const openEdit = (row: ReadingHistoryRow) => { setEditing(row); setValue(String(row.closing)); setReadOn(row.readOn); setError('') }
   const save = () => {
@@ -71,6 +89,7 @@ export function ReadingHistory({ rows }: { rows: ReadingHistoryRow[] }) {
         <table className="w-full text-[13px]">
           <thead>
             <tr className="text-xs text-muted-foreground">
+              <th className="w-10 px-4 py-2.5"><input type="checkbox" aria-label="Chọn tất cả" className="size-3.5 rounded border-border text-primary focus:ring-primary/30" checked={allChosen} ref={(el) => { if (el) el.indeterminate = chosen.length > 0 && !allChosen }} onChange={toggleAll} disabled={selectable.length === 0} /></th>
               <th className="px-4 py-2.5 text-left font-normal">Phòng</th>
               <th className="px-4 py-2.5 text-left font-normal">Đồng hồ</th>
               <th className="px-4 py-2.5 text-left font-normal">Tháng</th>
@@ -85,6 +104,7 @@ export function ReadingHistory({ rows }: { rows: ReadingHistoryRow[] }) {
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className="border-t border-border/60">
+                <td className="px-4 py-2.5">{!r.lockedBy && <input type="checkbox" aria-label={`Chọn ${r.meterName} phòng ${r.roomCode} tháng ${monthLabel(r.period)}`} className="size-3.5 rounded border-border text-primary focus:ring-primary/30" checked={selected.has(r.id)} onChange={() => toggle(r.id)} />}</td>
                 <td className="px-4 py-2.5 font-medium tabular-nums text-foreground">{r.roomCode}</td>
                 <td className="px-4 py-2.5"><div className="text-foreground">{r.meterName}</div>{r.meterCode && <div className="text-[11px] text-muted-foreground">{r.meterCode}</div>}</td>
                 <td className="px-4 py-2.5 tabular-nums">{monthLabel(r.period)}</td>
@@ -103,7 +123,8 @@ export function ReadingHistory({ rows }: { rows: ReadingHistoryRow[] }) {
         {rows.map((r) => (
           <li key={r.id} className="space-y-2 px-4 py-3">
             <div className="flex items-start justify-between gap-2">
-              <div>
+              {!r.lockedBy && <input type="checkbox" aria-label={`Chọn ${r.meterName} phòng ${r.roomCode} tháng ${monthLabel(r.period)}`} className="mt-1 size-3.5 rounded border-border text-primary focus:ring-primary/30" checked={selected.has(r.id)} onChange={() => toggle(r.id)} />}
+              <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium text-foreground"><span className="tabular-nums">Phòng {r.roomCode}</span> · {r.meterName}</div>
                 <div className="mt-0.5 text-[11px] text-muted-foreground">Tháng {monthLabel(r.period)} · chốt {formatDateVN(r.readOn)}</div>
               </div>
@@ -119,6 +140,22 @@ export function ReadingHistory({ rows }: { rows: ReadingHistoryRow[] }) {
         ))}
       </ul>
 
+      {chosen.length > 0 && (
+        <div className="fixed inset-x-0 bottom-4 z-30 mx-auto flex w-fit max-w-[calc(100vw-2rem)] items-center gap-3 rounded-2xl border border-border/80 bg-card px-4 py-2.5 shadow-lg">
+          <span className="text-sm tabular-nums text-foreground">Đã chọn {chosen.length}</span>
+          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Bỏ chọn</Button>
+          <Button size="sm" variant="outline" disabled={pending} className="border-rose-200/80 text-rose-700 hover:bg-rose-50 hover:text-rose-800" onClick={() => setBulkDeleting(true)}>Xoá đã chọn</Button>
+        </div>
+      )}
+      <ConfirmDialog
+        open={bulkDeleting}
+        onOpenChange={setBulkDeleting}
+        title={`Xoá ${chosen.length} lần chốt chỉ số?`}
+        description="Các lần chốt đã chọn sẽ bị xoá, dòng đã khoá được bỏ qua. Không thể hoàn tác."
+        confirmLabel="Xoá"
+        destructive
+        onConfirm={removeMany}
+      />
       {editing && (
         <FormDialog open onOpenChange={(o) => { if (!o) setEditing(null) }} title={`Sửa chỉ số ${editing.meterName} phòng ${editing.roomCode}`} description={editing.opening == null ? `Chỉ số bàn giao · đứng riêng, không tính vào chuỗi chỉ số tháng` : `Tháng ${monthLabel(editing.period)} · số đầu ${fmt(editing.opening)}`} size="sm">
           <div className="space-y-3">

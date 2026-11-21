@@ -400,3 +400,16 @@ export async function deleteMeterReading(db: DB, ctx: AccessContext, id: string)
     await recordAudit(tx, ctx, { action: 'delete', entity: 'meter_readings', entityId: id, facilityId: f.facilityId, summary: `Xoá chỉ số ${f.r.kind === 'handover' ? 'bàn giao' : f.r.period} đồng hồ phòng ${f.roomCode}`, before: f.r })
   })
 }
+
+/** Xoá nhiều lần chốt một lúc: dòng đã khoá (hoá đơn dùng nó đã duyệt) hoặc không thuộc quyền thì bỏ qua và đếm lại. */
+export async function deleteMeterReadings(db: DB, ctx: AccessContext, ids: string[]): Promise<{ deleted: number; skipped: number }> {
+  const unique = [...new Set(ids)].slice(0, 500)
+  let deleted = 0
+  for (const id of unique) {
+    try { await deleteMeterReading(db, ctx, id); deleted++ } catch (e) {
+      if (e instanceof ValidationError || e instanceof NotFoundError) continue
+      throw e
+    }
+  }
+  return { deleted, skipped: unique.length - deleted }
+}

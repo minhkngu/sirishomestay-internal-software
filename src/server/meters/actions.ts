@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/db/client'
 import { toActionResult } from '@/lib/action-result'
 import { getAccessContext } from '@/server/session'
-import { addRoomMeter, deleteMeterReading, replaceMeter, saveReadings, updateMeterReading, suggestMeterFinalReading, type ReadingInput } from './service'
+import { addRoomMeter, deleteMeterReading, deleteMeterReadings, replaceMeter, saveReadings, updateMeterReading, suggestMeterFinalReading, type ReadingInput } from './service'
 
 export async function saveReadingsAction(period: string, rows: ReadingInput[]) {
   const ctx = await getAccessContext()
@@ -34,4 +34,9 @@ export async function updateMeterReadingAction(id: string, input: { value: numbe
 export async function deleteMeterReadingAction(id: string) {
   const ctx = await getAccessContext()
   return toActionResult(async () => { await deleteMeterReading(db, ctx, id); revalidatePath('/meters'); revalidatePath('/invoices', 'layout'); return {} })
+}
+
+export async function deleteMeterReadingsAction(ids: string[]) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => { const r = await deleteMeterReadings(db, ctx, ids); revalidatePath('/meters'); revalidatePath('/invoices', 'layout'); return r })
 }
