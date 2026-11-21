@@ -109,12 +109,6 @@ async function lockedReadings(tx: Pick<DB, 'select'>, roomIds: string[]): Promis
   }
   return out
 }
-/** Chỉ số bàn giao nằm trong kỳ của một hoá đơn đã duyệt (kể cả hoá đơn thanh lý) thì khoá, trả mã hoá đơn. */
-async function lockedHandovers(tx: Pick<DB, 'select'>, roomIds: string[]): Promise<Array<{ roomId: string; code: string; start: string; end: string }>> {
-  if (roomIds.length === 0) return []
-  return tx.select({ roomId: leases.roomId, code: invoices.code, start: invoices.periodStart, end: invoices.periodEnd }).from(invoices).innerJoin(leases, eq(leases.id, invoices.leaseId)).where(and(inArray(leases.roomId, roomIds), eq(invoices.status, 'approved')))
-}
-const handoverLock = (list: Array<{ roomId: string; code: string; start: string; end: string }>, roomId: string, readOn: string) => list.find(x => x.roomId === roomId && x.start <= readOn && x.end >= readOn)?.code ?? null
 const lockMessage = (code: string) => `Chỉ số đã dùng trong hoá đơn ${code} đã duyệt, bỏ duyệt hoá đơn trước khi đổi`
 
 export type ReadingInput = { meterId: string; value: number; readOn: string }
@@ -340,7 +334,7 @@ export type ReadingHistoryRow = {
   kind: 'monthly' | 'handover'; period: string; readOn: string
   /** Chỉ số bàn giao đứng riêng, không có số đầu và mức dùng (null). */
   opening: number | null; closing: number; usage: number | null
-  /** Mã hoá đơn đã duyệt đang dùng chỉ số này; có thì không sửa, xoá được. */
+  /** Mã hoá đơn đã duyệt đang dùng chỉ số tháng này; có thì không sửa, xoá được. Chỉ số bàn giao không khoá. */
   lockedBy: string | null
 }
 
@@ -351,15 +345,14 @@ export async function listReadingHistory(db: DB, ctx: AccessContext, facilityId:
   assertCan(ctx, 'meters', facilityId)
   periodRange(from); periodRange(to)
   const overview = await listMeterOverview(db, ctx, facilityId)
-  const roomIds = [...new Set(overview.map((o) => o.roomId))]
-  const [locked, handoverCover] = await Promise.all([lockedReadings(db, roomIds), lockedHandovers(db, roomIds)])
+  const locked = await lockedReadings(db, [...new Set(overview.map((o) => o.roomId))])
   const rows: ReadingHistoryRow[] = []
   for (const m of overview) {
     const asc = [...m.readings].sort((a, b) => (a.readOn < b.readOn ? -1 : a.readOn > b.readOn ? 1 : 0))
     let prev = m.startReading
     for (const r of asc) {
       if (r.period >= from && r.period <= to) {
-        rows.push({ id: r.id, meterId: m.meterId, roomId: m.roomId, roomCode: m.roomCode, floor: m.floor, meterName: typeName(m.meterName), meterCode: m.meterCode, unit: m.unit, kind: r.kind, period: r.period, readOn: r.readOn, opening: r.kind === 'handover' ? null : prev, closing: r.value, usage: r.kind === 'handover' ? null : Math.max(r.value - prev, 0), lockedBy: r.kind === 'monthly' ? (locked.get(`${m.roomId}|${r.period}`) ?? null) : handoverLock(handoverCover, m.roomId, r.readOn) })
+        rows.push({ id: r.id, meterId: m.meterId, roomId: m.roomId, roomCode: m.roomCode, floor: m.floor, meterName: typeName(m.meterName), meterCode: m.meterCode, unit: m.unit, kind: r.kind, period: r.period, readOn: r.readOn, opening: r.kind === 'handover' ? null : prev, closing: r.value, usage: r.kind === 'handover' ? null : Math.max(r.value - prev, 0), lockedBy: r.kind === 'monthly' ? (locked.get(`${m.roomId}|${r.period}`) ?? null) : null })
       }
       prev = r.value
     }
@@ -371,9 +364,8 @@ async function readingForEdit(tx: DB, ctx: AccessContext, id: string) {
   const [found] = await tx.select({ r: meterReadings, m: meters, facilityId: rooms.facilityId, roomCode: rooms.code }).from(meterReadings).innerJoin(meters, eq(meters.id, meterReadings.meterId)).innerJoin(rooms, eq(rooms.id, meters.roomId)).where(eq(meterReadings.id, id))
   if (!found) throw new NotFoundError()
   assertCan(ctx, 'meters', found.facilityId)
-  const lockedBy = found.r.kind === 'monthly'
-    ? (await lockedReadings(tx, [found.m.roomId])).get(`${found.m.roomId}|${found.r.period}`)
-    : handoverLock(await lockedHandovers(tx, [found.m.roomId]), found.m.roomId, found.r.readOn)
+  // Chỉ số tháng khoá khi hoá đơn dùng nó đã duyệt; chỉ số bàn giao (nhập lúc chọn đồng hồ) chỉ để tham khảo cho hoá đơn đầu, không khoá
+  const lockedBy = found.r.kind === 'monthly' ? (await lockedReadings(tx, [found.m.roomId])).get(`${found.m.roomId}|${found.r.period}`) : null
   if (lockedBy) throw new ValidationError(lockMessage(lockedBy))
   return found
 }

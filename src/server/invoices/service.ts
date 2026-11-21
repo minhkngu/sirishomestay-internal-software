@@ -302,6 +302,40 @@ export async function updateInvoiceMeterReading(db: DB, ctx: AccessContext, invo
     await recordAudit(tx, ctx, { action: 'update', entity: 'invoice', entityId: invoiceId, facilityId: inv.facilityId, summary: `Sửa chỉ số ${fee.name} tháng ${period} trong hoá đơn`, before: { value: current?.value ?? null }, after: { value: data.value, period } })
   })
 }
+/**
+ * Sửa số đầu kỳ của hoá đơn nháp khi số đó đến từ chỉ số bàn giao hoặc chỉ số ban đầu của đồng hồ (nhập lúc chọn phí, chọn đồng hồ).
+ * Hoá đơn đầu lấy số này tham khảo nên sửa được, không khoá; số đầu là chốt tháng trước thì sửa ở chỉ số của tháng đó.
+ */
+export async function updateInvoiceOpeningReading(db: DB, ctx: AccessContext, invoiceId: string, input: { leaseFeeId: string; period: string; value: number }): Promise<void> {
+  const data = parse(z.object({ leaseFeeId: z.uuid(), period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/), value: z.number().int().min(0) }), input)
+  await db.transaction(async tx0 => {
+    const tx = tx0 as unknown as DB
+    await tx.select({ id: invoices.id }).from(invoices).where(eq(invoices.id, invoiceId)).for('update')
+    const inv = await getInvoice(tx, ctx, invoiceId)
+    assertCan(ctx, 'meters', inv.facilityId)
+    if (inv.status !== 'draft' || inv.kind !== 'monthly') throw new ValidationError('Chỉ sửa số đầu trong hoá đơn tháng còn nháp')
+    const [link] = await tx.select({ meterId: leaseFeeMeters.meterId }).from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).where(and(eq(leaseFeeMeters.leaseFeeId, data.leaseFeeId), eq(leaseFeeSnapshots.leaseId, inv.leaseId)))
+    if (!link) throw new ValidationError('Phí không thuộc hợp đồng hoặc chưa gắn đồng hồ')
+    const [meter] = await tx.select().from(meters).where(eq(meters.id, link.meterId))
+    const all = (await tx.select().from(meterReadings).where(eq(meterReadings.meterId, meter.id))).sort((a, b) => (a.readOn < b.readOn ? -1 : 1))
+    const before = all.filter(r => r.readOn < `${data.period}-01`)
+    const target = before[before.length - 1]
+    const next = all.find(r => r.readOn >= `${data.period}-01`)
+    if (target && target.kind !== 'handover') throw new ValidationError('Số đầu là chỉ số chốt tháng trước, hãy sửa chỉ số của tháng đó')
+    if (next && data.value > next.value) throw new ValidationError('Số đầu không được lớn hơn chỉ số chốt sau đó')
+    if (target) {
+      const prev = before[before.length - 2]
+      if (prev && data.value < prev.value) throw new ValidationError(DECREASE_MSG)
+      await tx.update(meterReadings).set({ value: data.value, updatedAt: new Date() }).where(eq(meterReadings.id, target.id))
+    } else {
+      await tx.update(meters).set({ startReading: data.value, updatedAt: new Date() }).where(eq(meters.id, meter.id))
+    }
+    await refreshMeterLines(tx, inv, await leaseData(tx, inv.leaseId))
+    await tx.update(invoices).set({ updatedAt: new Date() }).where(eq(invoices.id, invoiceId))
+    await recordAudit(tx, ctx, { action: 'update', entity: 'invoice', entityId: invoiceId, facilityId: inv.facilityId, summary: `Sửa số đầu kỳ đồng hồ trong hoá đơn`, before: { value: target?.value ?? meter.startReading }, after: { value: data.value, period: data.period } })
+  })
+}
+const DECREASE_MSG = 'Số đầu nhỏ hơn chỉ số trước đó của đồng hồ'
 export async function approveInvoice(db: DB, ctx: AccessContext, id: string, input: { dueRule?: DueRule; dueDate?: string; approvedOn?: string }) {
   const valid = z.object({ dueRule: z.discriminatedUnion('kind', [z.object({ kind: z.literal('day_of_next_month'), day: z.number().int().min(1).max(31) }), z.object({ kind: z.literal('day_of_invoice_month'), day: z.number().int().min(1).max(31) }), z.object({ kind: z.literal('days_after_approval'), days: z.number().int().min(0).max(90) })]).optional(), dueDate: z.iso.date().optional(), approvedOn: z.iso.date().optional() }).parse(input)
   return db.transaction(async tx0 => {
@@ -609,11 +643,15 @@ export async function getInvoiceDetail(db: DB, ctx: AccessContext, id: string) {
   // Chỉ số đã chốt của đồng hồ gắn với từng phí tính theo đồng hồ, 3 tháng liền trước tháng hoá đơn (thiếu thì để trống)
   const meterFees = inv.kind === 'monthly' ? await db.select({ leaseFeeId: leaseFeeSnapshots.id, name: leaseFeeSnapshots.name, unit: leaseFeeSnapshots.unit, meterId: leaseFeeMeters.meterId }).from(leaseFeeSnapshots).innerJoin(leaseFeeMeters, eq(leaseFeeMeters.leaseFeeId, leaseFeeSnapshots.id)).where(and(eq(leaseFeeSnapshots.leaseId, inv.leaseId), eq(leaseFeeSnapshots.quantitySource, 'meter'))) : []
   const periods = recentPeriods(inv.periodStart.slice(0, 7))
+  const meterStart = new Map((meterFees.length ? await db.select({ id: meters.id, startReading: meters.startReading }).from(meters).where(inArray(meters.id, meterFees.map(f => f.meterId))) : []).map(m => [m.id, m.startReading]))
   const monthly = meterFees.length ? await db.select().from(meterReadings).where(and(inArray(meterReadings.meterId, meterFees.map(f => f.meterId)), eq(meterReadings.kind, 'monthly'), inArray(meterReadings.period, periods))) : []
   // Số đầu kỳ của mỗi tháng = chỉ số gần nhất của đồng hồ trước ngày 1 của tháng đó (số chốt tháng trước, hoặc số ban đầu / bàn giao)
-  const earlier = meterFees.length ? await db.select({ meterId: meterReadings.meterId, readOn: meterReadings.readOn, value: meterReadings.value }).from(meterReadings).where(and(inArray(meterReadings.meterId, meterFees.map(f => f.meterId)), sql`${meterReadings.readOn} < ${`${periods[periods.length - 1]}-01`}`)) : []
-  const openingOf = (meterId: string, period: string) => earlier.filter(x => x.meterId === meterId && x.readOn < `${period}-01`).sort((a, b) => (a.readOn < b.readOn ? 1 : -1))[0]?.value ?? null
-  const meterPanels = meterFees.map(f => ({ leaseFeeId: f.leaseFeeId, name: f.name, unit: f.unit, rows: periods.map(period => { const r = monthly.find(x => x.meterId === f.meterId && x.period === period); return { period, readOn: r?.readOn ?? null, value: r?.value ?? null, opening: openingOf(f.meterId, period) } }) }))
+  const earlier = meterFees.length ? await db.select({ meterId: meterReadings.meterId, readOn: meterReadings.readOn, value: meterReadings.value, kind: meterReadings.kind }).from(meterReadings).where(and(inArray(meterReadings.meterId, meterFees.map(f => f.meterId)), sql`${meterReadings.readOn} < ${`${periods[periods.length - 1]}-01`}`)) : []
+  const openingRow = (meterId: string, period: string) => earlier.filter(x => x.meterId === meterId && x.readOn < `${period}-01`).sort((a, b) => (a.readOn < b.readOn ? 1 : -1))[0]
+  /** Nguồn số đầu kỳ: chốt tháng trước, chỉ số bàn giao, hay chỉ số ban đầu của đồng hồ (chưa có lần chốt nào). */
+  const openingSource = (meterId: string, period: string): 'monthly' | 'handover' | 'start' => { const r = openingRow(meterId, period); return !r ? 'start' : r.kind === 'handover' ? 'handover' : 'monthly' }
+  const openingOf = (meterId: string, period: string) => openingRow(meterId, period)?.value ?? meterStart.get(meterId) ?? null
+  const meterPanels = meterFees.map(f => ({ leaseFeeId: f.leaseFeeId, name: f.name, unit: f.unit, rows: periods.map(period => { const r = monthly.find(x => x.meterId === f.meterId && x.period === period); return { period, readOn: r?.readOn ?? null, value: r?.value ?? null, opening: openingOf(f.meterId, period), openingSource: openingSource(f.meterId, period) } }) }))
   const total = lines.reduce((n, l) => n + l.amount, 0), paid = pays.reduce((n, p) => n + p.amount, 0)
   return { invoice: inv, meterPanels, leaseFeeTypeIds: leaseFees.flatMap(f => f.feeTypeId ? [f.feeTypeId] : []), lines, payments: pays, periodFees: periodFees.map(f => ({ id: f.id, name: f.name, unit: f.unit, unitPrice: f.unitPrice, quantity: quantities.find(q => q.leaseFeeId === f.id)?.quantity ?? null })), total, paid, state: invoiceStatus(total, paid, inv.status, inv.dueDate, todayVN()), ...row }
 }

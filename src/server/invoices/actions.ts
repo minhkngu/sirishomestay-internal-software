@@ -6,7 +6,7 @@ import type { DueRule, Proration } from '@/domain/types'
 import { toActionResult } from '@/lib/action-result'
 import { getAccessContext } from '@/server/session'
 import { getStorage } from '@/server/storage'
-import { saveInvoiceFeeQuantities, addPayment, approveInvoice, createDraftForLease, createDrafts, deleteInvoice, discardUntouchedDraft, exportReceipt, listInvoiceableLeases, previewBatch, previewLease, leaseDebt, recordLeasePayment, removePayment, setInvoiceDueDate, setInvoiceNote, setLineTime, setPeriod, unapproveInvoice, updateInvoiceMeterReading, updateLines } from './service'
+import { saveInvoiceFeeQuantities, addPayment, approveInvoice, createDraftForLease, createDrafts, deleteInvoice, discardUntouchedDraft, exportReceipt, listInvoiceableLeases, previewBatch, previewLease, leaseDebt, recordLeasePayment, removePayment, setInvoiceDueDate, setInvoiceNote, setLineTime, setPeriod, unapproveInvoice, updateInvoiceMeterReading, updateInvoiceOpeningReading, updateLines } from './service'
 
 const refresh = () => { revalidatePath('/invoices', 'layout'); revalidatePath('/contracts', 'layout'); revalidatePath('/cashbook') }
 export async function previewBatchAction(input: { facilityId: string; period: string }) {
@@ -37,6 +37,10 @@ export async function deleteInvoiceAction(id: string) {
 export async function discardNewDraftAction(id: string) {
   const ctx = await getAccessContext()
   return toActionResult(async () => { const discarded = await discardUntouchedDraft(db, ctx, id); refresh(); return { discarded } })
+}
+export async function updateInvoiceOpeningReadingAction(invoiceId: string, input: { leaseFeeId: string; period: string; value: number }) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => { await updateInvoiceOpeningReading(db, ctx, invoiceId, input); refresh(); revalidatePath('/meters'); return {} })
 }
 export async function addPaymentAction(id: string, input: { paidOn: string; amount: number; method: 'cash' | 'transfer' | 'other'; note?: string }) {
   const ctx = await getAccessContext()

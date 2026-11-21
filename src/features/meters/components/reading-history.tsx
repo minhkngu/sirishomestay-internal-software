@@ -17,7 +17,7 @@ import type { ReadingHistoryRow } from '@/server/meters/service'
 const fmt = (value: number) => value.toLocaleString('vi-VN')
 const monthLabel = (period: string) => `${Number(period.slice(5))}/${period.slice(0, 4)}`
 
-/** Lịch sử chốt chỉ số: mỗi dòng một lần chốt (phòng, đồng hồ, tháng, số đầu, số cuối, ngày chốt). Sửa, xoá khi chưa có hoá đơn đã duyệt dùng chỉ số đó (kể cả chỉ số bàn giao). */
+/** Lịch sử chốt chỉ số: mỗi dòng một lần chốt (phòng, đồng hồ, tháng, số đầu, số cuối, ngày chốt). Chỉ số tháng đã dùng trong hoá đơn đã duyệt thì khoá; chỉ số bàn giao chỉ để tham khảo nên không khoá. */
 export function ReadingHistory({ rows }: { rows: ReadingHistoryRow[] }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -66,7 +66,7 @@ export function ReadingHistory({ rows }: { rows: ReadingHistoryRow[] }) {
   }
   return (
     <div className="rounded-2xl border border-border/80 bg-card">
-      <div className="border-b border-border/70 px-4 py-3 text-xs text-muted-foreground">{rows.length} lần chốt · số đầu là số chốt trước đó của đồng hồ, chỉ số bàn giao đứng riêng (không có số đầu, mức dùng), chỉ số đã dùng trong hoá đơn đã duyệt thì khoá.</div>
+      <div className="border-b border-border/70 px-4 py-3 text-xs text-muted-foreground">{rows.length} lần chốt · số đầu là số chốt trước đó của đồng hồ, chỉ số bàn giao đứng riêng (không có số đầu, mức dùng), </div>
       <div className="hidden overflow-x-auto lg:block">
         <table className="w-full text-[13px]">
           <thead>
