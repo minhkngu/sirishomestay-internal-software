@@ -245,7 +245,7 @@ export function InvoiceEditor(p: Props) {
             <label htmlFor="invoice-due" className="block text-xs font-medium text-muted-foreground">Hạn thanh toán</label>
             <div className="flex flex-wrap items-center gap-2.5">
               <input id="invoice-due" type="date" value={due} onChange={(e) => setDue(e.target.value)} className="h-9 rounded-lg border border-border/80 bg-background px-2.5 text-sm font-semibold tabular-nums text-foreground focus:border-primary focus:outline-none" />
-              <span className="text-xs text-muted-foreground">Mặc định theo Cài đặt: <strong className="font-semibold text-foreground">{formatDateVN(p.dueDefaultIso)}</strong> ({p.dueDefaultLabel})</span>
+              <span className="text-xs text-muted-foreground" title={`Theo Cài đặt: ${p.dueDefaultLabel}`}>Mặc định {formatDateVN(p.dueDefaultIso)}</span>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
