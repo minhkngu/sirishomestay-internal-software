@@ -50,6 +50,8 @@ export type MonthlyInvoiceInput = {
   oneOffs: OneOffCharge[]
   pending: PendingAdjustment[]
   overridePeriod?: { start: ISODate; end: ISODate; coefficient?: number }
+  /** Hoá đơn thứ hai trùng kỳ: không cộng tiền phòng (đã tính ở hoá đơn trước), vẫn tính các phí, phát sinh khác. */
+  skipRent?: boolean
   fullMonth?: boolean
 }
 
@@ -87,7 +89,7 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): { lines: Invoic
         const fraction = prorateFraction(segment.from, segment.to, input.proration)
         const coefficient = input.overridePeriod?.coefficient != null || input.fullMonth ? sum * fraction / totalFraction : fraction
         const segmentLines = rentAndFixedLines(segment.terms, segment.from, segment.to, coefficient, segment.terms.occupantIds.length)
-        lines.push(...segmentLines)
+        lines.push(...(input.skipRent ? segmentLines.filter((l) => l.type !== 'rent') : segmentLines))
       }
     }
   } else warnings.push('Hợp đồng không có hiệu lực trong kỳ này')

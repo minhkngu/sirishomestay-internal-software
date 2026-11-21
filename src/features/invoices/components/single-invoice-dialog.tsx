@@ -12,7 +12,7 @@ import { formatVND } from '@/domain/money'
 import { createDraftForLeaseAction, listInvoiceableLeasesAction, previewLeaseAction } from '@/server/invoices/actions'
 
 type LeaseOption = { leaseId: string; roomCode: string; tenantName: string }
-type Preview = { lines: Array<{ description: string; amount: number }>; warnings: string[]; prepaidUntil: string | null; period: { start: string; end: string } | null }
+type Preview = { lines: Array<{ description: string; amount: number }>; warnings: string[]; prepaidUntil: string | null; rentSkipped?: boolean; period: { start: string; end: string } | null }
 
 /** Popup tạo một hoá đơn nháp cho một phòng: Toà → Phòng → Tháng, xem trước rồi tạo. */
 export function SingleInvoiceDialog({ facilities, defaultPeriod }: { facilities: { id: string; name: string }[]; defaultPeriod: string }) {
@@ -84,6 +84,7 @@ export function SingleInvoiceDialog({ facilities, defaultPeriod }: { facilities:
               {preview.period && (
                 <>
                   <p className="font-medium">Kỳ {formatDateVN(preview.period.start)} – {formatDateVN(preview.period.end)}</p>
+                  {preview.rentSkipped && <p className="text-xs text-muted-foreground">Tháng này đã có hoá đơn: hoá đơn thêm này không cộng tiền phòng, dùng cho các khoản phát sinh khác.</p>}
                   <ul className="space-y-1">
                     {preview.lines.map((l, i) => <li key={i} className="flex justify-between gap-3"><span>{l.description}</span><span className="tabular-nums">{formatVND(l.amount)}</span></li>)}
                   </ul>

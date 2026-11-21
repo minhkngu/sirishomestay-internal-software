@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, like, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, like, lt, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { addenda, facilities, feeTypes, feeUnits, invoiceLines, invoices, invoiceFeeQuantities, leaseFeeMeters, leaseFeeSnapshots, leaseOccupants, leases, meterReadings, meters, oneOffCharges, payments, pendingAdjustments, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
@@ -79,8 +79,8 @@ async function loadCalcInputs(db: Pick<DB, 'select'>, facilityId: string, data: 
   return { settings, meters: ms, oneOffs, pending, readings, feeMeterLinks }
 }
 type CalcInputs = Awaited<ReturnType<typeof loadCalcInputs>>
-function calculateWith(inputs: CalcInputs, lease: Lease, addendaRows: Addendum[], facilityId: string, period: string, override?: { start: string; end: string; coefficient?: number }, fullMonth = false, proration?: Proration, periodQuantities: Array<{ leaseFeeId: string; period: string; quantity: number }> = []) {
-  return buildMonthlyInvoice({
+function calculateWith(inputs: CalcInputs, lease: Lease, addendaRows: Addendum[], facilityId: string, period: string, override?: { start: string; end: string; coefficient?: number }, fullMonth = false, proration?: Proration, periodQuantities: Array<{ leaseFeeId: string; period: string; quantity: number }> = [], skipRent = false) {
+  return buildMonthlyInvoice({ skipRent,
     lease, addenda: addendaRows, facilityId, period, proration: proration ?? lease.proration ?? inputs.settings.proration, meters: inputs.meters as Meter[], readings: inputs.readings as MeterReading[], feeMeterLinks: inputs.feeMeterLinks, periodQuantities,
     oneOffs: inputs.oneOffs.filter(x => x.leaseId === lease.id).map(x => ({ ...x, kind: x.kind as OneOffCharge['kind'], invoicedInId: x.invoiceId })),
     pending: inputs.pending.filter(x => x.leaseId === lease.id).map(x => ({ ...x, invoicedInId: x.invoiceId })) as PendingAdjustment[], overridePeriod: override, fullMonth,
@@ -89,7 +89,14 @@ function calculateWith(inputs: CalcInputs, lease: Lease, addendaRows: Addendum[]
 async function calculate(db: DB, lease: Lease, facilityId: string, period: string, override?: { start: string; end: string; coefficient?: number }, fullMonth = false, proration?: Proration, invoiceId?: string) {
   const found = (await leasesData(db, [lease.id])).get(lease.id)!
   const quantities = invoiceId ? await db.select().from(invoiceFeeQuantities).where(eq(invoiceFeeQuantities.invoiceId, invoiceId)) : []
-  return calculateWith(await loadCalcInputs(db, facilityId, new Map([[lease.id, { lease, addenda: found.addenda }]])), lease, found.addenda, facilityId, period, override, fullMonth, proration, quantities.map(q => ({ ...q, period })))
+  // Hoá đơn lập sau, trùng kỳ với hoá đơn đã có của hợp đồng: không cộng lại tiền phòng
+  let skipRent = false
+  if (invoiceId && override) {
+    const [self] = await db.select({ createdAt: invoices.createdAt }).from(invoices).where(eq(invoices.id, invoiceId))
+    const earlier = self ? await db.select({ id: invoices.id }).from(invoices).where(and(eq(invoices.leaseId, lease.id), eq(invoices.kind, 'monthly'), ne(invoices.id, invoiceId), lt(invoices.createdAt, self.createdAt), sql`${invoices.periodStart} <= ${override.end}`, sql`${invoices.periodEnd} >= ${override.start}`)).limit(1) : []
+    skipRent = earlier.length > 0
+  }
+  return calculateWith(await loadCalcInputs(db, facilityId, new Map([[lease.id, { lease, addenda: found.addenda }]])), lease, found.addenda, facilityId, period, override, fullMonth, proration, quantities.map(q => ({ ...q, period })), skipRent)
 }
 export async function previewBatch(db: DB, ctx: AccessContext, input: { facilityId: string; period: string }) {
   const { facilityId, period } = parse(batchSchema, input); assertCan(ctx, 'billing', facilityId)
@@ -111,9 +118,11 @@ async function previewCore(db: DB, facilityId: string, period: string, onlyLease
     if (last && last >= monthEnd) {
       const start = lease.startDate > monthStart ? lease.startDate : monthStart
       const end = lease.endDate < monthEnd ? lease.endDate : monthEnd
-      const free = start <= end && !mine.some(e => e.start <= end && e.end >= start)
-      if (!free) return { leaseId: lease.id, dueRule: lease.dueRule ?? null, lines: [] as InvoiceLineInput[], warnings: [] as string[], prepaidUntil: last, period: null }
-      return { leaseId: lease.id, dueRule: lease.dueRule ?? null, ...calculateWith(inputs, lease, addendaRows, facilityId, period, { start, end }), prepaidUntil: null, period: { start, end } }
+      if (start > end) return { leaseId: lease.id, dueRule: lease.dueRule ?? null, lines: [] as InvoiceLineInput[], warnings: [] as string[], prepaidUntil: last, period: null }
+      const free = !mine.some(e => e.start <= end && e.end >= start)
+      // Tháng đã có hoá đơn: chỉ lập thêm khi tạo lẻ cho một hợp đồng (để thêm chi phí phát sinh), không cộng lại tiền phòng; tạo hàng loạt bỏ qua
+      if (!free && !onlyLeaseId) return { leaseId: lease.id, dueRule: lease.dueRule ?? null, lines: [] as InvoiceLineInput[], warnings: [] as string[], prepaidUntil: last, period: null }
+      return { leaseId: lease.id, dueRule: lease.dueRule ?? null, ...calculateWith(inputs, lease, addendaRows, facilityId, period, { start, end }, false, undefined, [], !free), prepaidUntil: null, period: { start, end }, rentSkipped: !free }
     }
     // Chưa có hoá đơn nào: người dùng chọn kỳ đầu tiên, không dồn các tháng trước kỳ được chọn
     const first = `${period}-01`
