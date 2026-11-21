@@ -311,7 +311,7 @@ export function InvoiceEditor(p: Props) {
   const saveAll = (extra?: { staged: Record<string, string>; opening: Record<string, string> }) => start(async () => {
     const error = await persist(extra)
     if (error) { toast.error(error); router.refresh(); return }
-    if (createdId.current) { toast.success('Đã tạo hoá đơn'); router.replace(`/invoices/${createdId.current}`); return }
+    if (createdId.current) { toast.success('Đã tạo hoá đơn'); router.replace('/invoices'); router.refresh(); return }
     toast.success('Đã lưu hoá đơn')
     router.refresh()
   })
