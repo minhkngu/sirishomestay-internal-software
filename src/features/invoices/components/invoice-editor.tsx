@@ -174,6 +174,17 @@ function MeterReadingsPanel({ panel, editable, consumption, staged, onStage, sta
     // Số đã điền được lưu luôn, không cần bấm Lưu thay đổi (hoá đơn mới thì lưu cùng lúc tạo)
     onApply(readings, openings)
   }
+  // Hợp đồng mới bắt đầu, chưa có tháng nào để chốt: chỉ hiện chỉ số ban đầu ghi ở hợp đồng làm số đầu và số cuối kỳ
+  if (panel.rows.length === 0) {
+    if (!panel.initial) return <span className="text-muted-foreground/60">—</span>
+    const v = panel.initial.value.toLocaleString('vi-VN')
+    return (
+      <div className="text-[11px] text-muted-foreground">
+        <p className="tabular-nums">Số đầu kỳ <span className="font-medium text-foreground">{v}</span> · Số cuối kỳ <span className="font-medium text-foreground">{v}</span></p>
+        <p className="mt-0.5">Chỉ số ban đầu {formatDateVN(panel.initial.readOn)}, chưa phát sinh · Tiêu thụ: <span className="font-medium tabular-nums text-foreground">{consumption.toLocaleString('vi-VN')} {panel.unit}</span></p>
+      </div>
+    )
+  }
   return (
     <div className="text-[11px] text-muted-foreground">
       <Select value={null} onValueChange={(v) => { if (v) open(String(v)) }} items={items}>
