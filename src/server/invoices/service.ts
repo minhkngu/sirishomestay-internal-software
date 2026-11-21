@@ -390,6 +390,8 @@ const linesSchema = z.array(z.object({
   id: z.uuid().optional(), type: z.enum(['rent', 'fee', 'electric', 'water', 'one_off', 'penalty', 'adjustment', 'deposit', 'deposit_offset', 'refund']),
   description: z.string().trim().min(1, 'Nhập mô tả dòng'), quantity: z.number().finite(), unitPrice: z.number().int().safe(), meta: z.record(z.string(), z.unknown()).nullable().optional(),
 }))
+/** Dòng tính theo thời gian (tiền phòng, phí cố định hợp đồng): số lượng và thời gian, hệ số sửa được; điện nước (có chỉ số, theo kỳ) thì không. */
+const isTimeBasedLine = (type: string, meta: unknown) => { const m = (meta ?? {}) as Record<string, unknown>; return type === 'rent' || (!Array.isArray(m.segments) && typeof m.period !== 'string') }
 /** Thay toàn bộ dòng; số tiền mỗi dòng = làm tròn (số lượng × đơn giá). Hoá đơn đã duyệt cũng sửa được, có audit trước/sau. */
 export async function updateLines(db: DB, ctx: AccessContext, id: string, input: unknown) {
   const data = parse(linesSchema, input)
@@ -398,7 +400,7 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
     const old = await tx.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, id))
     if (inv.kind === 'monthly') {
       // Dòng tiền phòng và dòng phí hợp đồng lấy từ hợp đồng: không đổi mô tả, số lượng, đơn giá hay xoá ở đây (hệ số sửa qua setLineTime, chỉ số qua bảng chỉ số)
-      const protectedLine = (l: { id?: string; type: string; description: string; quantity: number; unitPrice: number; meta?: unknown }) => { const meta = l.meta as { leaseFeeId?: unknown } | null; return typeof meta?.leaseFeeId === 'string' || l.type === 'rent' ? JSON.stringify([l.id, meta?.leaseFeeId ?? null, l.type, l.description, l.type === 'rent' ? null : l.quantity, l.unitPrice]) : null }
+      const protectedLine = (l: { id?: string; type: string; description: string; quantity: number; unitPrice: number; meta?: unknown }) => { const meta = l.meta as { leaseFeeId?: unknown } | null; return typeof meta?.leaseFeeId === 'string' || l.type === 'rent' ? JSON.stringify([l.id, meta?.leaseFeeId ?? null, l.type, l.description, isTimeBasedLine(l.type, l.meta) ? null : l.quantity, l.unitPrice]) : null }
       const beforeFees = old.map(protectedLine).filter(Boolean).sort()
       const afterFees = data.map(protectedLine).filter(Boolean).sort()
       if (JSON.stringify(beforeFees) !== JSON.stringify(afterFees)) throw new ValidationError('Không sửa hoặc xoá dòng tiền phòng, phí hợp đồng tại đây; sửa hệ số, chỉ số hoặc số lượng theo kỳ ở từng dòng')
@@ -409,20 +411,24 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
       if (protectedFee) {
         // Dòng hợp đồng giữ mô tả, số lượng, đơn giá đã lưu; chỉ thời gian, hệ số đổi được (gửi kèm khi lưu) và thành tiền tính lại theo đó
         const prev = (protectedFee.meta ?? {}) as Record<string, unknown>
-        const timeBased = l.type === 'rent' || (!Array.isArray(prev.segments) && typeof prev.period !== 'string')
+        const timeBased = isTimeBasedLine(protectedFee.type, protectedFee.meta)
         const sent = typeof meta?.coefficient === 'number' && Number.isFinite(meta.coefficient) && meta.coefficient >= 0 ? Math.round(meta.coefficient * 10000) / 10000 : undefined
-        const changed = sent !== undefined && (sent !== prev.coefficient || (typeof meta?.from === 'string' && meta.from !== prev.from) || (typeof meta?.to === 'string' && meta.to !== prev.to))
-        if (timeBased && changed && sent !== undefined) {
-          const base = l.type === 'rent' ? 1 : protectedFee.quantity
-          return { invoiceId: id, type: protectedFee.type, description: protectedFee.description, quantity: l.type === 'rent' ? sent : protectedFee.quantity, unitPrice: protectedFee.unitPrice, amount: Math.round(base * protectedFee.unitPrice * sent), meta: { ...prev, from: typeof meta?.from === 'string' ? meta.from : prev.from, to: typeof meta?.to === 'string' ? meta.to : prev.to, coefficient: sent, coefficientOverride: meta?.coefficientOverride === true } }
+        const coefChanged = sent !== undefined && (sent !== prev.coefficient || (typeof meta?.from === 'string' && meta.from !== prev.from) || (typeof meta?.to === 'string' && meta.to !== prev.to))
+        const qty = protectedFee.type === 'rent' ? undefined : Number.isFinite(l.quantity) && l.quantity >= 0 ? l.quantity : protectedFee.quantity
+        const qtyChanged = qty !== undefined && qty !== protectedFee.quantity
+        if (timeBased && (coefChanged || qtyChanged)) {
+          const derived = protectedFee.type === 'rent' ? protectedFee.quantity : protectedFee.quantity * protectedFee.unitPrice !== 0 ? protectedFee.amount / (protectedFee.quantity * protectedFee.unitPrice) : 1
+          const coef = coefChanged && sent !== undefined ? sent : typeof prev.coefficient === 'number' ? prev.coefficient : Math.round(derived * 10000) / 10000
+          const rent = protectedFee.type === 'rent'
+          return { invoiceId: id, type: protectedFee.type, description: protectedFee.description, quantity: rent ? coef : qty ?? protectedFee.quantity, unitPrice: protectedFee.unitPrice, amount: Math.round((rent ? 1 : qty ?? protectedFee.quantity) * protectedFee.unitPrice * coef), meta: { ...prev, from: coefChanged && typeof meta?.from === 'string' ? meta.from : prev.from, to: coefChanged && typeof meta?.to === 'string' ? meta.to : prev.to, coefficient: coef, coefficientOverride: coefChanged ? meta?.coefficientOverride === true : prev.coefficientOverride } }
         }
         return { invoiceId: id, type: protectedFee.type, description: protectedFee.description, quantity: protectedFee.quantity, unitPrice: protectedFee.unitPrice, amount: protectedFee.amount, meta: protectedFee.meta }
       }
-      // Phí ngoài hợp đồng chọn từ loại phí: giữ mô tả, số lượng, đơn giá đã lưu; thành tiền nhân hệ số riêng của dòng
+      // Phí ngoài hợp đồng chọn từ loại phí: giữ mô tả, đơn giá đã lưu; số lượng sửa được; thành tiền nhân hệ số riêng của dòng
       const addedFee = l.type === 'one_off' && typeof meta?.feeTypeId === 'string' && typeof meta?.leaseFeeId !== 'string'
       const saved = addedFee ? old.find(previous => previous.id === l.id) : undefined
       const coefficient = addedFee && typeof meta?.coefficient === 'number' ? meta.coefficient : 1
-      return { invoiceId: id, type: l.type, description: saved?.description ?? l.description, quantity: saved?.quantity ?? l.quantity, unitPrice: saved?.unitPrice ?? l.unitPrice, amount: Math.round((saved?.quantity ?? l.quantity) * (saved?.unitPrice ?? l.unitPrice) * coefficient), meta: l.meta ?? null }
+      return { invoiceId: id, type: l.type, description: saved?.description ?? l.description, quantity: l.quantity, unitPrice: saved?.unitPrice ?? l.unitPrice, amount: Math.round(l.quantity * (saved?.unitPrice ?? l.unitPrice) * coefficient), meta: l.meta ?? null }
     })
     // Phí phát sinh / điều chỉnh bị bỏ khỏi hoá đơn thì trả về trạng thái chưa tính
     const keep = new Set(next.map(l => JSON.stringify(l.meta ?? {})))

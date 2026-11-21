@@ -82,6 +82,16 @@ const timePatch = (l: Line, meta: Record<string, unknown>): Partial<EditorLine> 
   return { meta }
 }
 
+/** Đổi số lượng: tiền phòng thì số lượng chính là hệ số; phí hợp đồng tính lại thành tiền theo hệ số đang có. */
+const qtyPatch = (l: Line, q: number): Partial<EditorLine> => {
+  if (l.type === 'rent') return { quantity: q, amount: Math.round(l.unitPrice * q), meta: { ...(l.meta ?? {}), coefficient: q, coefficientOverride: true } }
+  if (isLocked(l)) {
+    const coef = typeof l.meta?.coefficient === 'number' ? l.meta.coefficient : l.amount != null && l.quantity * l.unitPrice !== 0 ? l.amount / (l.quantity * l.unitPrice) : 1
+    return { quantity: q, amount: Math.round(q * l.unitPrice * coef) }
+  }
+  return { quantity: q }
+}
+
 /** Thời gian của một dòng: chọn từ–đến ngay trên dòng, hệ số tự tính theo tháng tròn từ ngày bắt đầu; lưu cùng mọi thay đổi khác của hoá đơn. */
 function LineTime({ line, defaultFrom, defaultTo, fullMonth, proration, editable, onChange }: { line: Line; defaultFrom: string; defaultTo: string; fullMonth: boolean; proration: Proration; editable: boolean; onChange: (meta: Record<string, unknown>) => void }) {
   const meta = line.meta ?? {}
@@ -105,7 +115,7 @@ type MeterPanel = { leaseFeeId: string; name: string; unit: string; rows: Array<
 const periodLabel = (period: string) => `${period.slice(5)}/${period.slice(0, 4)}`
 const NEW_READING = '__new'
 /** Chỉ số đã chốt của đồng hồ: danh sách các tháng, thêm dòng "Chốt chỉ số" cuối danh sách; chọn một dòng mở popup điền số (ghi ngược về tab Chỉ số). */
-function MeterReadingsPanel({ invoiceId, panel, editable }: { invoiceId: string; panel: MeterPanel; editable: boolean }) {
+function MeterReadingsPanel({ invoiceId, panel, editable, consumption }: { invoiceId: string; panel: MeterPanel; editable: boolean; consumption: number }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [period, setPeriod] = useState<string | null>(null)
@@ -132,6 +142,7 @@ function MeterReadingsPanel({ invoiceId, panel, editable }: { invoiceId: string;
         <SelectTrigger aria-label={`Chỉ số đã chốt ${panel.name}`} className="h-8 w-full rounded-lg border-border/80 bg-background text-xs"><SelectValue placeholder={rowLabel(last)} /></SelectTrigger>
         <SelectContent>{items.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
       </Select>
+      <p className="mt-1.5">Tiêu thụ: <span className="font-medium tabular-nums text-foreground">{consumption.toLocaleString('vi-VN')} {panel.unit}</span></p>
       {row && (
         <FormDialog open onOpenChange={(o) => { if (!o) setPeriod(null) }} title={`Chốt chỉ số ${panel.name}`} description={`Tháng ${periodLabel(row.period)}${row.value == null ? ' · chưa chốt' : ` · đang là ${row.value.toLocaleString('vi-VN')}`}. Số chốt ghi về tab Chỉ số và tính lại hoá đơn.`} size="sm">
           <div className="space-y-4 pb-1">
@@ -196,6 +207,7 @@ export function InvoiceEditor(p: Props) {
     router.refresh()
   })
 
+  const isMeterLine = (l: Line) => !!p.meterPanels?.some((x) => x.leaseFeeId === l.meta?.leaseFeeId)
   const approved = p.status === 'approved'
 
   return (
@@ -250,17 +262,20 @@ export function InvoiceEditor(p: Props) {
                     {isTimeBased(l) ? <LineTime line={l} defaultFrom={p.start} defaultTo={p.end} fullMonth={p.fullMonth} proration={p.proration} editable={p.status === 'draft'} onChange={(meta) => set(i, timePatch(l, meta))} /> : <span className="text-muted-foreground/60">—</span>}
                   </td>
                   <td className="p-2.5 align-top">
-                    {(() => { const panel = p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId); return panel ? <MeterReadingsPanel invoiceId={p.id} panel={panel} editable={p.status === 'draft'} /> : <span className="text-muted-foreground/60">—</span> })()}
+                    {(() => { const panel = p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId); return panel ? <MeterReadingsPanel invoiceId={p.id} panel={panel} editable={p.status === 'draft'} consumption={l.quantity} /> : <span className="text-muted-foreground/60">—</span> })()}
                   </td>
-                  <td className="p-2.5">
-                    <input
-                      type="number"
-                      step="any"
-                      value={l.quantity}
-                      disabled={isLocked(l) || isAddedFee(l)}
-                      onChange={(e) => set(i, { quantity: Number(e.target.value) })}
-                      className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
-                    />
+                  <td className="p-2.5 align-top">
+                    {isMeterLine(l)
+                      ? <span className="text-muted-foreground/60">—</span>
+                      : <input
+                          type="number"
+                          step="any"
+                          min={0}
+                          aria-label="Số lượng"
+                          value={l.quantity}
+                          onChange={(e) => set(i, qtyPatch(l, Number(e.target.value)))}
+                          className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
+                        />}
                   </td>
                   <td className="p-2.5 text-right font-bold tabular-nums text-foreground">
                     {formatVND(lineAmount(l))}

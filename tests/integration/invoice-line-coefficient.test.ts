@@ -77,6 +77,12 @@ describe('thời gian và hệ số riêng từng dòng', () => {
     expect(r.meta).toMatchObject({ from: '2026-07-11', to: '2026-07-31', coefficient: 0.6774 })
     expect(await fee()).toMatchObject({ amount: 100000 })
   })
+  it('sửa số lượng dòng phí hợp đồng thì tiền = số lượng × đơn giá × hệ số; sửa SL dòng tiền phòng chính là đổi hệ số', async () => {
+    const current = (await lines()).map(l => ({ id: l.id, type: l.type, description: l.description, quantity: l.type === 'fee' ? 3 : l.type === 'rent' ? 0.5 : l.quantity, unitPrice: l.unitPrice, meta: l.type === 'rent' ? { ...(l.meta as object), coefficient: 0.5, coefficientOverride: true } : l.meta }))
+    await updateLines(db, ctx(), invoiceId, current)
+    expect(await fee()).toMatchObject({ quantity: 3, amount: 600000 })
+    expect(await rent()).toMatchObject({ quantity: 0.5, amount: 4500000 })
+  })
   it('lưu lại mà không đổi hệ số thì tiền các dòng hợp đồng giữ nguyên', async () => {
     const before = await lines()
     await updateLines(db, ctx(), invoiceId, before.map(l => ({ id: l.id, type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta: l.meta })))
@@ -105,14 +111,14 @@ describe('thời gian và hệ số riêng từng dòng', () => {
       expect(added.amount).toBe(50000)
       expect(added.meta).toMatchObject({ from: '2026-07-16', to: '2026-07-31', coefficient: 0.5 })
     })
-    it('lưu lại dòng: mô tả, số lượng, đơn giá giữ như đã lưu dù gửi giá trị khác, hệ số vẫn được nhân', async () => {
+    it('lưu lại dòng: mô tả, đơn giá giữ như đã lưu dù gửi giá trị khác, số lượng sửa được, hệ số vẫn được nhân', async () => {
       const added = await addFee()
       await setLineTime(db, ctx(), invoiceId, added.id, { coefficient: 0.5 })
       const current = (await lines()).map(l => ({ id: l.id, type: l.type, description: l.id === added.id ? 'Tên tự đổi' : l.description, quantity: l.id === added.id ? 3 : l.quantity, unitPrice: l.id === added.id ? 1 : l.unitPrice, meta: l.meta }))
       await updateLines(db, ctx(), invoiceId, current)
       const after = (await lines()).find(l => l.id === added.id)!
       expect(after.description).toBe('Giặt ủi')
-      expect(after).toMatchObject({ quantity: 2, unitPrice: 100000, amount: 100000 })
+      expect(after).toMatchObject({ quantity: 3, unitPrice: 100000, amount: 150000 })
     })
   })
 })
