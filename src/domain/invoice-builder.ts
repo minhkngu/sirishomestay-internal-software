@@ -52,6 +52,8 @@ export type MonthlyInvoiceInput = {
   overridePeriod?: { start: ISODate; end: ISODate; coefficient?: number }
   /** Hoá đơn thứ hai trùng kỳ: không cộng tiền phòng (đã tính ở hoá đơn trước), vẫn tính các phí, phát sinh khác. */
   skipRent?: boolean
+  /** Kèm dòng tiền cọc còn thiếu = tiền cọc theo hợp đồng trừ phần đã có (đã thu hoặc đã lập ở hoá đơn khác). */
+  deposit?: { collected: number }
   fullMonth?: boolean
 }
 
@@ -66,6 +68,10 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): { lines: Invoic
   const monthEnd = lastDayOf(period)
   const warnings: string[] = []
   const lines: InvoiceLineInput[] = []
+  if (input.deposit && !input.skipRent) {
+    const missing = terms.depositAmount - input.deposit.collected
+    if (missing > 0) lines.push({ type: 'deposit', description: 'Tiền cọc còn thiếu', quantity: 1, unitPrice: missing, amount: missing, meta: { deposit: true } })
+  }
 
   // --- kỳ N: tiền phòng + phí cố định
   let from: ISODate

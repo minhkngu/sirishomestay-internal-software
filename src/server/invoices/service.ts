@@ -1,9 +1,10 @@
 import { and, asc, desc, eq, inArray, like, lt, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { addenda, auditLogs, facilities, feeTypes, feeUnits, invoiceLines, invoices, invoiceFeeQuantities, leaseFeeMeters, leaseFeeSnapshots, leaseOccupants, leases, meterReadings, meters, oneOffCharges, payments, pendingAdjustments, rooms, tenants } from '@/db'
+import { addenda, auditLogs, depositEntries, facilities, feeTypes, feeUnits, invoiceLines, invoices, invoiceFeeQuantities, leaseFeeMeters, leaseFeeSnapshots, leaseOccupants, leases, meterReadings, meters, oneOffCharges, payments, pendingAdjustments, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { computeDueDate } from '@/domain/due-date'
+import { depositHeld } from '@/domain/cashbook'
 import { daysInMonth, todayVN } from '@/domain/dates'
 import { displayName } from '@/domain/tenant-name'
 import { NotFoundError, ValidationError } from '@/domain/errors'
@@ -79,8 +80,22 @@ async function loadCalcInputs(db: Pick<DB, 'select'>, facilityId: string, data: 
   return { settings, meters: ms, oneOffs, pending, readings, feeMeterLinks }
 }
 type CalcInputs = Awaited<ReturnType<typeof loadCalcInputs>>
-function calculateWith(inputs: CalcInputs, lease: Lease, addendaRows: Addendum[], facilityId: string, period: string, override?: { start: string; end: string; coefficient?: number }, fullMonth = false, proration?: Proration, periodQuantities: Array<{ leaseFeeId: string; period: string; quantity: number }> = [], skipRent = false) {
-  return buildMonthlyInvoice({ skipRent,
+/**
+ * Tiền cọc đã có của từng hợp đồng: cọc đã thu (thu + bổ sung − hoàn − trừ − mất, chỉ khoản đã xong) cộng phần đã lập thành dòng "cọc còn thiếu"
+ * ở hoá đơn khác, để không đòi cọc hai lần. `excludeInvoiceId` loại hoá đơn đang tính lại.
+ */
+async function depositCollectedOf(db: Pick<DB, 'select'>, leaseIds: string[], excludeInvoiceId?: string): Promise<Map<string, number>> {
+  const out = new Map<string, number>(leaseIds.map(id => [id, 0]))
+  if (leaseIds.length === 0) return out
+  const [rows, billed] = await Promise.all([
+    db.select({ leaseId: depositEntries.leaseId, type: depositEntries.type, status: depositEntries.status, amount: depositEntries.amount }).from(depositEntries).where(inArray(depositEntries.leaseId, leaseIds)),
+    db.select({ leaseId: invoices.leaseId, amount: invoiceLines.amount }).from(invoiceLines).innerJoin(invoices, eq(invoices.id, invoiceLines.invoiceId)).where(and(inArray(invoices.leaseId, leaseIds), eq(invoiceLines.type, 'deposit'), excludeInvoiceId ? ne(invoices.id, excludeInvoiceId) : undefined)),
+  ])
+  for (const id of leaseIds) out.set(id, depositHeld(rows.filter(r => r.leaseId === id)) + billed.filter(b => b.leaseId === id).reduce((n, b) => n + b.amount, 0))
+  return out
+}
+function calculateWith(inputs: CalcInputs, lease: Lease, addendaRows: Addendum[], facilityId: string, period: string, override?: { start: string; end: string; coefficient?: number }, fullMonth = false, proration?: Proration, periodQuantities: Array<{ leaseFeeId: string; period: string; quantity: number }> = [], skipRent = false, deposit?: { collected: number }) {
+  return buildMonthlyInvoice({ skipRent, deposit,
     lease, addenda: addendaRows, facilityId, period, proration: proration ?? lease.proration ?? inputs.settings.proration, meters: inputs.meters as Meter[], readings: inputs.readings as MeterReading[], feeMeterLinks: inputs.feeMeterLinks, periodQuantities,
     oneOffs: inputs.oneOffs.filter(x => x.leaseId === lease.id).map(x => ({ ...x, kind: x.kind as OneOffCharge['kind'], invoicedInId: x.invoiceId })),
     pending: inputs.pending.filter(x => x.leaseId === lease.id).map(x => ({ ...x, invoicedInId: x.invoiceId })) as PendingAdjustment[], overridePeriod: override, fullMonth,
@@ -96,7 +111,9 @@ async function calculate(db: DB, lease: Lease, facilityId: string, period: strin
     const earlier = self ? await db.select({ id: invoices.id }).from(invoices).where(and(eq(invoices.leaseId, lease.id), eq(invoices.kind, 'monthly'), ne(invoices.id, invoiceId), lt(invoices.createdAt, self.createdAt), sql`${invoices.periodStart} <= ${override.end}`, sql`${invoices.periodEnd} >= ${override.start}`)).limit(1) : []
     skipRent = earlier.length > 0
   }
-  return calculateWith(await loadCalcInputs(db, facilityId, new Map([[lease.id, { lease, addenda: found.addenda }]])), lease, found.addenda, facilityId, period, override, fullMonth, proration, quantities.map(q => ({ ...q, period })), skipRent)
+  // Tiền cọc còn thiếu (chưa thu, chưa lập ở hoá đơn khác) đi cùng hoá đơn tính tiền phòng
+  const deposit = { collected: (await depositCollectedOf(db, [lease.id], invoiceId)).get(lease.id) ?? 0 }
+  return calculateWith(await loadCalcInputs(db, facilityId, new Map([[lease.id, { lease, addenda: found.addenda }]])), lease, found.addenda, facilityId, period, override, fullMonth, proration, quantities.map(q => ({ ...q, period })), skipRent, deposit)
 }
 export async function previewBatch(db: DB, ctx: AccessContext, input: { facilityId: string; period: string }) {
   const { facilityId, period } = parse(batchSchema, input); assertCan(ctx, 'billing', facilityId)
@@ -106,9 +123,10 @@ export async function previewBatch(db: DB, ctx: AccessContext, input: { facility
 async function previewCore(db: DB, facilityId: string, period: string, onlyLeaseId?: string) {
   const rows = await db.select({ id: leases.id }).from(leases).innerJoin(rooms, eq(rooms.id, leases.roomId)).where(and(eq(rooms.facilityId, facilityId), eq(leases.status, 'active'), ...(onlyLeaseId ? [eq(leases.id, onlyLeaseId)] : [])))
   const data = await leasesData(db, rows.map(r => r.id))
-  const [inputs, ends] = await Promise.all([
+  const [inputs, ends, collected] = await Promise.all([
     loadCalcInputs(db, facilityId, data),
     rows.length ? db.select({ leaseId: invoices.leaseId, start: sql<string>`${invoices.periodStart}::text`, end: sql<string>`${invoices.periodEnd}::text` }).from(invoices).where(inArray(invoices.leaseId, rows.map(r => r.id))) : [],
+    depositCollectedOf(db, rows.map(r => r.id)),
   ])
   return [...data.values()].map(({ lease, addenda: addendaRows }) => {
     const mine = ends.filter(e => e.leaseId === lease.id)
@@ -122,13 +140,13 @@ async function previewCore(db: DB, facilityId: string, period: string, onlyLease
       const free = !mine.some(e => e.start <= end && e.end >= start)
       // Tháng đã có hoá đơn: chỉ lập thêm khi tạo lẻ cho một hợp đồng (để thêm chi phí phát sinh), không cộng lại tiền phòng; tạo hàng loạt bỏ qua
       if (!free && !onlyLeaseId) return { leaseId: lease.id, dueRule: lease.dueRule ?? null, lines: [] as InvoiceLineInput[], warnings: [] as string[], prepaidUntil: last, period: null }
-      return { leaseId: lease.id, dueRule: lease.dueRule ?? null, ...calculateWith(inputs, lease, addendaRows, facilityId, period, { start, end }, false, undefined, [], !free), prepaidUntil: null, period: { start, end }, rentSkipped: !free }
+      return { leaseId: lease.id, dueRule: lease.dueRule ?? null, ...calculateWith(inputs, lease, addendaRows, facilityId, period, { start, end }, false, undefined, [], !free, { collected: collected.get(lease.id) ?? 0 }), prepaidUntil: null, period: { start, end }, rentSkipped: !free }
     }
     // Chưa có hoá đơn nào: người dùng chọn kỳ đầu tiên, không dồn các tháng trước kỳ được chọn
     const first = `${period}-01`
     const next = nextBillingPeriod(last || lease.startDate >= first ? lease : { ...lease, startDate: first }, last, period)
     if (!next) return { leaseId: lease.id, dueRule: lease.dueRule ?? null, lines: [] as InvoiceLineInput[], warnings: [] as string[], prepaidUntil: last, period: null }
-    return { leaseId: lease.id, dueRule: lease.dueRule ?? null, ...calculateWith(inputs, lease, addendaRows, facilityId, period, next), prepaidUntil: null, period: next }
+    return { leaseId: lease.id, dueRule: lease.dueRule ?? null, ...calculateWith(inputs, lease, addendaRows, facilityId, period, next, false, undefined, [], false, { collected: collected.get(lease.id) ?? 0 }), prepaidUntil: null, period: next }
   })
 }
 /** Mã tiếp theo `<mã cơ sở>-HD-<YYYYMM>-<số thứ tự>`. Gọi trong transaction đã khoá cơ sở, hoặc chấp nhận retry khi trùng. */

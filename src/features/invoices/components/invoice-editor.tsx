@@ -124,7 +124,7 @@ type MeterPanel = { leaseFeeId: string; name: string; unit: string; rows: Array<
 const periodLabel = (period: string) => `${period.slice(5)}/${period.slice(0, 4)}`
 const NEW_READING = '__new'
 /** Chỉ số đã chốt của đồng hồ: danh sách các tháng, thêm dòng "Chốt chỉ số" cuối danh sách; chọn một dòng mở popup điền số (ghi ngược về tab Chỉ số). */
-function MeterReadingsPanel({ panel, editable, consumption, staged, onStage, stagedOpening, onStageOpening }: { panel: MeterPanel; editable: boolean; consumption: number; /** Chỉ số đã điền nhưng chưa lưu, theo tháng. */ staged: Record<string, string>; onStage: (period: string, value: string) => void; /** Số đầu (bàn giao, ban đầu) đã sửa nhưng chưa lưu, theo tháng của hoá đơn. */ stagedOpening: Record<string, string>; onStageOpening: (period: string, value: string) => void }) {
+function MeterReadingsPanel({ panel, editable, consumption, staged, onStage, stagedOpening, onStageOpening, onApply }: { panel: MeterPanel; editable: boolean; consumption: number; /** Chỉ số đã điền nhưng chưa lưu, theo tháng. */ staged: Record<string, string>; onStage: (period: string, value: string) => void; /** Số đầu (bàn giao, ban đầu) đã sửa nhưng chưa lưu, theo tháng của hoá đơn. */ stagedOpening: Record<string, string>; onStageOpening: (period: string, value: string) => void; /** Lưu ngay số vừa điền (cùng các chỉ số chưa lưu) vào hoá đơn. */ onApply: (readings: Record<string, string>, openings: Record<string, string>) => void }) {
   const [period, setPeriod] = useState<string | null>(null)
   const [text, setText] = useState('')
   const [openText, setOpenText] = useState('')
@@ -147,7 +147,8 @@ function MeterReadingsPanel({ panel, editable, consumption, staged, onStage, sta
   const closing = /^\d+$/.test(text.trim()) ? Number(text.trim()) : null
   const tooLow = closing !== null && opening !== null && closing < opening
   const open = (value: string) => {
-    const target = value === NEW_READING ? (panel.rows.find((r) => r.value == null) ?? last).period : value
+    // Chưa có chỉ số thì mặc định chốt tháng liền trước tháng lập hoá đơn (dòng cuối của danh sách)
+    const target = value === NEW_READING ? (last.value == null ? last : (panel.rows.find((r) => r.value == null) ?? last)).period : value
     const found = panel.rows.find((r) => r.period === target) ?? last
     setText(staged[found.period] ?? (found.value == null ? '' : String(found.value)))
     const o = openingOf(found); setOpenText(o == null ? '' : String(o))
@@ -155,13 +156,18 @@ function MeterReadingsPanel({ panel, editable, consumption, staged, onStage, sta
   }
   const apply = () => {
     if (!row) return
-    // Đổi số đầu kỳ = sửa chỉ số chốt của tháng liền trước
+    const readings: Record<string, string> = { ...staged }
+    const openings: Record<string, string> = { ...stagedOpening }
+    // Đổi số đầu kỳ = sửa chỉ số chốt của tháng liền trước, hoặc chỉ số bàn giao, chỉ số ban đầu
     if (openingEditable && opening !== null && opening !== openingOf(row)) {
-      if (row.openingSource !== 'monthly') onStageOpening(row.period, String(opening))
-      else if (prevRow) onStage(prevRow.period, String(opening))
+      if (row.openingSource !== 'monthly') { onStageOpening(row.period, String(opening)); openings[row.period] = String(opening) }
+      else if (prevRow) { onStage(prevRow.period, String(opening)); readings[prevRow.period] = String(opening) }
     }
     onStage(row.period, String(Number(text.trim())))
+    readings[row.period] = String(Number(text.trim()))
     setPeriod(null)
+    // Số đã điền được lưu luôn, không cần bấm Lưu thay đổi
+    onApply(readings, openings)
   }
   return (
     <div className="text-[11px] text-muted-foreground">
@@ -171,7 +177,7 @@ function MeterReadingsPanel({ panel, editable, consumption, staged, onStage, sta
       </Select>
       <p className="mt-1.5">Tiêu thụ: <span className="font-medium tabular-nums text-foreground">{consumption.toLocaleString('vi-VN')} {panel.unit}</span>{Object.keys(staged).length > 0 && ' (tính lại sau khi lưu)'}</p>
       {row && (
-        <FormDialog open onOpenChange={(o) => { if (!o) setPeriod(null) }} title={`Chốt chỉ số ${panel.name}`} description={`Tháng ${periodLabel(row.period)}${row.value == null ? ' · chưa chốt' : ` · đang là ${row.value.toLocaleString('vi-VN')}`}. Số chốt được lưu cùng hoá đơn, ghi về tab Chỉ số và tính lại tiền.`} size="sm">
+        <FormDialog open onOpenChange={(o) => { if (!o) setPeriod(null) }} title={`Chốt chỉ số ${panel.name}`} description={`Tháng ${periodLabel(row.period)}${row.value == null ? ' · chưa chốt' : ` · đang là ${row.value.toLocaleString('vi-VN')}`}. Bấm Lưu để lưu luôn số này (cùng các thay đổi khác của hoá đơn), ghi về tab Chỉ số và tính lại tiền.`} size="sm">
           <div className="space-y-4 pb-1">
             {panel.rows.length > 1 && (
               <div className="space-y-1.5">
@@ -199,7 +205,7 @@ function MeterReadingsPanel({ panel, editable, consumption, staged, onStage, sta
             </p>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="ghost" onClick={() => setPeriod(null)}>Huỷ</Button>
-              <Button type="button" disabled={!/^\d+$/.test(text.trim()) || (openingEditable && opening === null) || tooLow || (row.value != null && staged[row.period] === undefined && text.trim() === String(row.value) && !(openingEditable && opening !== openingOf(row)))} onClick={apply}>Áp dụng</Button>
+              <Button type="button" disabled={!/^\d+$/.test(text.trim()) || (openingEditable && opening === null) || tooLow || (row.value != null && staged[row.period] === undefined && text.trim() === String(row.value) && !(openingEditable && opening !== openingOf(row)))} onClick={apply}>Lưu chỉ số</Button>
             </div>
           </div>
         </FormDialog>
@@ -236,19 +242,10 @@ export function InvoiceEditor(p: Props) {
   const stagedOpeningFor = (leaseFeeId: string) => Object.fromEntries(Object.entries(stagedOpening).filter(([key]) => key.startsWith(`${leaseFeeId}|`)).map(([key, value]) => [key.split('|')[1], value]))
   const stagedFor = (leaseFeeId: string) => Object.fromEntries(Object.entries(staged).filter(([key]) => key.startsWith(`${leaseFeeId}|`)).map(([key, value]) => [key.split('|')[1], value]))
   /** Lưu một lượt mọi thông tin của hoá đơn: chỉ số đã điền, các dòng (kể cả thời gian, số lượng) và hạn thanh toán. */
-  const persist = async (): Promise<string | null> => {
-    for (const [key, value] of Object.entries(stagedOpening)) {
-      const [leaseFeeId, period] = key.split('|')
-      const r = await updateInvoiceOpeningReadingAction(p.id, { leaseFeeId, period, value: Number(value) })
-      if (!r.ok) return r.error ?? 'Không lưu được số đầu kỳ'
-      setStagedOpening((cur) => { const next = { ...cur }; delete next[key]; return next })
-    }
-    for (const [key, value] of Object.entries(staged)) {
-      const [leaseFeeId, period] = key.split('|')
-      const r = await updateInvoiceMeterReadingAction(p.id, { leaseFeeId, period, value: Number(value) })
-      if (!r.ok) return r.error ?? 'Không lưu được chỉ số'
-      setStaged((cur) => { const next = { ...cur }; delete next[key]; return next })
-    }
+  const persist = async (extra?: { staged: Record<string, string>; opening: Record<string, string> }): Promise<string | null> => {
+    const readings = { ...staged, ...(extra?.staged ?? {}) }
+    const openings = { ...stagedOpening, ...(extra?.opening ?? {}) }
+    // Các dòng lưu trước, chỉ số lưu sau để tiền điện nước tính lại từ chỉ số mới nhất
     const r = await updateLinesAction(p.id, [...lines.map((l) => ({ id: l.id, type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta: l.meta })), ...(validRate > 0 ? [{ type: 'tax', description: `Thuế ${validRate}%`, quantity: 1, unitPrice: tax, meta: { rate: validRate } }] : [])])
     if (!r.ok) return r.error ?? 'Không lưu được các dòng'
     if (due && due !== (p.dueDateIso ?? '')) {
@@ -259,10 +256,22 @@ export function InvoiceEditor(p: Props) {
       const n = await setInvoiceNoteAction(p.id, note)
       if (!n.ok) return n.error ?? 'Không lưu được ghi chú'
     }
+    for (const [key, value] of Object.entries(openings)) {
+      const [leaseFeeId, period] = key.split('|')
+      const o = await updateInvoiceOpeningReadingAction(p.id, { leaseFeeId, period, value: Number(value) })
+      if (!o.ok) return o.error ?? 'Không lưu được số đầu kỳ'
+      setStagedOpening((cur) => { const next = { ...cur }; delete next[key]; return next })
+    }
+    for (const [key, value] of Object.entries(readings)) {
+      const [leaseFeeId, period] = key.split('|')
+      const m = await updateInvoiceMeterReadingAction(p.id, { leaseFeeId, period, value: Number(value) })
+      if (!m.ok) return m.error ?? 'Không lưu được chỉ số'
+      setStaged((cur) => { const next = { ...cur }; delete next[key]; return next })
+    }
     return null
   }
-  const saveAll = () => start(async () => {
-    const error = await persist()
+  const saveAll = (extra?: { staged: Record<string, string>; opening: Record<string, string> }) => start(async () => {
+    const error = await persist(extra)
     if (error) { toast.error(error); router.refresh(); return }
     toast.success('Đã lưu hoá đơn')
     router.refresh()
@@ -284,7 +293,7 @@ export function InvoiceEditor(p: Props) {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
-            <Button size="sm" disabled={pending} onClick={saveAll} className="gap-1.5 rounded-xl text-xs font-medium shadow-2xs">
+            <Button size="sm" disabled={pending} onClick={() => saveAll()} className="gap-1.5 rounded-xl text-xs font-medium shadow-2xs">
               <Check className="size-3.5" />
               <span>Lưu thay đổi</span>
             </Button>
@@ -362,7 +371,7 @@ export function InvoiceEditor(p: Props) {
                     {isTimeBased(l) && !isMeterLine(l) ? <LineTime line={l} defaultFrom={p.start} defaultTo={p.end} fullMonth={p.fullMonth} proration={p.proration} editable={p.status === 'draft'} onChange={(meta) => set(i, timePatch(l, meta))} /> : <span className="text-muted-foreground/60">—</span>}
                   </td>
                   <td className="p-2.5 align-top">
-                    {(() => { const panel = p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId); return panel ? <MeterReadingsPanel panel={panel} editable={p.status === 'draft'} consumption={l.quantity} staged={stagedFor(panel.leaseFeeId)} onStage={(period, value) => setStaged((cur) => ({ ...cur, [`${panel.leaseFeeId}|${period}`]: value }))} stagedOpening={stagedOpeningFor(panel.leaseFeeId)} onStageOpening={(period, value) => setStagedOpening((cur) => ({ ...cur, [`${panel.leaseFeeId}|${period}`]: value }))} /> : <span className="text-muted-foreground/60">—</span> })()}
+                    {(() => { const panel = p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId); return panel ? <MeterReadingsPanel panel={panel} editable={p.status === 'draft'} consumption={l.quantity} staged={stagedFor(panel.leaseFeeId)} onStage={(period, value) => setStaged((cur) => ({ ...cur, [`${panel.leaseFeeId}|${period}`]: value }))} onApply={(readings, openings) => saveAll({ staged: Object.fromEntries(Object.entries(readings).map(([k, v]) => [`${panel.leaseFeeId}|${k}`, v])), opening: Object.fromEntries(Object.entries(openings).map(([k, v]) => [`${panel.leaseFeeId}|${k}`, v])) })} stagedOpening={stagedOpeningFor(panel.leaseFeeId)} onStageOpening={(period, value) => setStagedOpening((cur) => ({ ...cur, [`${panel.leaseFeeId}|${period}`]: value }))} /> : <span className="text-muted-foreground/60">—</span> })()}
                   </td>
                   <td className="p-2.5 align-top">
                     {isMeterLine(l)

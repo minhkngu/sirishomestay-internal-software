@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { facilities, invoiceLines, invoices, leases, rooms, tenants } from '@/db'
+import { depositEntries, facilities, invoiceLines, invoices, leases, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
@@ -46,5 +46,29 @@ describe('lập hoá đơn tháng cũ', () => {
     await setInvoiceNote(db, ctx(), edited.id, 'đã sửa')
     expect(await discardUntouchedDraft(db, ctx(), edited.id)).toBe(false)
     expect(await db.select().from(invoices).where(eq(invoices.id, edited.id))).toHaveLength(1)
+  })
+})
+
+describe('tiền cọc còn thiếu trên hoá đơn', () => {
+  let db: DB, facilityId: string, leaseId: string
+  const ctx = () => context(['billing'], facilityId)
+  beforeEach(async () => {
+    db = await createTestDb()
+    const [facility] = await db.insert(facilities).values({ code: 'TD', name: 'Thảo Điền' }).returning(); facilityId = facility.id
+    const [room] = await db.insert(rooms).values({ facilityId, code: '301' }).returning()
+    const [tenant] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: facilityId, fullName: 'Khách', phone: '+84901234567', idNumber: '012345678901' }).returning()
+    const [lease] = await db.insert(leases).values({ code: 'HD1', roomId: room.id, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-12-31', monthlyRent: 9000000, depositAmount: 9000000 }).returning(); leaseId = lease.id
+  })
+  const depositOf = async (invoiceId: string) => (await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, invoiceId))).filter(l => l.type === 'deposit')
+  it('hoá đơn đầu có dòng cọc còn thiếu, hoá đơn tháng sau không đòi lại', async () => {
+    const first = await createDraftForLease(db, ctx(), { leaseId, period: '2026-12' })
+    expect(await depositOf(first.id)).toMatchObject([{ description: 'Tiền cọc còn thiếu', amount: 9000000 }])
+    const next = await createDraftForLease(db, ctx(), { leaseId, period: '2027-01' })
+    expect(await depositOf(next.id)).toHaveLength(0)
+  })
+  it('đã thu đủ cọc thì không có dòng cọc; thu một phần thì chỉ đòi phần còn thiếu', async () => {
+    await db.insert(depositEntries).values({ leaseId, type: 'collect', status: 'done', amount: 6000000, date: '2026-12-01', method: 'cash' })
+    const inv = await createDraftForLease(db, ctx(), { leaseId, period: '2026-12' })
+    expect(await depositOf(inv.id)).toMatchObject([{ amount: 3000000 }])
   })
 })
