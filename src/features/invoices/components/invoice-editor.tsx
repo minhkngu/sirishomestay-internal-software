@@ -11,7 +11,6 @@ import {
   Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { ConfirmDialog } from '@/components/confirm-dialog'
 import { FormDialog } from '@/components/form-dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -25,7 +24,6 @@ import { fullMonthCoefficient, monthsCoefficient } from '@/domain/proration'
 import type { Proration } from '@/domain/types'
 import {
   approveInvoiceAction,
-  deleteInvoiceAction,
   setInvoiceDueDateAction,
   setInvoiceNoteAction,
   updateInvoiceMeterReadingAction,
@@ -214,7 +212,6 @@ export function InvoiceEditor(p: Props) {
   const [due, setDue] = useState(p.dueDateIso ?? p.dueDefaultIso)
   const [note, setNote] = useState(p.note)
   const [pickingFee, setPickingFee] = useState(false)
-  const [deleting, setDeleting] = useState(false)
   const [createdFees, setCreatedFees] = useState<FeeOption[]>([])
   // Ô chi tiết: thành tiền các dòng phí, phát sinh, giảm giá, thuế (theo % trên phần còn lại) rồi tổng
   const subtotal = lines.filter((l) => !extraKind(l)).reduce((n, l) => n + lineAmount(l), 0)
@@ -224,17 +221,6 @@ export function InvoiceEditor(p: Props) {
   const validRate = Number.isFinite(rate) && rate > 0 && rate <= 100 ? rate : 0
   const tax = Math.round(((subtotal + surcharge + discount) * validRate) / 100)
   const total = subtotal + surcharge + discount + tax
-
-  const run = (fn: () => Promise<{ ok: boolean; error?: string }>, ok: string, after?: () => void) =>
-    start(async () => {
-      const r = await fn()
-      if (!r.ok) toast.error(r.error)
-      else {
-        toast.success(ok)
-        if (after) after()
-        else router.refresh()
-      }
-    })
 
   const set = (i: number, patch: Partial<EditorLine>) =>
     setLines(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)))
@@ -307,10 +293,6 @@ export function InvoiceEditor(p: Props) {
                 <span>Duyệt hoá đơn</span>
               </Button>
             )}
-            <Button size="sm" variant="outline" disabled={pending} onClick={() => setDeleting(true)} className="gap-1.5 rounded-xl border-rose-200/80 text-rose-700 hover:bg-rose-50 hover:text-rose-800 text-xs font-medium">
-              <Trash2 className="size-3.5" />
-              <span>Xoá</span>
-            </Button>
           </div>
         </div>
       </section>
@@ -498,15 +480,6 @@ export function InvoiceEditor(p: Props) {
         <label htmlFor="invoice-note" className="block text-sm font-semibold tracking-tight text-foreground">Ghi chú cho khách</label>
         <textarea id="invoice-note" rows={3} maxLength={1000} placeholder="Nội dung này được in trên hoá đơn gửi khách" value={note} onChange={(e) => setNote(e.target.value)} className="w-full rounded-lg border border-border/80 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30" />
       </section>
-      <ConfirmDialog
-        open={deleting}
-        onOpenChange={setDeleting}
-        title="Xoá hoá đơn?"
-        description={approved ? 'Hoá đơn đã duyệt: phải gỡ hết khoản thu trước. Không thể hoàn tác.' : 'Hoá đơn nháp sẽ bị xoá. Không thể hoàn tác.'}
-        confirmLabel="Xoá"
-        destructive
-        onConfirm={() => run(() => deleteInvoiceAction(p.id), 'Đã xoá', () => router.push('/invoices'))}
-      />
     </div>
   )
 }
