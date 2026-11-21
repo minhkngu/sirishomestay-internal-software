@@ -317,7 +317,7 @@ export async function setLineTime(db: DB, ctx: AccessContext, invoiceId: string,
     if (!line) throw new NotFoundError()
     const meta = (line.meta ?? {}) as Record<string, unknown>
     // Tiền phòng và phí cố định tính theo thời gian; điện nước (có chỉ số) và phí nhập theo kỳ thì không. Hoá đơn cũ chưa lưu từ–đến thì lấy kỳ của hoá đơn.
-    const timeBased = line.type === 'rent' || (line.type === 'fee' && typeof meta.leaseFeeId === 'string' && !Array.isArray(meta.segments) && typeof meta.period !== 'string')
+    const timeBased = line.type === 'rent' || (line.type === 'one_off' && typeof meta.feeTypeId === 'string' && typeof meta.leaseFeeId !== 'string') || (line.type === 'fee' && typeof meta.leaseFeeId === 'string' && !Array.isArray(meta.segments) && typeof meta.period !== 'string')
     if (!timeBased) throw new ValidationError('Dòng này không tính theo thời gian')
     const from = data.from ?? (typeof meta.from === 'string' ? meta.from : inv.periodStart), to = data.to ?? (typeof meta.to === 'string' ? meta.to : inv.periodEnd)
     if (to < from) throw new ValidationError('Ngày đến phải sau ngày từ')
@@ -404,8 +404,13 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
       if (JSON.stringify(beforeFees) !== JSON.stringify(afterFees)) throw new ValidationError('Không sửa hoặc xoá dòng tiền phòng, phí hợp đồng tại đây; sửa hệ số, chỉ số hoặc số lượng theo kỳ ở từng dòng')
     }
     const next = data.map(l => {
+      // Phí ngoài hợp đồng chọn từ loại phí: giữ mô tả đã lưu, thành tiền nhân hệ số riêng của dòng
+      const meta = l.meta as { feeTypeId?: unknown; leaseFeeId?: unknown; coefficient?: unknown } | null
+      const addedFee = l.type === 'one_off' && typeof meta?.feeTypeId === 'string' && typeof meta?.leaseFeeId !== 'string'
+      const savedDescription = addedFee ? old.find(previous => previous.id === l.id)?.description : undefined
+      const coefficient = addedFee && typeof meta?.coefficient === 'number' ? meta.coefficient : 1
       const protectedFee = inv.kind === 'monthly' && (typeof (l.meta as { leaseFeeId?: unknown } | null)?.leaseFeeId === 'string' || l.type === 'rent') ? old.find(previous => previous.id === l.id) : undefined
-      return { invoiceId: id, type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, amount: protectedFee?.amount ?? Math.round(l.quantity * l.unitPrice), meta: protectedFee ? protectedFee.meta : l.meta ?? null }
+      return { invoiceId: id, type: l.type, description: savedDescription ?? l.description, quantity: l.quantity, unitPrice: l.unitPrice, amount: protectedFee?.amount ?? Math.round(l.quantity * l.unitPrice * coefficient), meta: protectedFee ? protectedFee.meta : l.meta ?? null }
     })
     // Phí phát sinh / điều chỉnh bị bỏ khỏi hoá đơn thì trả về trạng thái chưa tính
     const keep = new Set(next.map(l => JSON.stringify(l.meta ?? {})))

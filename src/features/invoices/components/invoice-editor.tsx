@@ -41,7 +41,9 @@ type Line = {
 type EditorLine = Line & { unitPriceText: string }
 /** Dòng tiền phòng và phí hợp đồng lấy từ hợp đồng nên không sửa mô tả, SL, đơn giá và không xoá ở đây. */
 const isLocked = (l: Line) => l.type === 'rent' || typeof l.meta?.leaseFeeId === 'string'
-const lineAmount = (l: Line) => (isLocked(l) && l.amount != null ? l.amount : Math.round(l.quantity * l.unitPrice))
+/** Phí ngoài hợp đồng thêm vào hoá đơn từ loại phí trong Cài đặt: mô tả cố định theo tên phí, có thời gian và hệ số riêng. */
+const isAddedFee = (l: Line) => l.type === 'one_off' && typeof l.meta?.feeTypeId === 'string' && typeof l.meta?.leaseFeeId !== 'string'
+const lineAmount = (l: Line) => (isLocked(l) && l.amount != null ? l.amount : Math.round(l.quantity * l.unitPrice * (isAddedFee(l) && typeof l.meta?.coefficient === 'number' ? l.meta.coefficient : 1)))
 
 type AddFee = { feeTypes: FeeOption[]; usedTypeIds: string[]; facilityId: string; renderCreateFee?: (p: { onCreated: (fee: FeeOption) => void }) => React.ReactNode }
 
@@ -68,7 +70,7 @@ function LineTimeEdit({ invoiceId, line, defaultFrom, defaultTo, editable }: { i
   const [pending, start] = useTransition()
   const meta = line.meta
   // Tiền phòng, phí cố định tính theo thời gian; dòng điện nước (có chỉ số) và phí nhập theo kỳ thì không
-  const timeBased = line.type === 'rent' || (line.type === 'fee' && typeof meta?.leaseFeeId === 'string' && !Array.isArray(meta?.segments) && typeof meta?.period !== 'string')
+  const timeBased = line.type === 'rent' || isAddedFee(line) || (line.type === 'fee' && typeof meta?.leaseFeeId === 'string' && !Array.isArray(meta?.segments) && typeof meta?.period !== 'string')
   const savedFrom = typeof meta?.from === 'string' ? meta.from : defaultFrom
   const savedTo = typeof meta?.to === 'string' ? meta.to : defaultTo
   // Hoá đơn cũ chưa lưu hệ số: suy ra từ số lượng (tiền phòng) hoặc thành tiền
@@ -79,6 +81,7 @@ function LineTimeEdit({ invoiceId, line, defaultFrom, defaultTo, editable }: { i
   const [error, setError] = useState('')
   if (!timeBased) return null
   const label = <span className="tabular-nums">Hệ số × {coefficient.toLocaleString('vi-VN', { maximumFractionDigits: 4 })}{meta?.coefficientOverride === true ? ' (chỉnh riêng)' : coefficient !== 1 ? ' (tính theo ngày)' : ''}</span>
+  if (!line.id && isAddedFee(line)) return <p className="mt-1 text-[11px] text-muted-foreground">Lưu hoá đơn để chọn thời gian, hệ số cho phí này</p>
   if (!editable || !line.id) return <p className="mt-1 text-[11px] text-muted-foreground">{label}</p>
   const apply = () => start(async () => {
     const changedCoef = coef.trim() !== String(coefficient)
@@ -192,7 +195,7 @@ export function InvoiceEditor(p: Props) {
                   <td className="p-2.5">
                     <input
                       value={isLocked(l) ? l.description.replace(/ — phòng [0-9a-f-]{36}$/i, '') : l.description}
-                      disabled={isLocked(l)}
+                      disabled={isLocked(l) || isAddedFee(l)}
                       onChange={(e) => set(i, { description: e.target.value })}
                       className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 disabled:cursor-not-allowed disabled:border-transparent disabled:bg-transparent disabled:px-0 disabled:text-foreground"
                     />

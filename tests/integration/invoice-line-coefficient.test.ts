@@ -4,7 +4,7 @@ import { facilities, invoiceLines, leaseFeeSnapshots, leases, rooms, tenants } f
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ForbiddenError, ValidationError } from '@/domain/errors'
-import { approveInvoice, createDrafts, setLineTime } from '@/server/invoices/service'
+import { approveInvoice, createDrafts, setLineTime, updateLines } from '@/server/invoices/service'
 import { createTestDb } from '../helpers/db'
 
 const context = (permissions: Permission[], facilityId: string): AccessContext => ({ userId: crypto.randomUUID(), email: 'test@example.com', fullName: 'Test', permissions: new Set(permissions), facilityIds: new Set([facilityId]), isAdmin: false })
@@ -66,5 +66,31 @@ describe('thời gian và hệ số riêng từng dòng', () => {
     expect((await rent()).amount).toBe(4500000)
     await setLineTime(db, ctx(), invoiceId, (await fee()).id, { from: '2026-07-16', to: '2026-07-31' })
     expect((await fee()).amount).toBe(Math.round(200000 * 16 / 31))
+  })
+
+  describe('phí ngoài hợp đồng thêm từ loại phí', () => {
+    const feeTypeId = crypto.randomUUID()
+    const addFee = async () => {
+      const current = (await lines()).map(l => ({ id: l.id, type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta: l.meta }))
+      await updateLines(db, ctx(), invoiceId, [...current, { type: 'one_off', description: 'Giặt ủi', quantity: 2, unitPrice: 100000, meta: { feeTypeId } }])
+      return (await lines()).find(l => l.type === 'one_off')!
+    }
+    it('chọn thời gian cho dòng: hệ số theo ngày, thành tiền = số lượng × đơn giá × hệ số', async () => {
+      const added = await addFee()
+      expect(added.amount).toBe(200000)
+      await setLineTime(db, ctx(), invoiceId, added.id, { from: '2026-07-16', to: '2026-07-31' })
+      const after = (await lines()).find(l => l.id === added.id)!
+      expect(after.meta).toMatchObject({ feeTypeId, from: '2026-07-16', to: '2026-07-31', coefficient: 0.5161 })
+      expect(after.amount).toBe(Math.round(2 * 100000 * 0.5161))
+    })
+    it('lưu lại dòng: mô tả giữ đúng tên phí dù gửi tên khác, hệ số vẫn được nhân', async () => {
+      const added = await addFee()
+      await setLineTime(db, ctx(), invoiceId, added.id, { coefficient: 0.5 })
+      const current = (await lines()).map(l => ({ id: l.id, type: l.type, description: l.id === added.id ? 'Tên tự đổi' : l.description, quantity: l.id === added.id ? 3 : l.quantity, unitPrice: l.unitPrice, meta: l.meta }))
+      await updateLines(db, ctx(), invoiceId, current)
+      const after = (await lines()).find(l => l.id === added.id)!
+      expect(after.description).toBe('Giặt ủi')
+      expect(after.amount).toBe(150000)
+    })
   })
 })
