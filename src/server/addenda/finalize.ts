@@ -2,7 +2,6 @@ import { and, desc, eq, inArray, ne } from 'drizzle-orm'
 import { addenda, contractVersions, depositContracts, depositEntries, files, handoverItems, handovers, invoiceLines, leaseOccupants, leases } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
-import { ValidationError } from '@/domain/errors'
 import { addDays } from '@/domain/dates'
 import { depositBalance } from '@/domain/deposit'
 import type { DepositEntry, ForfeitInput } from '@/domain/types'
@@ -56,23 +55,4 @@ export async function finalizeTermination(tx: DB, ctx: AccessContext, invoice: {
     await tx.update(contractVersions).set({ snapshot: { ...(version.snapshot as object), terminationFinalized: true, retention } }).where(eq(contractVersions.id, version.id))
   }
   await recordAudit(tx, ctx, { action: 'update', entity: 'lease', entityId: lease.id, facilityId: invoice.facilityId, summary: `Thanh lý hợp đồng ${lease.code}`, before: { status: lease.status, endDate: lease.endDate }, after: { status: 'ended', endDate, forfeited, offset } })
-}
-
-const FINALIZE_NOTES = ['Mất cọc khi thanh lý', 'Trừ vào hoá đơn thanh lý']
-
-/**
- * Đảo ngược `finalizeTermination` khi bỏ duyệt hoá đơn thanh lý: hợp đồng về trạng thái và ngày kết thúc trước khi thanh lý,
- * gỡ các dòng cọc `forfeit`/`deduct` do thanh lý ghi, trả lại hạn xoá ảnh. Hợp đồng chưa `ended` thì không có gì để đảo.
- */
-export async function reverseTermination(tx: DB, ctx: AccessContext, invoice: { id: string; leaseId: string; facilityId: string }): Promise<void> {
-  const [lease] = await tx.select().from(leases).where(eq(leases.id, invoice.leaseId))
-  if (!lease || lease.status !== 'ended') return
-  const [version] = await tx.select().from(contractVersions).where(and(eq(contractVersions.contractId, lease.id), eq(contractVersions.kind, 'lease'), eq(contractVersions.operation, 'termination'))).orderBy(desc(contractVersions.sequence)).limit(1)
-  const snapshot = version?.snapshot as { contract?: { status: string; endDate: string }; terminationFinalized?: boolean; retention?: { id: string; before: string | null }[] } | undefined
-  if (!version || !snapshot?.contract) throw new ValidationError('Thiếu lịch sử thanh lý nên không bỏ duyệt được')
-  await tx.update(leases).set({ status: snapshot.contract.status, endDate: snapshot.contract.endDate, updatedAt: new Date() }).where(eq(leases.id, lease.id))
-  const removed = await tx.delete(depositEntries).where(and(eq(depositEntries.leaseId, lease.id), inArray(depositEntries.type, ['forfeit', 'deduct']), inArray(depositEntries.note, FINALIZE_NOTES))).returning()
-  for (const item of snapshot.retention ?? []) await tx.update(files).set({ deleteAfter: item.before, updatedAt: new Date() }).where(eq(files.id, item.id))
-  await tx.update(contractVersions).set({ snapshot: { ...snapshot, terminationFinalized: false, retention: [] } }).where(eq(contractVersions.id, version.id))
-  await recordAudit(tx, ctx, { action: 'update', entity: 'lease', entityId: lease.id, facilityId: invoice.facilityId, summary: `Bỏ duyệt thanh lý hợp đồng ${lease.code}`, before: { status: 'ended', endDate: lease.endDate }, after: { status: snapshot.contract.status, endDate: snapshot.contract.endDate, removedDepositEntries: removed.length } })
 }
