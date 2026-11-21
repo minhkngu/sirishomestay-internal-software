@@ -181,10 +181,15 @@ function MeterReadingsPanel({ panel, editable, consumption, staged, onStage, sta
         <SelectContent>{items.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
       </Select>
       {(() => {
-        // Số đầu kỳ (chỉ số ban đầu ghi ở hợp đồng, bàn giao, hoặc chốt tháng trước) và số cuối của tháng đang chốt
+        // Hoá đơn tháng đầu: chưa có lần chốt nào, chỉ số ban đầu ghi ở hợp đồng làm cả số đầu lẫn số cuối kỳ (chưa phát sinh)
+        const firstMonth = !!panel.initial && panel.rows.every((r) => r.value == null && staged[r.period] === undefined) && panel.initial.readOn > `${last.period}-31`
+        if (firstMonth && panel.initial) {
+          const v = panel.initial.value.toLocaleString('vi-VN')
+          return <p className="mt-1.5 tabular-nums">Số đầu kỳ <span className="font-medium text-foreground">{v}</span> · Số cuối kỳ <span className="font-medium text-foreground">{v}</span> <span className="text-muted-foreground/80">(chỉ số ban đầu {formatDateVN(panel.initial.readOn)}, chưa phát sinh)</span></p>
+        }
         const o = openingOf(last)
         const c = staged[last.period] !== undefined ? Number(staged[last.period]) : last.value
-        return <p className="mt-1.5 tabular-nums">{panel.initial && <><span>Chỉ số ban đầu <span className="font-medium text-foreground">{panel.initial.value.toLocaleString('vi-VN')}</span> ({formatDateVN(panel.initial.readOn)})</span><br /></>}Số đầu kỳ <span className="font-medium text-foreground">{o == null ? '—' : o.toLocaleString('vi-VN')}</span> · Số cuối kỳ <span className="font-medium text-foreground">{c == null ? '—' : c.toLocaleString('vi-VN')}</span></p>
+        return <p className="mt-1.5 tabular-nums">Số đầu kỳ <span className="font-medium text-foreground">{o == null ? '—' : o.toLocaleString('vi-VN')}</span> · Số cuối kỳ <span className="font-medium text-foreground">{c == null ? '—' : c.toLocaleString('vi-VN')}</span></p>
       })()}
       <p className="mt-0.5">Tiêu thụ: <span className="font-medium tabular-nums text-foreground">{consumption.toLocaleString('vi-VN')} {panel.unit}</span>{Object.keys(staged).length > 0 && ' (tính lại sau khi lưu)'}</p>
       {row && (
