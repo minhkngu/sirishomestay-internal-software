@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatVND } from '@/domain/money'
 import { resolveFeePrice } from '@/domain/fee-price'
-import { BareSelect } from './contract-form-ui'
-import type { FeeOption } from './lease-fees'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+
+export type FeeOption = { id: string; name: string; unit: string; defaultPrice: number; prices: Record<string, number>; billing: string; quantityFrom: string }
 
 const SOURCE_LABEL: Record<string, string> = { occupants: 'Theo số người ở', room: 'Theo phòng', meter: 'Theo đồng hồ', manual: 'Nhập số lượng mỗi kỳ', period_input: 'Nhập số lượng mỗi kỳ' }
 const FILTERS = [
@@ -35,7 +36,12 @@ export function FeePickerDialog({ open, onOpenChange, feeTypes, usedTypeIds, fac
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <Input aria-label="Tìm phí" placeholder="Tìm tên phí hoặc đơn vị" value={query} onChange={e => setQuery(e.target.value)} className="h-9 min-w-48 flex-1" />
-        <div className="w-52"><BareSelect ariaLabel="Lọc theo cách tính" value={source} onValueChange={setSource} options={FILTERS} /></div>
+        <div className="w-52">
+          <Select value={source} onValueChange={(next) => setSource(next == null ? '' : String(next))} items={FILTERS}>
+            <SelectTrigger aria-label="Lọc theo cách tính" className="h-9 w-full justify-between bg-card text-[13px] font-normal"><SelectValue /></SelectTrigger>
+            <SelectContent>{FILTERS.map((o) => <SelectItem key={o.value || '__all__'} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
         {renderCreateFee && <Button type="button" size="sm" variant={creating ? 'secondary' : 'outline'} aria-expanded={creating} aria-label="Tạo phí mới" title="Tạo phí mới" onClick={() => setCreating(v => !v)}>+ Tạo phí mới</Button>}
       </div>
       {creating && renderCreateFee && <div className="space-y-2 rounded-xl border border-border/70 bg-muted/20 p-3.5">

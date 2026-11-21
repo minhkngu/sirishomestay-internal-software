@@ -153,3 +153,17 @@ test('tạo hoá đơn lẻ từ popup: toà → phòng → tháng → xem trư�
   await expect(page).toHaveURL(/\/invoices\/[a-f0-9-]+$/)
   await expect(page.getByText('Nháp').first()).toBeVisible()
 })
+
+test('thêm phí ngoài vào hoá đơn nháp bằng hộp thoại chọn phí giống màn hợp đồng', async ({ page }) => {
+  await login(page, /^Admin/)
+  await page.goto('/invoices?view=draft')
+  await page.waitForLoadState('networkidle')
+  await page.locator('a[href^="/invoices/"]').filter({ hasNotText: 'Tạo' }).first().click()
+  await page.waitForLoadState('networkidle')
+  const before = await page.getByTitle('Xoá dòng').count()
+  await page.getByRole('button', { name: 'Thêm phí' }).click()
+  await expect(page.getByRole('heading', { name: 'Chọn phí dịch vụ' })).toBeVisible()
+  await page.getByRole('button', { name: 'Thêm', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Xong' }).click()
+  await expect(page.getByTitle('Xoá dòng')).toHaveCount(before + 1)
+})

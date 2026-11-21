@@ -403,15 +403,16 @@ registerPdfLoader('receipt', async (db, ctx, id) => {
 
 export async function getInvoiceDetail(db: DB, ctx: AccessContext, id: string) {
   const inv = await getInvoice(db, ctx, id)
-  const [lines, pays, [row], periodFees, quantities] = await Promise.all([
+  const [lines, pays, [row], periodFees, quantities, leaseFees] = await Promise.all([
     db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, id)).orderBy(asc(invoiceLines.createdAt)),
     db.select().from(payments).where(eq(payments.invoiceId, id)).orderBy(asc(payments.paidOn), asc(payments.createdAt)),
     db.select({ leaseCode: leases.code, tenantId: leases.tenantId, roomCode: rooms.code, tenantName: sql<string>`coalesce(${tenants.fullName}, ${tenants.companyName}, '')` }).from(leases).innerJoin(rooms, eq(rooms.id, leases.roomId)).innerJoin(tenants, eq(tenants.id, leases.tenantId)).where(eq(leases.id, inv.leaseId)),
     db.select().from(leaseFeeSnapshots).where(and(eq(leaseFeeSnapshots.leaseId, inv.leaseId), eq(leaseFeeSnapshots.quantitySource, 'period_input'))),
     db.select().from(invoiceFeeQuantities).where(eq(invoiceFeeQuantities.invoiceId, id)),
+    db.select({ feeTypeId: leaseFeeSnapshots.feeTypeId }).from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, inv.leaseId)),
   ])
   const total = lines.reduce((n, l) => n + l.amount, 0), paid = pays.reduce((n, p) => n + p.amount, 0)
-  return { invoice: inv, lines, payments: pays, periodFees: periodFees.map(f => ({ id: f.id, name: f.name, unit: f.unit, unitPrice: f.unitPrice, quantity: quantities.find(q => q.leaseFeeId === f.id)?.quantity ?? null })), total, paid, state: invoiceStatus(total, paid, inv.status, inv.dueDate, todayVN()), ...row }
+  return { invoice: inv, leaseFeeTypeIds: leaseFees.flatMap(f => f.feeTypeId ? [f.feeTypeId] : []), lines, payments: pays, periodFees: periodFees.map(f => ({ id: f.id, name: f.name, unit: f.unit, unitPrice: f.unitPrice, quantity: quantities.find(q => q.leaseFeeId === f.id)?.quantity ?? null })), total, paid, state: invoiceStatus(total, paid, inv.status, inv.dueDate, todayVN()), ...row }
 }
 function pdfLine(line: typeof invoiceLines.$inferSelect) {
   const meta = line.meta as { unit?: unknown; segments?: { start?: unknown; end?: unknown }[] } | null

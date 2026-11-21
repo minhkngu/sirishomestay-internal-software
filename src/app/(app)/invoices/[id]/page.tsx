@@ -7,13 +7,14 @@ import { NotFoundError } from '@/domain/errors'
 import { formatDateVN, todayVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { InvoiceFeeQuantities } from '@/features/invoices/components/invoice-fee-quantities'
-import { InvoiceEditor } from '@/features/invoices/components/invoice-editor'
+import { InvoiceEditorWithFees } from './invoice-editor-with-fees'
 import { InvoiceExport } from '@/features/invoices/components/invoice-export'
 import { InvoiceStatus } from '@/features/invoices/components/invoice-status'
 import { PaymentDialog } from '@/features/invoices/components/payment-dialog'
 import { getInvoiceDetail, tenantBalance } from '@/server/invoices/service'
 import { getAccessContext } from '@/server/session'
 import { listInvoiceTemplates } from '@/server/invoice-templates/service'
+import { listFeeTypePrices, listFeeTypes, listFeeUnits } from '@/server/fees/service'
 
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -25,6 +26,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const balance = await tenantBalance(db, ctx, d.tenantId)
   const inv = d.invoice
   const invoiceTemplates = await listInvoiceTemplates(db, ctx)
+  const [feeTypes, feeUnits, feePrices] = inv.status === 'draft' ? await Promise.all([listFeeTypes(db, ctx), listFeeUnits(db, ctx), listFeeTypePrices(db, ctx)]) : [[], [], {} as Record<string, Record<string, number>>]
+  const unitName = new Map(feeUnits.map((u) => [u.id, u.name]))
   const remaining = d.total - d.paid
 
   return (
@@ -100,7 +103,14 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       </div>
 
       {inv.status === 'draft' && <InvoiceFeeQuantities key={inv.updatedAt.toISOString()} invoiceId={id} fees={d.periodFees} />}
-      <InvoiceEditor
+      <InvoiceEditorWithFees
+        addFee={{
+          // Loại phí tính theo đồng hồ cần gắn đồng hồ nên chỉ thêm qua hợp đồng
+          feeTypes: feeTypes.filter((f) => f.quantityFrom !== 'meter').map((f) => ({ id: f.id, name: f.name, unit: unitName.get(f.unitId) ?? '', defaultPrice: f.defaultPrice, prices: feePrices[f.id] ?? {}, billing: f.billing, quantityFrom: f.quantityFrom })),
+          usedTypeIds: d.leaseFeeTypeIds,
+          facilityId: inv.facilityId,
+          units: feeUnits.map((u) => ({ id: u.id, name: u.name })),
+        }}
         key={inv.updatedAt.toISOString()}
         id={id}
         status={inv.status}

@@ -6,9 +6,9 @@ import { Input } from '@/components/ui/input'
 import { MoneyInput } from '@/components/ui/money-input'
 import { availableMeters, resolveMeterIds } from '../lease-fee-meters'
 import { BareSelect } from './contract-form-ui'
-import { FeePickerDialog } from './fee-picker-dialog'
+import { FeePickerDialog, type FeeOption } from '@/components/fee-picker-dialog'
 
-export type FeeOption = { id: string; name: string; unit: string; defaultPrice: number; prices: Record<string, number>; billing: string; quantityFrom: string }
+export type { FeeOption }
 export type RoomFeeMeter = { id: string; roomId: string; label: string; utility: 'electric' | 'water' | 'fee'; busy: boolean }
 export type FeeDraft = { key: string; feeTypeId: string | null; name: string; unit: string; quantitySource: 'occupants' | 'room' | 'meter' | 'period_input'; price: string; quantity: string; initialReading: string; existingMeterId?: string; legacyFixed?: boolean }
 

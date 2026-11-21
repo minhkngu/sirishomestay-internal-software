@@ -23,6 +23,8 @@ import {
 } from '@/components/ui/select'
 import { formatVND } from '@/domain/money'
 import { MoneyInput } from '@/components/ui/money-input'
+import { FeePickerDialog, type FeeOption } from '@/components/fee-picker-dialog'
+import { feeLineFromType } from '@/domain/invoice-fee-line'
 import { cn } from '@/lib/utils'
 import {
   approveInvoiceAction,
@@ -55,7 +57,10 @@ type Line = {
 
 type EditorLine = Line & { unitPriceText: string }
 
+type AddFee = { feeTypes: FeeOption[]; usedTypeIds: string[]; facilityId: string; renderCreateFee?: (p: { onCreated: (fee: FeeOption) => void }) => React.ReactNode }
+
 type Props = {
+  addFee?: AddFee
   id: string
   status: string
   start: string
@@ -104,6 +109,8 @@ export function InvoiceEditor(p: Props) {
     fullMonth: p.fullMonth,
   })
   const [dueDay, setDueDay] = useState('')
+  const [pickingFee, setPickingFee] = useState(false)
+  const [createdFees, setCreatedFees] = useState<FeeOption[]>([])
   const total = lines.reduce((n, l) => n + Math.round(l.quantity * l.unitPrice), 0)
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>, ok: string, after?: () => void) =>
@@ -341,6 +348,12 @@ export function InvoiceEditor(p: Props) {
             <Plus className="size-3.5" />
             <span>Thêm dòng</span>
           </Button>
+          {p.addFee && !approved && (
+            <Button size="sm" variant="outline" onClick={() => setPickingFee(true)} className="gap-1.5 rounded-xl border-border/80 font-medium text-xs">
+              <Plus className="size-3.5" />
+              <span>Thêm phí</span>
+            </Button>
+          )}
           <Button
             size="sm"
             disabled={pending}
@@ -351,6 +364,22 @@ export function InvoiceEditor(p: Props) {
             <span>Lưu các dòng</span>
           </Button>
         </div>
+        {p.addFee && (
+          <FeePickerDialog
+            open={pickingFee}
+            onOpenChange={setPickingFee}
+            feeTypes={[...p.addFee.feeTypes, ...createdFees]}
+            usedTypeIds={new Set([...p.addFee.usedTypeIds, ...lines.flatMap((l) => (typeof l.meta?.feeTypeId === 'string' ? [l.meta.feeTypeId] : []))])}
+            facilityId={p.addFee.facilityId}
+            onPick={(feeId) => {
+              const fee = [...p.addFee!.feeTypes, ...createdFees].find((f) => f.id === feeId)
+              if (!fee) return
+              const line = feeLineFromType(fee, p.addFee!.facilityId)
+              setLines((cur) => [...cur, { ...line, unitPriceText: String(line.unitPrice) }])
+            }}
+            renderCreateFee={p.addFee.renderCreateFee ? ({ onDone }) => p.addFee!.renderCreateFee!({ onCreated: (fee) => { setCreatedFees((cur) => [...cur, fee]); onDone() } }) : undefined}
+          />
+        )}
       </section>
 
       {/* 3. Phê duyệt & Hạn thanh toán */}
