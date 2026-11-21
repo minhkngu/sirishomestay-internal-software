@@ -58,7 +58,7 @@ export function Field({
     <div className={cn('space-y-1.5', className)}>
       <Label htmlFor={htmlFor} className="text-[13px] font-medium text-foreground">{label}</Label>
       {children}
-      {hint && <div className="text-xs text-muted-foreground">{hint}</div>}
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
       {error}
     </div>
   )

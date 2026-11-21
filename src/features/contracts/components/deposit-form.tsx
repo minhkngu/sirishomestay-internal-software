@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
 import { createDepositContractAction } from '@/server/contracts/actions'
 import { FormSection, Field, SummaryRow, FormSelect } from './contract-form-ui'
 import { PersonPicker } from './person-picker'
-import { DateField } from '@/components/date-field'
+import { DateField } from './date-field'
 
 export type RoomOption = { id: string; facilityId: string; facilityName?: string; label: string; roomLabel?: string; listPrice?: number | null }
 export type TenantOption = { id: string; name: string; kind: 'foreign' | 'vietnamese' | 'company'; phone: string | null }
@@ -59,8 +59,8 @@ export function DepositForm({ rooms, tenants, initialRoomId, initialTenantId, em
     <div className={cn(embedded ? 'space-y-5' : 'grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start')}>
       <FormSection title="Thông tin giữ chỗ" description="Chọn phòng, khách giữ chỗ và mức cọc đã thoả thuận.">
         <div className="grid gap-4 sm:grid-cols-2">
-          <FormSelect id="facility" label="Toà" value={facilityId} onValueChange={chooseFacility} options={facilityOptions} placeholder="— Chọn toà —" />
-          <FormSelect id="room" label="Phòng" value={roomId} onValueChange={pickRoom} disabled={!facilityId} options={roomsInFacility.map((r) => ({ value: r.id, label: r.roomLabel ?? r.label }))} placeholder={facilityId ? '— Chọn phòng —' : 'Chọn toà trước'} />
+          <FormSelect id="facility" label="Toà" value={facilityId} onValueChange={chooseFacility} options={facilityOptions} placeholder="— chọn toà —" />
+          <FormSelect id="room" label="Phòng" value={roomId} onValueChange={pickRoom} disabled={!facilityId} options={roomsInFacility.map((r) => ({ value: r.id, label: r.roomLabel ?? r.label }))} placeholder={facilityId ? '— chọn phòng —' : 'Chọn toà trước'} />
           <Field label="Bên thuê" htmlFor="tenant" className="sm:col-span-2">
             <PersonPicker people={tenants} onPick={setTenantId} onCreateNew={onCreatePerson ? () => onCreatePerson(facilityId, (person) => setTenantId(person.id)) : undefined} trigger={<Button id="tenant" type="button" variant="outline" aria-label="Bên thuê" className="h-9 w-full justify-between bg-card px-3 text-[13px] font-normal"><span className={tenant ? 'text-foreground' : 'text-muted-foreground'}>{tenant ? tenant.name : 'Chọn khách thuê'}</span><ChevronDown className="size-4 text-muted-foreground" /></Button>} />
           </Field>

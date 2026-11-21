@@ -4,7 +4,7 @@ import { useGoToContract } from './go-to-contract'
 import { UserPlus, X } from 'lucide-react'
 import { formatPhoneDisplay } from '@/domain/phone'
 import { PersonPicker } from './person-picker'
-import { DateField } from '@/components/date-field'
+import { DateField } from './date-field'
 import { useRef, useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -215,8 +215,8 @@ export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAsse
       <div className="space-y-4">
         <FormSection title="Bên thuê & người ở" description="Phòng trống, khách đứng tên ký và những người ở cùng.">
           <div className="grid gap-4 sm:grid-cols-2">
-            <FormSelect id="facility" label="Toà" value={facilityId} onValueChange={chooseFacility} disabled={!!initial.depositId} options={facilityOptions} placeholder="— Chọn toà —" />
-            <FormSelect id="room" label="Phòng" value={roomId} onValueChange={chooseRoom} disabled={!facilityId || !!initial.depositId} options={roomsInFacility.map((r) => ({ value: r.id, label: r.roomLabel ?? r.label }))} placeholder={facilityId ? '— Chọn phòng —' : 'Chọn toà trước'} error={fieldError('roomId')} />
+            <FormSelect id="facility" label="Toà" value={facilityId} onValueChange={chooseFacility} disabled={!!initial.depositId} options={facilityOptions} placeholder="— chọn toà —" />
+            <FormSelect id="room" label="Phòng" value={roomId} onValueChange={chooseRoom} disabled={!facilityId || !!initial.depositId} options={roomsInFacility.map((r) => ({ value: r.id, label: r.roomLabel ?? r.label }))} placeholder={facilityId ? '— chọn phòng —' : 'Chọn toà trước'} error={fieldError('roomId')} />
           </div>
 
           <div className="mt-4 space-y-2">
@@ -281,13 +281,15 @@ export function LeaseWizard({ templates, invoiceTemplates, assets, canManageAsse
           {fieldError('fees')}
         </FormSection>
 
-        <FormSection title="Thanh toán & lẻ ngày" description="Hạn thanh toán, cách tính lẻ ngày và kỳ hoá đơn.">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Field label="Hạn thanh toán" htmlFor="due" hint={<>Ngày … của tháng sau. Trống = {defaults.dueRuleLabel}.</>}>
-              <Input id="due" inputMode="numeric" placeholder="5" value={dayOfMonth} onChange={(e) => setDayOfMonth(e.target.value)} />
+        <FormSection title="Thanh toán & lẻ ngày" description="Hạn thanh toán và cách tính tháng đầu tiên.">
+          <div className="space-y-4">
+            <Field label={`Hạn thanh toán: ngày … của tháng sau (để trống = theo mặc định: ${defaults.dueRuleLabel})`} htmlFor="due">
+              <Input id="due" inputMode="numeric" className="w-28" value={dayOfMonth} onChange={(e) => setDayOfMonth(e.target.value)} />
             </Field>
-            <FormSelect id="pro" label="Cách tính lẻ ngày" value={overrideProration} onValueChange={setOverrideProration} options={[{ value: '', label: `Mặc định: ${defaults.proration === 'days_30' ? 'chia 30' : 'số ngày thực'}` }, { value: 'days_30', label: 'Chia 30' }, { value: 'actual_days', label: 'Số ngày thực của tháng' }]} />
-            <FormSelect id="cycle" label="Kỳ thanh toán" value={cycle} onValueChange={setCycle} options={Array.from({ length: 12 }, (_, i) => ({ value: String(i + 1), label: `${i + 1} tháng` }))} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormSelect id="pro" label="Cách tính lẻ ngày" value={overrideProration} onValueChange={setOverrideProration} options={[{ value: '', label: `Theo mặc định hệ thống (${defaults.proration === 'days_30' ? 'chia 30' : 'số ngày thực của tháng'})` }, { value: 'days_30', label: 'Chia 30' }, { value: 'actual_days', label: 'Số ngày thực của tháng' }]} />
+              <FormSelect id="cycle" label="Kỳ thanh toán mặc định (số tháng mỗi hoá đơn)" value={cycle} onValueChange={setCycle} options={Array.from({ length: 12 }, (_, i) => ({ value: String(i + 1), label: `${i + 1} tháng` }))} />
+            </div>
           </div>
         </FormSection>
 
