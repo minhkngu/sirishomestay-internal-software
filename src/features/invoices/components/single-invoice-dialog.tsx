@@ -76,7 +76,7 @@ export function SingleInvoiceDialog({ facilities, defaultPeriod }: { facilities:
               <input id="single-invoice-period" type="month" value={period} onChange={(e) => { setPeriod(e.target.value); reset() }} className="h-9 w-full rounded-lg border border-border/80 bg-background px-2 text-sm" />
             </div>
           </div>
-          <Button type="button" variant="outline" disabled={pending || !leaseId || !period} onClick={run}>Xem trước</Button>
+          <Button type="button" variant="outline" disabled={pending || !leaseId || !period} onClick={run}>{pending && !preview ? 'Đang tính…' : 'Xem trước'}</Button>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           {preview && (
             <div className="space-y-2 rounded-xl border border-border/70 p-3.5 text-sm">
@@ -95,8 +95,9 @@ export function SingleInvoiceDialog({ facilities, defaultPeriod }: { facilities:
               {preview.period && preview.warnings.length > 0 && <p className="text-xs text-muted-foreground">Vẫn tạo được hoá đơn nháp; bổ sung số liệu còn thiếu ngay trong hoá đơn trước khi duyệt.</p>}
             </div>
           )}
-          <div className="flex justify-end">
-            <Button type="button" disabled={pending || !canCreate} onClick={create}>Tạo hoá đơn</Button>
+          <div className="flex items-center justify-end gap-3">
+            {!preview && <span className="text-xs text-muted-foreground">Bấm Xem trước để tạo hoá đơn</span>}
+            <Button type="button" disabled={pending || !canCreate} onClick={create}>{pending && preview ? 'Đang tạo…' : 'Tạo hoá đơn'}</Button>
           </div>
         </div>
       </FormDialog>
