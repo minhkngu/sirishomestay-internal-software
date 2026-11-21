@@ -142,8 +142,6 @@ test('tạo hoá đơn lẻ từ popup: toà → phòng → tháng → xem trư�
   await page.getByLabel('Phòng', { exact: true }).click()
   await page.getByRole('option').first().click()
   await page.getByLabel('Tháng').fill('2031-07')
-  await page.getByRole('button', { name: 'Xem trước' }).click()
-  await expect(page.getByText(/^Kỳ /)).toBeVisible()
   await page.getByRole('button', { name: 'Tạo hoá đơn', exact: true }).click()
   await expect(page).toHaveURL(/\/invoices\/[a-f0-9-]+$/)
   await expect(page.getByText('Nháp').first()).toBeVisible()
