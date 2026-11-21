@@ -432,7 +432,7 @@ export function InvoiceEditor(p: Props) {
                   <td className="p-2.5 text-center">
                     <button
                       type="button"
-                      disabled={isLocked(l)}
+                      disabled={isLocked(l) && lines.some((x) => x.type === 'rent')}
                       onClick={() => setLines(lines.filter((_, j) => j !== i))}
                       className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-rose-50 hover:text-rose-600"
                       title="Xoá dòng"

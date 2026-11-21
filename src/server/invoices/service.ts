@@ -138,7 +138,7 @@ async function previewCore(db: DB, facilityId: string, period: string, onlyLease
       const end = lease.endDate < monthEnd ? lease.endDate : monthEnd
       if (start > end) return { leaseId: lease.id, dueRule: lease.dueRule ?? null, lines: [] as InvoiceLineInput[], warnings: [] as string[], prepaidUntil: last, period: null }
       const free = !mine.some(e => e.start <= end && e.end >= start)
-      // Tháng đã có hoá đơn: chỉ lập thêm khi tạo lẻ cho một hợp đồng (để thêm chi phí phát sinh), không cộng lại tiền phòng; tạo hàng loạt bỏ qua
+      // Kỳ đã có hoá đơn: chỉ lập thêm khi tạo lẻ cho một hợp đồng (để thêm chi phí phát sinh), không cộng lại tiền phòng; tạo hàng loạt bỏ qua
       if (!free && !onlyLeaseId) return { leaseId: lease.id, dueRule: lease.dueRule ?? null, lines: [] as InvoiceLineInput[], warnings: [] as string[], prepaidUntil: last, period: null }
       return { leaseId: lease.id, dueRule: lease.dueRule ?? null, ...calculateWith(inputs, lease, addendaRows, facilityId, period, { start, end }, false, undefined, [], !free, { collected: collected.get(lease.id) ?? 0 }), prepaidUntil: null, period: { start, end }, rentSkipped: !free }
     }
@@ -220,7 +220,7 @@ export async function createDraftForLease(db: DB, ctx: AccessContext, input: { l
   if (!created.length) {
     const [last] = await db.select({ end: sql<string>`max(${invoices.periodEnd})::text` }).from(invoices).where(eq(invoices.leaseId, leaseId))
     const [clash] = await db.select({ id: invoices.id }).from(invoices).where(and(eq(invoices.leaseId, leaseId), sql`${invoices.periodStart} <= ${`${period}-${String(daysInMonth(period)).padStart(2, '0')}`}`, sql`${invoices.periodEnd} >= ${`${period}-01`}`)).limit(1)
-    throw new ValidationError(clash ? 'Hợp đồng đã có hoá đơn trong tháng này' : last?.end ? `Hợp đồng đã được lập hoá đơn tới ${last.end}` : 'Hợp đồng không có hiệu lực trong kỳ này')
+    throw new ValidationError(clash ? 'Kỳ này đã có hoá đơn của hợp đồng' : last?.end ? `Hợp đồng đã được lập hoá đơn tới ${last.end}` : 'Hợp đồng không có hiệu lực trong kỳ này')
   }
   return created[0]
 }
@@ -259,7 +259,8 @@ export async function createInvoiceFromEditor(db: DB, ctx: AccessContext, input:
       return [{ ...l, id: match?.id }]
     })
     // Dòng hợp đồng mà giao diện không gửi lên thì giữ nguyên như vừa sinh
-    for (const m of made) if (!used.has(m.id) && isContract({ type: m.type, meta: m.meta as Record<string, unknown> | null })) mapped.push({ id: m.id, type: m.type, description: m.description, unitPrice: m.unitPrice, quantity: m.quantity, meta: m.meta as Record<string, unknown> | null })
+    // (hoá đơn thêm cho kỳ đã có hoá đơn, không có tiền phòng, thì phí nào bị bỏ là bỏ thật)
+    if (made.some(m => m.type === 'rent')) for (const m of made) if (!used.has(m.id) && isContract({ type: m.type, meta: m.meta as Record<string, unknown> | null })) mapped.push({ id: m.id, type: m.type, description: m.description, unitPrice: m.unitPrice, quantity: m.quantity, meta: m.meta as Record<string, unknown> | null })
     const tax = input.lines.filter(l => l.type === 'tax')
     await updateLines(db, ctx, inv.id, [...mapped, ...tax])
     if (input.dueDate) await setInvoiceDueDate(db, ctx, inv.id, input.dueDate)
@@ -534,7 +535,10 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
       const protectedLine = (l: { id?: string; type: string; description: string; quantity: number; unitPrice: number; meta?: unknown }) => { const meta = l.meta as { leaseFeeId?: unknown } | null; return typeof meta?.leaseFeeId === 'string' || l.type === 'rent' ? JSON.stringify([l.id, meta?.leaseFeeId ?? null, l.type, l.description, isTimeBasedLine(l.type, l.meta) ? null : l.quantity, l.unitPrice]) : null }
       const beforeFees = old.map(protectedLine).filter(Boolean).sort()
       const afterFees = data.map(protectedLine).filter(Boolean).sort()
-      if (JSON.stringify(beforeFees) !== JSON.stringify(afterFees)) throw new ValidationError('Không sửa hoặc xoá dòng tiền phòng, phí hợp đồng tại đây; sửa hệ số, chỉ số hoặc số lượng theo kỳ ở từng dòng')
+      // Hoá đơn thêm cho kỳ đã có hoá đơn (không có dòng tiền phòng): được bỏ bớt phí hợp đồng không tính lại, không được sửa
+      const supplementary = !old.some(l => l.type === 'rent')
+      const sameOrSubset = supplementary ? afterFees.every(f => beforeFees.includes(f)) : JSON.stringify(beforeFees) === JSON.stringify(afterFees)
+      if (!sameOrSubset) throw new ValidationError('Không sửa hoặc xoá dòng tiền phòng, phí hợp đồng tại đây; sửa hệ số, chỉ số hoặc số lượng theo kỳ ở từng dòng')
     }
     const taxRate = (() => { const t = data.find(l => l.type === 'tax'); const r = (t?.meta as { rate?: unknown } | null | undefined)?.rate; return typeof r === 'number' && Number.isFinite(r) && r > 0 && r <= 100 ? r : 0 })()
     // Phí hợp đồng theo đồng hồ hoặc theo kỳ chỉ dính số lượng, không nhân hệ số theo thời gian; mô tả luôn là tên phí

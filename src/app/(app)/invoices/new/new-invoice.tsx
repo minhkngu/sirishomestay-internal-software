@@ -50,7 +50,7 @@ export async function NewInvoice({ sp }: { sp: NewInvoiceParams }) {
                 <span className="flex items-center gap-1.5"><Calendar className="size-3.5" />{formatDateVN(preview.period.start)} – {formatDateVN(preview.period.end)}</span>
                 <span className="flex items-center gap-1.5"><FileText className="size-3.5" />Hợp đồng {preview.leaseCode}</span>
               </div>
-              {'rentSkipped' in preview && preview.rentSkipped && <p className="mt-2 text-xs text-muted-foreground">Tháng này đã có hoá đơn: hoá đơn thêm này không cộng tiền phòng, dùng cho các khoản phát sinh khác.</p>}
+              {'rentSkipped' in preview && preview.rentSkipped && <p className="mt-2 text-xs text-muted-foreground">Kỳ này đã có hoá đơn: hoá đơn thêm này không cộng tiền phòng, dùng cho các khoản phát sinh khác. Phí hợp đồng không cần tính lại thì xoá khỏi hoá đơn.</p>}
               {preview.warnings.length > 0 && <p className="mt-2 text-xs text-amber-700">⚠ {preview.warnings.join('; ')} — bổ sung sau khi lưu.</p>}
             </div>
           }
