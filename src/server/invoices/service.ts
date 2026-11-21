@@ -385,8 +385,8 @@ export async function updateInvoiceOpeningReading(db: DB, ctx: AccessContext, in
     const [meter] = await tx.select().from(meters).where(eq(meters.id, link.meterId))
     const all = (await tx.select().from(meterReadings).where(eq(meterReadings.meterId, meter.id))).sort((a, b) => (a.readOn < b.readOn ? -1 : 1))
     const before = all.filter(r => r.readOn < `${data.period}-01`)
-    const target = before[before.length - 1]
-    const next = all.find(r => r.readOn >= `${data.period}-01`)
+    const target = before[before.length - 1] ?? all.find(r => r.kind === 'handover' && r.readOn <= `${data.period}-31`)
+    const next = all.find(r => r.readOn >= `${data.period}-01` && r.id !== target?.id)
     if (target && target.kind !== 'handover') throw new ValidationError('Số đầu là chỉ số chốt tháng trước, hãy sửa chỉ số của tháng đó')
     if (next && data.value > next.value) throw new ValidationError('Số đầu không được lớn hơn chỉ số chốt sau đó')
     if (target) {
@@ -695,7 +695,9 @@ async function buildMeterPanels(db: DB, leaseId: string, periodStart: string, mo
   const monthly = meterFees.length && periods.length ? await db.select().from(meterReadings).where(and(inArray(meterReadings.meterId, meterFees.map(f => f.meterId)), eq(meterReadings.kind, 'monthly'), inArray(meterReadings.period, periods))) : []
   // Số đầu kỳ của mỗi tháng = chỉ số gần nhất của đồng hồ trước ngày 1 của tháng đó (số chốt tháng trước, hoặc số ban đầu / bàn giao)
   const earlier = meterFees.length ? await db.select({ meterId: meterReadings.meterId, readOn: meterReadings.readOn, value: meterReadings.value, kind: meterReadings.kind }).from(meterReadings).where(and(inArray(meterReadings.meterId, meterFees.map(f => f.meterId)), sql`${meterReadings.readOn} < ${`${recent[recent.length - 1]}-01`}`)) : []
-  const openingRow = (meterId: string, period: string) => earlier.filter(x => x.meterId === meterId && x.readOn < `${period}-01`).sort((a, b) => (a.readOn < b.readOn ? 1 : -1))[0]
+  // Số đầu kỳ: chỉ số gần nhất trước ngày 1 của tháng; chưa có thì là chỉ số bàn giao sớm nhất đến hết tháng đó (hợp đồng bắt đầu giữa tháng)
+  const openingRow = (meterId: string, period: string): { value: number; readOn: string; kind: string } | undefined => earlier.filter(x => x.meterId === meterId && x.readOn < `${period}-01`).sort((a, b) => (a.readOn < b.readOn ? 1 : -1))[0]
+    ?? handovers.filter(x => x.meterId === meterId && x.readOn <= `${period}-31`).map(x => ({ value: x.value, readOn: x.readOn, kind: 'handover' }))[0]
   /** Nguồn số đầu kỳ: chốt tháng trước, chỉ số bàn giao, hay chỉ số ban đầu của đồng hồ (chưa có lần chốt nào). */
   const openingSource = (meterId: string, period: string): 'monthly' | 'handover' | 'start' => { const r = openingRow(meterId, period); return !r ? 'start' : r.kind === 'handover' ? 'handover' : 'monthly' }
   const openingOf = (meterId: string, period: string) => openingRow(meterId, period)?.value ?? meterStart.get(meterId) ?? null
