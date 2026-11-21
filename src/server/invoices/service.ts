@@ -4,7 +4,7 @@ import { addenda, facilities, feeTypes, feeUnits, invoiceLines, invoices, invoic
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { computeDueDate } from '@/domain/due-date'
-import { todayVN } from '@/domain/dates'
+import { daysInMonth, todayVN } from '@/domain/dates'
 import { displayName } from '@/domain/tenant-name'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { midPeriodAdjustments } from '@/domain/adjustments'
@@ -101,10 +101,20 @@ async function previewCore(db: DB, facilityId: string, period: string, onlyLease
   const data = await leasesData(db, rows.map(r => r.id))
   const [inputs, ends] = await Promise.all([
     loadCalcInputs(db, facilityId, data),
-    rows.length ? db.select({ leaseId: invoices.leaseId, end: sql<string>`max(${invoices.periodEnd})::text` }).from(invoices).where(inArray(invoices.leaseId, rows.map(r => r.id))).groupBy(invoices.leaseId) : [],
+    rows.length ? db.select({ leaseId: invoices.leaseId, start: sql<string>`${invoices.periodStart}::text`, end: sql<string>`${invoices.periodEnd}::text` }).from(invoices).where(inArray(invoices.leaseId, rows.map(r => r.id))) : [],
   ])
   return [...data.values()].map(({ lease, addenda: addendaRows }) => {
-    const last = ends.find(e => e.leaseId === lease.id)?.end ?? null
+    const mine = ends.filter(e => e.leaseId === lease.id)
+    const last = mine.reduce<string | null>((max, e) => (!max || e.end > max ? e.end : max), null)
+    const monthStart = `${period}-01`, monthEnd = `${period}-${String(daysInMonth(period)).padStart(2, '0')}`
+    // Tháng cũ nằm trước hoá đơn cuối: lập đúng tháng đó nếu chưa có hoá đơn nào chạm vào và còn trong thời hạn hợp đồng
+    if (last && last >= monthEnd) {
+      const start = lease.startDate > monthStart ? lease.startDate : monthStart
+      const end = lease.endDate < monthEnd ? lease.endDate : monthEnd
+      const free = start <= end && !mine.some(e => e.start <= end && e.end >= start)
+      if (!free) return { leaseId: lease.id, dueRule: lease.dueRule ?? null, lines: [] as InvoiceLineInput[], warnings: [] as string[], prepaidUntil: last, period: null }
+      return { leaseId: lease.id, dueRule: lease.dueRule ?? null, ...calculateWith(inputs, lease, addendaRows, facilityId, period, { start, end }), prepaidUntil: null, period: { start, end } }
+    }
     // Chưa có hoá đơn nào: người dùng chọn kỳ đầu tiên, không dồn các tháng trước kỳ được chọn
     const first = `${period}-01`
     const next = nextBillingPeriod(last || lease.startDate >= first ? lease : { ...lease, startDate: first }, last, period)
@@ -182,7 +192,8 @@ export async function createDraftForLease(db: DB, ctx: AccessContext, input: { l
   const created = await createDraftsCore(db, ctx, { facilityId, period }, leaseId)
   if (!created.length) {
     const [last] = await db.select({ end: sql<string>`max(${invoices.periodEnd})::text` }).from(invoices).where(eq(invoices.leaseId, leaseId))
-    throw new ValidationError(last?.end ? `Hợp đồng đã được lập hoá đơn tới ${last.end}` : 'Hợp đồng không có hiệu lực trong kỳ này')
+    const [clash] = await db.select({ id: invoices.id }).from(invoices).where(and(eq(invoices.leaseId, leaseId), sql`${invoices.periodStart} <= ${`${period}-31`}`, sql`${invoices.periodEnd} >= ${`${period}-01`}`)).limit(1)
+    throw new ValidationError(clash ? 'Hợp đồng đã có hoá đơn trong tháng này' : last?.end ? `Hợp đồng đã được lập hoá đơn tới ${last.end}` : 'Hợp đồng không có hiệu lực trong kỳ này')
   }
   return created[0]
 }
