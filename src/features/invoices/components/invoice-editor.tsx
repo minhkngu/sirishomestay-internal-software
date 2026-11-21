@@ -18,11 +18,12 @@ import { MoneyInput } from '@/components/ui/money-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { FeePickerDialog, type FeeOption } from '@/components/fee-picker-dialog'
 import { feeLineFromType } from '@/domain/invoice-fee-line'
+import { fullMonthCoefficient, prorateFraction } from '@/domain/proration'
+import type { Proration } from '@/domain/types'
 import {
   approveInvoiceAction,
   deleteInvoiceAction,
   setInvoiceDueDateAction,
-  setLineTimeAction,
   updateInvoiceMeterReadingAction,
   updateLinesAction,
 } from '@/server/invoices/actions'
@@ -56,6 +57,8 @@ type Props = {
   end: string
   coefficient: number | null
   fullMonth: boolean
+  /** Cách tính lẻ ngày đang áp dụng, để tự tính hệ số khi đổi từ–đến của phí thêm. */
+  proration: Proration
   dueDate: string | null
   /** Hạn dạng YYYY-MM-DD để sửa trực tiếp; null khi chưa có. */
   dueDateIso: string | null
@@ -64,42 +67,46 @@ type Props = {
   lines: Line[]
 }
 
-/** Thời gian và hệ số riêng của một dòng tiền phòng, phí cố định: gõ hệ số, hoặc đổi từ–đến để hệ số tự tính theo ngày. */
-function LineTimeEdit({ invoiceId, line, defaultFrom, defaultTo, editable }: { invoiceId: string; line: Line; defaultFrom: string; defaultTo: string; editable: boolean }) {
-  const router = useRouter()
-  const [pending, start] = useTransition()
-  const meta = line.meta
-  // Tiền phòng, phí cố định tính theo thời gian; dòng điện nước (có chỉ số) và phí nhập theo kỳ thì không
-  const timeBased = line.type === 'rent' || isAddedFee(line) || (line.type === 'fee' && typeof meta?.leaseFeeId === 'string' && !Array.isArray(meta?.segments) && typeof meta?.period !== 'string')
-  const savedFrom = typeof meta?.from === 'string' ? meta.from : defaultFrom
-  const savedTo = typeof meta?.to === 'string' ? meta.to : defaultTo
+/** Dòng tính theo thời gian: tiền phòng, phí cố định của hợp đồng, phí thêm từ Cài đặt. Điện nước (có chỉ số) và phí nhập theo kỳ thì không. */
+const isTimeBased = (l: Line) => l.type === 'rent' || isAddedFee(l) || (l.type === 'fee' && typeof l.meta?.leaseFeeId === 'string' && !Array.isArray(l.meta?.segments) && typeof l.meta?.period !== 'string')
+
+/** Đổi thời gian, hệ số của dòng thì tiền phòng đổi số lượng, thành tiền các dòng hợp đồng tính lại ngay trên màn hình (server tính lại khi lưu). */
+const timePatch = (l: Line, meta: Record<string, unknown>): Partial<EditorLine> => {
+  const coef = typeof meta.coefficient === 'number' ? meta.coefficient : 1
+  if (l.type === 'rent') return { meta, quantity: coef, amount: Math.round(l.unitPrice * coef) }
+  if (isLocked(l)) return { meta, amount: Math.round(l.quantity * l.unitPrice * coef) }
+  return { meta }
+}
+
+/** Thời gian và hệ số của một dòng: chỉnh ngay trên dòng, đổi từ–đến thì hệ số tự tính theo ngày, gõ hệ số thì dùng đúng số đó; lưu cùng mọi thay đổi khác của hoá đơn. */
+function LineTime({ line, defaultFrom, defaultTo, fullMonth, proration, editable, onChange }: { line: Line; defaultFrom: string; defaultTo: string; fullMonth: boolean; proration: Proration; editable: boolean; onChange: (meta: Record<string, unknown>) => void }) {
+  const meta = line.meta ?? {}
+  const from = typeof meta.from === 'string' ? meta.from : defaultFrom
+  const to = typeof meta.to === 'string' ? meta.to : defaultTo
   // Hoá đơn cũ chưa lưu hệ số: suy ra từ số lượng (tiền phòng) hoặc thành tiền
-  const coefficient = typeof meta?.coefficient === 'number' ? meta.coefficient : line.type === 'rent' ? line.quantity : line.amount != null && line.quantity * line.unitPrice !== 0 ? Math.round((line.amount / (line.quantity * line.unitPrice)) * 10000) / 10000 : 1
-  const [from, setFrom] = useState(savedFrom)
-  const [to, setTo] = useState(savedTo)
+  const coefficient = typeof meta.coefficient === 'number' ? meta.coefficient : line.type === 'rent' ? line.quantity : line.amount != null && line.quantity * line.unitPrice !== 0 ? Math.round((line.amount / (line.quantity * line.unitPrice)) * 10000) / 10000 : 1
   const [coef, setCoef] = useState(String(coefficient))
-  const [error, setError] = useState('')
-  if (!timeBased) return null
-  const label = <span className="tabular-nums">Hệ số × {coefficient.toLocaleString('vi-VN', { maximumFractionDigits: 4 })}{meta?.coefficientOverride === true ? ' (chỉnh riêng)' : coefficient !== 1 ? ' (tính theo ngày)' : ''}</span>
-  if (!line.id && isAddedFee(line)) return <p className="mt-1 text-[11px] text-muted-foreground">Lưu hoá đơn để chọn thời gian, hệ số cho phí này</p>
-  if (!editable || !line.id) return <p className="mt-1 text-[11px] text-muted-foreground">{label}</p>
-  const apply = () => start(async () => {
-    const changedCoef = coef.trim() !== String(coefficient)
-    const input = changedCoef ? { coefficient: Number(coef.replace(',', '.')) } : { from, to }
-    const r = await setLineTimeAction(invoiceId, line.id!, input)
-    if (!r.ok) { setError(r.error); return }
-    setError(''); toast.success('Đã cập nhật thời gian, hệ số'); router.refresh()
-  })
-  const dirty = coef.trim() !== String(coefficient) || from !== savedFrom || to !== savedTo
+  const round4 = (n: number) => Math.round(n * 10000) / 10000
+  const label = <span className="tabular-nums">Hệ số × {coefficient.toLocaleString('vi-VN', { maximumFractionDigits: 4 })}{meta.coefficientOverride === true ? ' (chỉnh riêng)' : coefficient !== 1 ? ' (tính theo ngày)' : ''}</span>
+  if (!editable) return <p className="mt-1 text-[11px] text-muted-foreground">{label}</p>
+  const setDates = (nextFrom: string, nextTo: string) => {
+    if (!nextFrom || !nextTo || nextTo < nextFrom) { onChange({ ...meta, from: nextFrom, to: nextTo }); return }
+    const next = round4(fullMonth ? fullMonthCoefficient(nextFrom, nextTo) : prorateFraction(nextFrom, nextTo, proration))
+    setCoef(String(next))
+    onChange({ ...meta, from: nextFrom, to: nextTo, coefficient: next, coefficientOverride: false })
+  }
+  const setCoefficient = (text: string) => {
+    setCoef(text)
+    const n = Number(text.replace(',', '.'))
+    if (text.trim() !== '' && Number.isFinite(n) && n >= 0) onChange({ ...meta, from, to, coefficient: round4(n), coefficientOverride: true })
+  }
   return (
     <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
       {label}
-      <input aria-label="Từ ngày" type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-7 rounded-lg border border-border/80 bg-background px-1.5 text-foreground" />
+      <input aria-label="Từ ngày" type="date" value={from} onChange={(e) => setDates(e.target.value, to)} className="h-7 rounded-lg border border-border/80 bg-background px-1.5 text-foreground" />
       <span>–</span>
-      <input aria-label="Đến ngày" type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-7 rounded-lg border border-border/80 bg-background px-1.5 text-foreground" />
-      <input aria-label="Hệ số" inputMode="decimal" value={coef} onChange={(e) => setCoef(e.target.value)} className="h-7 w-20 rounded-lg border border-border/80 bg-background px-2 text-right tabular-nums text-foreground" />
-      <Button type="button" size="sm" variant="outline" disabled={pending || !dirty} onClick={apply} className="h-7 rounded-lg text-[11px]">Áp dụng</Button>
-      {error && <span role="alert" className="w-full text-destructive">{error}</span>}
+      <input aria-label="Đến ngày" type="date" value={to} onChange={(e) => setDates(from, e.target.value)} className="h-7 rounded-lg border border-border/80 bg-background px-1.5 text-foreground" />
+      <input aria-label="Hệ số" inputMode="decimal" value={coef} onChange={(e) => setCoefficient(e.target.value)} className="h-7 w-20 rounded-lg border border-border/80 bg-background px-2 text-right tabular-nums text-foreground" />
     </div>
   )
 }
@@ -161,6 +168,18 @@ export function InvoiceEditor(p: Props) {
   const set = (i: number, patch: Partial<EditorLine>) =>
     setLines(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)))
 
+  /** Lưu một lượt mọi thay đổi trong hoá đơn: các dòng (kể cả thời gian, hệ số) và hạn thanh toán. */
+  const saveAll = () => start(async () => {
+    const r = await updateLinesAction(p.id, lines.map((l) => ({ id: l.id, type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta: l.meta })))
+    if (!r.ok) { toast.error(r.error); return }
+    if (due && due !== (p.dueDateIso ?? '')) {
+      const d = await setInvoiceDueDateAction(p.id, due)
+      if (!d.ok) { toast.error(d.error); router.refresh(); return }
+    }
+    toast.success('Đã lưu thay đổi')
+    router.refresh()
+  })
+
   const approved = p.status === 'approved'
 
   return (
@@ -199,7 +218,7 @@ export function InvoiceEditor(p: Props) {
                       onChange={(e) => set(i, { description: e.target.value })}
                       className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 disabled:cursor-not-allowed disabled:border-transparent disabled:bg-transparent disabled:px-0 disabled:text-foreground"
                     />
-                    <LineTimeEdit invoiceId={p.id} line={l} defaultFrom={p.start} defaultTo={p.end} editable={p.status === 'draft'} />
+                    {isTimeBased(l) && <LineTime line={l} defaultFrom={p.start} defaultTo={p.end} fullMonth={p.fullMonth} proration={p.proration} editable={p.status === 'draft'} onChange={(meta) => set(i, timePatch(l, meta))} />}
                   </td>
                   <td className="p-2.5 align-top">
                     {(() => { const panel = p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId); return panel ? <MeterReadingsPanel invoiceId={p.id} panel={panel} editable={p.status === 'draft'} /> : <span className="text-muted-foreground/60">—</span> })()}
@@ -209,7 +228,7 @@ export function InvoiceEditor(p: Props) {
                       type="number"
                       step="any"
                       value={l.quantity}
-                      disabled={isLocked(l)}
+                      disabled={isLocked(l) || isAddedFee(l)}
                       onChange={(e) => set(i, { quantity: Number(e.target.value) })}
                       className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
                     />
@@ -218,7 +237,7 @@ export function InvoiceEditor(p: Props) {
                     <MoneyInput
                       allowNegative
                       value={l.unitPriceText}
-                      disabled={isLocked(l)}
+                      disabled={isLocked(l) || isAddedFee(l)}
                       onValueChange={(value) => set(i, { unitPriceText: value, unitPrice: value === '' || value === '-' ? 0 : Number(value) })}
                       className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
                     />
@@ -278,11 +297,11 @@ export function InvoiceEditor(p: Props) {
           <Button
             size="sm"
             disabled={pending}
-            onClick={() => run(() => updateLinesAction(p.id, lines.map((l) => ({ id: l.id, type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta: l.meta }))), 'Đã lưu các dòng')}
+            onClick={saveAll}
             className="gap-1.5 rounded-xl font-medium text-xs shadow-2xs"
           >
             <Check className="size-3.5" />
-            <span>Lưu các dòng</span>
+            <span>Lưu thay đổi</span>
           </Button>
         </div>
         {p.addFee && (
@@ -292,6 +311,7 @@ export function InvoiceEditor(p: Props) {
             feeTypes={[...p.addFee.feeTypes, ...createdFees]}
             usedTypeIds={new Set([...p.addFee.usedTypeIds, ...lines.flatMap((l) => (typeof l.meta?.feeTypeId === 'string' ? [l.meta.feeTypeId] : []))])}
             facilityId={p.addFee.facilityId}
+            description="Các loại phí đã tạo trong Cài đặt. Phí thêm vào hoá đơn dùng giá theo toà, chọn thời gian và hệ số ngay trên dòng."
             onPick={(feeId) => {
               const fee = [...p.addFee!.feeTypes, ...createdFees].find((f) => f.id === feeId)
               if (!fee) return
@@ -309,8 +329,7 @@ export function InvoiceEditor(p: Props) {
           <label htmlFor="invoice-due" className="block text-xs font-medium text-muted-foreground">Hạn thanh toán</label>
           <input id="invoice-due" type="date" value={due} onChange={(e) => setDue(e.target.value)} className="h-9 rounded-lg border border-border/80 bg-background px-2.5 text-sm font-semibold tabular-nums text-foreground focus:border-primary focus:outline-none" />
         </div>
-        <Button size="sm" variant="outline" disabled={pending || !due || due === (p.dueDateIso ?? '')} onClick={() => run(() => setInvoiceDueDateAction(p.id, due), 'Đã lưu hạn thanh toán')} className="rounded-xl text-xs font-medium">Lưu hạn</Button>
-        <p className="pb-2 text-xs text-muted-foreground">Mặc định theo Cài đặt: {p.dueDefaultLabel}.</p>
+        <p className="pb-2 text-xs text-muted-foreground">Mặc định theo Cài đặt: {p.dueDefaultLabel}. Lưu cùng các thay đổi khác bằng nút “Lưu thay đổi”.</p>
       </section>
 
       {/* 3. Phê duyệt & Hạn thanh toán */}
