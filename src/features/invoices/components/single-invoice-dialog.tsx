@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { FormDialog } from '@/components/form-dialog'
 import { Button } from '@/components/ui/button'
@@ -30,8 +30,10 @@ export function SingleInvoiceDialog({ facilities, defaultPeriod }: { facilities:
       if (!r.ok) setError(r.error); else setLeases(r.data)
     })
   }
-  const create = () => start(async () => {
-    const r = await createDraftForLeaseAction({ leaseId, period })
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
+  const create = (lease = leaseId, month = period) => start(async () => {
+    const r = await createDraftForLeaseAction({ leaseId: lease, period: month })
     if (!r.ok) { setError(r.error); return }
     toast.success('Đã tạo hoá đơn nháp')
     setOpen(false)
@@ -45,7 +47,7 @@ export function SingleInvoiceDialog({ facilities, defaultPeriod }: { facilities:
   return (
     <>
       <Button variant="outline" onClick={() => setOpen(true)}>Tạo hoá đơn lẻ</Button>
-      <FormDialog open={open} onOpenChange={setOpen} title="Tạo hoá đơn lẻ" description="Chọn toà, phòng và tháng rồi tạo hoá đơn nháp." size="md">
+      <FormDialog open={open} onOpenChange={setOpen} title="Tạo hoá đơn lẻ" description="Chọn toà, phòng rồi chọn tháng: hoá đơn nháp được tạo và mở ra để sửa." size="md">
         <div className="space-y-4 pb-1">
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
@@ -64,12 +66,18 @@ export function SingleInvoiceDialog({ facilities, defaultPeriod }: { facilities:
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="single-invoice-period">Tháng</Label>
-              <input id="single-invoice-period" type="month" value={period} onChange={(e) => { setPeriod(e.target.value); reset() }} className="h-9 w-full rounded-lg border border-border/80 bg-background px-2 text-sm" />
+              <input id="single-invoice-period" type="month" value={period} onChange={(e) => {
+                const month = e.target.value
+                setPeriod(month); reset()
+                if (timer.current) clearTimeout(timer.current)
+                // Chọn xong tháng thì tạo nháp và mở giao diện sửa hoá đơn; chờ một chút để không tạo nhầm khi đang gõ dở
+                if (leaseId && /^\d{4}-\d{2}$/.test(month)) timer.current = setTimeout(() => create(leaseId, month), 700)
+              }} className="h-9 w-full rounded-lg border border-border/80 bg-background px-2 text-sm" />
             </div>
           </div>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <div className="flex items-center justify-end gap-3">
-            <Button type="button" disabled={pending || !canCreate} onClick={create}>{pending ? 'Đang tạo…' : 'Tạo hoá đơn'}</Button>
+            <Button type="button" disabled={pending || !canCreate} onClick={() => create()}>{pending ? 'Đang tạo…' : 'Tạo hoá đơn'}</Button>
           </div>
         </div>
       </FormDialog>
