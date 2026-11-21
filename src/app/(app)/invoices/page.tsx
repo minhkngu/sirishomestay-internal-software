@@ -8,6 +8,8 @@ import { assertCan } from '@/domain/access'
 import { listInvoices } from '@/server/invoices/service'
 import { getAccessContext } from '@/server/session'
 import { InvoiceList } from '@/features/invoices/components/invoice-list'
+import { SingleInvoiceDialog } from '@/features/invoices/components/single-invoice-dialog'
+import { todayVN } from '@/domain/dates'
 
 export default async function InvoicesPage() {
   const ctx = await getAccessContext()
@@ -20,6 +22,7 @@ export default async function InvoicesPage() {
         title="Hoá đơn"
         action={
           <>
+            <SingleInvoiceDialog facilities={facs.map((f) => ({ id: f.id, name: f.name }))} defaultPeriod={todayVN().slice(0, 7)} />
             <Link href="/invoices/generate" className={buttonVariants({ variant: 'default' })}>
               Tạo hoá đơn hàng loạt
             </Link>
