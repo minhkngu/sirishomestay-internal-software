@@ -13,6 +13,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { FormDialog } from '@/components/form-dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -115,36 +116,33 @@ type MeterPanel = { leaseFeeId: string; name: string; unit: string; rows: Array<
 const periodLabel = (period: string) => `${period.slice(5)}/${period.slice(0, 4)}`
 const NEW_READING = '__new'
 /** Chỉ số đã chốt của đồng hồ: danh sách các tháng, thêm dòng "Chốt chỉ số" cuối danh sách; chọn một dòng mở popup điền số (ghi ngược về tab Chỉ số). */
-function MeterReadingsPanel({ invoiceId, panel, editable, consumption }: { invoiceId: string; panel: MeterPanel; editable: boolean; consumption: number }) {
-  const router = useRouter()
-  const [pending, start] = useTransition()
+function MeterReadingsPanel({ panel, editable, consumption, staged, onStage }: { panel: MeterPanel; editable: boolean; consumption: number; /** Chỉ số đã điền nhưng chưa lưu, theo tháng. */ staged: Record<string, string>; onStage: (period: string, value: string) => void }) {
   const [period, setPeriod] = useState<string | null>(null)
   const [text, setText] = useState('')
-  const [error, setError] = useState('')
+  const [, setError] = useState('')
   const last = panel.rows[panel.rows.length - 1]
-  const rowLabel = (r: MeterPanel['rows'][number]) => `Tháng ${periodLabel(r.period)} · ${r.value == null ? 'chưa chốt' : r.value.toLocaleString('vi-VN')}`
+  const rowLabel = (r: MeterPanel['rows'][number]) => staged[r.period] !== undefined ? `Tháng ${periodLabel(r.period)} · ${Number(staged[r.period]).toLocaleString('vi-VN')} (chưa lưu)` : `Tháng ${periodLabel(r.period)} · ${r.value == null ? 'chưa chốt' : r.value.toLocaleString('vi-VN')}`
   const items = [...panel.rows.map((r) => ({ value: r.period, label: rowLabel(r) })), ...(editable ? [{ value: NEW_READING, label: '＋ Chốt chỉ số' }] : [])]
   const row = panel.rows.find((r) => r.period === period)
   const open = (value: string) => {
     const target = value === NEW_READING ? (panel.rows.find((r) => r.value == null) ?? last).period : value
     const found = panel.rows.find((r) => r.period === target) ?? last
-    setText(found.value == null ? '' : String(found.value)); setError(''); setPeriod(found.period)
+    setText(staged[found.period] ?? (found.value == null ? '' : String(found.value))); setError(''); setPeriod(found.period)
   }
-  const save = () => start(async () => {
+  const apply = () => {
     if (!row) return
-    const r = await updateInvoiceMeterReadingAction(invoiceId, { leaseFeeId: panel.leaseFeeId, period: row.period, value: Number(text) })
-    if (!r.ok) { setError(r.error); return }
-    toast.success('Đã cập nhật chỉ số và tính lại hoá đơn'); setPeriod(null); router.refresh()
-  })
+    onStage(row.period, String(Number(text.trim())))
+    setPeriod(null)
+  }
   return (
     <div className="text-[11px] text-muted-foreground">
       <Select value={null} onValueChange={(v) => { if (v) open(String(v)) }} items={items}>
         <SelectTrigger aria-label={`Chỉ số đã chốt ${panel.name}`} className="h-8 w-full rounded-lg border-border/80 bg-background text-xs"><SelectValue placeholder={rowLabel(last)} /></SelectTrigger>
         <SelectContent>{items.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
       </Select>
-      <p className="mt-1.5">Tiêu thụ: <span className="font-medium tabular-nums text-foreground">{consumption.toLocaleString('vi-VN')} {panel.unit}</span></p>
+      <p className="mt-1.5">Tiêu thụ: <span className="font-medium tabular-nums text-foreground">{consumption.toLocaleString('vi-VN')} {panel.unit}</span>{Object.keys(staged).length > 0 && ' (tính lại sau khi lưu)'}</p>
       {row && (
-        <FormDialog open onOpenChange={(o) => { if (!o) setPeriod(null) }} title={`Chốt chỉ số ${panel.name}`} description={`Tháng ${periodLabel(row.period)}${row.value == null ? ' · chưa chốt' : ` · đang là ${row.value.toLocaleString('vi-VN')}`}. Số chốt ghi về tab Chỉ số và tính lại hoá đơn.`} size="sm">
+        <FormDialog open onOpenChange={(o) => { if (!o) setPeriod(null) }} title={`Chốt chỉ số ${panel.name}`} description={`Tháng ${periodLabel(row.period)}${row.value == null ? ' · chưa chốt' : ` · đang là ${row.value.toLocaleString('vi-VN')}`}. Số chốt được lưu cùng hoá đơn, ghi về tab Chỉ số và tính lại tiền.`} size="sm">
           <div className="space-y-4 pb-1">
             {panel.rows.length > 1 && (
               <div className="space-y-1.5">
@@ -159,10 +157,9 @@ function MeterReadingsPanel({ invoiceId, panel, editable, consumption }: { invoi
               <Label htmlFor="meter-reading-value">Chỉ số ({panel.unit})</Label>
               <Input id="meter-reading-value" inputMode="numeric" value={text} onChange={(e) => setText(e.target.value)} className="h-9 text-right tabular-nums" />
             </div>
-            {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
             <div className="flex justify-end gap-2">
               <Button type="button" variant="ghost" onClick={() => setPeriod(null)}>Huỷ</Button>
-              <Button type="button" disabled={pending || !/^\d+$/.test(text.trim()) || (row.value != null && text.trim() === String(row.value))} onClick={save}>Lưu</Button>
+              <Button type="button" disabled={!/^\d+$/.test(text.trim()) || (row.value != null && staged[row.period] === undefined && text.trim() === String(row.value))} onClick={apply}>Áp dụng</Button>
             </div>
           </div>
         </FormDialog>
@@ -178,6 +175,7 @@ export function InvoiceEditor(p: Props) {
   const [lines, setLines] = useState<EditorLine[]>(p.lines.map((l) => ({ ...l, unitPriceText: String(l.unitPrice) })))
   const [due, setDue] = useState(p.dueDateIso ?? '')
   const [pickingFee, setPickingFee] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [createdFees, setCreatedFees] = useState<FeeOption[]>([])
   const total = lines.reduce((n, l) => n + lineAmount(l), 0)
 
@@ -195,15 +193,28 @@ export function InvoiceEditor(p: Props) {
   const set = (i: number, patch: Partial<EditorLine>) =>
     setLines(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)))
 
-  /** Lưu một lượt mọi thay đổi trong hoá đơn: các dòng (kể cả thời gian, hệ số) và hạn thanh toán. */
-  const saveAll = () => start(async () => {
+  const [staged, setStaged] = useState<Record<string, string>>({})
+  const stagedFor = (leaseFeeId: string) => Object.fromEntries(Object.entries(staged).filter(([key]) => key.startsWith(`${leaseFeeId}|`)).map(([key, value]) => [key.split('|')[1], value]))
+  /** Lưu một lượt mọi thông tin của hoá đơn: chỉ số đã điền, các dòng (kể cả thời gian, số lượng) và hạn thanh toán. */
+  const persist = async (): Promise<string | null> => {
+    for (const [key, value] of Object.entries(staged)) {
+      const [leaseFeeId, period] = key.split('|')
+      const r = await updateInvoiceMeterReadingAction(p.id, { leaseFeeId, period, value: Number(value) })
+      if (!r.ok) return r.error ?? 'Không lưu được chỉ số'
+      setStaged((cur) => { const next = { ...cur }; delete next[key]; return next })
+    }
     const r = await updateLinesAction(p.id, lines.map((l) => ({ id: l.id, type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta: l.meta })))
-    if (!r.ok) { toast.error(r.error); return }
+    if (!r.ok) return r.error ?? 'Không lưu được các dòng'
     if (due && due !== (p.dueDateIso ?? '')) {
       const d = await setInvoiceDueDateAction(p.id, due)
-      if (!d.ok) { toast.error(d.error); router.refresh(); return }
+      if (!d.ok) return d.error ?? 'Không lưu được hạn thanh toán'
     }
-    toast.success('Đã lưu thay đổi')
+    return null
+  }
+  const saveAll = () => start(async () => {
+    const error = await persist()
+    if (error) { toast.error(error); router.refresh(); return }
+    toast.success('Đã lưu hoá đơn')
     router.refresh()
   })
 
@@ -262,7 +273,7 @@ export function InvoiceEditor(p: Props) {
                     {isTimeBased(l) ? <LineTime line={l} defaultFrom={p.start} defaultTo={p.end} fullMonth={p.fullMonth} proration={p.proration} editable={p.status === 'draft'} onChange={(meta) => set(i, timePatch(l, meta))} /> : <span className="text-muted-foreground/60">—</span>}
                   </td>
                   <td className="p-2.5 align-top">
-                    {(() => { const panel = p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId); return panel ? <MeterReadingsPanel invoiceId={p.id} panel={panel} editable={p.status === 'draft'} consumption={l.quantity} /> : <span className="text-muted-foreground/60">—</span> })()}
+                    {(() => { const panel = p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId); return panel ? <MeterReadingsPanel panel={panel} editable={p.status === 'draft'} consumption={l.quantity} staged={stagedFor(panel.leaseFeeId)} onStage={(period, value) => setStaged((cur) => ({ ...cur, [`${panel.leaseFeeId}|${period}`]: value }))} /> : <span className="text-muted-foreground/60">—</span> })()}
                   </td>
                   <td className="p-2.5 align-top">
                     {isMeterLine(l)
@@ -329,15 +340,6 @@ export function InvoiceEditor(p: Props) {
               <span>Thêm phí</span>
             </Button>
           )}
-          <Button
-            size="sm"
-            disabled={pending}
-            onClick={saveAll}
-            className="gap-1.5 rounded-xl font-medium text-xs shadow-2xs"
-          >
-            <Check className="size-3.5" />
-            <span>Lưu thay đổi</span>
-          </Button>
         </div>
         {p.addFee && (
           <FeePickerDialog
@@ -386,17 +388,23 @@ export function InvoiceEditor(p: Props) {
 
           {!approved && (
             <div className="flex flex-wrap items-center gap-2.5">
+              <Button size="sm" disabled={pending} onClick={saveAll} className="gap-1.5 rounded-xl text-xs font-medium shadow-2xs">
+                <Check className="size-3.5" />
+                <span>Lưu thay đổi</span>
+              </Button>
               <Button
                 size="sm"
+                variant="outline"
                 disabled={pending}
-                onClick={() =>
-                  run(
-                    () =>
-                      approveInvoiceAction(p.id, due ? { dueDate: due } : {}),
-                    'Đã duyệt hoá đơn'
-                  )
-                }
-                className="gap-1.5 rounded-xl text-xs font-medium shadow-2xs"
+                onClick={() => start(async () => {
+                  const error = await persist()
+                  if (error) { toast.error(error); router.refresh(); return }
+                  const r = await approveInvoiceAction(p.id, due ? { dueDate: due } : {})
+                  if (!r.ok) { toast.error(r.error); router.refresh(); return }
+                  toast.success('Đã duyệt hoá đơn')
+                  router.refresh()
+                })}
+                className="gap-1.5 rounded-xl text-xs font-medium"
               >
                 <CheckCircle2 className="size-3.5" />
                 <span>Duyệt hoá đơn</span>
@@ -406,10 +414,7 @@ export function InvoiceEditor(p: Props) {
                 size="sm"
                 variant="outline"
                 disabled={pending}
-                onClick={() => {
-                  if (confirm('Xoá hoá đơn nháp này?'))
-                    run(() => deleteInvoiceAction(p.id), 'Đã xoá', () => router.push('/invoices'))
-                }}
+                onClick={() => setDeleting(true)}
                 className="gap-1.5 rounded-xl border-rose-200/80 text-rose-700 hover:bg-rose-50 hover:text-rose-800 text-xs font-medium"
               >
                 <Trash2 className="size-3.5" />
@@ -427,14 +432,15 @@ export function InvoiceEditor(p: Props) {
                 </span>
               </span>
 
+              <Button size="sm" disabled={pending} onClick={saveAll} className="gap-1.5 rounded-xl text-xs font-medium shadow-2xs">
+                <Check className="size-3.5" />
+                <span>Lưu thay đổi</span>
+              </Button>
               <Button
                 size="sm"
                 variant="outline"
                 disabled={pending}
-                onClick={() => {
-                  if (confirm('Xoá hoá đơn đã duyệt? Phải gỡ hết khoản thu trước.'))
-                    run(() => deleteInvoiceAction(p.id), 'Đã xoá', () => router.push('/invoices'))
-                }}
+                onClick={() => setDeleting(true)}
                 className="gap-1.5 rounded-xl border-rose-200/80 text-rose-700 hover:bg-rose-50 hover:text-rose-800 text-xs font-medium"
               >
                 <Trash2 className="size-3.5" />
@@ -444,6 +450,15 @@ export function InvoiceEditor(p: Props) {
           )}
         </div>
       </section>
+      <ConfirmDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        title="Xoá hoá đơn?"
+        description={approved ? 'Hoá đơn đã duyệt: phải gỡ hết khoản thu trước. Không thể hoàn tác.' : 'Hoá đơn nháp sẽ bị xoá. Không thể hoàn tác.'}
+        confirmLabel="Xoá"
+        destructive
+        onConfirm={() => run(() => deleteInvoiceAction(p.id), 'Đã xoá', () => router.push('/invoices'))}
+      />
     </div>
   )
 }
