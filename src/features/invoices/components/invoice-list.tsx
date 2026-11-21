@@ -32,6 +32,12 @@ export function InvoiceList({ invoices, facilities }: { invoices: InvoiceRow[]; 
     if (!r.ok) toast.error(r.error)
     else setPdf({ url: `/api/files/${r.data.fileId}?inline=1`, code: i.code })
   })
+  // Tổng dư nợ theo hợp đồng: các hoá đơn đã duyệt còn thiếu tiền (hoá đơn hoàn khách không tính)
+  const debtByLease = useMemo(() => {
+    const out: Record<string, number> = {}
+    for (const i of invoices) if (i.status === 'approved' && i.total > 0 && i.total > i.paid) out[i.leaseId] = (out[i.leaseId] ?? 0) + (i.total - i.paid)
+    return out
+  }, [invoices])
   const names = useMemo(() => Object.fromEntries(facilities.map((f) => [f.id, f.name])), [facilities])
 
   const scoped = useMemo(
@@ -82,7 +88,7 @@ export function InvoiceList({ invoices, facilities }: { invoices: InvoiceRow[]; 
           <tbody className="divide-y divide-border/50">
             {pageRows.map((i) => (
               <tr key={i.id} className="transition-colors hover:bg-muted/30">
-                <td className="p-3 whitespace-nowrap"><InvoiceRowActions id={i.id} code={i.code} draft={i.state === 'draft'} canUnapprove={i.status === 'approved' && i.kind !== 'termination' && i.paid === 0} /></td>
+                <td className="p-3 whitespace-nowrap"><InvoiceRowActions id={i.id} code={i.code} draft={i.state === 'draft'} canUnapprove={i.status === 'approved' && i.kind !== 'termination' && i.paid === 0} collect={i.status === 'approved' && i.total > i.paid && debtByLease[i.leaseId] > 0 ? { leaseId: i.leaseId, roomCode: i.roomCode, tenantName: i.tenantName, debt: debtByLease[i.leaseId] } : null} /></td>
                 <td className="p-3 whitespace-nowrap">
                   <button
                     type="button"

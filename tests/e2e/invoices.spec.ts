@@ -34,10 +34,14 @@ test('tạo hoá đơn hàng loạt → sửa kỳ → duyệt → thu một ph�
   await expect(page.getByText('Đã tính lại tiền phòng và phí cố định')).toBeVisible()
   await page.getByRole('button', { name: 'Duyệt hoá đơn' }).click()
   await expect(page.getByText('Chưa thu').first()).toBeVisible()
-  await page.getByRole('button', { name: 'Ghi thu' }).click()
-  await page.getByLabel('Số tiền').fill('1000000')
-  await page.getByRole('button', { name: 'Lưu khoản thu' }).click()
-  await expect(page.getByText('Thu một phần').first()).toBeVisible()
+  // Ghi thu theo hợp đồng ở danh sách hoá đơn: icon thu tiền mở popup, mặc định điền tổng dư nợ
+  await page.goto('/invoices')
+  await page.waitForLoadState('networkidle')
+  await page.getByRole('button', { name: /^Thu tiền / }).first().click()
+  await expect(page.getByLabel('Số tiền thu')).not.toHaveValue('')
+  await page.getByLabel('Số tiền thu').fill('1000000')
+  await page.getByRole('button', { name: 'Ghi thu', exact: true }).click()
+  await expect(page.getByText('Đã ghi thu')).toBeVisible()
 })
 
 test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → check-in → hoá đơn đầu tiên nháp', async ({ page }) => {

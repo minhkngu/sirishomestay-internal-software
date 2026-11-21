@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import { ArrowLeft, Calendar, FileText, Home, User } from 'lucide-react'
 import { db } from '@/db/client'
 import { NotFoundError } from '@/domain/errors'
-import { formatDateVN, todayVN } from '@/domain/dates'
+import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { InvoiceFeeQuantities } from '@/features/invoices/components/invoice-fee-quantities'
 import { InvoiceEditorWithFees } from './invoice-editor-with-fees'
@@ -132,8 +132,6 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       />
 
       <PaymentDialog
-        invoiceId={id}
-        approved={inv.status === 'approved'}
         payments={d.payments.map((p) => ({
           id: p.id,
           paidOn: p.paidOn,
@@ -141,8 +139,6 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           method: p.method,
           note: p.note,
         }))}
-        remaining={remaining}
-        today={todayVN()}
       />
 
       <section className="space-y-3 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">

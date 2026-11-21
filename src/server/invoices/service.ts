@@ -377,6 +377,46 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
     return rows
   })
 }
+const leasePaymentSchema = z.object({ paidOn: z.iso.date(), amount: z.number().int().safe().positive('Số tiền phải lớn hơn 0'), method: z.enum(['cash', 'transfer', 'other']), note: z.string().max(500).optional() })
+/** Hoá đơn đã duyệt của hợp đồng còn thiếu tiền (tổng dương), cũ nhất trước, kèm số còn thiếu. */
+async function openInvoices(tx: Pick<DB, 'select'>, leaseId: string) {
+  const rows = await tx.select({ id: invoices.id, facilityId: invoices.facilityId }).from(invoices).where(and(eq(invoices.leaseId, leaseId), eq(invoices.status, 'approved'))).orderBy(asc(invoices.periodStart), asc(invoices.createdAt))
+  if (!rows.length) return []
+  const ids = rows.map(r => r.id)
+  const [totals, paids] = await Promise.all([
+    tx.select({ id: invoiceLines.invoiceId, n: sql<number>`sum(${invoiceLines.amount})::float8` }).from(invoiceLines).where(inArray(invoiceLines.invoiceId, ids)).groupBy(invoiceLines.invoiceId),
+    tx.select({ id: payments.invoiceId, n: sql<number>`sum(${payments.amount})::float8` }).from(payments).where(inArray(payments.invoiceId, ids)).groupBy(payments.invoiceId),
+  ])
+  const sum = (list: { id: string; n: number }[], id: string) => list.find(x => x.id === id)?.n ?? 0
+  return rows.map(r => ({ ...r, total: sum(totals, r.id), paid: sum(paids, r.id) })).filter(r => r.total > 0).map(r => ({ ...r, owed: r.total - r.paid })).filter(r => r.owed > 0)
+}
+/** Tổng dư nợ của hợp đồng: tổng còn thiếu của các hoá đơn đã duyệt. */
+export async function leaseDebt(db: DB, ctx: AccessContext, leaseId: string): Promise<number> {
+  await facilityOfLease(db, ctx, leaseId)
+  return (await openInvoices(db, leaseId)).reduce((n, r) => n + r.owed, 0)
+}
+/** Ghi một khoản thu cho hợp đồng, tự gạch các hoá đơn đã duyệt từ cũ đến mới; không thu quá tổng dư nợ. */
+export async function recordLeasePayment(db: DB, ctx: AccessContext, leaseId: string, input: { paidOn: string; amount: number; method: 'cash' | 'transfer' | 'other'; note?: string }) {
+  const data = parse(leasePaymentSchema, input)
+  const facilityId = await facilityOfLease(db, ctx, leaseId)
+  return db.transaction(async tx0 => {
+    const tx = tx0 as unknown as DB
+    await tx.execute(sql`select id from leases where id = ${leaseId} for update`)
+    const open = await openInvoices(tx, leaseId)
+    const debt = open.reduce((n, r) => n + r.owed, 0)
+    if (data.amount > debt) throw new ValidationError(`Số tiền vượt tổng dư nợ ${debt.toLocaleString('vi-VN')}`)
+    let left = data.amount
+    const created: (typeof payments.$inferSelect)[] = []
+    for (const inv of open) {
+      if (left <= 0) break
+      const part = Math.min(left, inv.owed)
+      const [row] = await tx.insert(payments).values({ invoiceId: inv.id, paidOn: data.paidOn, amount: part, method: data.method, note: data.note ?? '', receivedBy: ctx.userId }).returning()
+      created.push(row); left -= part
+    }
+    await recordAuditBatch(tx, ctx, created.map(row => ({ action: 'create' as const, entity: 'payment', entityId: row.id, facilityId, summary: 'Ghi nhận thanh toán theo hợp đồng', after: row })))
+    return created
+  })
+}
 export async function removePayment(db: DB, ctx: AccessContext, paymentId: string): Promise<void> {
   await db.transaction(async tx0 => {
     const tx = tx0 as unknown as DB; const [row] = await tx.select().from(payments).where(eq(payments.id, paymentId)); if (!row) throw new NotFoundError()
