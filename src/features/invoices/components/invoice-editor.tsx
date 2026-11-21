@@ -281,6 +281,7 @@ export function InvoiceEditor(p: Props) {
                       onChange={(e) => set(i, { description: e.target.value })}
                       className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
                     />
+                    {typeof l.meta?.coefficient === 'number' && <p className="mt-1 text-[11px] tabular-nums text-muted-foreground">Hệ số kỳ × {l.meta.coefficient.toLocaleString('vi-VN', { maximumFractionDigits: 4 })}{l.meta.coefficient !== 1 ? ' (tính theo ngày)' : ''}</p>}
                     {p.status === 'draft' && <MeterReadingEdit invoiceId={p.id} meta={l.meta} />}
                   </td>
                   <td className="p-2.5">

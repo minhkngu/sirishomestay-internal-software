@@ -25,13 +25,13 @@ function rentAndFixedLines(terms: LeaseTerms, from: ISODate, to: ISODate, sum: n
   const label = rangeLabel(from, to)
   const lines: InvoiceLineInput[] = [{
     type: 'rent', description: `Tiền phòng ${label}`, quantity: round4(sum), unitPrice: terms.monthlyRent, amount: Math.round(terms.monthlyRent * sum),
-    meta: { from, to },
+    meta: { from, to, coefficient: round4(sum) },
   }]
   for (const f of terms.fees.filter((x) => (x.billing === 'monthly_fixed' || x.quantitySource === 'occupants' || x.quantitySource === 'room') && x.quantitySource !== 'meter' && x.quantitySource !== 'period_input')) {
     const qty = f.quantitySource === 'room' ? 1 : f.quantitySource === 'occupants' || (!f.quantitySource && f.quantityFrom === 'occupants') ? occupantsCount : f.quantity
     lines.push({
       type: 'fee', description: `${f.name} (${qty} ${f.unit}) ${label}`, quantity: qty, unitPrice: f.unitPrice,
-      amount: Math.round(qty * f.unitPrice * sum), meta: { feeTypeId: f.feeTypeId, leaseFeeId: f.leaseFeeId, unit: f.unit, from, to },
+      amount: Math.round(qty * f.unitPrice * sum), meta: { feeTypeId: f.feeTypeId, leaseFeeId: f.leaseFeeId, unit: f.unit, from, to, coefficient: round4(sum) },
     })
   }
   return lines
