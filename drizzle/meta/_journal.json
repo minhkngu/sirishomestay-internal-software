@@ -281,6 +281,13 @@
       "when": 1795243566942,
       "tag": "0039_gop_nhap_tay",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1795257436830,
+      "tag": "0040_handy_vulcan",
+      "breakpoints": true
     }
   ]
 }
