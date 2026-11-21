@@ -396,7 +396,7 @@ export function InvoiceEditor(p: Props) {
             open={pickingFee}
             onOpenChange={setPickingFee}
             feeTypes={[...p.addFee.feeTypes, ...createdFees]}
-            usedTypeIds={new Set([...p.addFee.usedTypeIds, ...lines.flatMap((l) => (typeof l.meta?.feeTypeId === 'string' ? [l.meta.feeTypeId] : []))])}
+            usedTypeIds={new Set(lines.flatMap((l) => (typeof l.meta?.feeTypeId === 'string' ? [l.meta.feeTypeId] : [])))}
             facilityId={p.addFee.facilityId}
             description="Các loại phí đã tạo trong Cài đặt. Phí thêm vào hoá đơn dùng giá theo toà, chọn thời gian và hệ số ngay trên dòng."
             onPick={(feeId) => {
