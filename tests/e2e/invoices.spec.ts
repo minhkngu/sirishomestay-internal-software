@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { fillMeterReadings, meterValue, pickDate, pickTerm } from './helpers'
+import { chooseSelectOption, fillMeterReadings, meterValue, pickDate, pickTerm } from './helpers'
 
 test.skip(!process.env.E2E_BASE_URL, 'Cần E2E_BASE_URL trỏ tới môi trường thử có dữ liệu mẫu')
 async function login(page: Page, name: RegExp) {
@@ -79,8 +79,8 @@ test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → 
 
   // Hợp đồng không tự sinh hoá đơn: tạo hàng loạt cho cơ sở của phòng, kỳ 12/2026 (tháng bắt đầu hợp đồng)
   await page.goto('/invoices/generate')
-  await page.getByLabel('Cơ sở').selectOption({ label: facilityName })
-  await page.getByLabel('Kỳ (tháng)').fill('2026-12')
+  await chooseSelectOption(page, 'Toà', facilityName)
+  await page.getByLabel('Tháng', { exact: true }).fill('2026-12')
   await page.getByRole('button', { name: 'Xem trước' }).click()
   const createDrafts = page.getByRole('button', { name: /^Tạo \d+ hoá đơn nháp$/ })
   await expect(createDrafts).toBeEnabled()
@@ -163,4 +163,18 @@ test('thêm phí ngoài vào hoá đơn nháp bằng hộp thoại chọn phí g
   await page.getByRole('button', { name: 'Thêm', exact: true }).first().click()
   await page.getByRole('button', { name: 'Xong' }).click()
   await expect(page.getByTitle('Xoá dòng')).toHaveCount(before + 1)
+})
+
+test('tạo hoá đơn hàng loạt mở popup từ danh sách, Esc về lại danh sách', async ({ page }) => {
+  await login(page, /^Admin/)
+  await page.goto('/invoices')
+  await page.getByRole('link', { name: 'Tạo hoá đơn hàng loạt' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Tạo hoá đơn hàng loạt' })
+  await expect(dialog).toBeVisible()
+  await expect(page).toHaveURL(/\/invoices\/generate$/)
+  await page.keyboard.press('Escape')
+  await expect(dialog).toHaveCount(0)
+  await expect(page).toHaveURL(/\/invoices$/)
+  await page.goto('/invoices/generate')
+  await expect(page.getByRole('heading', { name: 'Tạo hoá đơn hàng loạt' })).toBeVisible()
 })
