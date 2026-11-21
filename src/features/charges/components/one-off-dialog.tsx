@@ -32,6 +32,6 @@ export function OneOffDialog({ leaseId, charges = [], readOnly = false }: { leas
     </form>
     </FormDialog>
     </>}
-    {charges.length > 0 && <ul className="space-y-1 text-sm">{charges.map(c => <li key={c.id}>{c.description} · {c.quantity} × {formatVND(c.unitPrice)} · {c.invoiceId ? 'Đã tính' : 'Chưa tính'} {!readOnly && !c.invoiceId && <button className="underline" disabled={pending} onClick={() => startTransition(async () => { const result = await removeOneOffAction(c.id); if (!result.ok) toast.error(result.error); else toast.success('Đã gỡ phí') })}>Gỡ</button>}</li>)}</ul>}
+    {charges.length > 0 && <ul className="divide-y divide-border/60 text-[13px]">{charges.map(c => <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 py-2 first:pt-0 last:pb-0"><span className="text-foreground">{c.description}</span><span className="flex items-center gap-2 text-muted-foreground"><span className="tabular-nums">{c.quantity} × {formatVND(c.unitPrice)}</span><span className="text-xs">{c.invoiceId ? 'Đã tính' : 'Chưa tính'}</span> {!readOnly && !c.invoiceId && <button className="text-primary hover:underline" disabled={pending} onClick={() => startTransition(async () => { const result = await removeOneOffAction(c.id); if (!result.ok) toast.error(result.error); else toast.success('Đã gỡ phí') })}>Gỡ</button>}</span></li>)}</ul>}
   </div>
 }

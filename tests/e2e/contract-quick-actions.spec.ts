@@ -50,7 +50,8 @@ test('sửa, chuyển nhượng và khôi phục từng bước trên dữ liệ
     await sql`update leases set sign_status='signed', signed_file_id='88888888-8888-4888-8888-888888888888' where id='55555555-5555-4555-8555-555555555555'`
     await row.getByRole('button', { name: 'Chuyển nhượng hợp đồng' }).click()
     modal = page.getByRole('dialog')
-    await modal.getByLabel('Người nhận').selectOption('66666666-6666-4666-8666-666666666666')
+    await modal.getByLabel('Người nhận').click()
+    await page.getByRole('option', { name: /Người nhận thử/ }).click()
     await modal.getByRole('button', { name: 'Lưu phụ lục' }).click()
     await expect(modal).toBeHidden()
     await expect(row).toContainText('Người nhận thử')

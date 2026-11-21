@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm'
-import { depositContracts, depositEntries, facilities, leaseFees, leaseOccupants, leases, rooms, tenants } from '@/db'
+import { depositContracts, depositEntries, facilities, leaseFeeSnapshots, leaseOccupants, leases, rooms, tenants } from '@/db'
 import { addDays } from '@/domain/dates'
 import type { SeedModule } from './types'
 
@@ -44,10 +44,10 @@ export const contractSeed: SeedModule = {
       const occupants = isCompany ? [people[(i + 3) % people.length], people[(i + 7) % people.length]] : [tenant, ...(i % 4 === 0 ? [people[(i + 5) % people.length]] : [])]
       const uniq = [...new Map(occupants.map((o) => [o.id, o])).values()]
       await db.insert(leaseOccupants).values(uniq.map((o) => ({ leaseId: lease.id, tenantId: o.id })))
-      await db.insert(leaseFees).values([
-        { leaseId: lease.id, feeTypeId: feeIds['Phí dịch vụ'], quantity: 1, unitPrice: 200_000 },
-        ...(i % 3 === 0 ? [{ leaseId: lease.id, feeTypeId: feeIds['Gửi xe máy'], quantity: 1, unitPrice: 100_000 }] : []),
-        ...(i % 2 === 0 ? [{ leaseId: lease.id, feeTypeId: feeIds['Internet'], quantity: 1, unitPrice: 150_000 }] : []),
+      await db.insert(leaseFeeSnapshots).values([
+        { leaseId: lease.id, feeTypeId: feeIds['Phí dịch vụ'], name: 'Phí dịch vụ', unit: 'người', quantitySource: 'occupants', quantity: 1, billing: 'monthly_fixed', unitPrice: 200_000 },
+        ...(i % 3 === 0 ? [{ leaseId: lease.id, feeTypeId: feeIds['Gửi xe máy'], name: 'Gửi xe máy', unit: 'xe', quantitySource: 'legacy_fixed', quantity: 1, billing: 'monthly_fixed', unitPrice: 100_000 }] : []),
+        ...(i % 2 === 0 ? [{ leaseId: lease.id, feeTypeId: feeIds['Internet'], name: 'Internet', unit: 'phòng', quantitySource: 'legacy_fixed', quantity: 1, billing: 'monthly_fixed', unitPrice: 150_000 }] : []),
       ])
       await db.insert(depositEntries).values({ leaseId: lease.id, date: startDate, type: 'collect', amount: rent, status: 'done', method: 'transfer', note: 'Thu cọc khi ký', isDemo: true })
       leaseIds.push(lease.id)

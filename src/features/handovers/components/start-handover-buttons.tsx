@@ -16,7 +16,7 @@ export function StartHandoverButtons({ leaseId }: { leaseId: string }) {
   })
   return (
     <div className="space-y-1">
-      <div className="flex gap-2"><Button disabled={pending} onClick={() => go('check_in')}>Check-in</Button><Button variant="outline" disabled={pending} onClick={() => go('check_out')}>Check-out</Button></div>
+      <div className="flex gap-2"><Button size="sm" variant="outline" disabled={pending} onClick={() => go('check_in')}>Check-in</Button><Button size="sm" variant="ghost" disabled={pending} onClick={() => go('check_out')}>Check-out</Button></div>
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   )

@@ -28,7 +28,6 @@ export type Lease = {
   occupantIds: string[]
   billingCycleMonths: number
   billWaterByMeter: boolean
-  feeModel?: 'legacy' | 'snapshot'
   dueRule?: DueRule | null
   proration?: Proration | null
 }
@@ -71,6 +70,8 @@ export type Meter = {
   startReading: number
   removedOn?: ISODate | null
   finalReading?: number | null
+  /** Chỉ số cuối là số ước tính (công tơ hỏng, không đọc được). */
+  finalReadingEstimated?: boolean
 }
 
 export type MeterReading = { meterId: string; period: string; readOn: ISODate; value: number; kind?: 'monthly' | 'handover' }

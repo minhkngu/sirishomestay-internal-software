@@ -42,7 +42,6 @@ export const leases = pgTable(
     note: text('note').notNull().default(''),
     contractTemplateId: uuid('contract_template_id').references(() => docTemplates.id),
     invoiceTemplateId: uuid('invoice_template_id').references(() => invoiceTemplates.id),
-    feeModel: text('fee_model').notNull().default('legacy'),
     dueRule: jsonb('due_rule'),
     proration: text('proration'),
     fromDepositContractId: uuid('from_deposit_contract_id').references(() => depositContracts.id),
@@ -64,14 +63,6 @@ export const leaseOccupants = pgTable(
   },
   (t) => [primaryKey({ columns: [t.leaseId, t.tenantId] })],
 )
-
-export const leaseFees = pgTable('lease_fees', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  leaseId: uuid('lease_id').notNull().references(() => leases.id, { onDelete: 'cascade' }),
-  feeTypeId: uuid('fee_type_id').notNull().references(() => feeTypes.id),
-  quantity: integer('quantity').notNull().default(1),
-  unitPrice: integer('unit_price').notNull(),
-})
 
 export const leaseFeeSnapshots = pgTable('lease_fee_snapshots', {
   id: uuid('id').primaryKey().defaultRandom(),

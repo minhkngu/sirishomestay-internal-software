@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { facilities, invoiceLines, leaseFeeMeters, leaseFeeSnapshots, leases, rooms, tenants, meters, meterReadings, utilityRates } from '@/db'
+import { facilities, invoiceLines, leaseFeeMeters, leaseFeeSnapshots, leases, rooms, tenants, meters, meterReadings } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
@@ -23,7 +23,6 @@ describe('hoá đơn và thu tiền', () => {
   })
   it('lưu số lượng phí theo kỳ vào hóa đơn nháp và từ chối sửa sau duyệt', async () => {
     const ctx = context(['billing'], facilityId)
-    await db.update(leases).set({ feeModel: 'snapshot' }).where(eq(leases.id, leaseId))
     const [fee] = await db.insert(leaseFeeSnapshots).values({ leaseId, name: 'Dọn', unit: 'lần', quantitySource: 'period_input', unitPrice: 7000 }).returning()
     const [inv] = await createDrafts(db, ctx, { facilityId, period: '2026-12' })
     await expect(saveInvoiceFeeQuantities(db, ctx, inv.id, [{ leaseFeeId: crypto.randomUUID(), quantity: 1 }])).rejects.toThrow(ValidationError)
@@ -41,7 +40,6 @@ describe('hoá đơn và thu tiền', () => {
 
   it('không duyệt hóa đơn snapshot khi thiếu số lượng phí', async () => {
     const ctx = context(['billing'], facilityId)
-    await db.update(leases).set({ feeModel: 'snapshot' }).where(eq(leases.id, leaseId))
     const [fee] = await db.insert(leaseFeeSnapshots).values({ leaseId, name: 'Dọn', unit: 'lần', quantitySource: 'period_input', unitPrice: 7000 }).returning()
     const [inv] = await createDrafts(db, ctx, { facilityId, period: '2026-12' })
     await expect(approveInvoice(db, ctx, inv.id, { dueDate: '2027-01-05' })).rejects.toThrow('Dọn')
@@ -51,7 +49,6 @@ describe('hoá đơn và thu tiền', () => {
 
   it('không cho sửa hoặc xóa dòng phí snapshot trực tiếp trong hóa đơn', async () => {
     const ctx = context(['billing'], facilityId)
-    await db.update(leases).set({ feeModel: 'snapshot' }).where(eq(leases.id, leaseId))
     const [fee] = await db.insert(leaseFeeSnapshots).values({ leaseId, name: 'Dọn', unit: 'lần', quantitySource: 'period_input', unitPrice: 7000 }).returning()
     const [inv] = await createDrafts(db, ctx, { facilityId, period: '2026-12' })
     await saveInvoiceFeeQuantities(db, ctx, inv.id, [{ leaseFeeId: fee.id, quantity: 3 }])
@@ -63,7 +60,7 @@ describe('hoá đơn và thu tiền', () => {
 
   it('giữ thành tiền phí theo kỳ lẻ khi sửa mô tả hóa đơn', async () => {
     const ctx = context(['billing'], facilityId)
-    await db.update(leases).set({ feeModel: 'snapshot', startDate: '2026-12-16' }).where(eq(leases.id, leaseId))
+    await db.update(leases).set({ startDate: '2026-12-16' }).where(eq(leases.id, leaseId))
     const [fee] = await db.insert(leaseFeeSnapshots).values({ leaseId, name: 'Phòng', unit: 'phòng', quantitySource: 'room', unitPrice: 300000 }).returning()
     const [inv] = await createDrafts(db, ctx, { facilityId, period: '2026-12' })
     await setPeriod(db, ctx, inv.id, { start: '2026-12-16', end: '2026-12-31', coefficient: 0.5 })
@@ -78,7 +75,6 @@ describe('hoá đơn và thu tiền', () => {
 
   it('đổi tháng hóa đơn yêu cầu nhập lại số lượng theo kỳ', async () => {
     const ctx = context(['billing'], facilityId)
-    await db.update(leases).set({ feeModel: 'snapshot' }).where(eq(leases.id, leaseId))
     const [fee] = await db.insert(leaseFeeSnapshots).values({ leaseId, name: 'Dọn', unit: 'lần', quantitySource: 'period_input', unitPrice: 7000 }).returning()
     const [inv] = await createDrafts(db, ctx, { facilityId, period: '2026-12' })
     await saveInvoiceFeeQuantities(db, ctx, inv.id, [{ leaseFeeId: fee.id, quantity: 3 }])
@@ -90,7 +86,6 @@ describe('hoá đơn và thu tiền', () => {
 
   it('hóa đơn phí đồng hồ dùng đúng đơn giá hợp đồng, không cộng điện nước ngầm', async () => {
     const ctx = context(['billing'], facilityId)
-    await db.update(leases).set({ feeModel: 'snapshot' }).where(eq(leases.id, leaseId))
     const [fee] = await db.insert(leaseFeeSnapshots).values({ leaseId, name: 'Bất kỳ', unit: 'đơn vị', quantitySource: 'meter', unitPrice: 5000 }).returning()
     const [meter] = await db.insert(meters).values({ roomId, utility: 'fee', installedOn: '2026-01-01', startReading: 100 }).returning()
     await db.insert(leaseFeeMeters).values({ leaseFeeId: fee.id, meterId: meter.id })
@@ -104,11 +99,12 @@ describe('hoá đơn và thu tiền', () => {
     const ctx = context(['billing'], facilityId)
     const [meter] = await db.insert(meters).values({ roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 }).returning()
     await db.insert(meterReadings).values([{ meterId: meter.id, period: '2026-10', readOn: '2026-10-31', value: 100 }, { meterId: meter.id, period: '2026-11', readOn: '2026-11-30', value: 200 }])
-    await db.insert(utilityRates).values({ facilityId, utility: 'electric', effectiveFrom: '2026-01-01', pricePerUnit: 3500 })
+    const [electricFee] = await db.insert(leaseFeeSnapshots).values({ leaseId, name: 'Điện', unit: 'kWh', quantitySource: 'meter', billing: 'per_occurrence', unitPrice: 3500 }).returning()
+    await db.insert(leaseFeeMeters).values({ leaseFeeId: electricFee.id, meterId: meter.id })
     await addOneOff(db, ctx, leaseId, { kind: 'service', description: 'Giặt ủi', date: '2026-11-20', quantity: 3, unitPrice: 25000 })
     const rows = await createDrafts(db, ctx, { facilityId, period: '2026-12' })
     expect(rows).toHaveLength(1)
-    expect(rows[0].lines.map((line: { type: string }) => line.type)).toEqual(expect.arrayContaining(['rent', 'electric', 'one_off']))
+    expect(rows[0].lines.map((line: { type: string }) => line.type)).toEqual(expect.arrayContaining(['rent', 'fee', 'one_off']))
     expect(await createDrafts(db, ctx, { facilityId, period: '2026-12' })).toHaveLength(0)
     await setPeriod(db, ctx, rows[0].id, { start: '2026-12-01', end: '2027-02-28' })
     expect((await previewBatch(db, ctx, { facilityId, period: '2027-01' }))[0].prepaidUntil).toBe('2027-02-28')

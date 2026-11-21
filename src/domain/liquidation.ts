@@ -1,13 +1,13 @@
 import { addDays, daysInMonth, formatDateVN } from './dates'
 import { prorateFraction } from './proration'
-import type { ForfeitInput, Invoice, InvoiceLineInput, ISODate, LeaseTerms, OneOffCharge, PendingAdjustment, Proration, Utility } from './types'
+import type { ForfeitInput, Invoice, InvoiceLineInput, ISODate, LeaseTerms, OneOffCharge, PendingAdjustment, Proration } from './types'
 
 export type TerminationInput = {
   terms: LeaseTerms
   endDate: ISODate
   approvedInvoices: Invoice[]
-  /** điện, nước từ đầu tháng tới ngày trả phòng (đã tính bằng meterUsage + rateFor) */
-  utilities: { type: Utility; usage: number; unitPrice: number }[]
+  /** phí tính theo đồng hồ (điện, nước, phí khác) từ đầu tháng tới ngày trả phòng, mức dùng đã tính bằng meterUsage, đơn giá của dòng phí hợp đồng */
+  meterFees: { leaseFeeId: string; name: string; unit: string; usage: number; unitPrice: number }[]
   oneOffs: OneOffCharge[]
   pending: PendingAdjustment[]
   penalties: { description: string; amount: number }[]
@@ -56,9 +56,8 @@ export function buildTerminationInvoice(input: TerminationInput): { lines: Invoi
     }
   }
 
-  for (const u of input.utilities) {
-    const name = u.type === 'electric' ? 'điện' : 'nước'
-    lines.push({ type: u.type, description: `Tiền ${name} đến ${formatDateVN(endDate)}`, quantity: u.usage, unitPrice: u.unitPrice, amount: Math.round(u.usage * u.unitPrice) })
+  for (const f of input.meterFees) {
+    lines.push({ type: 'fee', description: `${f.name} đến ${formatDateVN(endDate)} (${f.usage} ${f.unit})`, quantity: f.usage, unitPrice: f.unitPrice, amount: Math.round(f.usage * f.unitPrice), meta: { leaseFeeId: f.leaseFeeId, unit: f.unit } })
   }
   for (const o of input.oneOffs.filter((x) => !x.invoicedInId)) {
     lines.push({ type: o.kind === 'penalty' ? 'penalty' : 'one_off', description: o.description, quantity: o.quantity, unitPrice: o.unitPrice, amount: Math.round(o.quantity * o.unitPrice), meta: { oneOffId: o.id } })
