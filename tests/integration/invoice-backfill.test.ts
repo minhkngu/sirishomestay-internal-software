@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { facilities, invoiceLines, leases, rooms, tenants } from '@/db'
+import { facilities, invoiceLines, invoices, leases, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
-import { createDraftForLease, createDrafts } from '@/server/invoices/service'
+import { createDraftForLease, createDrafts, discardUntouchedDraft, setInvoiceNote } from '@/server/invoices/service'
 import { createTestDb } from '../helpers/db'
 
 const context = (permissions: Permission[], facilityId: string): AccessContext => ({ userId: crypto.randomUUID(), email: 'test@example.com', fullName: 'Test', permissions: new Set(permissions), facilityIds: new Set([facilityId]), isAdmin: false })
@@ -37,5 +37,14 @@ describe('lập hoá đơn tháng cũ', () => {
   })
   it('tháng trước ngày bắt đầu hợp đồng thì từ chối', async () => {
     await expect(createDraftForLease(db, ctx(), { leaseId, period: '2025-11' })).rejects.toThrow(ValidationError)
+  })
+  it('bỏ nháp vừa tạo khi chưa lưu gì, giữ lại khi đã sửa', async () => {
+    const fresh = await createDraftForLease(db, ctx(), { leaseId, period: '2026-10' })
+    expect(await discardUntouchedDraft(db, ctx(), fresh.id)).toBe(true)
+    expect(await db.select().from(invoices).where(eq(invoices.id, fresh.id))).toHaveLength(0)
+    const edited = await createDraftForLease(db, ctx(), { leaseId, period: '2026-10' })
+    await setInvoiceNote(db, ctx(), edited.id, 'đã sửa')
+    expect(await discardUntouchedDraft(db, ctx(), edited.id)).toBe(false)
+    expect(await db.select().from(invoices).where(eq(invoices.id, edited.id))).toHaveLength(1)
   })
 })

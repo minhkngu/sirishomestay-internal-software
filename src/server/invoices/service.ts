@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, like, lt, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { addenda, facilities, feeTypes, feeUnits, invoiceLines, invoices, invoiceFeeQuantities, leaseFeeMeters, leaseFeeSnapshots, leaseOccupants, leases, meterReadings, meters, oneOffCharges, payments, pendingAdjustments, rooms, tenants } from '@/db'
+import { addenda, auditLogs, facilities, feeTypes, feeUnits, invoiceLines, invoices, invoiceFeeQuantities, leaseFeeMeters, leaseFeeSnapshots, leaseOccupants, leases, meterReadings, meters, oneOffCharges, payments, pendingAdjustments, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { computeDueDate } from '@/domain/due-date'
@@ -405,6 +405,26 @@ export async function deleteInvoice(db: DB, ctx: AccessContext, id: string): Pro
     if ((await tx.select({ id: payments.id }).from(payments).where(eq(payments.invoiceId, id))).length) throw new ValidationError('Gỡ các khoản đã thu trước khi xoá')
     await tx.update(oneOffCharges).set({ invoiceId: null }).where(eq(oneOffCharges.invoiceId, id)); await tx.update(pendingAdjustments).set({ invoiceId: null }).where(eq(pendingAdjustments.invoiceId, id))
     await tx.delete(invoices).where(eq(invoices.id, id)); await recordAudit(tx, ctx, { action: 'delete', entity: 'invoice', entityId: id, facilityId: inv.facilityId, summary: `Xoá hoá đơn ${inv.code}`, before: inv })
+  })
+}
+
+/**
+ * Bỏ bản nháp vừa tạo trong popup mà chưa ai lưu gì: nháp, chưa có khoản thu, chưa có nhật ký nào ngoài lúc tạo.
+ * Xoá cả dòng nhật ký tạo vì hoá đơn này coi như chưa từng được lưu. Đã sửa, đã duyệt thì giữ nguyên.
+ */
+export async function discardUntouchedDraft(db: DB, ctx: AccessContext, id: string): Promise<boolean> {
+  return db.transaction(async tx0 => {
+    const tx = tx0 as unknown as DB
+    const inv = await getInvoice(tx, ctx, id).catch(() => null)
+    if (!inv || inv.status !== 'draft') return false
+    assertCan(ctx, 'billing', inv.facilityId)
+    if ((await tx.select({ id: payments.id }).from(payments).where(eq(payments.invoiceId, id))).length) return false
+    const logs = await tx.select({ id: auditLogs.id, action: auditLogs.action }).from(auditLogs).where(and(eq(auditLogs.entity, 'invoice'), eq(auditLogs.entityId, id)))
+    if (logs.some(l => l.action !== 'create')) return false
+    await tx.update(oneOffCharges).set({ invoiceId: null }).where(eq(oneOffCharges.invoiceId, id)); await tx.update(pendingAdjustments).set({ invoiceId: null }).where(eq(pendingAdjustments.invoiceId, id))
+    await tx.delete(invoices).where(eq(invoices.id, id))
+    if (logs.length) await tx.delete(auditLogs).where(inArray(auditLogs.id, logs.map(l => l.id)))
+    return true
   })
 }
 

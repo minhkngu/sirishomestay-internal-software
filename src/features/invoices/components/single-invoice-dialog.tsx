@@ -42,7 +42,7 @@ export function SingleInvoiceDialog({ facilities }: { facilities: { id: string; 
     toast.success('Đã tạo hoá đơn nháp')
     // Giữ popup, đổi sang khung chờ cùng cỡ rồi đóng khi giao diện sửa hoá đơn hiện lên
     setOpeningId(r.data.id)
-    router.push(`/invoices/${r.data.id}`)
+    router.push(`/invoices/${r.data.id}?new=1`)
   })
 
   const facilityItems = facilities.map((f) => ({ value: f.id, label: f.name }))

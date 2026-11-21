@@ -143,7 +143,7 @@ test('tạo hoá đơn lẻ từ popup: toà → phòng → tháng → xem trư�
   await page.getByRole('option').first().click()
   // Chọn xong tháng thì hoá đơn nháp được tạo và mở ra để sửa
   await page.getByLabel('Tháng').fill('2031-07')
-  await expect(page).toHaveURL(/\/invoices\/[a-f0-9-]+$/)
+  await expect(page).toHaveURL(/\/invoices\/[a-f0-9-]+(\?new=1)?$/)
   await expect(page.getByText('Nháp').first()).toBeVisible()
 })
 
