@@ -87,8 +87,6 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): { lines: Invoic
         const fraction = prorateFraction(segment.from, segment.to, input.proration)
         const coefficient = input.overridePeriod?.coefficient != null || input.fullMonth ? sum * fraction / totalFraction : fraction
         const segmentLines = rentAndFixedLines(segment.terms, segment.from, segment.to, coefficient, segment.terms.occupantIds.length)
-        // Chỉ dòng tiền phòng ghi thêm phòng; dòng phí giữ đúng tên phí trong Cài đặt
-        segmentLines.forEach(line => { if (line.type === 'rent') line.description += ` — phòng ${segment.terms.roomId}` })
         lines.push(...segmentLines)
       }
     }

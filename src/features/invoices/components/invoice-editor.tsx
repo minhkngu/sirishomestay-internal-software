@@ -191,7 +191,7 @@ export function InvoiceEditor(p: Props) {
                 <tr key={i} className="transition-colors hover:bg-muted/20">
                   <td className="p-2.5">
                     <input
-                      value={l.description}
+                      value={isLocked(l) ? l.description.replace(/ — phòng [0-9a-f-]{36}$/i, '') : l.description}
                       disabled={isLocked(l)}
                       onChange={(e) => set(i, { description: e.target.value })}
                       className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 disabled:cursor-not-allowed disabled:border-transparent disabled:bg-transparent disabled:px-0 disabled:text-foreground"
