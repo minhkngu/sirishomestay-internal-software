@@ -132,7 +132,7 @@ export function CashbookList({ rows, depositHeld, facilities, rooms, leases, exp
           <tbody className="divide-y divide-border/50">
             {pageRows.map((r) => (
               <tr key={r.key} className="hover:bg-muted/30">
-                <td className="p-3 whitespace-nowrap text-muted-foreground">{formatDateVN(r.date)}</td>
+                <td className="p-3 whitespace-nowrap text-muted-foreground">{formatDateVN(r.date)}{r.time && <span className="ml-1.5 text-xs tabular-nums text-muted-foreground/80">{r.time}</span>}</td>
                 <td className="p-3 whitespace-nowrap"><span className="font-medium">{r.label}</span>{badge(r) && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{badge(r)}</span>}</td>
                 <td className="max-w-[170px] truncate p-3 text-muted-foreground" title={where(r)}>{where(r)}</td>
                 <td className="p-3"><div className="max-w-[160px] truncate" title={r.party}>{r.party || '—'}</div>{r.method && <div className="text-xs text-muted-foreground">{METHOD_LABEL[r.method] ?? r.method}</div>}</td>
@@ -151,7 +151,7 @@ export function CashbookList({ rows, depositHeld, facilities, rooms, leases, exp
           <li key={r.key} className="flex items-start justify-between gap-3 p-3">
             <div className="min-w-0">
               <p className="font-medium">{r.label}{badge(r) && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">{badge(r)}</span>}</p>
-              <p className="truncate text-xs text-muted-foreground">{formatDateVN(r.date)} · {where(r)}{r.party ? ` · ${r.party}` : ''}</p>
+              <p className="truncate text-xs text-muted-foreground">{formatDateVN(r.date)}{r.time ? ` ${r.time}` : ''} · {where(r)}{r.party ? ` · ${r.party}` : ''}</p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">{amountCell(r)}{actions(r)}</div>
           </li>

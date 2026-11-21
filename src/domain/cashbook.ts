@@ -20,6 +20,10 @@ export type LedgerRow = {
   method: string | null
   note: string
   status: 'done' | 'pending'
+  /** Thời điểm ghi nhận khoản này (giờ Việt Nam, HH:mm); dòng cũ không rõ thì rỗng. */
+  time: string
+  /** ISO của thời điểm ghi nhận, dùng để xếp trong cùng một ngày. */
+  at: string
 }
 
 export const EXPENSE_CATEGORIES = [

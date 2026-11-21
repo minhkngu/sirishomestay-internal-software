@@ -20,6 +20,9 @@ function scopeOf(ctx: AccessContext, facilityId?: string): string[] | null {
 }
 const inScope = (column: Parameters<typeof inArray>[0], scope: string[] | null) => scope ? inArray(column, scope.length ? scope : NONE) : undefined
 
+const hhmm = (at: Date) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', hour12: false }).format(at)
+const when = (at: Date | null | undefined) => ({ time: at ? hhmm(at) : '', at: at ? at.toISOString() : '' })
+
 /** Sổ quỹ chung: thu tiền thuê + cọc + chi, mới nhất trước. `month` dạng YYYY-MM, bỏ trống là tất cả. */
 export async function listCashbook(db: DB, ctx: AccessContext, input: { month?: string; facilityId?: string } = {}): Promise<{ rows: LedgerRow[]; depositHeld: number }> {
   const scope = scopeOf(ctx, input.facilityId)
@@ -36,11 +39,11 @@ export async function listCashbook(db: DB, ctx: AccessContext, input: { month?: 
     db.select({ type: depositEntries.type, status: depositEntries.status, amount: depositEntries.amount }).from(depositEntries).innerJoin(leases, eq(leases.id, depositEntries.leaseId)).innerJoin(rooms, eq(rooms.id, leases.roomId)).where(inScope(rooms.facilityId, scope)),
   ])
   const rows: LedgerRow[] = [
-    ...pay.map((r): LedgerRow => ({ key: `payment:${r.p.id}`, source: 'payment', id: r.p.id, date: r.p.paidOn, direction: 'in', kind: 'rent', label: 'Thu tiền thuê', amount: r.p.amount, counted: true, facilityId: r.facilityId, roomCode: r.roomCode, party: displayName(r), method: r.p.method, note: r.p.note || r.code, status: 'done' })),
-    ...dep.map((r): LedgerRow => { const m = depositMovement(r.e.type, r.e.status); return { key: `deposit:${r.e.id}`, source: 'deposit', id: r.e.id, date: r.e.date, direction: m.direction, kind: 'deposit', label: m.label, amount: r.e.amount, counted: m.counted, facilityId: r.facilityId, roomCode: r.roomCode, party: displayName(r), method: r.e.method, note: r.e.note, status: r.e.status === 'done' ? 'done' : 'pending' } }),
-    ...exp.map((r): LedgerRow => ({ key: `expense:${r.x.id}`, source: 'expense', id: r.x.id, date: r.x.date, direction: 'out', kind: r.x.category, label: `Chi ${expenseLabel(r.x.category).toLowerCase()}`, amount: r.x.amount, counted: true, facilityId: r.x.facilityId, roomCode: r.roomCode, party: r.x.payee, method: r.x.method, note: r.x.note, status: 'done' })),
+    ...pay.map((r): LedgerRow => ({ key: `payment:${r.p.id}`, source: 'payment', id: r.p.id, date: r.p.paidOn, direction: 'in', kind: 'rent', label: 'Thu tiền thuê', amount: r.p.amount, counted: true, facilityId: r.facilityId, roomCode: r.roomCode, party: displayName(r), method: r.p.method, note: r.p.note || r.code, status: 'done', ...when(r.p.createdAt) })),
+    ...dep.map((r): LedgerRow => { const m = depositMovement(r.e.type, r.e.status); return { key: `deposit:${r.e.id}`, source: 'deposit', id: r.e.id, date: r.e.date, direction: m.direction, kind: 'deposit', label: m.label, amount: r.e.amount, counted: m.counted, facilityId: r.facilityId, roomCode: r.roomCode, party: displayName(r), method: r.e.method, note: r.e.note, status: r.e.status === 'done' ? 'done' : 'pending', ...when(r.e.createdAt) } }),
+    ...exp.map((r): LedgerRow => ({ key: `expense:${r.x.id}`, source: 'expense', id: r.x.id, date: r.x.date, direction: 'out', kind: r.x.category, label: `Chi ${expenseLabel(r.x.category).toLowerCase()}`, amount: r.x.amount, counted: true, facilityId: r.x.facilityId, roomCode: r.roomCode, party: r.x.payee, method: r.x.method, note: r.x.note, status: 'done', ...when(r.x.createdAt) })),
   ]
-  rows.sort((a, b) => b.date.localeCompare(a.date) || a.key.localeCompare(b.key))
+  rows.sort((a, b) => b.date.localeCompare(a.date) || b.at.localeCompare(a.at) || a.key.localeCompare(b.key))
   return { rows, depositHeld: depositHeld(depAll) }
 }
 
