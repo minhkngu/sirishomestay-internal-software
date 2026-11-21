@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { addenda, assets, depositEntries, feeTypes, feeTypePrices, feeUnits, leaseFeeMeters, leaseFeeSnapshots, payments, facilities, files, invoiceLines, invoices, leaseOccupants, leases, meterReadings, meters, pendingAdjustments, rooms, tenants, utilityRates } from '@/db'
+import { addenda, assets, depositEntries, feeTypes, feeTypePrices, feeUnits, leaseFeeMeters, leaseFeeSnapshots, payments, facilities, files, invoiceLines, invoices, leaseOccupants, leases, meterReadings, meters, pendingAdjustments, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'

@@ -172,5 +172,4 @@ Kế hoạch chi tiết: `docs/superpowers/plans/README.md`.
 
 - Tiền phòng có dừng ở ngày trước ngày kết thúc hay không.
 - Phí thêm giữa hợp đồng bill cả tháng trước; `replaceMeter` cũng chuyển liên kết hợp đồng đã kết thúc; phụ lục thiếu `leaseFeeId`.
-- Dấu vết kiểu cũ còn trong code nhưng không dùng khi lập hoá đơn: bảng `utility_rates` (chỉ còn gợi ý giá mặc định cho loại phí Điện/Nước), cột `leases.bill_water_by_meter`, hàm `rateFor` ở `src/domain/rates.ts`. Dọn khi tiện.
 - Tự động xoá ảnh quá hạn, nút "Giữ lại", chuyển file sang R2, thử khôi phục sao lưu (đợt 5).

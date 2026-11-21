@@ -45,7 +45,7 @@ async function leasesData(db: Pick<DB, 'select'>, ids: string[]): Promise<Map<st
     const firstTransfer = mine.find(a => a.type === 'transfer'), firstOccupants = mine.find(a => a.type === 'occupants')
     const lease: Lease = {
       id: row.id, code: row.code, roomId: firstTransfer?.oldRoomId ?? row.roomId, startDate: row.startDate, endDate: row.endDate, monthlyRent: row.monthlyRent, depositAmount: row.depositAmount,
-      billingCycleMonths: row.billingCycleMonths, billWaterByMeter: row.billWaterByMeter, dueRule: row.dueRule as DueRule | null, proration: row.proration as Proration | null,
+      billingCycleMonths: row.billingCycleMonths, dueRule: row.dueRule as DueRule | null, proration: row.proration as Proration | null,
       occupantIds: (firstOccupants?.oldOccupantIds as string[] | undefined) ?? occupants.filter(x => x.leaseId === row.id).map(x => x.tenantId),
       fees: snapshots.filter(f => f.leaseId === row.id).map(f => ({ leaseFeeId: f.id, feeTypeId: f.feeTypeId, name: f.name, unit: f.unit, billing: f.billing as ContractFee['billing'], quantityFrom: f.quantitySource === 'occupants' ? 'occupants' as const : 'manual' as const, quantitySource: f.quantitySource as NonNullable<ContractFee['quantitySource']>, quantity: f.quantity, unitPrice: f.unitPrice })),
     }

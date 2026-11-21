@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { prorate, fullMonthCoefficient } from '@/domain/proration'
 import { meterUsage, suggestFinalReading } from '@/domain/meters'
-import { rateFor } from '@/domain/rates'
 import { computeDueDate } from '@/domain/due-date'
 import { contractTermsAt } from '@/domain/contract-terms'
 import { midPeriodAdjustments } from '@/domain/adjustments'
@@ -9,14 +8,14 @@ import { buildMonthlyInvoice, buildFirstInvoice } from '@/domain/invoice-builder
 import { depositBalance, depositDiffEntry } from '@/domain/deposit'
 import { buildTerminationInvoice } from '@/domain/liquidation'
 import { ValidationError } from '@/domain/errors'
-import type { Addendum, ContractFee, DepositEntry, Invoice, Lease, Meter, MeterReading, UtilityRate } from '@/domain/types'
+import type { Addendum, ContractFee, DepositEntry, Invoice, Lease, Meter, MeterReading } from '@/domain/types'
 
 const fee = (over: Partial<ContractFee> = {}): ContractFee => ({
   feeTypeId: 'f1', name: 'Phí dịch vụ', unit: 'người', billing: 'monthly_fixed', quantityFrom: 'occupants', quantity: 1, unitPrice: 200_000, ...over,
 })
 const lease = (over: Partial<Lease> = {}): Lease => ({
   id: 'L1', code: 'TD-HĐ-2026-0001', roomId: 'R1', startDate: '2026-01-01', endDate: '2027-01-01', monthlyRent: 9_000_000,
-  billingCycleMonths: 1, billWaterByMeter: true, depositAmount: 9_000_000, fees: [], occupantIds: ['t1'], ...over,
+  billingCycleMonths: 1, depositAmount: 9_000_000, fees: [], occupantIds: ['t1'], ...over,
 })
 const invoice = (over: Partial<Invoice> = {}): Invoice => ({
   id: 'I1', leaseId: 'L1', kind: 'monthly', status: 'approved', periodStart: '2026-11-01', periodEnd: '2026-11-30', lines: [], ...over,
@@ -104,19 +103,7 @@ describe('suggestFinalReading', () => {
   })
 })
 
-describe('rateFor / computeDueDate', () => {
-  const rates: UtilityRate[] = [
-    { facilityId: 'TD', utility: 'electric', pricePerUnit: 3500, effectiveFrom: '2026-01-01' },
-    { facilityId: 'TD', utility: 'electric', pricePerUnit: 3800, effectiveFrom: '2026-11-01' },
-  ]
-  it('đổi giá điện từ 01/11', () => {
-    expect(rateFor(rates, 'TD', 'electric', '2026-10-01')).toBe(3500)
-    expect(rateFor(rates, 'TD', 'electric', '2026-11-01')).toBe(3800)
-  })
-  it('chưa cài đơn giá → lỗi', () => {
-    expect(() => rateFor(rates, 'TD', 'water', '2026-10-01')).toThrow('Chưa cài đơn giá')
-    expect(() => rateFor(rates, 'TD', 'electric', '2025-12-31')).toThrow(ValidationError)
-  })
+describe('computeDueDate', () => {
   it('hạn thanh toán', () => {
     expect(computeDueDate({ kind: 'days_after_approval', days: 5 }, '2026-11-03')).toBe('2026-11-08')
     expect(computeDueDate({ kind: 'day_of_next_month', day: 31 }, '2027-01-20')).toBe('2027-02-28')

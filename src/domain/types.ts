@@ -27,7 +27,6 @@ export type Lease = {
   fees: ContractFee[]
   occupantIds: string[]
   billingCycleMonths: number
-  billWaterByMeter: boolean
   dueRule?: DueRule | null
   proration?: Proration | null
 }
@@ -51,7 +50,6 @@ export type Addendum = {
 /** Điều khoản hiệu lực của hợp đồng tại một ngày (hợp đồng gốc + phụ lục). */
 export type LeaseTerms = {
   billingCycleMonths: number
-  billWaterByMeter: boolean
   roomId: string
   startDate: ISODate
   endDate: ISODate
@@ -75,7 +73,6 @@ export type Meter = {
 }
 
 export type MeterReading = { meterId: string; period: string; readOn: ISODate; value: number; kind?: 'monthly' | 'handover' }
-export type UtilityRate = { facilityId: string; utility: Utility; pricePerUnit: number; effectiveFrom: ISODate }
 
 export type InvoiceLineType = 'rent' | 'fee' | 'electric' | 'water' | 'one_off' | 'penalty' | 'adjustment' | 'deposit' | 'deposit_offset' | 'refund'
 export type InvoiceLineInput = {
