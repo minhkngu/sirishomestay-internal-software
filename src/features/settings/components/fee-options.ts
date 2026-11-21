@@ -4,7 +4,6 @@ export const BILLING_OPTIONS = [
 ]
 
 export const QUANTITY_OPTIONS = [
-  { value: 'manual', label: 'Nhập tay' },
   { value: 'occupants', label: 'Theo số người ở' },
   { value: 'room', label: 'Theo phòng' },
   { value: 'meter', label: 'Theo đồng hồ' },

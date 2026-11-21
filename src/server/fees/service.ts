@@ -16,7 +16,7 @@ const feeTypeFields = {
   name: z.string().trim().min(1, 'Nhập tên loại phí'),
   defaultPrice: z.number().int().min(0, 'Đơn giá không hợp lệ'),
   billing: z.enum(['monthly_fixed', 'per_occurrence']),
-  quantityFrom: z.enum(['manual', 'occupants', 'room', 'meter', 'period_input']),
+  quantityFrom: z.enum(['occupants', 'room', 'meter', 'period_input']),
 }
 const feeTypeInput = z.object({
   ...feeTypeFields,

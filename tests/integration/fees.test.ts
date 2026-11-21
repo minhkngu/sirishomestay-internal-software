@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from 'node:fs'
+import path from 'node:path'
 import { eq, sql } from 'drizzle-orm'
 import { describe, it, expect, beforeEach } from 'vitest'
 import { facilities, feeTypes, feeTypePrices, feeUnits } from '@/db'
@@ -54,7 +56,7 @@ describe('fees & rates', () => {
 
   it('đặt lại, xoá giá riêng, kiểm tra giá và phân quyền', async () => {
     const unit = await createFeeUnit(db, admin, { name: 'người' })
-    const fee = await createFeeType(db, admin, { name: 'Dịch vụ', unitId: unit.id, defaultPrice: 200000, billing: 'monthly_fixed', quantityFrom: 'manual' })
+    const fee = await createFeeType(db, admin, { name: 'Dịch vụ', unitId: unit.id, defaultPrice: 200000, billing: 'monthly_fixed', quantityFrom: 'period_input' })
     const input = { feeTypeId: fee.id, facilityId: fa, price: 250000 }
     await setFeeTypePrice(db, admin, input); await setFeeTypePrice(db, admin, { ...input, price: 0 })
     expect(await listFeeTypePrices(db, admin)).toEqual({ [fee.id]: { [fa]: 0 } })
@@ -69,7 +71,7 @@ describe('fees & rates', () => {
 
   it('xoá toà kéo theo giá riêng', async () => {
     const unit = await createFeeUnit(db, admin, { name: 'phòng' })
-    const fee = await createFeeType(db, admin, { name: 'Phí', unitId: unit.id, defaultPrice: 1, billing: 'monthly_fixed', quantityFrom: 'manual' })
+    const fee = await createFeeType(db, admin, { name: 'Phí', unitId: unit.id, defaultPrice: 1, billing: 'monthly_fixed', quantityFrom: 'period_input' })
     await setFeeTypePrice(db, admin, { feeTypeId: fee.id, facilityId: fa, price: 2 })
     await db.delete(facilities).where(eq(facilities.id, fa))
     expect(await db.select().from(feeTypePrices)).toHaveLength(0)
@@ -98,9 +100,27 @@ describe('fees & rates', () => {
     expect(await db.select().from(feeUnits)).toHaveLength(1)
   })
 
+  it('không cho đặt cách tính "manual" (Nhập tay) nữa', async () => {
+    const unit = await createFeeUnit(db, admin, { name: 'lần' })
+    await expect(createFeeType(db, admin, { name: 'X', unitId: unit.id, defaultPrice: 1, billing: 'monthly_fixed', quantityFrom: 'manual' as never })).rejects.toThrow(ValidationError)
+    const ok = await createFeeType(db, admin, { name: 'Y', unitId: unit.id, defaultPrice: 1, billing: 'monthly_fixed', quantityFrom: 'period_input' })
+    await expect(updateFeeType(db, admin, ok.id, { quantityFrom: 'manual' as never })).rejects.toThrow(ValidationError)
+  })
+
+  it('migration gộp "manual" vào "period_input", giữ nguyên cách tính khác', async () => {
+    const unit = await createFeeUnit(db, admin, { name: 'xe' })
+    const [old] = await db.insert(feeTypes).values({ name: 'Cũ', unitId: unit.id, quantityFrom: 'manual' }).returning()
+    const [keep] = await db.insert(feeTypes).values({ name: 'Giữ', unitId: unit.id, quantityFrom: 'occupants' }).returning()
+    const file = readdirSync(path.resolve(process.cwd(), 'drizzle')).find((f) => f.includes('gop_nhap_tay'))
+    expect(file).toBeDefined()
+    await db.execute(sql.raw(readFileSync(path.resolve(process.cwd(), 'drizzle', file!), 'utf8').replaceAll('--> statement-breakpoint', '')))
+    expect((await db.select().from(feeTypes).where(eq(feeTypes.id, old.id)))[0].quantityFrom).toBe('period_input')
+    expect((await db.select().from(feeTypes).where(eq(feeTypes.id, keep.id)))[0].quantityFrom).toBe('occupants')
+  })
+
   it('từ chối khi vừa chọn đơn vị vừa nhập đơn vị mới, hoặc thiếu cả hai', async () => {
     const unit = await createFeeUnit(db, admin, { name: 'lần' })
-    const base = { name: 'X', defaultPrice: 1, billing: 'monthly_fixed', quantityFrom: 'manual' } as const
+    const base = { name: 'X', defaultPrice: 1, billing: 'monthly_fixed', quantityFrom: 'period_input' } as const
     await expect(createFeeType(db, admin, { ...base, unitId: unit.id, newUnitName: 'Y' })).rejects.toThrow('Chọn đơn vị hoặc nhập đơn vị mới')
     await expect(createFeeType(db, admin, base)).rejects.toThrow('Chọn đơn vị hoặc nhập đơn vị mới')
     expect(await listFeeTypes(db, admin)).toHaveLength(0)
@@ -120,7 +140,7 @@ describe('fees & rates', () => {
 
   it('chỉ nhóm settings khôi phục được; phí không tồn tại báo không thấy', async () => {
     const unit = await createFeeUnit(db, admin, { name: 'lần' })
-    const fee = await createFeeType(db, admin, { name: 'Giặt', unitId: unit.id, defaultPrice: 0, billing: 'per_occurrence', quantityFrom: 'manual' })
+    const fee = await createFeeType(db, admin, { name: 'Giặt', unitId: unit.id, defaultPrice: 0, billing: 'per_occurrence', quantityFrom: 'period_input' })
     await archiveFeeType(db, admin, fee.id)
     await expect(restoreFeeType(db, ctxOf(['billing'], [fa]), fee.id)).rejects.toThrow(ForbiddenError)
     await expect(restoreFeeType(db, admin, crypto.randomUUID())).rejects.toThrow(NotFoundError)

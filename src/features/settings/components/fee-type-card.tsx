@@ -44,7 +44,7 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
           <p className="font-medium">{fee.name}</p>
           <p className="text-xs text-muted-foreground">
             {unitName} · {formatVND(fee.defaultPrice)} đ · {billingLabel(fee.billing)}
-            {fee.quantityFrom !== 'manual' ? ` · ${quantityLabel(fee.quantityFrom)}` : ''}
+            {` · ${quantityLabel(fee.quantityFrom)}`}
           </p>
           <p className="text-xs text-muted-foreground">
             {appliedFacilities.length === 0 ? feeApplicationSummary(0, 0) : (

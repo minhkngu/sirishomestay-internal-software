@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildFeeFacilityItems, feeApplicationSummary, filterFacilitiesByName, isPriceInput } from '@/features/settings/components/fee-options'
+import { QUANTITY_OPTIONS, buildFeeFacilityItems, feeApplicationSummary, filterFacilitiesByName, isPriceInput } from '@/features/settings/components/fee-options'
 
 it('chỉ nhận chuỗi số nguyên không âm cho ô giá', () => {
   expect(isPriceInput('3500')).toBe(true)
@@ -49,4 +49,8 @@ describe('buildFeeFacilityItems', () => {
     const bad = { ...same, c: { on: true, price: '3,5' } }
     expect(buildFeeFacilityItems(ids, applied, prices, bad).invalid).toBe(true)
   })
+})
+
+it('không còn lựa chọn "Nhập tay" cho cách tính số lượng', () => {
+  expect(QUANTITY_OPTIONS.map((o) => o.value)).toEqual(['occupants', 'room', 'meter', 'period_input'])
 })

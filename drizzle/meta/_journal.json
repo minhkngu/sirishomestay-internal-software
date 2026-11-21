@@ -267,6 +267,20 @@
       "when": 1795240733361,
       "tag": "0037_bo_dau_vet_kieu_cu",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1795243565995,
+      "tag": "0038_quantity_from_mac_dinh",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1795243566942,
+      "tag": "0039_gop_nhap_tay",
+      "breakpoints": true
     }
   ]
 }
