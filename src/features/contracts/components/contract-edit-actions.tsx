@@ -23,6 +23,7 @@ import { PdfBlobDialog } from '@/components/pdf-blob-dialog'
 import { EditAssets, assetsDraftChanged, emptyAssetsDraft, type AssetRow } from './edit-assets'
 import { EditDocuments, docsDraftChanged, emptyDocsDraft, type DepositRow } from './edit-documents'
 import { deleteContractAction, retryContractFileCleanupAction, setSignStatusAction, updateDepositContractAction, updateLeaseAction, updateLeaseAssetsAction, refreshContractDocumentsAction } from '@/server/contracts/actions'
+import { FormSelect, BareSelect } from './contract-form-ui'
 
 type Common = { id: string; roomId: string; tenantId: string; depositAmount: number; signStatus: string }
 type Contract = (Common & { kind: 'lease'; startDate: string; endDate: string; monthlyRent: number; note: string }) | (Common & { kind: 'deposit'; expectedMoveIn: string; agreedRent: number })
@@ -201,8 +202,8 @@ export function ContractEditActions({ contract, canDelete, rooms, tenants, mode,
     {editing && <form id="edit-contract-form" onSubmit={save} className="space-y-3 rounded-xl border p-4">
       <p className="text-sm text-muted-foreground">Hoá đơn và các khoản tiền cọc hiện có sẽ được giữ nguyên. Vui lòng tự kiểm tra và điều chỉnh nếu cần.</p>
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1"><Label htmlFor="edit-room">Phòng</Label><select id="edit-room" value={roomId} onChange={e => setRoomId(e.target.value)} className="h-9 w-full rounded-lg border bg-background px-2 text-sm">{rooms.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}</select></div>
-        {!editOccupants && <div className="space-y-1"><Label htmlFor="edit-tenant">Bên thuê</Label><select id="edit-tenant" value={tenantId} onChange={e => setTenantId(e.target.value)} className="h-9 w-full rounded-lg border bg-background px-2 text-sm">{tenants.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}</select></div>}
+        <FormSelect id="edit-room" label="Phòng" value={roomId} onValueChange={setRoomId} options={rooms.map(o => ({ value: o.id, label: o.label }))} />
+        {!editOccupants && <FormSelect id="edit-tenant" label="Bên thuê" value={tenantId} onValueChange={setTenantId} options={tenants.map(o => ({ value: o.id, label: o.label }))} />}
         <div className="space-y-1"><Label htmlFor="edit-rent">Giá thuê (VND/tháng)</Label><MoneyInput id="edit-rent" required value={rent} onValueChange={setRent} /></div>
         <div className="space-y-1"><Label htmlFor="edit-deposit">Tiền cọc (VND)</Label><MoneyInput id="edit-deposit" required value={deposit} onValueChange={setDeposit} /></div>
         <div className="space-y-1"><Label htmlFor="edit-start">{contract.kind === 'lease' ? 'Ngày bắt đầu' : 'Ngày vào ở dự kiến'}</Label><Input id="edit-start" required type="date" value={startDate} onChange={e => setStartDate(e.target.value)} /></div>
@@ -313,7 +314,7 @@ export function ContractEditActions({ contract, canDelete, rooms, tenants, mode,
     </div>}
     <FormDialog open={meterFee !== null} onOpenChange={o => { if (!o) setMeterFee(null) }} title={meterFee ? `Thêm phí ${meterFee.name}` : 'Thêm phí'} description="Bắt buộc chọn một đồng hồ của phòng và nhập chỉ số hiện tại. Mỗi đồng hồ chỉ gắn với một dòng phí." size="sm">
       {meterFee && <div className="space-y-3">
-        <div className="space-y-1"><Label htmlFor="meter-pick">Đồng hồ</Label><select id="meter-pick" value={meterId} onChange={e => setMeterId(e.target.value)} className="h-9 w-full rounded-lg border bg-background px-2 text-sm"><option value="">— Chọn đồng hồ —</option>{(feeData?.roomMeters ?? []).filter(m => !m.busy && !feeRows.some(r => r.meterInit?.existingMeterId === m.id)).map(m => <option key={m.id} value={m.id}>{m.label}</option>)}</select></div>
+        <div className="space-y-1"><Label htmlFor="meter-pick">Đồng hồ</Label><BareSelect id="meter-pick" ariaLabel="Đồng hồ" value={meterId} onValueChange={setMeterId} options={[{ value: '', label: '— Chọn đồng hồ —' }, ...(feeData?.roomMeters ?? []).filter(m => !m.busy && !feeRows.some(r => r.meterInit?.existingMeterId === m.id)).map(m => ({ value: m.id, label: m.label }))]} /></div>
         <div className="space-y-1"><Label htmlFor="meter-reading">Chỉ số hiện tại của đồng hồ</Label><Input id="meter-reading" inputMode="numeric" value={meterReading} onChange={e => setMeterReading(e.target.value)} /></div>
         <Button type="button" disabled={!meterId || !/^\d+$/.test(meterReading.trim())} onClick={() => { setFeeRows([...feeRows, { leaseFeeId: null, feeTypeId: meterFee.id, name: meterFee.name, unit: meterFee.unit, unitPrice: meterFee.price, price: String(meterFee.price), locked: false, meterInit: { initialReading: Number(meterReading), existingMeterId: meterId } }]); setMeterFee(null); setAddingFee(false) }}>Thêm vào hợp đồng</Button>
       </div>}

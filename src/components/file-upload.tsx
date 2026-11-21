@@ -14,6 +14,10 @@ type Props = {
   capture?: boolean
   multiple?: boolean
   label?: string
+  /** Cỡ nút, để nút tải lên đứng cùng hàng với các nút khác. */
+  size?: 'default' | 'sm' | 'xs'
+  /** Kiểu nút, để nút tải lên không tranh vai với nút chính của màn hình. */
+  variant?: 'default' | 'outline' | 'ghost'
   /** nhãn/tên hiển thị cho tệp (mặc định lấy tên file) */
   nameFor?: (file: File) => string
   meta?: Record<string, unknown>
@@ -50,7 +54,7 @@ export async function uploadOne(file: File, ownerType: OwnerType, ownerId: strin
   }
 
 
-export function FileUpload({ ownerType, ownerId, accept = 'image/*', capture, multiple, label = 'Tải tệp lên', nameFor, meta, onUploaded }: Props) {
+export function FileUpload({ ownerType, ownerId, accept = 'image/*', capture, multiple, label = 'Tải tệp lên', size, variant, nameFor, meta, onUploaded }: Props) {
   const router = useRouter()
   const input = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
@@ -74,7 +78,7 @@ export function FileUpload({ ownerType, ownerId, accept = 'image/*', capture, mu
   return (
     <div className="space-y-1">
       <input ref={input} type="file" accept={accept} multiple={multiple} {...(capture ? { capture: 'environment' as const } : {})} className="hidden" onChange={(e) => onChange(e.target.files)} />
-      <Button type="button" onClick={() => input.current?.click()} disabled={busy}>{busy ? 'Đang tải…' : label}</Button>
+      <Button type="button" size={size} variant={variant} onClick={() => input.current?.click()} disabled={busy}>{busy ? 'Đang tải…' : label}</Button>
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   )
