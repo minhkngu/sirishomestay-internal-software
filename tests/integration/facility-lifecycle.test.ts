@@ -81,7 +81,10 @@ describe('ngừng và xoá cơ sở, phòng', () => {
     await deleteRoom(db, admin, r.id)
     await expect(getRoom(db, admin, r.id)).rejects.toBeInstanceOf(NotFoundError)
     expect(await db.select().from(leases)).toHaveLength(0)
-    expect(await db.select().from(meters)).toHaveLength(1)
+    // chỉ còn công tơ của phòng 102 (hai công tơ mặc định + một công tơ thêm), công tơ của phòng 101 bị xoá theo
+    const left = await db.select().from(meters)
+    expect(left).toHaveLength(3)
+    expect(left.every((m) => m.roomId === other.id)).toBe(true)
     expect(await db.select().from(tenants)).toHaveLength(1)
     expect((await getRoom(db, admin, other.id)).code).toBe('102')
   })
@@ -123,7 +126,10 @@ describe('ngừng và xoá cơ sở, phòng', () => {
     await deleteFacility(db, admin, fid)
     await expect(getFacility(db, admin, fid)).rejects.toBeInstanceOf(NotFoundError)
     expect(await db.select().from(leases)).toHaveLength(0)
-    expect(await db.select().from(meters)).toHaveLength(0)
+    // công tơ của toà bị xoá mất hết, chỉ còn hai công tơ mặc định của phòng ở toà khác
+    const left = await db.select().from(meters)
+    expect(left).toHaveLength(2)
+    expect(left.every((m) => m.roomId === keep.id)).toBe(true)
     const kept = await db.select().from(tenants)
     expect(kept).toHaveLength(1)
     expect(kept[0].homeFacilityId).toBeNull()

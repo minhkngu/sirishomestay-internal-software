@@ -13,6 +13,7 @@ type InvoiceTemplate = {
   hasBody: boolean
   style: 'formal' | 'modern'
   body: string | null
+  preview: string | null
 }
 type WordTemplate = {
   id: string
@@ -23,6 +24,7 @@ type WordTemplate = {
   isDefault: boolean
   style: 'formal' | 'modern'
   body: string | null
+  preview: string | null
 }
 
 const TABS = [

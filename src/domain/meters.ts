@@ -1,7 +1,7 @@
 import { ValidationError } from './errors'
 import type { ISODate, Meter, MeterReading } from './types'
 
-export type MeterSegment = { meterId: string; start: number; end: number }
+export type MeterSegment = { meterId: string; start: number; end: number; estimated?: boolean }
 
 /**
  * Tiêu thụ của một loại (điện hoặc nước) của một phòng trong kỳ, cộng phần chạy trên từng đồng hồ có hiệu lực.
@@ -38,8 +38,10 @@ export function meterUsage(
     const begin = before.length ? before[before.length - 1].value : m.startReading
 
     let end: number | undefined
+    let estimated = false
     if (m.removedOn && m.removedOn <= periodEnd) {
       end = m.finalReading ?? undefined
+      estimated = m.finalReadingEstimated === true
     } else {
       const inside = mine.filter((r) => r.readOn >= periodStart && r.readOn <= periodEnd)
       end = inside.length ? inside[inside.length - 1].value : undefined
@@ -48,8 +50,21 @@ export function meterUsage(
       missing.push(m.id)
       continue
     }
-    segments.push({ meterId: m.id, start: begin, end })
+    segments.push({ meterId: m.id, start: begin, end, ...(estimated && { estimated: true }) })
     usage += end - begin
   }
   return { usage, segments, missing }
+}
+
+/**
+ * Gợi ý chỉ số cuối khi công tơ hỏng, không đọc được: chỉ số ghi gần nhất cộng mức dùng trung bình
+ * (người gọi truyền tối đa 3 mức dùng tháng gần nhất). Chưa có mức dùng thì giữ chỉ số gần nhất.
+ */
+export function suggestFinalReading(
+  lastReading: number,
+  monthlyUsages: number[],
+): { value: number; basis: 'average' | 'last' } {
+  if (monthlyUsages.length === 0) return { value: lastReading, basis: 'last' }
+  const average = monthlyUsages.reduce((a, b) => a + b, 0) / monthlyUsages.length
+  return { value: lastReading + Math.round(average), basis: 'average' }
 }
