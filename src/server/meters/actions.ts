@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/db/client'
 import { toActionResult } from '@/lib/action-result'
 import { getAccessContext } from '@/server/session'
-import { addRoomMeter, deleteMeterReading, deleteMeterReadings, replaceMeter, saveReadings, updateMeterReading, suggestMeterFinalReading, type ReadingInput } from './service'
+import { listReadingSheet, addRoomMeter, deleteMeterReading, deleteMeterReadings, replaceMeter, saveReadings, updateMeterReading, suggestMeterFinalReading, type ReadingInput } from './service'
 
 export async function saveReadingsAction(period: string, rows: ReadingInput[]) {
   const ctx = await getAccessContext()
@@ -39,4 +39,10 @@ export async function deleteMeterReadingAction(id: string) {
 export async function deleteMeterReadingsAction(ids: string[]) {
   const ctx = await getAccessContext()
   return toActionResult(async () => { const r = await deleteMeterReadings(db, ctx, ids); revalidatePath('/meters'); revalidatePath('/invoices', 'layout'); return r })
+}
+
+/** Bảng điền số cuối kỳ của một tháng (cho hộp Chốt chỉ số chọn tháng khác với tháng đang lọc). */
+export async function loadReadingSheetAction(facilityId: string, period: string) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => ({ rows: (await listReadingSheet(db, ctx, facilityId, period)).rows }))
 }

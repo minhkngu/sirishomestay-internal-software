@@ -17,13 +17,14 @@ export type GridRow = { roomId: string; roomCode: string; floor?: string | null;
 
 const fmt = (value: number) => value.toLocaleString('vi-VN')
 
-export function ReadingGrid({ rows, period, readOn, meterFilter, unitByType = {}, roomFiltered = false, clearFiltersHref }: { rows: GridRow[]; period: string; readOn: string; meterFilter: string; unitByType?: Record<string, string>; roomFiltered?: boolean; clearFiltersHref?: string }) {
+export function ReadingGrid({ rows, period, readOn, meterFilter, unitByType = {}, roomFiltered = false, clearFiltersHref, onSaved }: { rows: GridRow[]; period: string; readOn: string; meterFilter: string; unitByType?: Record<string, string>; roomFiltered?: boolean; clearFiltersHref?: string; /** Gọi sau khi lưu xong (để nơi chứa tải lại dữ liệu kỳ này). */ onSaved?: () => void }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [values, setValues] = useState<Record<string, string>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [msg, setMsg] = useState<string | null>(null)
   const [onlyOccupied, setOnlyOccupied] = useState(true)
+  const [onlyPending, setOnlyPending] = useState(true)
   const [replacing, setReplacing] = useState<{ roomId: string; roomCode: string; utility: 'electric' | 'water' } | null>(null)
   const refs = useRef<Record<string, HTMLInputElement | null>>({})
 
@@ -33,7 +34,8 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, unitByType = {}
   const visibleFeeMeters = (row: GridRow) => (row.feeMeters ?? []).filter((fee) => !feeFilter || meterTypeName(fee.name) === feeFilter)
 
   // Phòng có người ở lên trước; bật bộ lọc thì ẩn phòng trống. Lọc đúng một phòng thì luôn hiện phòng đó.
-  const shownRows = [...rows].filter((row) => roomFiltered || !onlyOccupied || row.occupied).sort((a, b) => Number(!!b.occupied) - Number(!!a.occupied))
+  const hasPending = (row: GridRow) => [showElectric ? row.electric : null, showWater ? row.water : null, ...visibleFeeMeters(row).map((fee) => fee.cell)].some((cell) => cell && cell.current == null)
+  const shownRows = [...rows].filter((row) => (roomFiltered || !onlyOccupied || row.occupied) && (!onlyPending || hasPending(row))).sort((a, b) => Number(!!b.occupied) - Number(!!a.occupied))
   const order = shownRows.flatMap((row) => [
     showElectric ? row.electric?.meterId : undefined,
     showWater ? row.water?.meterId : undefined,
@@ -72,6 +74,7 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, unitByType = {}
       setValues(Object.fromEntries(Object.entries(values).filter(([meterId]) => !saved.has(meterId))))
       setMsg(`Đã lưu ${result.data.saved} chỉ số${result.data.errors.length ? `, ${result.data.errors.length} dòng lỗi` : ''}`)
       router.refresh()
+      onSaved?.()
     })
   }
 
@@ -160,6 +163,10 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, unitByType = {}
             </div>
           )}
         </div>
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <input type="checkbox" checked={onlyPending} onChange={(event) => setOnlyPending(event.target.checked)} className="size-3.5 rounded border-border text-primary focus:ring-primary/30" />
+          Chỉ đồng hồ chưa chốt
+        </label>
         {!roomFiltered && (
           <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <input type="checkbox" checked={onlyOccupied} onChange={(event) => setOnlyOccupied(event.target.checked)} className="size-3.5 rounded border-border text-primary focus:ring-primary/30" />
@@ -170,9 +177,10 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, unitByType = {}
 
       {shownRows.length === 0 ? (
         <div className="border-t border-border/70 px-4 py-12 text-center">
-          <p className="text-sm font-medium text-foreground">Không có phòng nào để ghi</p>
+          <p className="text-sm font-medium text-foreground">{onlyPending ? 'Không còn đồng hồ nào chưa chốt trong tháng này' : 'Không có phòng nào để ghi'}</p>
           <p className="mt-1 text-xs text-muted-foreground">{onlyOccupied ? 'Kỳ này chưa có phòng có người ở, hoặc bộ lọc đang ẩn hết phòng.' : 'Bộ lọc phòng, đồng hồ không khớp phòng nào.'}</p>
           <div className="mt-3 flex flex-wrap items-center justify-center gap-3 text-xs font-medium text-primary">
+            {onlyPending && <button type="button" className="hover:underline hover:underline-offset-2" onClick={() => setOnlyPending(false)}>Hiện cả đồng hồ đã chốt</button>}
             {onlyOccupied && <button type="button" className="hover:underline hover:underline-offset-2" onClick={() => setOnlyOccupied(false)}>Hiện tất cả phòng</button>}
             {clearFiltersHref && <Link className="hover:underline hover:underline-offset-2" href={clearFiltersHref}>Xoá lọc phòng, đồng hồ</Link>}
           </div>
