@@ -349,6 +349,8 @@ export type MeterOverviewRow = {
   meterName: string; meterCode: string | null; feeName: string | null; unit: string | null; leaseCode: string | null
   /** Ngày bắt đầu hợp đồng đang chạy đang dùng đồng hồ; null khi không có hợp đồng đang chạy. */
   leaseStartDate: string | null
+  /** Ngày bắt đầu của mọi hợp đồng từng gắn đồng hồ, để nhận ra dòng chốt đầu hợp đồng trong lịch sử. */
+  leaseStartDates: string[]
   serial: string | null; startReading: number; installedOn: string; removedOn: string | null
   finalReadingEstimated: boolean; estimateNote: string | null
   /** Chỉ số mới nhất theo ngày ghi (chốt tháng hoặc bàn giao), null nếu chưa có. */
@@ -382,6 +384,7 @@ export async function listMeterOverview(db: DB, ctx: AccessContext, facilityId: 
       feeName: link?.name ?? legacy?.name ?? null, unit: link?.unit ?? legacy?.unit ?? null,
       leaseCode: link?.status === 'active' ? link.leaseCode : null,
       leaseStartDate: link?.status === 'active' ? link.startDate : null,
+      leaseStartDates: [...new Set(mine.map(l => l.startDate))],
       serial: meter.serial, startReading: meter.startReading, installedOn: meter.installedOn, removedOn: meter.removedOn,
       finalReadingEstimated: meter.finalReadingEstimated, estimateNote: meter.estimateNote,
       lastReading: (readingsByMeter.get(meter.id) ?? [])[0] ? { value: readingsByMeter.get(meter.id)![0].value, readOn: readingsByMeter.get(meter.id)![0].readOn } : null,
@@ -418,7 +421,7 @@ export async function listReadingHistory(db: DB, ctx: AccessContext, facilityId:
     for (const r of asc) {
       if (r.period >= from && r.period <= to) {
         // Dòng bàn giao đầu hợp đồng mở chuỗi chỉ số: số đầu bằng số cuối, mức dùng 0
-        const opensLease = r.kind === 'handover' && m.leaseStartDate !== null && r.readOn === m.leaseStartDate
+        const opensLease = r.kind === 'handover' && m.leaseStartDates.includes(r.readOn)
         rows.push({ id: r.id, meterId: m.meterId, roomId: m.roomId, roomCode: m.roomCode, floor: m.floor, meterName: typeName(m.meterName), meterCode: m.meterCode, unit: m.unit, kind: r.kind, period: r.period, readOn: r.readOn, opening: opensLease ? r.value : prev, closing: r.value, usage: opensLease ? 0 : Math.max(r.value - prev, 0), lockedBy: r.kind === 'monthly' ? (locked.get(`${m.roomId}|${r.period}`) ?? null) : null })
       }
       prev = r.value

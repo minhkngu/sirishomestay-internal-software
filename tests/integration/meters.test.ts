@@ -386,9 +386,14 @@ describe('meters', () => {
 
     it('tổng quan đồng hồ trả ngày bắt đầu hợp đồng đang chạy để nhận ra dòng bàn giao đầu', async () => {
       await midMonthLease()
-      expect((await listMeterOverview(db, hung(), fa)).find((r) => r.meterId === m.E101)!.leaseStartDate).toBe('2026-10-15')
+      const active = (await listMeterOverview(db, hung(), fa)).find((r) => r.meterId === m.E101)!
+      expect(active.leaseStartDate).toBe('2026-10-15')
+      expect(active.leaseStartDates).toEqual(['2026-10-15'])
       await db.update(leases).set({ status: 'ended' }).where(eq(leases.roomId, r101))
       expect((await listMeterOverview(db, hung(), fa)).find((r) => r.meterId === m.E101)!.leaseStartDate).toBeNull()
+      // Hợp đồng đã kết thúc thì dòng bàn giao đầu vẫn là mốc mở chuỗi, không tính mức dùng
+      const handover = (await listReadingHistory(db, hung(), fa, '2026-10', '2026-10')).find((x) => x.meterId === m.E101 && x.kind === 'handover')!
+      expect(handover).toMatchObject({ opening: 1250, closing: 1250, usage: 0 })
     })
   })
 
