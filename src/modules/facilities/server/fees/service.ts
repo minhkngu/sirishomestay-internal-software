@@ -1,16 +1,13 @@
-import { and, asc, desc, eq, inArray, lte } from 'drizzle-orm'
+import { and, asc, eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
-import { feeTypes, feeTypePrices, feeUnits, utilityRates, feeDefaults, facilities } from '@/db'
+import { feeTypes, feeTypePrices, feeUnits, feeDefaults, facilities } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
-import { todayVN } from '@/domain/dates'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/modules/platform'
-import { getFacility } from '../facilities/service'
 
 export type FeeType = typeof feeTypes.$inferSelect
 export type FeeUnit = typeof feeUnits.$inferSelect
-export type UtilityRateRow = typeof utilityRates.$inferSelect
 
 const unitInput = z.object({ name: z.string().trim().min(1, 'Nhập tên đơn vị') })
 const feeTypeFields = {
@@ -30,13 +27,6 @@ const feeTypeInput = z
     path: ['unitId'],
   })
 const feeTypeUpdateInput = z.object({ ...feeTypeFields, unitId: z.string().uuid('Chọn đơn vị') }).partial()
-const rateInput = z.object({
-  facilityId: z.string().uuid(),
-  utility: z.enum(['electric', 'water']),
-  pricePerUnit: z.number().int().min(0, 'Đơn giá không hợp lệ'),
-  effectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày hiệu lực không hợp lệ'),
-})
-
 function parse<T>(schema: z.ZodType<T>, input: unknown): T {
   const r = schema.safeParse(input)
   if (!r.success) {
@@ -177,47 +167,6 @@ export async function restoreFeeType(db: DB, ctx: AccessContext, id: string): Pr
       before: { isActive: false },
       after: { isActive: true },
     })
-  })
-}
-
-/** Đơn giá điện nước của một cơ sở (mới nhất trước); người ngoài phạm vi cơ sở → NotFoundError. */
-export async function listRates(db: DB, ctx: AccessContext, facilityId: string): Promise<UtilityRateRow[]> {
-  await getFacility(db, ctx, facilityId)
-  return db
-    .select()
-    .from(utilityRates)
-    .where(eq(utilityRates.facilityId, facilityId))
-    .orderBy(desc(utilityRates.effectiveFrom), asc(utilityRates.utility))
-}
-
-export async function createRate(db: DB, ctx: AccessContext, input: unknown): Promise<UtilityRateRow> {
-  assertCan(ctx, 'settings')
-  const data = parse(rateInput, input)
-  return db.transaction(async (tx) => {
-    const [dup] = await tx
-      .select()
-      .from(utilityRates)
-      .where(
-        and(
-          eq(utilityRates.facilityId, data.facilityId),
-          eq(utilityRates.utility, data.utility),
-          eq(utilityRates.effectiveFrom, data.effectiveFrom),
-        ),
-      )
-    if (dup)
-      throw new ValidationError('Đã có đơn giá với ngày hiệu lực này', {
-        effectiveFrom: 'Đã có đơn giá với ngày hiệu lực này',
-      })
-    const [r] = await tx.insert(utilityRates).values(data).returning()
-    await recordAudit(tx, ctx, {
-      action: 'create',
-      entity: 'utility_rate',
-      entityId: r.id,
-      facilityId: r.facilityId,
-      summary: `Thêm đơn giá ${r.utility === 'electric' ? 'điện' : 'nước'} ${r.pricePerUnit} từ ${r.effectiveFrom}`,
-      after: r,
-    })
-    return r
   })
 }
 
@@ -425,8 +374,8 @@ export async function setFeeDefault(
 
 /**
  * Nạp sẵn hai loại phí Điện (kWh) và Nước (m³) tính theo đồng hồ. Có thể chạy nhiều lần:
- * loại phí đã có (theo tên) được giữ nguyên, không ghi đè giá. Giá mặc định lấy từ đơn giá mới nhất
- * của cơ sở đầu tiên (theo mã) có đơn giá; cơ sở khác giá thì lưu giá riêng theo toà.
+ * loại phí đã có (theo tên) được giữ nguyên, không ghi đè giá. Giá mặc định 0, chỉ là giá tham khảo
+ * để sửa ở Cài đặt; giá thật nằm trong từng hợp đồng.
  */
 export async function ensureUtilityFeeTypes(
   db: DB,
@@ -435,33 +384,17 @@ export async function ensureUtilityFeeTypes(
   assertCan(ctx, 'settings')
   return db.transaction(async (t) => {
     const tx = t as unknown as DB
-    const facs = await tx.select().from(facilities).orderBy(asc(facilities.code))
-    // Bỏ đơn giá có ngày hiệu lực ở tương lai: giá mặc định là giá đang áp dụng
-    const rates = await tx
-      .select()
-      .from(utilityRates)
-      .where(lte(utilityRates.effectiveFrom, todayVN()))
-      .orderBy(desc(utilityRates.effectiveFrom))
-    const ensure = async (utility: 'electric' | 'water', name: string, unit: string): Promise<FeeType> => {
+    const ensure = async (name: string, unit: string): Promise<FeeType> => {
       const [existing] = await tx.select().from(feeTypes).where(eq(feeTypes.name, name))
       if (existing) return existing
-      const latest = new Map<string, number>()
-      for (const r of rates)
-        if (r.utility === utility && !latest.has(r.facilityId)) latest.set(r.facilityId, r.pricePerUnit)
-      const priced = facs.filter((f) => latest.has(f.id))
-      const defaultPrice = priced.length ? latest.get(priced[0].id)! : 0
-      const created = await createFeeType(tx, ctx, {
+      return createFeeType(tx, ctx, {
         name,
         newUnitName: unit,
-        defaultPrice,
+        defaultPrice: 0,
         billing: 'per_occurrence',
         quantityFrom: 'meter',
       })
-      for (const f of priced)
-        if (latest.get(f.id) !== defaultPrice)
-          await setFeeTypePrice(tx, ctx, { feeTypeId: created.id, facilityId: f.id, price: latest.get(f.id)! })
-      return created
     }
-    return { electric: await ensure('electric', 'Điện', 'kWh'), water: await ensure('water', 'Nước', 'm³') }
+    return { electric: await ensure('Điện', 'kWh'), water: await ensure('Nước', 'm³') }
   })
 }

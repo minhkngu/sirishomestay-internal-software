@@ -1,5 +1,8 @@
+import '@/modules/registrations'
 import { describe, it, expect, beforeEach } from 'vitest'
-import { facilities, rooms, roomAmenities } from '@/db'
+import { eq } from 'drizzle-orm'
+import { facilities, rooms, roomAmenities, meters } from '@/db'
+import { saveReadings } from '@/server/meters/service'
 import {
   listFacilities,
   getFacility,
@@ -94,6 +97,31 @@ describe('facilities & rooms', () => {
     const r = await createRoomsBulk(db, admin, fa, { floor: '3', from: 301, to: 305 })
     expect(r).toEqual({ created: 4, skipped: ['303'] })
     expect((await db.select().from(rooms)).filter((x) => x.facilityId === fa)).toHaveLength(5)
+  })
+
+  const activeMeters = (roomId: string) => db.select().from(meters).where(eq(meters.roomId, roomId))
+
+  it('createRoom tạo sẵn một công tơ điện và một công tơ nước đang dùng', async () => {
+    const room = await createRoom(db, admin, { facilityId: fa, code: '101' })
+    const ms = await activeMeters(room.id)
+    expect(ms.map((m) => m.utility).sort()).toEqual(['electric', 'water'])
+    expect(ms.every((m) => m.startReading === 0 && m.removedOn === null)).toBe(true)
+  })
+
+  it('createRoomsBulk tạo đủ hai công tơ cho mỗi phòng mới và không tạo cho mã bị bỏ qua', async () => {
+    const skipped = await createRoom(db, admin, { facilityId: fa, code: '303' })
+    await db.delete(meters).where(eq(meters.roomId, skipped.id))
+    await createRoomsBulk(db, admin, fa, { floor: '3', from: 301, to: 305 })
+    const all = await db.select().from(meters)
+    expect(all).toHaveLength(4 * 2)
+    expect(all.some((m) => m.roomId === skipped.id)).toBe(false)
+  })
+
+  it('ghi chỉ số ngay sau khi tạo phòng không cần thay công tơ', async () => {
+    const room = await createRoom(db, admin, { facilityId: fa, code: '101' })
+    const [electric] = (await activeMeters(room.id)).filter((m) => m.utility === 'electric')
+    const r = await saveReadings(db, admin, '2026-11', [{ meterId: electric.id, value: 10, readOn: '2026-11-30' }])
+    expect(r).toEqual({ saved: 1, errors: [] })
   })
 
   it('createRoomsBulk dùng prefix và giới hạn dải hợp lệ', async () => {
