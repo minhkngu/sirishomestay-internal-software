@@ -71,8 +71,10 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, unitByType = {}
 
   function save() {
     setMsg(null)
-    const batch = Object.entries(values).filter(([, value]) => value.trim() !== '').map(([meterId, value]) => ({ meterId, value: Number(value), readOn }))
-    const openingBatch = changedOpenings.map(([meterId, value]) => ({ meterId, value: Number(value) }))
+    const openingOf = (meterId: string) => changedOpenings.find(([id]) => id === meterId)?.[1]
+    const batch = Object.entries(values).filter(([, value]) => value.trim() !== '').map(([meterId, value]) => ({ meterId, value: Number(value), readOn, ...(openingOf(meterId) !== undefined ? { opening: Number(openingOf(meterId)) } : {}) }))
+    // Số đầu sửa mà không nhập số cuối mới: chỉ có tác dụng với tháng đã có lần ghi
+    const openingBatch = changedOpenings.filter(([meterId]) => !batch.some((row) => row.meterId === meterId)).map(([meterId, value]) => ({ meterId, value: Number(value) }))
     if (batch.length === 0 && openingBatch.length === 0) { setMsg('Chưa nhập chỉ số nào'); return }
     start(async () => {
       const failed: Record<string, string> = {}
@@ -94,6 +96,7 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, unitByType = {}
         const saved = new Set(batch.map((row) => row.meterId))
         result.data.errors.forEach((error) => saved.delete(error.meterId))
         setValues(Object.fromEntries(Object.entries(values).filter(([meterId]) => !saved.has(meterId))))
+        setOpenings((cur) => Object.fromEntries(Object.entries(cur).filter(([meterId]) => !saved.has(meterId))))
       }
       setErrors(failed)
       setOpeningErrors(openFailed)

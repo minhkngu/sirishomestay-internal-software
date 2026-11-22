@@ -127,7 +127,7 @@ function LineTime({ line, defaultFrom, defaultTo, fullMonth, proration, editable
     </div>
   )
 }
-type MeterPanel = { leaseFeeId: string; name: string; unit: string; /** Chỉ số ban đầu ghi ở hợp đồng (bàn giao hoặc lúc lắp đồng hồ). */ initial?: { value: number; readOn: string } | null; rows: Array<{ period: string; readOn: string | null; value: number | null; /** Số đầu kỳ: chỉ số gần nhất trước tháng này; null khi chưa có. */ opening: number | null; /** Số đầu đến từ chốt tháng trước, chỉ số bàn giao, hay chỉ số ban đầu của đồng hồ. */ openingSource: 'monthly' | 'handover' | 'start' }> }
+type MeterPanel = { leaseFeeId: string; name: string; unit: string; /** Chỉ số ban đầu ghi ở hợp đồng (bàn giao hoặc lúc lắp đồng hồ). */ initial?: { value: number; readOn: string } | null; rows: Array<{ period: string; readOn: string | null; value: number | null; /** Số đầu kỳ: chỉ số gần nhất trước tháng này; null khi chưa có. */ opening: number | null; /** Số đầu đã lưu riêng cho lần ghi (tự điền lúc ghi hoặc sửa). */ openingStored: boolean; /** Số đầu đến từ chốt tháng trước, chỉ số bàn giao, hay chỉ số ban đầu của đồng hồ. */ openingSource: 'monthly' | 'handover' | 'start' }> }
 const periodLabel = (period: string) => `${period.slice(5)}/${period.slice(0, 4)}`
 const NEW_READING = '__new'
 /** Chỉ số đã chốt của đồng hồ: danh sách các tháng, thêm dòng "Chốt chỉ số" cuối danh sách; chọn một dòng mở popup điền số (ghi ngược về tab Chỉ số). */
@@ -139,9 +139,10 @@ function MeterReadingsPanel({ panel, editable, consumption, staged, onStage, sta
   const last = panel.rows[panel.rows.length - 1]
   // Danh sách tháng hiện số đầu – số cuối (không hiện mức tiêu thụ)
   const openingOf = (r: MeterPanel['rows'][number]) => {
-    if (r.openingSource !== 'monthly') return stagedOpening[r.period] !== undefined ? Number(stagedOpening[r.period]) : r.opening
+    if (stagedOpening[r.period] !== undefined) return Number(stagedOpening[r.period])
+    // Chưa có số đầu riêng thì tự lấy số cuối tháng trước đang điền
     const prev = panel.rows[panel.rows.indexOf(r) - 1]
-    return prev && staged[prev.period] !== undefined ? Number(staged[prev.period]) : r.opening
+    return !r.openingStored && prev && staged[prev.period] !== undefined ? Number(staged[prev.period]) : r.opening
   }
   const fmt = (n: number | null | undefined) => n == null ? '—' : n.toLocaleString('vi-VN')
   const rowLabel = (r: MeterPanel['rows'][number]) => staged[r.period] !== undefined ? `Tháng ${periodLabel(r.period)} · ${fmt(openingOf(r))} – ${fmt(Number(staged[r.period]))} ` : r.value == null ? `Tháng ${periodLabel(r.period)} · chưa chốt` : `Tháng ${periodLabel(r.period)} · ${fmt(openingOf(r))} – ${fmt(r.value)}`
@@ -151,7 +152,7 @@ function MeterReadingsPanel({ panel, editable, consumption, staged, onStage, sta
   const prevRow = row ? panel.rows[panel.rows.indexOf(row) - 1] : undefined
   // Số đầu kỳ chính là chỉ số chốt của tháng liền trước: sửa được khi tháng đó nằm trong danh sách (cùng quy tắc 3 tháng gần nhất)
   // Số đầu là chốt tháng trước thì sửa qua tháng đó; là chỉ số bàn giao hoặc chỉ số ban đầu thì sửa trực tiếp, không khoá
-  const openingEditable = editable && !!row && (row.openingSource !== 'monthly' || !!prevRow)
+  const openingEditable = editable && !!row
   const opening = openingEditable ? (/^\d+$/.test(openText.trim()) ? Number(openText.trim()) : null) : (row ? openingOf(row) : null)
   const closing = /^\d+$/.test(text.trim()) ? Number(text.trim()) : null
   const tooLow = closing !== null && opening !== null && closing < opening
@@ -169,8 +170,7 @@ function MeterReadingsPanel({ panel, editable, consumption, staged, onStage, sta
     const openings: Record<string, string> = { ...stagedOpening }
     // Đổi số đầu kỳ = sửa chỉ số chốt của tháng liền trước, hoặc chỉ số bàn giao, chỉ số ban đầu
     if (openingEditable && opening !== null && opening !== openingOf(row)) {
-      if (row.openingSource !== 'monthly') { onStageOpening(row.period, String(opening)); openings[row.period] = String(opening) }
-      else if (prevRow) { onStage(prevRow.period, String(opening)); readings[prevRow.period] = String(opening) }
+      onStageOpening(row.period, String(opening)); openings[row.period] = String(opening)
     }
     onStage(row.period, String(Number(text.trim())))
     readings[row.period] = String(Number(text.trim()))
@@ -263,7 +263,7 @@ export function InvoiceEditor(p: Props) {
     if (!Object.keys(st).length && !Object.keys(so).length) return l
     const prev = panel.rows[panel.rows.length - 2]
     const closing = st[last.period] !== undefined ? Number(st[last.period]) : last.value
-    const opening = last.openingSource !== 'monthly' ? (so[last.period] !== undefined ? Number(so[last.period]) : last.opening) : (prev && st[prev.period] !== undefined ? Number(st[prev.period]) : last.opening)
+    const opening = so[last.period] !== undefined ? Number(so[last.period]) : (!last.openingStored && prev && st[prev.period] !== undefined ? Number(st[prev.period]) : last.opening)
     if (closing == null || opening == null || closing < opening) return l
     const quantity = closing - opening
     return { ...l, quantity, amount: Math.round(quantity * l.unitPrice) }
@@ -290,13 +290,15 @@ export function InvoiceEditor(p: Props) {
   const savePreviewReadings = (leaseFeeId: string, readings: Record<string, string>, openings: Record<string, string>) => start(async () => {
     const n = p.newInvoice
     if (!n) return
+    for (const [period, value] of Object.entries(readings)) {
+      const opening = openings[period]
+      const r = await savePreviewMeterReadingAction({ leaseId: n.leaseId, invoicePeriod: n.period, leaseFeeId, period, value: Number(value), ...(opening !== undefined ? { opening: Number(opening) } : {}) })
+      if (!r.ok) { toast.error(r.error ?? 'Không lưu được chỉ số'); return }
+    }
     for (const [period, value] of Object.entries(openings)) {
+      if (readings[period] !== undefined) continue
       const r = await savePreviewOpeningReadingAction({ leaseId: n.leaseId, invoicePeriod: n.period, leaseFeeId, period, value: Number(value) })
       if (!r.ok) { toast.error(r.error ?? 'Không lưu được số đầu kỳ'); return }
-    }
-    for (const [period, value] of Object.entries(readings)) {
-      const r = await savePreviewMeterReadingAction({ leaseId: n.leaseId, invoicePeriod: n.period, leaseFeeId, period, value: Number(value) })
-      if (!r.ok) { toast.error(r.error ?? 'Không lưu được chỉ số'); return }
     }
     toast.success('Đã lưu chỉ số')
   })
@@ -325,17 +327,21 @@ export function InvoiceEditor(p: Props) {
       const n = await setInvoiceNoteAction(id, note)
       if (!n.ok) return n.error ?? 'Không lưu được ghi chú'
     }
+    // Số đầu gửi cùng số cuối của tháng đó; số đầu sửa riêng chỉ áp dụng được cho tháng đã có số cuối
+    for (const [key, value] of Object.entries(readings)) {
+      const [leaseFeeId, period] = key.split('|')
+      const opening = openings[key]
+      const m = await updateInvoiceMeterReadingAction(id, { leaseFeeId, period, value: Number(value), ...(opening !== undefined ? { opening: Number(opening) } : {}) })
+      if (!m.ok) return m.error ?? 'Không lưu được chỉ số'
+      setStaged((cur) => { const next = { ...cur }; delete next[key]; return next })
+      setStagedOpening((cur) => { const next = { ...cur }; delete next[key]; return next })
+    }
     for (const [key, value] of Object.entries(openings)) {
+      if (readings[key] !== undefined) continue
       const [leaseFeeId, period] = key.split('|')
       const o = await updateInvoiceOpeningReadingAction(id, { leaseFeeId, period, value: Number(value) })
       if (!o.ok) return o.error ?? 'Không lưu được số đầu kỳ'
       setStagedOpening((cur) => { const next = { ...cur }; delete next[key]; return next })
-    }
-    for (const [key, value] of Object.entries(readings)) {
-      const [leaseFeeId, period] = key.split('|')
-      const m = await updateInvoiceMeterReadingAction(id, { leaseFeeId, period, value: Number(value) })
-      if (!m.ok) return m.error ?? 'Không lưu được chỉ số'
-      setStaged((cur) => { const next = { ...cur }; delete next[key]; return next })
     }
     return null
   }

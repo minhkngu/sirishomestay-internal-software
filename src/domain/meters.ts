@@ -20,17 +20,11 @@ export function meterUsage(
 
   for (const m of meters) {
     const mine = readings.filter((r) => r.meterId === m.id).sort((a, b) => (a.readOn < b.readOn ? -1 : 1))
-    // chỉ số phải không giảm theo thời gian trên cùng đồng hồ
-    const chain = [m.startReading, ...mine.map((r) => r.value), ...(m.removedOn && m.finalReading != null ? [m.finalReading] : [])]
-    for (let i = 1; i < chain.length; i++) {
-      if (chain[i] < chain[i - 1]) throw new ValidationError('Chỉ số mới nhỏ hơn chỉ số cũ', { value: 'Chỉ số mới nhỏ hơn chỉ số cũ' })
-    }
-
     if (m.installedOn > periodEnd) continue
     if (m.removedOn && m.removedOn < periodStart) continue
 
     const before = mine.filter((r) => r.readOn < periodStart)
-    const begin = before.length ? before[before.length - 1].value : m.startReading
+    let begin = before.length ? before[before.length - 1].value : m.startReading
 
     let end: number | undefined
     let estimated = false
@@ -39,12 +33,17 @@ export function meterUsage(
       estimated = m.finalReadingEstimated === true
     } else {
       const inside = mine.filter((r) => r.readOn >= periodStart && r.readOn <= periodEnd)
-      end = inside.length ? inside[inside.length - 1].value : undefined
+      const last = inside[inside.length - 1]
+      end = last?.value
+      // Số đầu riêng của lần ghi cuối kỳ (đã tự điền bằng số cuối lần ghi trước, hoặc người dùng sửa) thay cho số liền trước
+      if (inside.length === 1 && last.kind !== 'handover' && last.opening != null) begin = last.opening
     }
     if (end === undefined) {
       missing.push(m.id)
       continue
     }
+    // Các lần ghi độc lập nhau: chỉ kiểm số đầu và số cuối của kỳ đang tính, số cuối nhỏ hơn số đầu thì không ra tiêu thụ âm
+    if (end < begin) throw new ValidationError('Chỉ số mới nhỏ hơn chỉ số cũ', { value: 'Chỉ số mới nhỏ hơn chỉ số cũ' })
     segments.push({ meterId: m.id, start: begin, end, ...(estimated && { estimated: true }) })
     usage += end - begin
   }

@@ -73,7 +73,7 @@ export async function createDraftForLeaseAction(input: { leaseId: string; period
   return toActionResult(async () => { const inv = await createDraftForLease(db, ctx, input); refresh(); return { id: inv.id } })
 }
 
-export async function updateInvoiceMeterReadingAction(invoiceId: string, input: { leaseFeeId: string; period?: string; value: number }) {
+export async function updateInvoiceMeterReadingAction(invoiceId: string, input: { leaseFeeId: string; period?: string; value: number; opening?: number }) {
   const ctx = await getAccessContext()
   return toActionResult(async () => { await updateInvoiceMeterReading(db, ctx, invoiceId, input); refresh(); revalidatePath('/meters'); return {} })
 }
@@ -105,7 +105,7 @@ export async function setLineTimeAction(invoiceId: string, lineId: string, input
   const ctx = await getAccessContext()
   return toActionResult(async () => { await setLineTime(db, ctx, invoiceId, lineId, input); refresh(); return {} })
 }
-export async function savePreviewMeterReadingAction(input: { leaseId: string; invoicePeriod: string; leaseFeeId: string; period?: string; value: number }) {
+export async function savePreviewMeterReadingAction(input: { leaseId: string; invoicePeriod: string; leaseFeeId: string; period?: string; value: number; opening?: number }) {
   const ctx = await getAccessContext()
   return toActionResult(async () => { await savePreviewMeterReading(db, ctx, input); revalidatePath('/meters'); return {} })
 }

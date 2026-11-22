@@ -31,7 +31,7 @@ export async function addRoomMeterAction(roomId: string, input: { name: string; 
   return toActionResult(async () => { const r = await addRoomMeter(db, ctx, roomId, input); revalidatePath('/meters'); return r })
 }
 
-export async function updateMeterReadingAction(id: string, input: { value: number; readOn: string }) {
+export async function updateMeterReadingAction(id: string, input: { value: number; readOn: string; opening?: number }) {
   const ctx = await getAccessContext()
   return toActionResult(async () => { await updateMeterReading(db, ctx, id, input); revalidatePath('/meters'); revalidatePath('/invoices', 'layout'); return {} })
 }

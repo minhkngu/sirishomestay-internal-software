@@ -47,29 +47,21 @@ describe('meters', () => {
     return (await db.insert(leases).values({ code, roomId, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-01-01', monthlyRent: 1, depositAmount: 1, ...over }).returning())[0]
   }
 
-  it('sửa số đầu kỳ: sửa chỉ số chốt tháng trước, hạ xuống thì các số trước đó theo xuống; không được lớn hơn chỉ số sau', async () => {
-    await read('E101', '2026-10', '2026-10-31', 1100)
-    const value = async (period: string) => (await db.select().from(meterReadings).where(eq(meterReadings.meterId, m.E101))).find((r) => r.period === period)?.value
-    expect(await saveOpenings(db, hung(), '2026-10', [{ meterId: m.E101, value: 1050 }])).toMatchObject({ saved: 1, errors: [] })
-    expect(await value('2026-09')).toBe(1050)
-    const tooHigh = await saveOpenings(db, hung(), '2026-10', [{ meterId: m.E101, value: 1200 }])
-    expect(tooHigh.saved).toBe(0)
-    expect(tooHigh.errors[0].message).toContain('không được lớn hơn chỉ số sau')
-    expect(await value('2026-09')).toBe(1050)
-    await read('E101', '2026-08', '2026-08-31', 900)
-    expect(await saveOpenings(db, hung(), '2026-10', [{ meterId: m.E101, value: 800 }])).toMatchObject({ saved: 1, errors: [] })
-    expect([await value('2026-08'), await value('2026-09')]).toEqual([800, 800])
+  it('số đầu tự điền bằng số cuối lần ghi trước lúc ghi; sửa số đầu chỉ đổi lần ghi đó, không kéo theo lần ghi khác', async () => {
+    await saveReadings(db, hung(), '2026-10', [{ meterId: m.E101, value: 1100, readOn: '2026-10-31' }])
+    const find = async (period: string) => (await db.select().from(meterReadings).where(eq(meterReadings.meterId, m.E101))).find((r) => r.period === period)!
+    expect(await find('2026-10')).toMatchObject({ value: 1100, opening: 1000 })
+    // Sửa số cuối tháng 9 sau đó không làm đổi số đầu đã điền của tháng 10
+    await saveReadings(db, hung(), '2026-09', [{ meterId: m.E101, value: 1050, readOn: '2026-09-30' }])
+    expect(await find('2026-10')).toMatchObject({ opening: 1000 })
+    expect(await saveOpenings(db, hung(), '2026-10', [{ meterId: m.E101, value: 1300 }])).toMatchObject({ saved: 1, errors: [] })
+    expect(await find('2026-10')).toMatchObject({ value: 1100, opening: 1300 })
+    expect((await find('2026-09')).value).toBe(1050)
   })
-  it('chỉ số tháng đã dùng trong hoá đơn đã duyệt vẫn sửa được, hoá đơn đã duyệt giữ số cũ', async () => {
-    const tenant = (await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: fa, fullName: 'Khách', phone: '+84901230001', idNumber: '0123456789001' }).returning())[0]
-    const lease = (await db.insert(leases).values({ code: 'HD-L', roomId: r101, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-01-01', monthlyRent: 1, depositAmount: 0 }).returning())[0]
-    await db.insert(invoices).values({ code: 'BT-HD-202610-0001', leaseId: lease.id, facilityId: fa, kind: 'monthly', periodStart: '2026-10-01', periodEnd: '2026-10-31', issueDate: '2026-10-01', status: 'approved' })
-    expect(await saveReadings(db, hung(), '2026-09', [{ meterId: m.E101, value: 1010, readOn: '2026-09-30' }])).toMatchObject({ saved: 1, errors: [] })
-  })
-  it('sửa số đầu kỳ của đồng hồ chưa có lần ghi nào thì sửa số lúc lắp; thiếu quyền cơ sở thì từ chối', async () => {
-    await addMeter(r101, 'water', 'W101B', 5)
-    expect(await saveOpenings(db, hung(), '2026-10', [{ meterId: m.W101B, value: 9 }])).toMatchObject({ saved: 1, errors: [] })
-    expect((await db.select().from(meters).where(eq(meters.id, m.W101B)))[0].startReading).toBe(9)
+  it('sửa số đầu kỳ của tháng chưa có lần ghi thì báo cần nhập số cuối kỳ; thiếu quyền cơ sở thì từ chối', async () => {
+    const r = await saveOpenings(db, hung(), '2026-10', [{ meterId: m.E101, value: 9 }])
+    expect(r.saved).toBe(0)
+    expect(r.errors[0].message).toContain('số cuối kỳ')
     await expect(saveOpenings(db, ctxOf(['meters'], [fb]), '2026-10', [{ meterId: m.E101, value: 1 }])).rejects.toThrow(NotFoundError)
   })
   it('bảng ghi: mỗi phòng có chỉ số kỳ trước, chỉ số kỳ này, tiêu thụ và tiến độ theo phòng có người ở', async () => {
@@ -92,16 +84,17 @@ describe('meters', () => {
     expect(sheet.progress).toEqual({ recorded: 0, total: 0 })
   })
 
-  it('chỉ số nhỏ hơn kỳ trước → lỗi ở đúng dòng, các dòng khác vẫn lưu', async () => {
+  it('chỉ số nhỏ hơn kỳ trước vẫn lưu được (các lần ghi độc lập)', async () => {
     const r = await saveReadings(db, hung(), '2026-10', [
       { meterId: m.E101, value: 1100, readOn: '2026-10-31' },
       { meterId: m.E102, value: 450, readOn: '2026-10-31' },
       { meterId: m.E201, value: 1300, readOn: '2026-10-31' },
     ])
-    expect(r.saved).toBe(2)
-    expect(r.errors).toEqual([{ meterId: m.E102, message: 'Chỉ số mới nhỏ hơn chỉ số cũ' }])
+    // Các lần ghi độc lập nhau nên không chặn khi nhỏ hơn kỳ trước; hoá đơn tính tiền sẽ báo lỗi nếu số cuối nhỏ hơn số đầu
+    expect(r.saved).toBe(3)
+    expect(r.errors).toEqual([])
     const sheet = await listReadingSheet(db, hung(), fa, '2026-10')
-    expect(sheet.rows.map((x) => x.electric?.current)).toEqual([1100, null, 1300])
+    expect(sheet.rows.map((x) => x.electric?.current)).toEqual([1100, 450, 1300])
   })
 
   it('thay đồng hồ chuyển liên kết dòng phí sang đồng hồ mới', async () => {
@@ -180,11 +173,11 @@ describe('meters', () => {
     })
   })
 
-  it('chỉ số kỳ trước không được lớn hơn chỉ số đã ghi của kỳ sau', async () => {
+  it('chỉ số kỳ trước lớn hơn chỉ số đã ghi của kỳ sau vẫn lưu được', async () => {
     await read('E101', '2026-10', '2026-10-31', 1100)
     const r = await saveReadings(db, hung(), '2026-09', [{ meterId: m.E101, value: 1200, readOn: '2026-09-30' }])
-    expect(r.saved).toBe(0)
-    expect(r.errors).toEqual([{ meterId: m.E101, message: 'Chỉ số lớn hơn chỉ số của kỳ sau' }])
+    expect(r.saved).toBe(1)
+    expect(r.errors).toEqual([])
   })
 
   it('ghi lại cùng kỳ thì cập nhật, không tạo dòng trùng', async () => {
@@ -331,12 +324,11 @@ describe('meters', () => {
       expect((await listReadingHistory(db, hung(), fa, '2026-10', '2026-10')).every((x) => x.period === '2026-10')).toBe(true)
     })
 
-    it('sửa và xoá được chỉ số tháng chưa có hoá đơn duyệt dùng; sửa theo cùng quy tắc không nhỏ hơn kỳ trước', async () => {
+    it('sửa và xoá được chỉ số tháng chưa có hoá đơn duyệt dùng; sửa kèm số đầu riêng', async () => {
       await read('E101', '2026-10', '2026-10-31', 1100)
       const row = (await listReadingHistory(db, hung(), fa, '2026-10', '2026-10')).find((x) => x.meterId === m.E101)!
       await updateMeterReading(db, hung(), row.id, { value: 1150, readOn: '2026-10-30' })
       expect((await listReadingHistory(db, hung(), fa, '2026-10', '2026-10')).find((x) => x.id === row.id)).toMatchObject({ closing: 1150, readOn: '2026-10-30' })
-      await expect(updateMeterReading(db, hung(), row.id, { value: 10, readOn: '2026-10-30' })).rejects.toThrow(ValidationError)
       await deleteMeterReading(db, hung(), row.id)
       expect((await listReadingHistory(db, hung(), fa, '2026-10', '2026-10')).some((x) => x.id === row.id)).toBe(false)
     })

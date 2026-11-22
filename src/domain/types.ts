@@ -72,7 +72,7 @@ export type Meter = {
   finalReadingEstimated?: boolean
 }
 
-export type MeterReading = { meterId: string; period: string; readOn: ISODate; value: number; kind?: 'monthly' | 'handover' }
+export type MeterReading = { meterId: string; period: string; readOn: ISODate; value: number; kind?: 'monthly' | 'handover'; /** Số đầu kỳ riêng của lần ghi; không có thì lấy theo lần ghi liền trước. */ opening?: number | null }
 
 export type InvoiceLineType = 'rent' | 'fee' | 'electric' | 'water' | 'one_off' | 'penalty' | 'adjustment' | 'deposit' | 'deposit_offset' | 'refund' | 'tax'
 export type InvoiceLineInput = {

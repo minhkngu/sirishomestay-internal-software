@@ -41,9 +41,10 @@ describe('sửa chỉ số điện trong hoá đơn', () => {
     await expect(updateInvoiceMeterReading(db, ctx(), invoiceId, { leaseFeeId: feeId, value: 90 })).rejects.toThrow(ValidationError)
     expect((await db.select().from(meterReadings).where(and(eq(meterReadings.meterId, meterId), eq(meterReadings.period, '2026-11'))))[0].value).toBe(200)
   })
-  it('cao hơn chỉ số tháng sau thì từ chối', async () => {
+  it('cao hơn chỉ số tháng sau vẫn lưu được: các lần ghi độc lập nhau', async () => {
     await db.insert(meterReadings).values({ meterId, period: '2026-12', readOn: '2026-12-31', value: 250 })
-    await expect(updateInvoiceMeterReading(db, ctx(), invoiceId, { leaseFeeId: feeId, value: 260 })).rejects.toThrow(ValidationError)
+    await updateInvoiceMeterReading(db, ctx(), invoiceId, { leaseFeeId: feeId, value: 260 })
+    expect((await db.select().from(meterReadings).where(and(eq(meterReadings.meterId, meterId), eq(meterReadings.period, '2026-12'))))[0].value).toBe(250)
   })
   it('hoá đơn đã duyệt thì từ chối', async () => {
     await approveInvoice(db, ctx(), invoiceId, { dueDate: '2026-12-05' })
@@ -71,18 +72,26 @@ describe('sửa chỉ số điện trong hoá đơn', () => {
     const waterLine = (await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, invoiceId))).find(l => (l.meta as { leaseFeeId?: string } | null)?.leaseFeeId === waterFee.id)
     expect(waterLine?.amount ?? 0).toBe(0)
   })
-  it('mở hoá đơn nháp thì dòng điện theo chỉ số mới nhất dù chỉ số vừa được sửa ở nơi khác', async () => {
+  it('sửa chỉ số ở nơi khác không đổi hoá đơn đã tạo, kể cả hoá đơn nháp', async () => {
     expect((await electricLine()).quantity).toBe(100)
     await db.update(meterReadings).set({ value: 260 }).where(and(eq(meterReadings.meterId, meterId), eq(meterReadings.period, '2026-11')))
     const detail = await getInvoiceDetail(db, ctx(), invoiceId)
-    expect(detail.lines.find(l => (l.meta as { leaseFeeId?: string } | null)?.leaseFeeId === feeId)).toMatchObject({ quantity: 160, amount: 560000 })
+    expect(detail.lines.find(l => (l.meta as { leaseFeeId?: string } | null)?.leaseFeeId === feeId)).toMatchObject({ quantity: 100, amount: 350000 })
+  })
+  it('số đầu riêng của lần ghi: tự điền bằng số cuối lần ghi trước, sửa riêng không kéo theo lần ghi khác', async () => {
+    await updateInvoiceMeterReading(db, ctx(), invoiceId, { leaseFeeId: feeId, value: 260 })
+    const nov = async () => (await db.select().from(meterReadings).where(and(eq(meterReadings.meterId, meterId), eq(meterReadings.period, '2026-11'))))[0]
+    await updateInvoiceMeterReading(db, ctx(), invoiceId, { leaseFeeId: feeId, value: 260, opening: 150 })
+    expect(await nov()).toMatchObject({ value: 260, opening: 150 })
+    expect((await electricLine()).quantity).toBe(110)
+    const oct = (await db.select().from(meterReadings).where(and(eq(meterReadings.meterId, meterId), eq(meterReadings.period, '2026-10'))))[0]
+    expect(oct.value).toBe(100)
   })
   it('bản xem trước chưa lưu: chỉ số ghi thẳng vào bảng chỉ số, không tạo hoá đơn', async () => {
     const before = (await db.select().from(invoices)).length
     await savePreviewMeterReading(db, ctx(), { leaseId, invoicePeriod: '2026-12', leaseFeeId: feeId, value: 260 })
     expect((await db.select().from(meterReadings).where(and(eq(meterReadings.meterId, meterId), eq(meterReadings.period, '2026-11'))))[0].value).toBe(260)
     expect((await db.select().from(invoices)).length).toBe(before)
-    await expect(savePreviewMeterReading(db, ctx(), { leaseId, invoicePeriod: '2026-12', leaseFeeId: feeId, value: 90 })).rejects.toThrow(ValidationError)
     await expect(savePreviewMeterReading(db, context(['billing'], facilityId), { leaseId, invoicePeriod: '2026-12', leaseFeeId: feeId, value: 300 })).rejects.toThrow(ForbiddenError)
   })
   it('hoá đơn tháng sau đã duyệt vẫn giữ số đã lưu khi chỉ số được sửa; chỉ hoá đơn nháp áp dụng số mới', async () => {
@@ -115,9 +124,9 @@ describe('sửa chỉ số điện trong hoá đơn', () => {
     expect(d.meterPanels).toHaveLength(1)
     expect(d.meterPanels[0]).toMatchObject({ leaseFeeId: feeId, name: 'Điện' })
     expect(d.meterPanels[0].rows).toEqual([
-      { period: '2026-09', readOn: null, value: null, opening: 0, openingSource: 'start' },
-      { period: '2026-10', readOn: '2026-10-31', value: 100, opening: 0, openingSource: 'start' },
-      { period: '2026-11', readOn: '2026-11-30', value: 200, opening: 100, openingSource: 'monthly' },
+      { period: '2026-09', readOn: null, value: null, opening: 0, openingStored: false, openingSource: 'start' },
+      { period: '2026-10', readOn: '2026-10-31', value: 100, opening: 0, openingStored: false, openingSource: 'start' },
+      { period: '2026-11', readOn: '2026-11-30', value: 200, opening: 100, openingStored: false, openingSource: 'monthly' },
     ])
   })
   it('sửa chỉ số tháng đầu kỳ (tháng 10) trong hoá đơn tháng 12: lượng dùng tính lại', async () => {
