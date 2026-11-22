@@ -10,7 +10,7 @@ import { createTenant } from '@/server/tenants/service'
 import type { AccessContext } from '@/domain/access'
 
 it.skipIf(!process.env.TEST_POSTGRES_URL)(
-  'đồng thời tạo hai dòng phí cùng loại: mỗi dòng có đồng hồ riêng',
+  'đồng thời hai dòng phí chọn cùng một đồng hồ: chỉ một dòng thành công',
   async () => {
     const client = postgres(process.env.TEST_POSTGRES_URL!, { max: 4, prepare: false })
     const nativeDb = drizzle(client, { schema })
@@ -44,48 +44,35 @@ it.skipIf(!process.env.TEST_POSTGRES_URL)(
           endDate: '2026-12-31',
           monthlyRent: 0,
           depositAmount: 0,
-          feeModel: 'snapshot',
         })
         .returning()
-      const [unit] = await db.insert(schema.feeUnits).values({ name: 'lượt' }).returning()
-      const [feeType] = await db
-        .insert(schema.feeTypes)
-        .values({ name: 'Race', unitId: unit.id, quantityFrom: 'meter' })
+      const [meter] = await db
+        .insert(schema.meters)
+        .values({ roomId: room.id, utility: 'electric', installedOn: '2026-01-01', startReading: 0 })
         .returning()
       const fees = await db
         .insert(schema.leaseFeeSnapshots)
         .values(
-          [1, 2].map(() => ({
-            leaseId: lease.id,
-            feeTypeId: feeType.id,
-            name: 'Race',
-            unit: 'lượt',
-            quantitySource: 'meter',
-            unitPrice: 1,
-          })),
+          [1, 2].map(() => ({ leaseId: lease.id, name: 'Race', unit: 'kWh', quantitySource: 'meter', unitPrice: 1 })),
         )
         .returning()
-      const results = await Promise.all(
+      const results = await Promise.allSettled(
         fees.map((fee) =>
           db.transaction((tx) =>
             ensureFeeMeter(tx as unknown as DB, admin, {
               roomId: room.id,
-              feeTypeId: feeType.id,
               leaseFeeId: fee.id,
+              existingMeterId: meter.id,
               initialReading: 123,
               installedOn: '2026-01-01',
             }),
           ),
         ),
       )
-      expect(results[0].id).not.toBe(results[1].id)
-      expect(await db.select().from(schema.meters).where(eq(schema.meters.roomId, room.id))).toHaveLength(2)
-      const links = await db.select().from(schema.leaseFeeMeters)
-      expect(links).toEqual(
-        expect.arrayContaining(
-          fees.map((fee, i) => expect.objectContaining({ leaseFeeId: fee.id, meterId: results[i].id })),
-        ),
-      )
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
+      expect(
+        await db.select().from(schema.leaseFeeMeters).where(eq(schema.leaseFeeMeters.meterId, meter.id)),
+      ).toHaveLength(1)
     } finally {
       await client.end()
     }

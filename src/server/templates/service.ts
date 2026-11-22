@@ -1,16 +1,25 @@
-import { and, asc, eq, isNotNull, ne } from 'drizzle-orm'
+import { and, asc, eq, getTableColumns, isNotNull, ne } from 'drizzle-orm'
 import { docTemplates, files, leases } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
-import { DOC_TYPES, PDF_DOC_TYPES, type PdfDocType, type DocEntities, type DocType } from '@/domain/template-fields'
+import {
+  DOC_TYPES,
+  PDF_DOC_TYPES,
+  sampleDataFor,
+  type PdfDocType,
+  type DocEntities,
+  type DocType,
+} from '@/domain/template-fields'
 import { renderTemplate, type TemplateStyle } from '@/domain/doc-template'
 import { recordAudit } from '@/server/audit'
 import { fileAccessPermission } from '@/server/files/owners'
 import { assertFormatAllowed, convertPdfToPng, FORMAT_EXT, type ExportFormat } from '@/server/convert'
 import type { StorageAdapter } from '@/server/storage/types'
 
-export type DocTemplate = Omit<typeof docTemplates.$inferSelect, 'style'> & { style: TemplateStyle }
+export type DocTemplate = Omit<typeof docTemplates.$inferSelect, 'style' | 'previewPdf' | 'previewVersion'> & {
+  style: TemplateStyle
+}
 
 const STYLES: readonly string[] = ['formal', 'modern']
 const MAX_BODY = 200_000
@@ -19,17 +28,79 @@ export const isUsableTemplate = (t: { body: string | null }): boolean => !!t.bod
 
 const isDocType = (v: string): v is DocType => (DOC_TYPES as readonly string[]).includes(v)
 
-/** Ai đăng nhập cũng xem được danh sách mẫu (cần để chọn mẫu khi xuất giấy tờ). */
+/** Ai đăng nhập cũng xem được danh sách mẫu (cần để chọn mẫu khi xuất giấy tờ). Không kèm bản xem PDF (nặng). */
 export async function listTemplates(
   db: Pick<DB, 'select'>,
   _ctx: AccessContext,
   docType?: DocType,
 ): Promise<DocTemplate[]> {
-  const q = db.select().from(docTemplates)
+  const { previewPdf, previewVersion, ...columns } = getTableColumns(docTemplates)
+  void previewPdf
+  void previewVersion
+  const q = db.select(columns).from(docTemplates)
   return (await (docType ? q.where(eq(docTemplates.docType, docType)) : q).orderBy(
     asc(docTemplates.docType),
     asc(docTemplates.createdAt),
   )) as DocTemplate[]
+}
+
+/** Phiên bản bộ dựng bản xem; đổi số này khi cách dựng PDF thay đổi để bản xem đã lưu được dựng lại. */
+export const DOC_TEMPLATE_PREVIEW_VERSION = 1
+
+/** Dựng bản xem và lưu vào mẫu; lỗi dựng không làm hỏng việc lưu mẫu (bản xem để trống, dựng lại ở lần xem sau). Mẫu không có nội dung thì bỏ qua. */
+export async function storeTemplatePreview(
+  db: Pick<DB, 'select' | 'update'>,
+  templateId: string,
+): Promise<string | null> {
+  try {
+    const [t] = await db.select().from(docTemplates).where(eq(docTemplates.id, templateId))
+    if (!t?.body) return null
+    const { doc } = renderTemplate(t.body, sampleDataFor(t.docType as DocType))
+    const bytes = await (await import('@/server/pdf/template-pdf')).renderTemplatePdf(doc, t.style as TemplateStyle)
+    const base64 = Buffer.from(bytes).toString('base64')
+    await db
+      .update(docTemplates)
+      .set({ previewPdf: base64, previewVersion: DOC_TEMPLATE_PREVIEW_VERSION })
+      .where(eq(docTemplates.id, templateId))
+    return base64
+  } catch {
+    return null
+  }
+}
+
+/** Bản xem của một mẫu (gọi khi bấm mở mẫu thu gọn): dùng bản đã lưu, chưa có thì dựng và lưu. */
+export async function getTemplatePreview(db: DB, ctx: AccessContext, id: string): Promise<string> {
+  assertCan(ctx, 'settings')
+  const previews = await listTemplatePreviews(db, ctx, [id])
+  if (!previews[id]) throw new ValidationError('Không dựng được bản xem mẫu')
+  return previews[id]
+}
+
+/** Bản xem của mọi mẫu có nội dung (id → base64): dùng bản đã lưu, dựng và lưu lại mẫu còn thiếu hoặc cũ phiên bản. */
+export async function listTemplatePreviews(
+  db: DB,
+  ctx: AccessContext,
+  ids?: string[],
+): Promise<Record<string, string>> {
+  void ctx
+  const all = await db
+    .select({ id: docTemplates.id, previewPdf: docTemplates.previewPdf, previewVersion: docTemplates.previewVersion })
+    .from(docTemplates)
+    .where(isNotNull(docTemplates.body))
+    .orderBy(asc(docTemplates.createdAt))
+  const rows = ids ? all.filter((r) => ids.includes(r.id)) : all
+  const entries = await Promise.all(
+    rows.map(
+      async (r) =>
+        [
+          r.id,
+          r.previewPdf && r.previewVersion === DOC_TEMPLATE_PREVIEW_VERSION
+            ? r.previewPdf
+            : await storeTemplatePreview(db, r.id),
+        ] as const,
+    ),
+  )
+  return Object.fromEntries(entries.filter((e): e is readonly [string, string] => e[1] !== null))
 }
 
 function checkStyle(style: unknown): TemplateStyle {
@@ -58,7 +129,7 @@ export async function createTemplate(
   if (!name) throw new ValidationError('Nhập tên mẫu', { name: 'Nhập tên mẫu' })
   const body = input.body === undefined ? null : checkBody(input.body)
   const style = input.style === undefined ? 'formal' : checkStyle(input.style)
-  return db.transaction(async (tx) => {
+  const created = await db.transaction(async (tx) => {
     const existing = body
       ? await tx
           .select({ id: docTemplates.id })
@@ -82,8 +153,10 @@ export async function createTemplate(
       summary: `Tạo mẫu giấy tờ ${name}`,
       after: t,
     })
-    return t as DocTemplate
+    return t
   })
+  await storeTemplatePreview(db, created.id)
+  return created as DocTemplate
 }
 
 /** Sửa tên, nội dung (HTML) và kiểu trình bày của mẫu; mẫu đầu tiên của loại có nội dung tự thành mặc định. */
@@ -94,7 +167,11 @@ export async function updateTemplate(
   input: { name?: string; body?: string; style?: TemplateStyle },
 ): Promise<DocTemplate> {
   assertCan(ctx, 'settings')
-  const patch: Partial<typeof docTemplates.$inferInsert> = { updatedAt: new Date() }
+  const patch: Partial<typeof docTemplates.$inferInsert> = {
+    updatedAt: new Date(),
+    previewPdf: null,
+    previewVersion: null,
+  }
   if (input.name !== undefined) {
     const name = input.name.trim()
     if (!name) throw new ValidationError('Nhập tên mẫu', { name: 'Nhập tên mẫu' })
@@ -102,7 +179,7 @@ export async function updateTemplate(
   }
   if (input.body !== undefined) patch.body = checkBody(input.body)
   if (input.style !== undefined) patch.style = checkStyle(input.style)
-  return db.transaction(async (tx) => {
+  const updated = await db.transaction(async (tx) => {
     const [t] = await tx.select().from(docTemplates).where(eq(docTemplates.id, id))
     if (!t) throw new NotFoundError()
     if (patch.body) {
@@ -126,8 +203,10 @@ export async function updateTemplate(
       before: { ...t, body: t.body ? '(đã có)' : null },
       after: { ...after, body: after.body ? '(đã có)' : null },
     })
-    return after as DocTemplate
+    return after
   })
+  await storeTemplatePreview(db, updated.id)
+  return updated as DocTemplate
 }
 
 /** Gắn file .docx đã tải lên (ownerType `template`, ownerId = id mẫu); mẫu đầu tiên của loại tự thành mặc định. */
