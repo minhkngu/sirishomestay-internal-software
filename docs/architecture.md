@@ -2,7 +2,7 @@
 
 Tài liệu cho người (và agent) tiếp tục sửa repo. Đọc trước khi thêm tính năng, dời file hay đổi quy tắc import. Tóm tắt luật nằm ở mục Architecture của `CLAUDE.md`; file này giải thích chi tiết, trạng thái hiện tại và các bẫy.
 
-Cập nhật lần cuối: 20/11/2026.
+Cập nhật lần cuối: 22/11/2026.
 
 ## 1. Các module
 
@@ -14,9 +14,9 @@ Repo là **Modular monolith**: mỗi mảng nghiệp vụ là một module ở `
 | 2 | `users` | người dùng, nhóm quyền, cơ sở được cấp |
 | 2 | `tenants` | khách thuê, giấy tờ tuỳ thân |
 | 2 | `facilities` | cơ sở, phòng, tiện ích, loại phí và giá |
-| 2 | `documents` | mẫu giấy tờ, mẫu hoá đơn, dựng PDF/Word/PNG |
+| 2 | `documents` | mẫu giấy tờ, mẫu hoá đơn, xem sẵn mẫu, dựng PDF/Word/PNG |
 | 3 | `assets` | tài sản, kho, chuyển tài sản |
-| 3 | `meters` | đồng hồ, chỉ số điện nước |
+| 3 | `meters` | đồng hồ (mỗi phòng có sẵn điện, nước — mục 4), chỉ số theo tháng |
 | 4 | `leasing` | cọc, hợp đồng, phụ lục, bàn giao, sổ cọc, phí phát sinh, hoá đơn, thu tiền, sự cố |
 | 5 | `import` | nhập Excel |
 | 5 | `dashboard` | nhắc việc |
@@ -65,17 +65,18 @@ Luật:
 
 - **Quyền:** 7 nhóm (`src/domain/access.ts`). Có `settings` là admin, thấy mọi cơ sở. Người khác chỉ thấy cơ sở được cấp. `assertCan` ném `NotFoundError` khi ngoài phạm vi cơ sở (không lộ sự tồn tại), `ForbiddenError` khi thiếu nhóm quyền. Khách mất cơ sở dùng `NO_FACILITY` (chỉ admin thấy). Số passport/CCCD bị che (`maskId`) với người không có `tenants_contracts`.
 - **Hoá đơn tháng N** (`src/modules/leasing/domain/invoice-builder.ts`): tiền phòng + phí cố định của kỳ N (trả trước); điện, nước, phí theo lần của tháng N−1 (trả sau). Có chia ngày lẻ (`proration.ts`) và hệ số kỳ.
-- **Hai cách lưu phí hợp đồng:** `leases.feeModel` = `'legacy'` (bảng `lease_fees`) hoặc `'snapshot'` (bảng `lease_fee_snapshots`, chụp giá lúc ký). Code xử lý cả hai; đừng xoá nhánh `legacy`.
+- **Phí hợp đồng:** lưu ở `lease_fee_snapshots` (chụp giá lúc ký). Điện, nước là dòng phí gắn đúng một đồng hồ của phòng (bảng `lease_fee_meters`; mức dùng tính ở `src/modules/leasing/domain/meter-fee-usage.ts`), đơn giá lấy từ hợp đồng; không còn kiểu cũ (`lease_fees`, `feeModel`, bảng giá cơ sở `utility_rates`).
 - **Hợp đồng cọc → hợp đồng thuê:** mỗi phòng tối đa 1 hợp đồng cọc `pending` và 1 hợp đồng `active` (unique index có điều kiện trong `src/db/schema/contracts.ts`).
 - **Lịch sử/khôi phục hợp đồng:** mỗi lần sửa/xoá chụp bản ghi vào `contract_versions` (`server/contracts/history.ts`, `restore.ts`).
 - **Ghi chéo trong một transaction:** hàm hậu tố `InTransaction` (`createAssetInTransaction`, `moveAssetsInTransaction`, `setAssetStatusInTransaction`, `startHandoverInTransaction`) nhận `tx` để module khác gọi trong cùng transaction. Giữ mẫu này khi cần ghi qua module.
+- **Phòng mới có sẵn đồng hồ điện, nước:** `createRoom`/`createRoomsBulk` (facilities, tầng 2) không import meters (tầng 3); facilities mở điểm móc `registerRoomsCreatedHook(name, hook)`, chạy mọi hook trong cùng transaction tạo phòng (`hook(tx, roomIds, ngày)`), meters đăng ký `createDefaultMeters` vào đó. Hook lỗi thì phòng cũng không được tạo. Gọi service tạo phòng mà chưa nạp `src/modules/registrations.ts` (vd trong test) thì phòng không có đồng hồ; test `tests/integration/rooms-created-hook.test.ts`.
 - **Dữ liệu demo:** cột `isDemo` đánh dấu dữ liệu giả của `npm run db:seed`.
 
 ## 5. Bẫy đã biết
 
 | Bẫy | Hậu quả | Cách xử lý / trạng thái |
 |---|---|---|
-| Đăng ký kiểu side-effect: `registerOwnerResolver`, `registerExportOwnerResolver`, `registerDocLoader`, `registerPdfLoader` chỉ chạy khi file đăng ký đã được import | Route lạnh báo "Loại tệp chưa được hỗ trợ" hoặc không xuất được giấy tờ | Module có `register*` phải được import trong `src/modules/registrations.ts` — `tests/unit/architecture/registrations.test.ts` kiểm |
+| Đăng ký kiểu side-effect: `registerOwnerResolver`, `registerExportOwnerResolver`, `registerDocLoader`, `registerPdfLoader`, `registerRoomsCreatedHook` chỉ chạy khi file đăng ký đã được import | Route lạnh báo "Loại tệp chưa được hỗ trợ", không xuất được giấy tờ, hoặc phòng mới không có đồng hồ điện nước | Module có `register*` phải được import trong `src/modules/registrations.ts` — `tests/unit/architecture/registrations.test.ts` kiểm |
 | Font PDF dùng đường dẫn cứng `src/modules/documents/server/pdf/fonts/` ở `next.config.ts` (`outputFileTracingIncludes`) và `src/modules/documents/server/pdf/fonts.ts` | Dời thư mục mà quên: local, test vẫn xanh, **PDF trên Vercel hỏng** | Sửa cả hai chỗ; test: `tests/unit/pdf-fonts.test.ts` (bắt lệch đường dẫn hoặc glob); luôn thử "Xem PDF" trên preview |
 | `cascade-delete.ts` (xoá cơ sở/phòng) ghi bảng của hợp đồng, hoá đơn… | Vi phạm luật "ghi bảng module khác" | Ngoại lệ có chủ ý vì DB không có `ON DELETE CASCADE`; không "sửa" bằng cách thêm cascade trong schema nếu chưa bàn |
 | `NEXT_PUBLIC_*` đọc kiểu `process.env[name]` | Không được nhúng vào bundle trình duyệt, đăng nhập hỏng | Luôn viết literal `process.env.NEXT_PUBLIC_X` (gom ở `src/lib/env.ts`) |

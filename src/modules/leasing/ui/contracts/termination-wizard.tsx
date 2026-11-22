@@ -1,4 +1,5 @@
 'use client'
+import { BareSelect } from './contract-form-ui'
 import { useState } from 'react'
 import { createTerminationAction } from '../../server/addenda/actions'
 import { AddendumShell, Field, inputCls, ReadingInputs, toReadings, type MeterOption } from './addendum-shell'
@@ -40,11 +41,16 @@ export function TerminationWizard({
         <input type="date" className={inputCls} value={endDate} onChange={(e) => setEnd(e.target.value)} />
       </Field>
       <Field label="Mất cọc">
-        <select className={inputCls} value={mode} onChange={(e) => setMode(e.target.value as 'none')}>
-          <option value="none">Không mất cọc</option>
-          <option value="partial">Mất một phần</option>
-          <option value="all">Mất toàn bộ</option>
-        </select>
+        <BareSelect
+          ariaLabel="Mất cọc"
+          value={mode}
+          onValueChange={(next) => setMode(next as 'none' | 'partial' | 'all')}
+          options={[
+            { value: 'none', label: 'Không mất cọc' },
+            { value: 'partial', label: 'Mất một phần' },
+            { value: 'all', label: 'Mất toàn bộ' },
+          ]}
+        />
       </Field>
       {mode === 'partial' && (
         <Field label="Số tiền mất cọc">

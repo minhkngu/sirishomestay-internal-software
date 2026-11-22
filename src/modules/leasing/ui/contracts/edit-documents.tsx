@@ -1,12 +1,13 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatDateVN, todayVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { DEPOSIT_ENTRY_LABELS } from '../../domain/deposit'
 import type { DepositEntry } from '@/domain/types'
+import { BareSelect } from './contract-form-ui'
 
 export type DepositRow = { id: string; date: string; type: string; amount: number; status: string }
 export type DocsDraft = {
@@ -174,25 +175,20 @@ export function EditDocuments({
                                   })
                                 }
                               />
-                              <select
-                                aria-label="Hình thức"
-                                className="h-7 rounded-lg border bg-background px-1 text-xs"
+                              <BareSelect
+                                ariaLabel="Hình thức"
                                 value={done.method}
-                                onChange={(ev) =>
+                                onValueChange={(method) =>
                                   set({
                                     doneEntries: {
                                       ...draft.doneEntries,
-                                      [e.id]: { ...done, method: ev.target.value as 'cash' },
+                                      [e.id]: { ...done, method: method as 'cash' },
                                     },
                                   })
                                 }
-                              >
-                                {Object.entries(METHOD).map(([k, v]) => (
-                                  <option key={k} value={k}>
-                                    {v}
-                                  </option>
-                                ))}
-                              </select>
+                                options={Object.entries(METHOD).map(([k, v]) => ({ value: k, label: v }))}
+                                className="h-7 w-36 rounded-lg px-2 py-0 text-xs"
+                              />
                               <Button
                                 type="button"
                                 size="sm"
@@ -262,24 +258,27 @@ export function EditDocuments({
 
 function NewEntry({ onAdd }: { onAdd: (entry: DocsDraft['newEntries'][number]) => void }) {
   const dateRef = useRef<HTMLInputElement>(null)
-  const typeRef = useRef<HTMLSelectElement>(null)
   const amountRef = useRef<HTMLInputElement>(null)
+  const [type, setType] = useState<'topup' | 'collect' | 'deduct' | 'refund' | 'forfeit'>('topup')
   return (
     <div className="flex flex-wrap items-end gap-2 text-sm">
       <label className="grid gap-0.5 text-xs">
         Ngày
         <Input ref={dateRef} type="date" className="h-8" defaultValue={todayVN()} />
       </label>
-      <label className="grid gap-0.5 text-xs">
-        Loại
-        <select ref={typeRef} className="h-8 rounded-lg border bg-background px-2 text-sm">
-          {(['topup', 'collect', 'deduct', 'refund', 'forfeit'] as const).map((k) => (
-            <option key={k} value={k}>
-              {DEPOSIT_ENTRY_LABELS[k]}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="grid gap-0.5 text-xs">
+        <span>Loại</span>
+        <BareSelect
+          ariaLabel="Loại"
+          value={type}
+          onValueChange={(value) => setType(value as 'topup' | 'collect' | 'deduct' | 'refund' | 'forfeit')}
+          options={(['topup', 'collect', 'deduct', 'refund', 'forfeit'] as const).map((k) => ({
+            value: k,
+            label: DEPOSIT_ENTRY_LABELS[k],
+          }))}
+          className="h-8 w-28 rounded-lg px-2 py-0 text-xs"
+        />
+      </div>
       <label className="grid gap-0.5 text-xs">
         Số tiền
         <Input ref={amountRef} type="number" min="1" step="1" className="h-8 w-32" />
@@ -291,12 +290,7 @@ function NewEntry({ onAdd }: { onAdd: (entry: DocsDraft['newEntries'][number]) =
         onClick={() => {
           const amount = Number(amountRef.current?.value)
           if (!dateRef.current?.value || !Number.isSafeInteger(amount) || amount < 1) return
-          onAdd({
-            key: crypto.randomUUID(),
-            date: dateRef.current.value,
-            type: typeRef.current!.value as 'topup',
-            amount,
-          })
+          onAdd({ key: crypto.randomUUID(), date: dateRef.current.value, type, amount })
           if (amountRef.current) amountRef.current.value = ''
         }}
       >

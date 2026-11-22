@@ -8,7 +8,6 @@ import {
   feeUnits,
   handoverItems,
   invoiceTemplates,
-  leaseFees,
   leaseFeeSnapshots,
   leaseOccupants,
   leases,
@@ -28,7 +27,7 @@ import { createAssetInTransaction, moveAssetsInTransaction, setAssetStatusInTran
 import { startHandoverInTransaction } from '../handovers/service'
 import { loadRoom, loadTenant, toDomainEntry, type Lease } from './shared'
 import { contractFees, nextLeaseCode } from './lease-queries'
-import type { LeaseCreated, LeaseFeeInput, LeaseInput, LegacyFeeInput } from './lease-types'
+import type { LeaseCreated, LeaseFeeInput, LeaseInput } from './lease-types'
 
 /** Bước 1: nạp phòng, khách, kiểm tra mẫu, ngày, tiền, người ở và phòng chưa có hợp đồng đang hiệu lực. */
 async function validateLeaseInput(tx: DB, ctx: AccessContext, input: LeaseInput) {
@@ -57,17 +56,10 @@ async function validateLeaseInput(tx: DB, ctx: AccessContext, input: LeaseInput)
     throw new ValidationError('Tiền thuê quá lớn (tối đa 2.147.483.647)', { monthlyRent: 'Tiền thuê quá lớn' })
   if (input.depositAmount > MAX_MONEY)
     throw new ValidationError('Tiền cọc quá lớn (tối đa 2.147.483.647)', { depositAmount: 'Tiền cọc quá lớn' })
-  const occupants =
-    input.feeModel === 'snapshot'
-      ? [...new Set([tenant.id, ...(input.occupantIds ?? [])])]
-      : [...new Set(input.occupantIds?.length ? input.occupantIds : [tenant.id])]
+  const occupants = [...new Set([tenant.id, ...(input.occupantIds ?? [])])]
   if (occupants.length === 0)
     throw new ValidationError('Chọn ít nhất một người ở', { occupantIds: 'Chọn ít nhất một người ở' })
-  for (const o of occupants) {
-    const occupant = await loadTenant(tx, ctx, o)
-    if (input.feeModel !== 'snapshot' && occupant.kind === 'company' && occupant.id !== tenant.id)
-      throw new ValidationError('Người ở phải là khách cá nhân', { occupantIds: 'Người ở phải là khách cá nhân' })
-  }
+  for (const o of occupants) await loadTenant(tx, ctx, o)
 
   const [active] = await tx
     .select()
@@ -104,11 +96,9 @@ async function insertLeaseRow(
       note: input.note ?? '',
       contractTemplateId: input.contractTemplateId ?? null,
       invoiceTemplateId: input.invoiceTemplateId ?? null,
-      feeModel: input.feeModel ?? 'legacy',
       dueRule: input.dueRule ?? null,
       proration: input.proration ?? null,
       billingCycleMonths: input.billingCycleMonths ?? 1,
-      billWaterByMeter: input.billWaterByMeter ?? true,
       fromDepositContractId: fromDepositId,
     })
     .returning()
@@ -116,14 +106,24 @@ async function insertLeaseRow(
   return lease
 }
 
-/** Bước 3a: ghi phí dạng bản chụp phí (kiểm tra từng dòng, gắn đồng hồ nếu cần). */
-async function insertSnapshotFees(tx: DB, ctx: AccessContext, lease: Lease, room: LeaseRoom, input: LeaseInput) {
-  const fees = input.fees as LeaseFeeInput[]
+type MeterStart = { leaseFeeId: string; reading: number }
+
+/** Bước 3: ghi phí dạng bản chụp phí (kiểm tra từng dòng, gắn đồng hồ nếu cần). Trả về chỉ số đầu của các phí theo đồng hồ. */
+async function insertLeaseFees(
+  tx: DB,
+  ctx: AccessContext,
+  lease: Lease,
+  room: LeaseRoom,
+  input: LeaseInput,
+): Promise<MeterStart[]> {
+  const meterStarts: MeterStart[] = []
+  if (!input.fees?.length) return meterStarts
+  const fees = input.fees
   // Phí tính theo đồng hồ được thêm nhiều dòng cùng loại (mỗi dòng một đồng hồ); các phí khác chỉ một dòng mỗi loại
   const meterIds = fees.flatMap((f) => (f.existingMeterId ? [f.existingMeterId] : []))
   if (new Set(meterIds).size !== meterIds.length) throw new ValidationError('Đồng hồ bị chọn trùng')
   const seenCommon = new Set<string>()
-  for (const fee of input.fees as LeaseFeeInput[]) {
+  for (const fee of fees) {
     if (
       !Number.isSafeInteger(fee.unitPrice) ||
       fee.unitPrice < 0 ||
@@ -171,23 +171,18 @@ async function insertSnapshotFees(tx: DB, ctx: AccessContext, lease: Lease, room
         unitPrice: fee.unitPrice,
       })
       .returning()
-    if (source === 'meter')
+    if (source === 'meter') {
       await ensureFeeMeter(tx, ctx, {
         roomId: room.id,
-        feeTypeId: fee.feeTypeId,
         leaseFeeId: savedFee.id,
         initialReading: fee.initialReading,
         existingMeterId: fee.existingMeterId,
         installedOn: input.startDate,
       })
+      meterStarts.push({ leaseFeeId: savedFee.id, reading: fee.initialReading! })
+    }
   }
-}
-
-/** Bước 3: ghi phí của hợp đồng theo mô hình phí đã chọn. */
-async function insertLeaseFees(tx: DB, ctx: AccessContext, lease: Lease, room: LeaseRoom, input: LeaseInput) {
-  if (input.fees?.length && input.feeModel === 'snapshot') await insertSnapshotFees(tx, ctx, lease, room, input)
-  else if (input.fees?.length)
-    await tx.insert(leaseFees).values((input.fees as LegacyFeeInput[]).map((f) => ({ leaseId: lease.id, ...f })))
+  return meterStarts
 }
 
 /** Bước 4: sổ cọc. Trả về số cọc đã nhận. */
@@ -359,6 +354,7 @@ async function finishLease(
   room: LeaseRoom,
   occupants: string[],
   received: number,
+  meterStarts: MeterStart[],
   createdHandoverItems: Array<{ assetCode: string; itemId: string }>,
 ): Promise<LeaseCreated> {
   // hoá đơn đầu tiên (nháp) — bảng hoá đơn nối ở Task 14, trước đó trả về dòng nháp
@@ -367,7 +363,6 @@ async function finishLease(
   const fees = await contractFees(tx, lease.id)
   const terms: LeaseTerms = {
     billingCycleMonths: lease.billingCycleMonths,
-    billWaterByMeter: lease.billWaterByMeter,
     roomId: lease.roomId,
     startDate: lease.startDate,
     endDate: lease.endDate,
@@ -376,7 +371,7 @@ async function finishLease(
     fees,
     occupantIds: occupants,
   }
-  const firstInvoiceLines = buildFirstInvoice(terms, lease.startDate, proration, received)
+  const firstInvoiceLines = buildFirstInvoice(terms, lease.startDate, proration, received, meterStarts)
   await recordAudit(tx, ctx, {
     action: 'create',
     entity: 'lease',
@@ -396,8 +391,8 @@ export async function insertLease(
 ): Promise<LeaseCreated> {
   const { room, tenant, occupants } = await validateLeaseInput(tx, ctx, input)
   const lease = await insertLeaseRow(tx, input, room, tenant, occupants, fromDepositId)
-  await insertLeaseFees(tx, ctx, lease, room, input)
+  const meterStarts = await insertLeaseFees(tx, ctx, lease, room, input)
   const received = await recordLeaseDeposit(tx, lease, input, fromDepositId)
   const createdHandoverItems = input.handover ? await applyCheckInHandover(tx, ctx, lease, room, input.handover) : []
-  return finishLease(tx, ctx, lease, room, occupants, received, createdHandoverItems)
+  return finishLease(tx, ctx, lease, room, occupants, received, meterStarts, createdHandoverItems)
 }

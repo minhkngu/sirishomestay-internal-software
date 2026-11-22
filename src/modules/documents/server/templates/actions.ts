@@ -16,6 +16,7 @@ import { restoreDefaultTemplates } from './defaults'
 import {
   attachTemplateFile,
   createTemplate,
+  getTemplatePreview,
   updateTemplate,
   exportDocument,
   previewDocument,
@@ -138,4 +139,10 @@ export async function previewDocumentAction(input: { docType: DocType; entityId:
     const r = await previewDocument(db, ctx, input)
     return { base64: toBase64(r.bytes), name: r.name, mime: MIME.pdf, warnings: r.warnings }
   })
+}
+
+/** Lấy bản xem đã lưu của một mẫu khi bấm mở (không dựng lại nếu đã có). */
+export async function getTemplatePreviewAction(id: string) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => ({ base64: await getTemplatePreview(db, ctx, id) }))
 }

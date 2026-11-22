@@ -47,7 +47,7 @@ src/
       index.ts            cổng công khai phía server
       actions.ts          cổng server action cho giao diện
       ui.ts               cổng component
-    registrations.ts      đăng ký resolver/loader (tải tệp, xuất giấy tờ)
+    registrations.ts      đăng ký resolver/loader/hook (tải tệp, xuất giấy tờ, đồng hồ mặc định của phòng)
   domain/                 lõi dùng chung: tiền, ngày, lỗi, quyền, trạng thái
   components/             UI dùng chung (shadcn trong ui/, khung app trong app-shell/)
   lib/                    tiện ích, client Supabase, biến môi trường
@@ -60,9 +60,9 @@ src/
 | 2 | `users` | người dùng, nhóm quyền, cơ sở được cấp |
 | 2 | `tenants` | khách thuê, giấy tờ tuỳ thân |
 | 2 | `facilities` | cơ sở, phòng, tiện ích, loại phí và giá |
-| 2 | `documents` | mẫu giấy tờ, mẫu hoá đơn, dựng PDF/Word/PNG |
+| 2 | `documents` | mẫu giấy tờ, mẫu hoá đơn, xem sẵn mẫu, dựng PDF/Word/PNG |
 | 3 | `assets` | tài sản, kho, chuyển tài sản |
-| 3 | `meters` | đồng hồ, chỉ số điện nước |
+| 3 | `meters` | đồng hồ (mỗi phòng có sẵn điện, nước), chỉ số theo tháng |
 | 4 | `leasing` | cọc, hợp đồng, phụ lục, bàn giao, sổ cọc, phí phát sinh, hoá đơn, thu tiền, sự cố |
 | 5 | `import`, `dashboard` | nhập Excel; nhắc việc |
 

@@ -1,6 +1,16 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { facilities, meterReadings, meters, rooms } from '@/db'
-import { listMeterOverview, listReadingSheet, saveReadings, replaceMeter } from '@/modules/meters/server/meters/service'
+import { facilities, leaseFeeMeters, leaseFeeSnapshots, leases, meterReadings, meters, rooms, tenants } from '@/db'
+import {
+  addRoomMeter,
+  createDefaultMeters,
+  ensureFeeMeter,
+  listMeterOverview,
+  listReadingSheet,
+  saveReadings,
+  replaceMeter,
+  suggestMeterFinalReading,
+  listMonthlyReadings,
+} from '@/modules/meters/server/meters/service'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import type { AccessContext, Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'
@@ -61,14 +71,48 @@ describe('meters', () => {
     await read('W201', '2026-09', '2026-09-30', 80)
   })
 
-  it('bảng ghi: mỗi phòng có chỉ số kỳ trước, chỉ số kỳ này, tiêu thụ và tiến độ', async () => {
+  async function occupy(roomId: string, code: string, over: Partial<typeof leases.$inferInsert> = {}) {
+    const [tenant] = await db
+      .insert(tenants)
+      .values({
+        kind: 'vietnamese',
+        homeFacilityId: fa,
+        fullName: `Khách ${code}`,
+        phone: `+8490123${code.padStart(4, '0')}`,
+        idNumber: `0123456${code.padStart(5, '0')}`,
+      })
+      .returning()
+    await db.insert(leases).values({
+      code,
+      roomId,
+      tenantId: tenant.id,
+      startDate: '2026-01-01',
+      endDate: '2027-01-01',
+      monthlyRent: 1,
+      depositAmount: 1,
+      ...over,
+    })
+  }
+
+  it('bảng ghi: mỗi phòng có chỉ số kỳ trước, chỉ số kỳ này, tiêu thụ và tiến độ theo phòng có người ở', async () => {
+    await occupy(r101, 'A1')
+    await occupy(r102, 'A2')
     await read('E101', '2026-10', '2026-10-31', 1100)
     const sheet = await listReadingSheet(db, hung(), fa, '2026-10')
     expect(sheet.rows.map((r) => r.roomCode)).toEqual(['101', '102', '201'])
     const r = sheet.rows[0]
     expect(r.electric).toMatchObject({ meterId: m.E101, previous: 1000, current: 1100, usage: 100 })
     expect(sheet.rows[1].electric).toMatchObject({ previous: 500, current: null, usage: null })
-    expect(sheet.progress).toEqual({ recorded: 1, total: 3 }) // tiến độ tính theo điện
+    expect(sheet.rows.map((x) => x.occupied)).toEqual([true, true, false])
+    expect(sheet.progress).toEqual({ recorded: 1, total: 2 }) // tiến độ tính theo điện của phòng có người ở
+  })
+
+  it('phòng chỉ có hợp đồng đã kết thúc hoặc chưa bắt đầu trong kỳ không được coi là có người ở', async () => {
+    await occupy(r101, 'B1', { status: 'ended', endDate: '2026-09-30' })
+    await occupy(r102, 'B2', { startDate: '2026-11-15' })
+    const sheet = await listReadingSheet(db, hung(), fa, '2026-10')
+    expect(sheet.rows.map((x) => x.occupied)).toEqual([false, false, false])
+    expect(sheet.progress).toEqual({ recorded: 0, total: 0 })
   })
 
   it('chỉ số nhỏ hơn kỳ trước → lỗi ở đúng dòng, các dòng khác vẫn lưu', async () => {
@@ -81,6 +125,223 @@ describe('meters', () => {
     expect(r.errors).toEqual([{ meterId: m.E102, message: 'Chỉ số mới nhỏ hơn chỉ số cũ' }])
     const sheet = await listReadingSheet(db, hung(), fa, '2026-10')
     expect(sheet.rows.map((x) => x.electric?.current)).toEqual([1100, null, 1300])
+  })
+
+  it('thay đồng hồ chuyển liên kết dòng phí sang đồng hồ mới', async () => {
+    const [tenant] = await db
+      .insert(tenants)
+      .values({
+        kind: 'vietnamese',
+        homeFacilityId: fa,
+        fullName: 'Khách',
+        phone: '+84901234567',
+        idNumber: '012345678901',
+      })
+      .returning()
+    const [lease] = await db
+      .insert(leases)
+      .values({
+        code: 'HD1',
+        roomId: r101,
+        tenantId: tenant.id,
+        startDate: '2026-01-01',
+        endDate: '2027-01-01',
+        monthlyRent: 1,
+        depositAmount: 1,
+      })
+      .returning()
+    const [fee] = await db
+      .insert(leaseFeeSnapshots)
+      .values({
+        leaseId: lease.id,
+        name: 'Điện',
+        unit: 'kWh',
+        quantitySource: 'meter',
+        billing: 'per_occurrence',
+        unitPrice: 3500,
+      })
+      .returning()
+    await db.insert(leaseFeeMeters).values({ leaseFeeId: fee.id, meterId: m.E101 })
+    await replaceMeter(db, hung(), r101, 'electric', { removedOn: '2026-10-20', finalReading: 1260, startReading: 0 })
+    const [link] = await db.select().from(leaseFeeMeters).where(eq(leaseFeeMeters.leaseFeeId, fee.id))
+    const fresh = (await db.select().from(meters).where(eq(meters.roomId, r101))).find(
+      (x) => x.utility === 'electric' && x.removedOn === null,
+    )!
+    expect(link.meterId).toBe(fresh.id)
+    expect(link.meterId).not.toBe(m.E101)
+  })
+
+  describe('gắn đồng hồ của phòng cho dòng phí', () => {
+    const contractCtx = () => ctxOf(['tenants_contracts', 'meters'], [fa])
+    async function leaseFee(roomId: string, code: string) {
+      const [tenant] = await db
+        .insert(tenants)
+        .values({
+          kind: 'vietnamese',
+          homeFacilityId: fa,
+          fullName: `Khách ${code}`,
+          phone: `+8490123${code.padStart(4, '0')}`,
+          idNumber: `0123456${code.padStart(5, '0')}`,
+        })
+        .returning()
+      const [lease] = await db
+        .insert(leases)
+        .values({
+          code,
+          roomId,
+          tenantId: tenant.id,
+          startDate: '2026-01-01',
+          endDate: '2027-01-01',
+          monthlyRent: 1,
+          depositAmount: 1,
+        })
+        .returning()
+      const [fee] = await db
+        .insert(leaseFeeSnapshots)
+        .values({
+          leaseId: lease.id,
+          name: 'Phí',
+          unit: 'đv',
+          quantitySource: 'meter',
+          billing: 'per_occurrence',
+          unitPrice: 1,
+        })
+        .returning()
+      return { lease, fee }
+    }
+    const attach = (roomId: string, leaseFeeId: string, existingMeterId?: string) =>
+      db.transaction((tx) =>
+        ensureFeeMeter(tx as unknown as DB, contractCtx(), {
+          roomId,
+          leaseFeeId,
+          existingMeterId,
+          initialReading: 1000,
+          installedOn: '2026-10-01',
+        }),
+      )
+
+    it('đồng hồ điện của phòng chọn được cho phí bất kỳ; ghi chỉ số bàn giao tại ngày bắt đầu', async () => {
+      const { fee } = await leaseFee(r101, '1')
+      await attach(r101, fee.id, m.E101)
+      const [link] = await db.select().from(leaseFeeMeters).where(eq(leaseFeeMeters.leaseFeeId, fee.id))
+      expect(link.meterId).toBe(m.E101)
+      const handover = (await db.select().from(meterReadings).where(eq(meterReadings.meterId, m.E101))).find(
+        (r) => r.kind === 'handover',
+      )
+      expect(handover).toMatchObject({ readOn: '2026-10-01', value: 1000 })
+    })
+
+    it('chọn đồng hồ của phòng khác bị từ chối', async () => {
+      const { fee } = await leaseFee(r101, '2')
+      await expect(attach(r101, fee.id, m.E102)).rejects.toThrow('Đồng hồ không thuộc phòng này')
+    })
+
+    it('đồng hồ đã gắn dòng phí của hợp đồng đang chạy bị từ chối', async () => {
+      const { fee } = await leaseFee(r101, '3')
+      await attach(r101, fee.id, m.E101)
+      const [tenant2] = await db
+        .insert(tenants)
+        .values({
+          kind: 'vietnamese',
+          homeFacilityId: fa,
+          fullName: 'Khách 4',
+          phone: '+84901230004',
+          idNumber: '012345600004',
+        })
+        .returning()
+      const [lease2] = await db
+        .insert(leases)
+        .values({
+          code: '4',
+          roomId: r101,
+          tenantId: tenant2.id,
+          startDate: '2026-01-01',
+          endDate: '2027-01-01',
+          monthlyRent: 1,
+          depositAmount: 1,
+          status: 'ended',
+        })
+        .returning()
+      const [fee2] = await db
+        .insert(leaseFeeSnapshots)
+        .values({
+          leaseId: lease2.id,
+          name: 'Phí',
+          unit: 'đv',
+          quantitySource: 'meter',
+          billing: 'per_occurrence',
+          unitPrice: 1,
+        })
+        .returning()
+      // đồng hồ đang gắn phí của hợp đồng đang chạy (hợp đồng 3) nên dòng phí khác không dùng được
+      await expect(attach(r101, fee2.id, m.E101)).rejects.toThrow('Đồng hồ đang gắn với phí của hợp đồng khác')
+    })
+
+    it('thiếu đồng hồ được chọn bị từ chối', async () => {
+      const { fee } = await leaseFee(r101, '5')
+      await expect(attach(r101, fee.id, undefined)).rejects.toThrow('Chọn đồng hồ cho phí')
+    })
+
+    it('addRoomMeter thêm đồng hồ có tên cho phòng và cần quyền đồng hồ của cơ sở', async () => {
+      const created = await addRoomMeter(db, hung(), r101, {
+        name: ' Máy giặt ',
+        startReading: 5,
+        installedOn: '2026-10-01',
+        serial: ' X1 ',
+      })
+      const [row] = await db.select().from(meters).where(eq(meters.id, created.id))
+      expect(row).toMatchObject({
+        roomId: r101,
+        name: 'Máy giặt',
+        utility: 'fee',
+        serial: 'X1',
+        startReading: 5,
+        removedOn: null,
+        code: 'DH-BT-101-03',
+      }) // phòng đã có 2 đồng hồ
+      await expect(
+        addRoomMeter(db, ctxOf(['meters'], [fb]), r101, {
+          name: 'Máy sấy',
+          startReading: 0,
+          installedOn: '2026-10-01',
+        }),
+      ).rejects.toThrow(NotFoundError)
+    })
+
+    it('addRoomMeter bắt buộc có tên và không trùng tên đồng hồ đang dùng của phòng', async () => {
+      await expect(
+        addRoomMeter(db, hung(), r101, { name: '  ', startReading: 0, installedOn: '2026-10-01' }),
+      ).rejects.toThrow('Nhập tên đồng hồ')
+      await addRoomMeter(db, hung(), r101, { name: 'Máy giặt', startReading: 0, installedOn: '2026-10-01' })
+      await expect(
+        addRoomMeter(db, hung(), r101, { name: 'máy giặt', startReading: 0, installedOn: '2026-10-01' }),
+      ).rejects.toThrow('Tên đồng hồ đã có trong phòng')
+      await addRoomMeter(db, hung(), r102, { name: 'Máy giặt', startReading: 0, installedOn: '2026-10-01' }) // phòng khác dùng lại tên được
+    })
+
+    it('đồng hồ mặc định có tên Điện, Nước và thay đồng hồ giữ nguyên tên', async () => {
+      const [room] = await db.insert(rooms).values({ facilityId: fa, code: '301' }).returning()
+      await createDefaultMeters(db, [room.id], '2026-10-01')
+      expect(
+        (await db.select().from(meters).where(eq(meters.roomId, room.id))).map((x) => [x.name, x.code]).sort(),
+      ).toEqual([
+        ['Nước', 'DH-BT-301-02'],
+        ['Điện', 'DH-BT-301-01'],
+      ])
+      await replaceMeter(db, hung(), room.id, 'electric', { removedOn: '2026-10-20', finalReading: 0, startReading: 0 })
+      const active = (await db.select().from(meters).where(eq(meters.roomId, room.id))).filter(
+        (x) => x.removedOn === null,
+      )
+      expect(active.map((x) => x.name).sort()).toEqual(['Nước', 'Điện'])
+      expect(active.find((x) => x.name === 'Điện')!.code).toBe('DH-BT-301-03') // đồng hồ mới nối tiếp số thứ tự của phòng
+    })
+  })
+
+  it('chỉ số kỳ trước không được lớn hơn chỉ số đã ghi của kỳ sau', async () => {
+    await read('E101', '2026-10', '2026-10-31', 1100)
+    const r = await saveReadings(db, hung(), '2026-09', [{ meterId: m.E101, value: 1200, readOn: '2026-09-30' }])
+    expect(r.saved).toBe(0)
+    expect(r.errors).toEqual([{ meterId: m.E101, message: 'Chỉ số lớn hơn chỉ số của kỳ sau' }])
   })
 
   it('ghi lại cùng kỳ thì cập nhật, không tạo dòng trùng', async () => {
@@ -191,5 +452,157 @@ describe('meters', () => {
   it('người ngoài phạm vi cơ sở bị từ chối, người thiếu quyền meters bị từ chối', async () => {
     await expect(listMeterOverview(db, ctxOf(['meters'], [fb]), fa)).rejects.toThrow(NotFoundError)
     await expect(listMeterOverview(db, ctxOf(['billing'], [fa]), fa)).rejects.toThrow(ForbiddenError)
+  })
+
+  describe('thay công tơ ước tính', () => {
+    const oldE101 = () =>
+      db
+        .select()
+        .from(meters)
+        .where(eq(meters.id, m.E101))
+        .then((r) => r[0])
+
+    it('thay công tơ ước tính lưu cờ và lý do trên công tơ cũ', async () => {
+      await replaceMeter(db, hung(), r101, 'electric', {
+        removedOn: '2026-10-20',
+        finalReading: 1060,
+        startReading: 0,
+        estimated: true,
+        note: 'Công tơ cháy, không đọc được',
+      })
+      const old = await oldE101()
+      expect(old).toMatchObject({
+        finalReading: 1060,
+        finalReadingEstimated: true,
+        estimateNote: 'Công tơ cháy, không đọc được',
+      })
+    })
+
+    it('thay thường không bật cờ ước tính', async () => {
+      await replaceMeter(db, hung(), r101, 'electric', { removedOn: '2026-10-20', finalReading: 1060, startReading: 0 })
+      expect(await oldE101()).toMatchObject({ finalReadingEstimated: false, estimateNote: null })
+    })
+
+    it('ước tính mà thiếu lý do bị từ chối với lỗi ở trường note', async () => {
+      const err = await replaceMeter(db, hung(), r101, 'electric', {
+        removedOn: '2026-10-20',
+        finalReading: 1060,
+        startReading: 0,
+        estimated: true,
+        note: '  ',
+      }).catch((e) => e)
+      expect(err).toBeInstanceOf(ValidationError)
+      expect(err.fieldErrors?.note).toBeTruthy()
+      expect((await oldE101()).removedOn).toBeNull()
+    })
+
+    it('chỉ số cuối ước tính nhỏ hơn chỉ số đã ghi bị từ chối', async () => {
+      await expect(
+        replaceMeter(db, hung(), r101, 'electric', {
+          removedOn: '2026-10-20',
+          finalReading: 900,
+          startReading: 0,
+          estimated: true,
+          note: 'hỏng',
+        }),
+      ).rejects.toThrow(ValidationError)
+    })
+
+    it('suggestMeterFinalReading: chỉ số gần nhất cộng trung bình mức dùng 3 tháng gần nhất', async () => {
+      await read('E101', '2026-06', '2026-06-30', 700)
+      await read('E101', '2026-07', '2026-07-31', 790)
+      await read('E101', '2026-08', '2026-08-31', 900)
+      expect(await suggestMeterFinalReading(db, hung(), r101, 'electric')).toEqual({ value: 1100, basis: 'average' })
+    })
+
+    it('suggestMeterFinalReading: công tơ chỉ có một chỉ số trả chỉ số đó với basis last', async () => {
+      expect(await suggestMeterFinalReading(db, hung(), r101, 'electric')).toEqual({ value: 1000, basis: 'last' })
+    })
+
+    it('suggestMeterFinalReading: công tơ chưa có chỉ số nào trả chỉ số đầu với basis last', async () => {
+      const [room] = await db.insert(rooms).values({ facilityId: fa, code: '301', floor: '3' }).returning()
+      await db
+        .insert(meters)
+        .values({ roomId: room.id, utility: 'electric', installedOn: '2026-01-01', startReading: 50 })
+      expect(await suggestMeterFinalReading(db, hung(), room.id, 'electric')).toEqual({ value: 50, basis: 'last' })
+    })
+
+    it('suggestMeterFinalReading không thấp hơn chỉ số bàn giao đã ghi sau chỉ số tháng gần nhất', async () => {
+      await db
+        .insert(meterReadings)
+        .values({ meterId: m.E101, period: '2026-10', kind: 'handover', readOn: '2026-10-10', value: 1050 })
+      const s = await suggestMeterFinalReading(db, hung(), r101, 'electric')
+      expect(s.value).toBeGreaterThanOrEqual(1050)
+      await expect(
+        replaceMeter(db, hung(), r101, 'electric', {
+          removedOn: '2026-10-20',
+          finalReading: s.value,
+          startReading: 0,
+          estimated: true,
+          note: 'hỏng',
+        }),
+      ).resolves.toBeUndefined()
+    })
+
+    it('người không có quyền meters của toà không gợi ý được', async () => {
+      await expect(suggestMeterFinalReading(db, ctxOf(['meters'], [fb]), r101, 'electric')).rejects.toThrow(
+        NotFoundError,
+      )
+      await expect(suggestMeterFinalReading(db, ctxOf(['billing'], [fa]), r101, 'electric')).rejects.toThrow(
+        ForbiddenError,
+      )
+    })
+
+    it('listMeterOverview trả cờ và lý do ước tính của công tơ đã gỡ', async () => {
+      await replaceMeter(db, hung(), r101, 'electric', {
+        removedOn: '2026-10-20',
+        finalReading: 1060,
+        startReading: 0,
+        estimated: true,
+        note: 'cháy',
+      })
+      const rows = (await listMeterOverview(db, hung(), fa)).filter((r) => r.roomId === r101 && r.removedOn)
+      expect(rows).toHaveLength(1)
+      expect(rows[0]).toMatchObject({ finalReadingEstimated: true, estimateNote: 'cháy' })
+    })
+  })
+
+  describe('listMonthlyReadings', () => {
+    it('trả 6 kỳ kết thúc ở kỳ cuối, ô có chỉ số và mức dùng, ô chưa ghi để trống', async () => {
+      await read('E101', '2026-10', '2026-10-31', 1100)
+      const r = await listMonthlyReadings(db, hung(), fa, '2026-10')
+      expect(r.periods).toEqual(['2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10'])
+      const row = r.rows.find((x) => x.roomCode === '101')!
+      expect(row.electric).toHaveLength(6)
+      expect(row.electric[4]).toMatchObject({ period: '2026-09', values: [1000] })
+      expect(row.electric[5]).toMatchObject({ period: '2026-10', values: [1100], usage: 100 })
+      expect(row.electric[0].values).toEqual([])
+    })
+
+    it('phòng thiếu công tơ vẫn có hàng với ô rỗng', async () => {
+      await db.insert(rooms).values({ facilityId: fa, code: '301', floor: '3' })
+      const row = (await listMonthlyReadings(db, hung(), fa, '2026-10')).rows.find((x) => x.roomCode === '301')!
+      expect(row.electric.every((c) => c.values.length === 0)).toBe(true)
+      expect(row.water).toHaveLength(6)
+    })
+
+    it('chỉ trả phòng đang dùng của toà được chọn', async () => {
+      await db.update(rooms).set({ isActive: false }).where(eq(rooms.id, r102))
+      await db.insert(rooms).values({ facilityId: fb, code: 'X1' })
+      expect((await listMonthlyReadings(db, hung(), fa, '2026-10')).rows.map((x) => x.roomCode)).toEqual(['101', '201'])
+    })
+
+    it('người không có quyền toà đó hoặc thiếu quyền meters bị từ chối', async () => {
+      await expect(listMonthlyReadings(db, ctxOf(['meters'], [fb]), fa, '2026-10')).rejects.toThrow(NotFoundError)
+      await expect(listMonthlyReadings(db, ctxOf(['billing'], [fa]), fa, '2026-10')).rejects.toThrow(ForbiddenError)
+    })
+
+    it('toà không có phòng trả rows rỗng, số kỳ tối đa 12, kỳ sai bị từ chối', async () => {
+      const ctx = ctxOf(['meters'], [fb])
+      const empty = await listMonthlyReadings(db, ctx, fb, '2026-10', 24)
+      expect(empty.rows).toEqual([])
+      expect(empty.periods).toHaveLength(12)
+      await expect(listMonthlyReadings(db, hung(), fa, '2026-13')).rejects.toThrow(ValidationError)
+    })
   })
 })
