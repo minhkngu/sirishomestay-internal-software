@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
-import { Check, Pencil, Trash2 } from 'lucide-react'
+import { Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { FacilityFilter } from '@/components/list/facility-filter'
@@ -17,7 +17,7 @@ import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { cn } from '@/lib/utils'
 import { deleteExpenseAction, deletePaymentAction } from '@/server/cashbook/actions'
-import { DepositDialog, CollectRentDialog, DepositDoneDialog, type LeaseTarget } from './lease-dialogs'
+import { DepositDialog, CollectRentDialog, type LeaseTarget } from './lease-dialogs'
 import { ExpenseDialog, type ExpenseDraft, type RoomOption } from './expense-dialog'
 
 type Facility = { id: string; name: string }
@@ -53,7 +53,6 @@ export function CashbookList({ rows, depositHeld, facilities, rooms, leases, exp
   const [dialog, setDialog] = useState<null | 'expense' | 'rent' | 'deposit'>(null)
   const [editing, setEditing] = useState<ExpenseDetail | null>(null)
   const [removing, setRemoving] = useState<LedgerRow | null>(null)
-  const [confirming, setConfirming] = useState<LedgerRow | null>(null)
   const names = useMemo(() => Object.fromEntries(facilities.map((f) => [f.id, f.name])), [facilities])
 
   const scoped = useMemo(() => rows.filter((r) => selected.length === 0 || selected.includes(r.facilityId)), [rows, selected])
@@ -78,10 +77,7 @@ export function CashbookList({ rows, depositHeld, facilities, rooms, leases, exp
     )
     : r.source === 'payment'
       ? <div className="flex justify-end"><Button type="button" variant="ghost" size="icon-sm" aria-label="Xoá khoản thu" title="Xoá khoản thu" onClick={() => setRemoving(r)}><Trash2 className="size-4" /></Button></div>
-    : r.source === 'deposit' && r.status === 'pending'
-      ? <Button type="button" variant="outline" size="sm" onClick={() => setConfirming(r)}><Check className="size-4" />Xác nhận</Button>
-      : null
-  const badge = (r: LedgerRow) => r.status === 'pending' ? 'chờ thu' : !r.counted ? 'không tiền mặt' : null
+    : null
   const amountCell = (r: LedgerRow) => (
     <span className={cn('font-semibold tabular-nums', !r.counted ? 'text-muted-foreground' : r.direction === 'in' ? 'text-emerald-700' : 'text-rose-700')}>
       {r.direction === 'in' ? '+' : '−'}{formatVND(r.amount)}
@@ -133,7 +129,7 @@ export function CashbookList({ rows, depositHeld, facilities, rooms, leases, exp
             {pageRows.map((r) => (
               <tr key={r.key} className="hover:bg-muted/30">
                 <td className="p-3 whitespace-nowrap text-muted-foreground">{formatDateVN(r.date)}{r.time && <span className="ml-1.5 text-xs tabular-nums text-muted-foreground/80">{r.time}</span>}</td>
-                <td className="p-3 whitespace-nowrap"><span className="font-medium">{r.label}</span>{badge(r) && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{badge(r)}</span>}</td>
+                <td className="p-3 whitespace-nowrap"><span className="font-medium">{r.label}</span></td>
                 <td className="max-w-[170px] truncate p-3 text-muted-foreground" title={where(r)}>{where(r)}</td>
                 <td className="p-3"><div className="max-w-[160px] truncate" title={r.party}>{r.party || '—'}</div>{r.method && <div className="text-xs text-muted-foreground">{METHOD_LABEL[r.method] ?? r.method}</div>}</td>
                 <td className="max-w-[150px] truncate p-3 text-muted-foreground" title={r.note}>{r.note || '—'}</td>
@@ -150,7 +146,7 @@ export function CashbookList({ rows, depositHeld, facilities, rooms, leases, exp
         {pageRows.map((r) => (
           <li key={r.key} className="flex items-start justify-between gap-3 p-3">
             <div className="min-w-0">
-              <p className="font-medium">{r.label}{badge(r) && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">{badge(r)}</span>}</p>
+              <p className="font-medium">{r.label}</p>
               <p className="truncate text-xs text-muted-foreground">{formatDateVN(r.date)}{r.time ? ` ${r.time}` : ''} · {where(r)}{r.party ? ` · ${r.party}` : ''}</p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">{amountCell(r)}{actions(r)}</div>
@@ -164,7 +160,6 @@ export function CashbookList({ rows, depositHeld, facilities, rooms, leases, exp
       {editing && <ExpenseDialog open onOpenChange={(o) => !o && setEditing(null)} facilities={facilities} rooms={rooms} initial={editing} />}
       {dialog === 'rent' && <CollectRentDialog open onOpenChange={(o) => !o && setDialog(null)} leases={leases} />}
       {dialog === 'deposit' && <DepositDialog open onOpenChange={(o) => !o && setDialog(null)} leases={leases} />}
-      {confirming && <DepositDoneDialog open onOpenChange={(o) => !o && setConfirming(null)} id={confirming.id} label={confirming.label} amount={confirming.amount} />}
       <ConfirmDialog open={!!removing} onOpenChange={(o) => !o && setRemoving(null)} title={removing?.source === 'payment' ? 'Xoá khoản thu?' : 'Xoá khoản chi?'} description={removing?.source === 'payment' ? 'Khoản thu bị gỡ, dư nợ hoá đơn tăng lại. Có ghi nhật ký.' : 'Khoản chi sẽ bị gỡ khỏi sổ quỹ, có ghi nhật ký.'} confirmLabel="Xoá" destructive onConfirm={() => removing && remove(removing)} />
     </>
   )

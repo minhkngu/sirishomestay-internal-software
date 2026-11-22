@@ -12,7 +12,7 @@ import { MoneyInput } from '@/components/ui/money-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { todayVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
-import { addDepositEntryAction, markDepositDoneAction } from '@/server/charges/actions'
+import { addDepositEntryAction } from '@/server/charges/actions'
 
 export type LeaseTarget = { leaseId: string; facilityId: string; roomCode: string; tenantName: string; debt: number }
 const METHODS = [
@@ -117,46 +117,6 @@ export function DepositDialog({ open, onOpenChange, leases }: { open: boolean; o
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Huỷ</Button>
           <Button type="button" disabled={pending || !leaseId || value <= 0} onClick={submit}>Ghi sổ</Button>
-        </div>
-      </div>
-    </FormDialog>
-  )
-}
-
-/** Xác nhận một dòng cọc đang chờ đã thu hoặc đã hoàn. */
-export function DepositDoneDialog({ open, onOpenChange, id, label, amount }: { open: boolean; onOpenChange: (open: boolean) => void; id: string; label: string; amount: number }) {
-  const router = useRouter()
-  const [pending, start] = useTransition()
-  const [date, setDate] = useState(todayVN())
-  const [method, setMethod] = useState('cash')
-  const [error, setError] = useState('')
-  const submit = () => start(async () => {
-    const r = await markDepositDoneAction(id, { date, method: method as 'cash' })
-    if (!r.ok) { setError(r.error); return }
-    toast.success('Đã xác nhận')
-    onOpenChange(false)
-    router.refresh()
-  })
-  return (
-    <FormDialog open={open} onOpenChange={onOpenChange} title={`Xác nhận: ${label}`} description={`Số tiền ${formatVND(amount)}.`} size="sm">
-      <div className="space-y-4 pb-1">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="done-date">Ngày</Label>
-            <Input id="done-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-9" />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Hình thức</Label>
-            <Select value={method} onValueChange={(v) => v && setMethod(String(v))} items={METHODS}>
-              <SelectTrigger aria-label="Hình thức" className="h-9 w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>{METHODS.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-        </div>
-        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Huỷ</Button>
-          <Button type="button" disabled={pending} onClick={submit}>Xác nhận</Button>
         </div>
       </div>
     </FormDialog>

@@ -24,7 +24,7 @@ describe('sổ quỹ thu chi', () => {
     const [lease] = await db.insert(leases).values({ code: 'HD1', roomId, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-12-31', monthlyRent: 9000000, depositAmount: 9000000 }).returning(); leaseId = lease.id
   })
 
-  it('gộp thu tiền thuê, cọc và chi; chờ thu, trừ cọc, mất cọc không cộng vào Thu/Chi', async () => {
+  it('gộp thu tiền thuê, cọc và chi; chờ thu, trừ cọc, mất cọc không hiện và không cộng vào Thu/Chi', async () => {
     const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-08' }); await approveInvoice(db, ctx(), inv.id, {})
     await recordLeasePayment(db, ctx(), leaseId, { paidOn: '2026-08-10', amount: 4000000, method: 'cash' })
     await db.insert(depositEntries).values([
@@ -35,7 +35,8 @@ describe('sổ quỹ thu chi', () => {
     ])
     await addExpense(db, ctx(), expense())
     const { rows, depositHeld } = await listCashbook(db, ctx(), { month: '2026-08' })
-    expect(rows.map(r => r.source).sort()).toEqual(['deposit', 'deposit', 'deposit', 'deposit', 'expense', 'payment'])
+    // Chỉ khoản tiền đã thực nhận/chi mới hiện: cọc đã thu, chi, thu tiền thuê; cọc chờ thu, trừ cọc, mất cọc không hiện
+    expect(rows.map(r => r.source).sort()).toEqual(['deposit', 'expense', 'payment'])
     expect(summarize(rows)).toEqual({ income: 13000000, expense: 500000, net: 12500000 })
     expect(depositHeld).toBe(8700000)
   })
