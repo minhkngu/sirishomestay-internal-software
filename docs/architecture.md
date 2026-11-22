@@ -83,7 +83,7 @@ Luật chuyển tiếp (bỏ ở Task 22): code cũ (`src/server`, `src/features
 
 - **Quyền:** 7 nhóm (`src/domain/access.ts`). Có `settings` là admin, thấy mọi cơ sở. Người khác chỉ thấy cơ sở được cấp. `assertCan` ném `NotFoundError` khi ngoài phạm vi cơ sở (không lộ sự tồn tại), `ForbiddenError` khi thiếu nhóm quyền. Khách mất cơ sở dùng `NO_FACILITY` (chỉ admin thấy). Số passport/CCCD bị che (`maskId`) với người không có `tenants_contracts`.
 - **Hoá đơn tháng N** (`src/domain/invoice-builder.ts`): tiền phòng + phí cố định của kỳ N (trả trước); điện, nước, phí theo lần của tháng N−1 (trả sau). Có chia ngày lẻ (`proration.ts`) và hệ số kỳ.
-- **Hai cách lưu phí hợp đồng:** `leases.feeModel` = `'legacy'` (bảng `lease_fees`) hoặc `'snapshot'` (bảng `lease_fee_snapshots`, chụp giá lúc ký). Code xử lý cả hai; đừng xoá nhánh `legacy`.
+- **Phí hợp đồng:** lưu ở `lease_fee_snapshots` (chụp giá lúc ký). Điện, nước là dòng phí gắn đúng một đồng hồ của phòng, đơn giá lấy từ hợp đồng; không còn kiểu cũ (`lease_fees`, `feeModel`, bảng giá cơ sở `utility_rates`).
 - **Hợp đồng cọc → hợp đồng thuê:** mỗi phòng tối đa 1 hợp đồng cọc `pending` và 1 hợp đồng `active` (unique index có điều kiện trong `src/db/schema/contracts.ts`).
 - **Lịch sử/khôi phục hợp đồng:** mỗi lần sửa/xoá chụp bản ghi vào `contract_versions` (`server/contracts/history.ts`, `restore.ts`).
 - **Ghi chéo trong một transaction:** hàm hậu tố `InTransaction` (`createAssetInTransaction`, `moveAssetsInTransaction`, `setAssetStatusInTransaction`, `startHandoverInTransaction`) nhận `tx` để module khác gọi trong cùng transaction. Giữ mẫu này khi cần ghi qua module.
