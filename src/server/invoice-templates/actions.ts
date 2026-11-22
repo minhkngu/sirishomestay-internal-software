@@ -5,11 +5,13 @@ import '@/modules/registrations'
 import { revalidatePath } from 'next/cache'
 import { db } from '@/db/client'
 import { toActionResult } from '@/lib/action-result'
+import { assertCan } from '@/domain/access'
 import { getAccessContext } from '@/modules/platform'
 import type { TemplateStyle } from '@/domain/doc-template'
 import { restoreDefaultInvoiceTemplates } from './defaults'
 import {
   createInvoiceTemplate,
+  getInvoiceTemplatePreview,
   previewInvoiceTemplateById,
   previewInvoiceTemplateHtml,
   deleteInvoiceTemplate,
@@ -75,5 +77,14 @@ export async function restoreDefaultInvoiceTemplatesAction() {
     const created = await restoreDefaultInvoiceTemplates(db, ctx)
     refresh()
     return { created }
+  })
+}
+
+/** Lấy bản xem đã lưu của một mẫu hoá đơn khi bấm mở (không dựng lại nếu đã có). */
+export async function getInvoiceTemplatePreviewAction(id: string) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => {
+    assertCan(ctx, 'settings')
+    return { base64: await getInvoiceTemplatePreview(db, id) }
   })
 }
