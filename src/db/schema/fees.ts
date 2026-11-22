@@ -1,4 +1,4 @@
-import { boolean, date, integer, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core'
+import { boolean, integer, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core'
 import { facilities } from './facilities'
 
 export const feeUnits = pgTable('fee_units', {
@@ -23,23 +23,6 @@ export const feeTypes = pgTable('fee_types', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
-
-export const utilityRates = pgTable(
-  'utility_rates',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    facilityId: uuid('facility_id')
-      .notNull()
-      .references(() => facilities.id),
-    utility: text('utility').notNull(), // electric | water
-    pricePerUnit: integer('price_per_unit').notNull(),
-    effectiveFrom: date('effective_from', { mode: 'string' }).notNull(),
-    isDemo: boolean('is_demo').notNull().default(false),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [unique('utility_rates_facility_utility_from_unique').on(t.facilityId, t.utility, t.effectiveFrom)],
-)
 
 export const feeTypePrices = pgTable(
   'fee_type_prices',
