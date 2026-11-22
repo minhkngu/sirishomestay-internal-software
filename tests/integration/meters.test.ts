@@ -378,10 +378,10 @@ describe('meters', () => {
       expect(cell).toMatchObject({ previous: 40, previousReadOn: '2026-09-20', previousKind: 'start', current: null, usage: null })
     })
 
-    it('lịch sử: dòng bàn giao đầu hợp đồng có số đầu bằng số cuối và mức dùng 0', async () => {
+    it('lịch sử chỉ hiện lần chốt tháng; chỉ số bàn giao không hiện, số đầu tháng đầu lấy chỉ số đó', async () => {
       await midMonthLease()
       const rows = (await listReadingHistory(db, hung(), fa, '2026-10', '2026-10')).filter((x) => x.meterId === m.E101)
-      expect(rows.map((x) => [x.kind, x.opening, x.closing, x.usage])).toEqual([['monthly', 1250, 1300, 50], ['handover', 1250, 1250, 0]])
+      expect(rows.map((x) => [x.kind, x.opening, x.closing, x.usage])).toEqual([['monthly', 1250, 1300, 50]])
     })
 
     it('tổng quan đồng hồ trả ngày bắt đầu hợp đồng đang chạy để nhận ra dòng bàn giao đầu', async () => {
@@ -391,9 +391,8 @@ describe('meters', () => {
       expect(active.leaseStartDates).toEqual(['2026-10-15'])
       await db.update(leases).set({ status: 'ended' }).where(eq(leases.roomId, r101))
       expect((await listMeterOverview(db, hung(), fa)).find((r) => r.meterId === m.E101)!.leaseStartDate).toBeNull()
-      // Hợp đồng đã kết thúc thì dòng bàn giao đầu vẫn là mốc mở chuỗi, không tính mức dùng
-      const handover = (await listReadingHistory(db, hung(), fa, '2026-10', '2026-10')).find((x) => x.meterId === m.E101 && x.kind === 'handover')!
-      expect(handover).toMatchObject({ opening: 1250, closing: 1250, usage: 0 })
+      // Chỉ số bàn giao không phải lần chốt nên không có dòng trong lịch sử
+      expect((await listReadingHistory(db, hung(), fa, '2026-10', '2026-10')).some((x) => x.kind === 'handover')).toBe(false)
     })
   })
 

@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Nhắc việc' })).toBeVisible()
 })
 
-test('menu Chỉ số và trang có hai tab Chốt chỉ số, Đồng hồ', async ({ page }) => {
+test('menu Chỉ số và trang có hai tab Chốt chỉ số, Đồng hồ; tab Chốt chỉ số là danh sách theo tháng', async ({ page }) => {
   const nav = page.getByRole('navigation').first()
   await expect(nav.getByRole('link', { name: 'Chỉ số', exact: true }).first()).toBeVisible()
   await expect(page.getByRole('link', { name: 'Điện nước', exact: true })).toHaveCount(0)
@@ -18,8 +18,8 @@ test('menu Chỉ số và trang có hai tab Chốt chỉ số, Đồng hồ', as
   await expect(page.getByLabel('Kỳ ghi')).toBeVisible()
   await expect(page.getByRole('link', { name: 'Chốt chỉ số', exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Theo tháng', exact: true })).toHaveCount(0)
-  await page.getByRole('link', { name: 'Lịch sử', exact: true }).click()
-  await expect(page).toHaveURL(/view=history/)
+  await expect(page.getByRole('button', { name: 'Chốt chỉ số', exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Lịch sử', exact: true })).toHaveCount(0)
   await page.getByRole('link', { name: 'Đồng hồ', exact: true }).click()
   await expect(page).toHaveURL(/tab=meters/)
   await expect(page.getByLabel('Kỳ ghi')).toHaveCount(0)

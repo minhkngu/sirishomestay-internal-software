@@ -17,8 +17,8 @@ import type { ReadingHistoryRow } from '@/server/meters/service'
 const fmt = (value: number) => value.toLocaleString('vi-VN')
 const monthLabel = (period: string) => `${Number(period.slice(5))}/${period.slice(0, 4)}`
 
-/** Lịch sử chốt chỉ số: mỗi dòng một lần chốt (phòng, đồng hồ, tháng, số đầu, số cuối, ngày chốt). Chỉ số tháng đã dùng trong hoá đơn đã duyệt thì khoá; chỉ số bàn giao chỉ để tham khảo nên không khoá. */
-export function ReadingHistory({ rows }: { rows: ReadingHistoryRow[] }) {
+/** Các đồng hồ đã chốt trong tháng đang lọc: mỗi dòng một lần chốt (đồng hồ, phòng · toà, số đầu, số cuối, ngày chốt). Chỉ số tháng đã dùng trong hoá đơn đã duyệt thì khoá; chỉ số bàn giao chỉ để tham khảo nên không khoá. */
+export function ReadingHistory({ rows, facilityName }: { rows: ReadingHistoryRow[]; facilityName: string }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [editing, setEditing] = useState<ReadingHistoryRow | null>(null)
@@ -69,10 +69,10 @@ export function ReadingHistory({ rows }: { rows: ReadingHistoryRow[] }) {
     })
   }
 
-  const status = (r: ReadingHistoryRow) => r.lockedBy
-      ? <span title={`Đang dùng trong hoá đơn ${r.lockedBy} đã duyệt`} className="inline-flex items-center gap-1 rounded-full border border-border/80 bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground"><Lock className="size-3" />{r.kind === 'handover' ? 'Bàn giao · ' : ''}Đã khoá · {r.lockedBy}</span>
-      : <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">{r.kind === 'handover' ? 'Bàn giao · Mở' : 'Mở'}</span>
-  const actions = (r: ReadingHistoryRow) => !r.lockedBy && (
+  const lockIcon = (r: ReadingHistoryRow) => r.lockedBy ? <span title={`Đang dùng trong hoá đơn ${r.lockedBy} đã duyệt, không sửa được`} className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Lock className="size-3" />{r.lockedBy}</span> : null
+  const meterCell = (r: ReadingHistoryRow) => <><div className="text-foreground">{r.meterName}</div>{r.meterCode && <div className="text-[11px] text-muted-foreground">{r.meterCode}</div>}</>
+  const roomCell = (r: ReadingHistoryRow) => `Phòng ${r.roomCode} · ${facilityName}`
+  const actions = (r: ReadingHistoryRow) => r.lockedBy ? <div className="flex justify-end">{lockIcon(r)}</div> : (
     <div className="flex justify-end gap-1.5">
       <Button size="sm" variant="outline" disabled={pending} onClick={() => openEdit(r)}>Sửa</Button>
       <Button size="sm" variant="outline" disabled={pending} className="border-rose-200/80 text-rose-700 hover:bg-rose-50 hover:text-rose-800" onClick={() => setDeleting(r)}>Xoá</Button>
@@ -80,7 +80,7 @@ export function ReadingHistory({ rows }: { rows: ReadingHistoryRow[] }) {
   )
 
   if (rows.length === 0) {
-    return <div className="rounded-2xl border border-dashed border-border/80 bg-card/60 p-8 text-center text-xs text-muted-foreground">Không có lần chốt chỉ số nào trong khoảng này.</div>
+    return <div className="rounded-2xl border border-dashed border-border/80 bg-card/60 p-8 text-center text-xs text-muted-foreground">Tháng này chưa có đồng hồ nào được chốt.</div>
   }
   return (
     <div className="rounded-2xl border border-border/80 bg-card">
@@ -90,14 +90,11 @@ export function ReadingHistory({ rows }: { rows: ReadingHistoryRow[] }) {
           <thead>
             <tr className="text-xs text-muted-foreground">
               <th className="w-10 px-4 py-2.5"><input type="checkbox" aria-label="Chọn tất cả" className="size-3.5 rounded border-border text-primary focus:ring-primary/30" checked={allChosen} ref={(el) => { if (el) el.indeterminate = chosen.length > 0 && !allChosen }} onChange={toggleAll} disabled={selectable.length === 0} /></th>
-              <th className="px-4 py-2.5 text-left font-normal">Phòng</th>
               <th className="px-4 py-2.5 text-left font-normal">Đồng hồ</th>
-              <th className="px-4 py-2.5 text-left font-normal">Tháng</th>
+              <th className="px-4 py-2.5 text-left font-normal">Phòng · Toà</th>
               <th className="px-4 py-2.5 text-right font-normal">Số đầu</th>
               <th className="px-4 py-2.5 text-right font-normal">Số cuối</th>
-              <th className="px-4 py-2.5 text-right font-normal">Dùng</th>
               <th className="px-4 py-2.5 text-left font-normal">Ngày chốt</th>
-              <th className="px-4 py-2.5 text-left font-normal">Trạng thái</th>
               <th className="w-40 px-4 py-2.5" aria-label="Thao tác" />
             </tr>
           </thead>
@@ -105,14 +102,11 @@ export function ReadingHistory({ rows }: { rows: ReadingHistoryRow[] }) {
             {rows.map((r) => (
               <tr key={r.id} className="border-t border-border/60">
                 <td className="px-4 py-2.5">{!r.lockedBy && <input type="checkbox" aria-label={`Chọn ${r.meterName} phòng ${r.roomCode} tháng ${monthLabel(r.period)}`} className="size-3.5 rounded border-border text-primary focus:ring-primary/30" checked={selected.has(r.id)} onChange={() => toggle(r.id)} />}</td>
-                <td className="px-4 py-2.5 font-medium tabular-nums text-foreground">{r.roomCode}</td>
-                <td className="px-4 py-2.5"><div className="text-foreground">{r.meterName}</div>{r.meterCode && <div className="text-[11px] text-muted-foreground">{r.meterCode}</div>}</td>
-                <td className="px-4 py-2.5 tabular-nums">{monthLabel(r.period)}</td>
+                <td className="px-4 py-2.5">{meterCell(r)}</td>
+                <td className="px-4 py-2.5 text-foreground">{roomCell(r)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{fmt(r.opening)}</td>
                 <td className="px-4 py-2.5 text-right font-medium tabular-nums text-foreground">{fmt(r.closing)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums">{fmt(r.usage)}{r.unit && <span className="ml-1 text-[11px] text-muted-foreground">{r.unit}</span>}</td>
                 <td className="px-4 py-2.5 tabular-nums">{formatDateVN(r.readOn)}</td>
-                <td className="px-4 py-2.5">{status(r)}</td>
                 <td className="px-4 py-2.5">{actions(r)}</td>
               </tr>
             ))}
@@ -122,18 +116,16 @@ export function ReadingHistory({ rows }: { rows: ReadingHistoryRow[] }) {
       <ul className="divide-y divide-border/60 lg:hidden">
         {rows.map((r) => (
           <li key={r.id} className="space-y-2 px-4 py-3">
-            <div className="flex items-start justify-between gap-2">
+            <div className="flex items-start gap-2">
               {!r.lockedBy && <input type="checkbox" aria-label={`Chọn ${r.meterName} phòng ${r.roomCode} tháng ${monthLabel(r.period)}`} className="mt-1 size-3.5 rounded border-border text-primary focus:ring-primary/30" checked={selected.has(r.id)} onChange={() => toggle(r.id)} />}
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium text-foreground"><span className="tabular-nums">Phòng {r.roomCode}</span> · {r.meterName}</div>
-                <div className="mt-0.5 text-[11px] text-muted-foreground">Tháng {monthLabel(r.period)} · chốt {formatDateVN(r.readOn)}</div>
+                <div className="text-sm font-medium text-foreground">{r.meterName}</div>
+                <div className="mt-0.5 text-[11px] text-muted-foreground">{roomCell(r)} · chốt {formatDateVN(r.readOn)}</div>
               </div>
-              {status(r)}
             </div>
-            <div className="grid grid-cols-3 gap-2 text-xs tabular-nums">
+            <div className="grid grid-cols-2 gap-2 text-xs tabular-nums">
               <div><div className="text-muted-foreground">Số đầu</div><div className="mt-0.5 text-foreground">{fmt(r.opening)}</div></div>
               <div><div className="text-muted-foreground">Số cuối</div><div className="mt-0.5 font-medium text-foreground">{fmt(r.closing)}</div></div>
-              <div className="text-right"><div className="text-muted-foreground">Dùng</div><div className="mt-0.5 text-foreground">{fmt(r.usage)}</div></div>
             </div>
             {actions(r)}
           </li>
@@ -157,7 +149,7 @@ export function ReadingHistory({ rows }: { rows: ReadingHistoryRow[] }) {
         onConfirm={removeMany}
       />
       {editing && (
-        <FormDialog open onOpenChange={(o) => { if (!o) setEditing(null) }} title={`Sửa chỉ số ${editing.meterName} phòng ${editing.roomCode}`} description={editing.kind === 'handover' ? 'Chỉ số bàn giao · không tính vào chuỗi chỉ số tháng' : `Tháng ${monthLabel(editing.period)} · số đầu ${fmt(editing.opening)}`} size="sm">
+        <FormDialog open onOpenChange={(o) => { if (!o) setEditing(null) }} title={`Sửa chỉ số ${editing.meterName} phòng ${editing.roomCode}`} description={`Tháng ${monthLabel(editing.period)} · số đầu ${fmt(editing.opening)}`} size="sm">
           <div className="space-y-3">
             <div className="space-y-1.5"><Label htmlFor="history-value">Số cuối kỳ</Label><Input id="history-value" inputMode="numeric" value={value} onChange={(e) => setValue(e.target.value)} className="text-right tabular-nums" /></div>
             <DateField id="history-read-on" label="Ngày chốt" value={readOn} onValueChange={setReadOn} />

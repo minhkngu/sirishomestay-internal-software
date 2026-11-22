@@ -419,10 +419,9 @@ export async function listReadingHistory(db: DB, ctx: AccessContext, facilityId:
     const asc = [...m.readings].sort((a, b) => (a.readOn < b.readOn ? -1 : a.readOn > b.readOn ? 1 : 0))
     let prev = m.startReading
     for (const r of asc) {
-      if (r.period >= from && r.period <= to) {
-        // Dòng bàn giao đầu hợp đồng mở chuỗi chỉ số: số đầu bằng số cuối, mức dùng 0
-        const opensLease = r.kind === 'handover' && m.leaseStartDates.includes(r.readOn)
-        rows.push({ id: r.id, meterId: m.meterId, roomId: m.roomId, roomCode: m.roomCode, floor: m.floor, meterName: typeName(m.meterName), meterCode: m.meterCode, unit: m.unit, kind: r.kind, period: r.period, readOn: r.readOn, opening: opensLease ? r.value : prev, closing: r.value, usage: opensLease ? 0 : Math.max(r.value - prev, 0), lockedBy: r.kind === 'monthly' ? (locked.get(`${m.roomId}|${r.period}`) ?? null) : null })
+      // Chỉ số ban đầu (bàn giao) chỉ để tham khảo khi lập hoá đơn đầu, không phải lần chốt: không hiện trong danh sách
+      if (r.kind === 'monthly' && r.period >= from && r.period <= to) {
+        rows.push({ id: r.id, meterId: m.meterId, roomId: m.roomId, roomCode: m.roomCode, floor: m.floor, meterName: typeName(m.meterName), meterCode: m.meterCode, unit: m.unit, kind: r.kind, period: r.period, readOn: r.readOn, opening: prev, closing: r.value, usage: Math.max(r.value - prev, 0), lockedBy: r.kind === 'monthly' ? (locked.get(`${m.roomId}|${r.period}`) ?? null) : null })
       }
       prev = r.value
     }

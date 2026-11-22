@@ -106,7 +106,7 @@ export function MeterList({ rows }: { rows: MeterOverviewRow[] }) {
                         </summary>
                         <ul className="mt-1.5 space-y-0.5 text-[11px] tabular-nums text-muted-foreground">
                           {row.readings.map((reading, index) => (
-                            <li key={`${reading.readOn}-${index}`}>{formatDateVN(reading.readOn)} · {fmt(reading.value)}{reading.kind === 'handover' ? ' · bàn giao' : ''}</li>
+                            <li key={`${reading.readOn}-${index}`}>{formatDateVN(reading.readOn)} · {fmt(reading.value)}{reading.kind === 'handover' ? ' · chỉ số ban đầu' : ''}</li>
                           ))}
                         </ul>
                       </details>
