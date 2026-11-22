@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { formatDateVN } from '@/domain/dates'
-import { deleteMeterReadingAction, deleteMeterReadingsAction, updateMeterReadingAction } from '@/server/meters/actions'
+import { deleteMeterReadingAction, deleteMeterReadingsAction, saveOpeningsAction, updateMeterReadingAction } from '@/server/meters/actions'
 import type { ReadingHistoryRow } from '@/server/meters/service'
 
 const fmt = (value: number) => value.toLocaleString('vi-VN')
@@ -23,6 +23,7 @@ export function ReadingHistory({ rows, facilityName }: { rows: ReadingHistoryRow
   const [pending, start] = useTransition()
   const [editing, setEditing] = useState<ReadingHistoryRow | null>(null)
   const [value, setValue] = useState('')
+  const [openValue, setOpenValue] = useState('')
   const [readOn, setReadOn] = useState('')
   const [deleting, setDeleting] = useState<ReadingHistoryRow | null>(null)
   const [error, setError] = useState('')
@@ -45,11 +46,19 @@ export function ReadingHistory({ rows, facilityName }: { rows: ReadingHistoryRow
     })
   }
 
-  const openEdit = (row: ReadingHistoryRow) => { setEditing(row); setValue(String(row.closing)); setReadOn(row.readOn); setError('') }
+  const openEdit = (row: ReadingHistoryRow) => { setEditing(row); setValue(String(row.closing)); setOpenValue(String(row.opening)); setReadOn(row.readOn); setError('') }
   const save = () => {
     if (!editing) return
     if (!/^\d+$/.test(value.trim())) { setError('Nhập số cuối kỳ là số nguyên không âm'); return }
+    if (!/^\d+$/.test(openValue.trim())) { setError('Nhập số đầu kỳ là số nguyên không âm'); return }
+    if (Number(value) < Number(openValue)) { setError('Số cuối kỳ không được nhỏ hơn số đầu kỳ'); return }
     start(async () => {
+      // Số đầu là lần ghi liền trước: lưu trước để số cuối kiểm theo số đầu mới
+      if (Number(openValue) !== editing.opening) {
+        const o = await saveOpeningsAction(editing.period, [{ meterId: editing.meterId, value: Number(openValue) }])
+        if (!o.ok) { setError(o.error); return }
+        if (o.data.errors.length > 0) { setError(o.data.errors[0].message); return }
+      }
       const r = await updateMeterReadingAction(editing.id, { value: Number(value), readOn })
       if (!r.ok) { setError(r.error); return }
       toast.success('Đã sửa chỉ số')
@@ -149,8 +158,9 @@ export function ReadingHistory({ rows, facilityName }: { rows: ReadingHistoryRow
         onConfirm={removeMany}
       />
       {editing && (
-        <FormDialog open onOpenChange={(o) => { if (!o) setEditing(null) }} title={`Sửa chỉ số ${editing.meterName} phòng ${editing.roomCode}`} description={`Tháng ${monthLabel(editing.period)} · số đầu ${fmt(editing.opening)}`} size="sm">
+        <FormDialog open onOpenChange={(o) => { if (!o) setEditing(null) }} title={`Sửa chỉ số ${editing.meterName} phòng ${editing.roomCode}`} description={`Tháng ${monthLabel(editing.period)} · số đầu là lần ghi liền trước, sửa số đầu là sửa lần ghi đó`} size="sm">
           <div className="space-y-3">
+            <div className="space-y-1.5"><Label htmlFor="history-open">Số đầu kỳ</Label><Input id="history-open" inputMode="numeric" value={openValue} onChange={(e) => setOpenValue(e.target.value)} className="text-right tabular-nums" /></div>
             <div className="space-y-1.5"><Label htmlFor="history-value">Số cuối kỳ</Label><Input id="history-value" inputMode="numeric" value={value} onChange={(e) => setValue(e.target.value)} className="text-right tabular-nums" /></div>
             <DateField id="history-read-on" label="Ngày chốt" value={readOn} onValueChange={setReadOn} />
             {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
