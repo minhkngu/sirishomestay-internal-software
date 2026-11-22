@@ -44,7 +44,7 @@ describe('meters', () => {
 
   async function occupy(roomId: string, code: string, over: Partial<typeof leases.$inferInsert> = {}) {
     const [tenant] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: fa, fullName: `Khách ${code}`, phone: `+8490123${code.padStart(4, '0')}`, idNumber: `0123456${code.padStart(5, '0')}` }).returning()
-    await db.insert(leases).values({ code, roomId, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-01-01', monthlyRent: 1, depositAmount: 1, ...over })
+    return (await db.insert(leases).values({ code, roomId, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-01-01', monthlyRent: 1, depositAmount: 1, ...over }).returning())[0]
   }
 
   it('bảng ghi: mỗi phòng có chỉ số kỳ trước, chỉ số kỳ này, tiêu thụ và tiến độ theo phòng có người ở', async () => {
@@ -352,6 +352,43 @@ describe('meters', () => {
     it('người không có quyền meters nhận rỗng', async () => {
       const { lease } = await feeLease('2026-10-15')
       expect(await listLeaseMeterInitials(db, ctxOf(['tenants_contracts'], [fa]), lease.id)).toEqual({})
+    })
+  })
+
+  describe('trang chỉ số khớp chuỗi hoá đơn', () => {
+    // Hợp đồng bắt đầu giữa tháng: chốt bàn giao 15/10 là số đầu, chốt tháng 31/10 là số cuối
+    async function midMonthLease() {
+      const lease = await occupy(r101, 'C1', { startDate: '2026-10-15' })
+      const [fee] = await db.insert(leaseFeeSnapshots).values({ leaseId: lease.id, name: 'Điện', unit: 'kWh', quantitySource: 'meter', billing: 'per_occurrence', unitPrice: 3500 }).returning()
+      await db.insert(leaseFeeMeters).values({ leaseFeeId: fee.id, meterId: m.E101 })
+      await db.insert(meterReadings).values({ meterId: m.E101, period: '2026-10', readOn: '2026-10-15', value: 1250, kind: 'handover' })
+      await read('E101', '2026-10', '2026-10-31', 1300)
+    }
+
+    it('bảng ghi lấy số đầu là chốt bàn giao gần nhất, không phải chốt tháng trước', async () => {
+      await midMonthLease()
+      const cell = (await listReadingSheet(db, hung(), fa, '2026-10')).rows[0].electric!
+      expect(cell).toMatchObject({ previous: 1250, previousReadOn: '2026-10-15', previousKind: 'handover', current: 1300, usage: 50 })
+    })
+
+    it('bảng ghi không có lần chốt nào trước kỳ thì số đầu là chỉ số lúc lắp', async () => {
+      const [room] = await db.insert(rooms).values({ facilityId: fa, code: '302' }).returning()
+      await db.insert(meters).values({ roomId: room.id, utility: 'electric', installedOn: '2026-09-20', startReading: 40 })
+      const cell = (await listReadingSheet(db, hung(), fa, '2026-10')).rows.find((r) => r.roomId === room.id)!.electric!
+      expect(cell).toMatchObject({ previous: 40, previousReadOn: '2026-09-20', previousKind: 'start', current: null, usage: null })
+    })
+
+    it('lịch sử: dòng bàn giao đầu hợp đồng có số đầu bằng số cuối và mức dùng 0', async () => {
+      await midMonthLease()
+      const rows = (await listReadingHistory(db, hung(), fa, '2026-10', '2026-10')).filter((x) => x.meterId === m.E101)
+      expect(rows.map((x) => [x.kind, x.opening, x.closing, x.usage])).toEqual([['monthly', 1250, 1300, 50], ['handover', 1250, 1250, 0]])
+    })
+
+    it('tổng quan đồng hồ trả ngày bắt đầu hợp đồng đang chạy để nhận ra dòng bàn giao đầu', async () => {
+      await midMonthLease()
+      expect((await listMeterOverview(db, hung(), fa)).find((r) => r.meterId === m.E101)!.leaseStartDate).toBe('2026-10-15')
+      await db.update(leases).set({ status: 'ended' }).where(eq(leases.roomId, r101))
+      expect((await listMeterOverview(db, hung(), fa)).find((r) => r.meterId === m.E101)!.leaseStartDate).toBeNull()
     })
   })
 

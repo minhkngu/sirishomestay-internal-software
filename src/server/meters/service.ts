@@ -29,7 +29,10 @@ const toReading = (r: typeof meterReadings.$inferSelect): MeterReading => ({ met
 export type MeterCell = {
   meterId: string
   serial: string | null
+  /** Số đầu kỳ: lần chốt gần nhất (tháng hoặc bàn giao) trước cuối kỳ, không có thì chỉ số lúc lắp. */
   previous: number
+  previousReadOn: string
+  previousKind: 'monthly' | 'handover' | 'start'
   current: number | null
   usage: number | null
   abnormal: boolean
@@ -72,10 +75,14 @@ export async function listReadingSheet(db: DB, ctx: AccessContext, facilityId: s
     const rs = allReadings.map(toReading)
     const active = ms.find((m) => !m.removedOn) ?? ms[ms.length - 1]
     const mine = rs.filter((r) => r.meterId === active.id).sort((a, b) => (a.readOn < b.readOn ? -1 : 1))
-    const before = mine.filter((r) => r.readOn < start)
-    const previous = before.length ? before[before.length - 1].value : active.startReading
+    // Số đầu kỳ là lần chốt gần nhất trước cuối kỳ, trừ dòng chốt tháng của chính kỳ đang ghi
+    const checkpoints = mine.filter((r) => r.readOn <= end && !(r.period === period && r.kind === 'monthly'))
+    const latest = checkpoints[checkpoints.length - 1]
+    const previous = latest?.value ?? active.startReading
+    const previousReadOn = latest?.readOn ?? active.installedOn
+    const previousKind: MeterCell['previousKind'] = latest?.kind ?? 'start'
     const currentReading = mine.find((r) => r.period === period && r.kind !== 'handover')
-    const { usage } = safeUsage(ms, rs, start, end)
+    const { usage: replacedUsage } = safeUsage(ms, rs, start, end)
     const history: number[] = []
     for (let i = 1; i <= 3; i++) {
       const p = shiftPeriod(period, -i)
@@ -85,7 +92,9 @@ export async function listReadingSheet(db: DB, ctx: AccessContext, facilityId: s
     }
     const avg = history.length ? history.reduce((a, b) => a + b, 0) / history.length : 0
     const replaced = ms.length > 1 && ms.some((m) => (m.removedOn && m.removedOn >= start && m.removedOn <= end) || (m.installedOn >= start && m.installedOn <= end && m.id !== ms[0].id))
-    return { meterId: active.id, serial: active.serial ?? null, previous, current: currentReading?.value ?? null, usage, abnormal: usage != null && avg > 0 && usage > 2 * avg, replaced }
+    // Thay đồng hồ giữa kỳ thì mức dùng cộng phần đồng hồ cũ; không thay thì lấy số cuối trừ số đầu của cùng đồng hồ
+    const usage = replaced ? replacedUsage : currentReading ? Math.max(currentReading.value - previous, 0) : null
+    return { meterId: active.id, serial: active.serial ?? null, previous, previousReadOn, previousKind, current: currentReading?.value ?? null, usage, abnormal: usage != null && avg > 0 && usage > 2 * avg, replaced }
   }
 
   const feeIds = allMeters.filter(m => m.utility === 'fee' && !m.removedOn).map(m => m.id)
@@ -338,6 +347,8 @@ export async function addRoomMeter(db: DB, ctx: AccessContext, roomId: string, i
 export type MeterOverviewRow = {
   meterId: string; roomId: string; roomCode: string; floor: string | null
   meterName: string; meterCode: string | null; feeName: string | null; unit: string | null; leaseCode: string | null
+  /** Ngày bắt đầu hợp đồng đang chạy đang dùng đồng hồ; null khi không có hợp đồng đang chạy. */
+  leaseStartDate: string | null
   serial: string | null; startReading: number; installedOn: string; removedOn: string | null
   finalReadingEstimated: boolean; estimateNote: string | null
   /** Chỉ số mới nhất theo ngày ghi (chốt tháng hoặc bàn giao), null nếu chưa có. */
@@ -370,6 +381,7 @@ export async function listMeterOverview(db: DB, ctx: AccessContext, facilityId: 
       meterId: meter.id, roomId: room.id, roomCode: room.code, floor: room.floor, meterName: meter.name || legacy?.name || 'Đồng hồ', meterCode: meter.code,
       feeName: link?.name ?? legacy?.name ?? null, unit: link?.unit ?? legacy?.unit ?? null,
       leaseCode: link?.status === 'active' ? link.leaseCode : null,
+      leaseStartDate: link?.status === 'active' ? link.startDate : null,
       serial: meter.serial, startReading: meter.startReading, installedOn: meter.installedOn, removedOn: meter.removedOn,
       finalReadingEstimated: meter.finalReadingEstimated, estimateNote: meter.estimateNote,
       lastReading: (readingsByMeter.get(meter.id) ?? [])[0] ? { value: readingsByMeter.get(meter.id)![0].value, readOn: readingsByMeter.get(meter.id)![0].readOn } : null,
@@ -385,8 +397,8 @@ export type ReadingHistoryRow = {
   /** Tên loại đồng hồ (đã bỏ mã trong ngoặc) để lọc và hiển thị. */
   meterName: string; meterCode: string | null; unit: string | null
   kind: 'monthly' | 'handover'; period: string; readOn: string
-  /** Chỉ số bàn giao đứng riêng, không có số đầu và mức dùng (null). */
-  opening: number | null; closing: number; usage: number | null
+  /** Số đầu của lần chốt: số chốt liền trước; dòng bàn giao đầu hợp đồng lấy bằng số cuối. */
+  opening: number; closing: number; usage: number
   /** Mã hoá đơn đã duyệt đang dùng chỉ số tháng này; có thì không sửa, xoá được. Chỉ số bàn giao không khoá. */
   lockedBy: string | null
 }
@@ -405,7 +417,9 @@ export async function listReadingHistory(db: DB, ctx: AccessContext, facilityId:
     let prev = m.startReading
     for (const r of asc) {
       if (r.period >= from && r.period <= to) {
-        rows.push({ id: r.id, meterId: m.meterId, roomId: m.roomId, roomCode: m.roomCode, floor: m.floor, meterName: typeName(m.meterName), meterCode: m.meterCode, unit: m.unit, kind: r.kind, period: r.period, readOn: r.readOn, opening: r.kind === 'handover' ? null : prev, closing: r.value, usage: r.kind === 'handover' ? null : Math.max(r.value - prev, 0), lockedBy: r.kind === 'monthly' ? (locked.get(`${m.roomId}|${r.period}`) ?? null) : null })
+        // Dòng bàn giao đầu hợp đồng mở chuỗi chỉ số: số đầu bằng số cuối, mức dùng 0
+        const opensLease = r.kind === 'handover' && m.leaseStartDate !== null && r.readOn === m.leaseStartDate
+        rows.push({ id: r.id, meterId: m.meterId, roomId: m.roomId, roomCode: m.roomCode, floor: m.floor, meterName: typeName(m.meterName), meterCode: m.meterCode, unit: m.unit, kind: r.kind, period: r.period, readOn: r.readOn, opening: opensLease ? r.value : prev, closing: r.value, usage: opensLease ? 0 : Math.max(r.value - prev, 0), lockedBy: r.kind === 'monthly' ? (locked.get(`${m.roomId}|${r.period}`) ?? null) : null })
       }
       prev = r.value
     }

@@ -84,7 +84,7 @@ export function ReadingHistory({ rows }: { rows: ReadingHistoryRow[] }) {
   }
   return (
     <div className="rounded-2xl border border-border/80 bg-card">
-      <div className="border-b border-border/70 px-4 py-3 text-xs text-muted-foreground">{rows.length} lần chốt · số đầu là số chốt trước đó của đồng hồ, chỉ số bàn giao đứng riêng (không có số đầu, mức dùng), </div>
+      <div className="border-b border-border/70 px-4 py-3 text-xs text-muted-foreground">{rows.length} lần chốt · số đầu là lần chốt liền trước của đồng hồ</div>
       <div className="hidden overflow-x-auto lg:block">
         <table className="w-full text-[13px]">
           <thead>
@@ -108,9 +108,9 @@ export function ReadingHistory({ rows }: { rows: ReadingHistoryRow[] }) {
                 <td className="px-4 py-2.5 font-medium tabular-nums text-foreground">{r.roomCode}</td>
                 <td className="px-4 py-2.5"><div className="text-foreground">{r.meterName}</div>{r.meterCode && <div className="text-[11px] text-muted-foreground">{r.meterCode}</div>}</td>
                 <td className="px-4 py-2.5 tabular-nums">{monthLabel(r.period)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{r.opening == null ? '—' : fmt(r.opening)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{fmt(r.opening)}</td>
                 <td className="px-4 py-2.5 text-right font-medium tabular-nums text-foreground">{fmt(r.closing)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums">{r.usage == null ? '—' : <>{fmt(r.usage)}{r.unit && <span className="ml-1 text-[11px] text-muted-foreground">{r.unit}</span>}</>}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums">{fmt(r.usage)}{r.unit && <span className="ml-1 text-[11px] text-muted-foreground">{r.unit}</span>}</td>
                 <td className="px-4 py-2.5 tabular-nums">{formatDateVN(r.readOn)}</td>
                 <td className="px-4 py-2.5">{status(r)}</td>
                 <td className="px-4 py-2.5">{actions(r)}</td>
@@ -131,9 +131,9 @@ export function ReadingHistory({ rows }: { rows: ReadingHistoryRow[] }) {
               {status(r)}
             </div>
             <div className="grid grid-cols-3 gap-2 text-xs tabular-nums">
-              <div><div className="text-muted-foreground">Số đầu</div><div className="mt-0.5 text-foreground">{r.opening == null ? '—' : fmt(r.opening)}</div></div>
+              <div><div className="text-muted-foreground">Số đầu</div><div className="mt-0.5 text-foreground">{fmt(r.opening)}</div></div>
               <div><div className="text-muted-foreground">Số cuối</div><div className="mt-0.5 font-medium text-foreground">{fmt(r.closing)}</div></div>
-              <div className="text-right"><div className="text-muted-foreground">Dùng</div><div className="mt-0.5 text-foreground">{r.usage == null ? '—' : fmt(r.usage)}</div></div>
+              <div className="text-right"><div className="text-muted-foreground">Dùng</div><div className="mt-0.5 text-foreground">{fmt(r.usage)}</div></div>
             </div>
             {actions(r)}
           </li>
@@ -157,7 +157,7 @@ export function ReadingHistory({ rows }: { rows: ReadingHistoryRow[] }) {
         onConfirm={removeMany}
       />
       {editing && (
-        <FormDialog open onOpenChange={(o) => { if (!o) setEditing(null) }} title={`Sửa chỉ số ${editing.meterName} phòng ${editing.roomCode}`} description={editing.opening == null ? `Chỉ số bàn giao · đứng riêng, không tính vào chuỗi chỉ số tháng` : `Tháng ${monthLabel(editing.period)} · số đầu ${fmt(editing.opening)}`} size="sm">
+        <FormDialog open onOpenChange={(o) => { if (!o) setEditing(null) }} title={`Sửa chỉ số ${editing.meterName} phòng ${editing.roomCode}`} description={editing.kind === 'handover' ? 'Chỉ số bàn giao · không tính vào chuỗi chỉ số tháng' : `Tháng ${monthLabel(editing.period)} · số đầu ${fmt(editing.opening)}`} size="sm">
           <div className="space-y-3">
             <div className="space-y-1.5"><Label htmlFor="history-value">Số cuối kỳ</Label><Input id="history-value" inputMode="numeric" value={value} onChange={(e) => setValue(e.target.value)} className="text-right tabular-nums" /></div>
             <DateField id="history-read-on" label="Ngày chốt" value={readOn} onValueChange={setReadOn} />
