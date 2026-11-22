@@ -6,8 +6,8 @@ import { join, relative, sep } from 'node:path'
 // `register…(` với thụt lề tối đa 2 ký tự, nằm ngoài định nghĩa `function register…`.
 // Lời gọi trong vòng lặp/hàm (thụt lề sâu hơn) vẫn được tính vì dòng `for`/`function` mở ở cấp module.
 const ROOT = process.cwd()
-const REGISTER_CALL = /^ {0,2}register(OwnerResolver|ExportOwnerResolver|DocLoader|PdfLoader)\(/
-const REGISTER_CALL_IN_BLOCK = /^\s+register(OwnerResolver|ExportOwnerResolver|DocLoader|PdfLoader)\(/
+const REGISTER_CALL = /^ {0,2}register(OwnerResolver|ExportOwnerResolver|DocLoader|PdfLoader|RoomsCreatedHook)\(/
+const REGISTER_CALL_IN_BLOCK = /^\s+register(OwnerResolver|ExportOwnerResolver|DocLoader|PdfLoader|RoomsCreatedHook)\(/
 
 function walk(dir: string): string[] {
   if (!existsSync(dir)) return []
