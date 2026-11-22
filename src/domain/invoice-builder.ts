@@ -124,7 +124,12 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): { lines: Invoic
       if (!linked) { warnings.push(`Chưa có đồng hồ ${f.name}`); continue }
       try {
         const total = meterFeeUsage({ lease: input.lease, addenda: input.addenda, linked, meters: input.meters, readings: input.readings, from: prevStart, to: prevEnd, startDate: terms.startDate })
-        if (total.missing.length) { warnings.push(`Chưa ghi chỉ số ${f.name} tháng ${mmYYYY(prev)}`); continue }
+        if (total.missing.length) {
+          // Vẫn giữ dòng (0 đồng) để có chỗ chốt chỉ số ngay trong hoá đơn; điền chỉ số xong thì dòng được tính lại
+          warnings.push(`Chưa ghi chỉ số ${f.name} tháng ${mmYYYY(prev)}`)
+          lines.push({ type: 'fee', description: f.name, quantity: 0, unitPrice: f.unitPrice, amount: 0, meta: { leaseFeeId: f.leaseFeeId, unit: f.unit } })
+          continue
+        }
         lines.push({
           type: 'fee', description: f.name,
           quantity: total.usage, unitPrice: f.unitPrice, amount: Math.round(total.usage * f.unitPrice), meta: { leaseFeeId: f.leaseFeeId, unit: f.unit, segments: total.segments },
