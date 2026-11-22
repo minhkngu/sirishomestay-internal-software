@@ -1,11 +1,14 @@
 import type { FeeDraft, RoomFeeMeter } from './components/lease-fees'
 
-const matches = (m: RoomFeeMeter, roomId: string, fee: FeeDraft) =>
-  m.roomId === roomId && (fee.feeTypeId ? m.feeTypeId === fee.feeTypeId : !m.feeTypeId && m.unit === fee.unit)
+/** Đồng hồ mặc định theo tên phí: phí Điện lấy đồng hồ điện, phí Nước lấy đồng hồ nước, phí khác để nhân viên chọn. */
+const preferredUtility = (fee: FeeDraft): RoomFeeMeter['utility'] | null => {
+  const name = fee.name.trim().toLowerCase()
+  return name === 'điện' ? 'electric' : name === 'nước' ? 'water' : null
+}
 
 /**
- * Đồng hồ mỗi dòng phí đang dùng: `existingMeterId` rỗng ('') là chủ động tạo mới; chưa chọn (undefined) thì mặc định
- * lấy đồng hồ rảnh đầu tiên của phòng để không sinh đồng hồ trùng, và hai dòng không nhận cùng một đồng hồ.
+ * Đồng hồ mỗi dòng phí đang dùng: `existingMeterId` rỗng ('') là chủ động bỏ chọn; chưa chọn (undefined) thì phí Điện, Nước
+ * lấy đồng hồ rảnh cùng loại của phòng, phí khác để trống; hai dòng không nhận cùng một đồng hồ.
  */
 export function resolveMeterIds({
   roomMeters,
@@ -26,14 +29,17 @@ export function resolveMeterIds({
       resolved[f.key] = f.existingMeterId || undefined
       continue
     }
-    const free = roomMeters.find((m) => !m.busy && !taken.has(m.id) && matches(m, roomId, f))
+    const utility = preferredUtility(f)
+    const free = utility
+      ? roomMeters.find((m) => m.roomId === roomId && m.utility === utility && !m.busy && !taken.has(m.id))
+      : undefined
     if (free) taken.add(free.id)
     resolved[f.key] = free?.id
   }
   return resolved
 }
 
-/** Đồng hồ có thể chọn cho một dòng phí: cùng phòng, cùng loại phí (hoặc cùng đơn vị với phí riêng), không bận và chưa dòng khác dùng. */
+/** Đồng hồ có thể chọn cho một dòng phí: cùng phòng, không bận, chưa dòng khác trong form chọn (giữ đồng hồ dòng này đang chọn). */
 export function availableMeters({
   roomMeters,
   roomId,
@@ -46,14 +52,13 @@ export function availableMeters({
   resolved: Record<string, string | undefined>
 }): RoomFeeMeter[] {
   const others = new Set(Object.entries(resolved).flatMap(([key, id]) => (key !== fee.key && id ? [id] : [])))
-  return roomMeters.filter(
-    (m) => matches(m, roomId, fee) && (m.id === resolved[fee.key] || !m.busy) && !others.has(m.id),
-  )
+  return roomMeters.filter((m) => m.roomId === roomId && (m.id === resolved[fee.key] || !m.busy) && !others.has(m.id))
 }
 
-/** Lỗi chỉ số ban đầu của dòng phí đồng hồ; luôn bắt buộc, kể cả khi dùng đồng hồ có sẵn. */
-export function meterFeeError(fee: FeeDraft): string | null {
+/** Lỗi của dòng phí đồng hồ: phải chọn đồng hồ của phòng và nhập chỉ số ban đầu hợp lệ. */
+export function meterFeeError(fee: FeeDraft, meterId: string | undefined): string | null {
   if (fee.quantitySource !== 'meter') return null
+  if (!meterId) return `Chọn đồng hồ cho ${fee.name}`
   const value = fee.initialReading.trim()
   return value === '' || !Number.isSafeInteger(Number(value)) || Number(value) < 0
     ? `Nhập chỉ số ban đầu hợp lệ cho ${fee.name}`
