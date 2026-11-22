@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { todayVN, parseFlexibleDate, formatDateVN, addDays, diffDays, daysInMonth } from '@/domain/dates'
+import { todayVN, parseFlexibleDate, formatDateVN, addDays, addMonths, diffDays, daysInMonth } from '@/domain/dates'
 
 describe('dates', () => {
   it('todayVN theo múi giờ Việt Nam', () => {
@@ -27,6 +27,13 @@ describe('dates', () => {
     expect(addDays('2026-11-16', 30)).toBe('2026-12-16')
     expect(addDays('2026-12-31', 1)).toBe('2027-01-01')
     expect(addDays('2026-11-16', -6)).toBe('2026-11-10')
+  })
+  it('addMonths giữ ngày, kẹp về cuối tháng khi tháng đích ngắn hơn', () => {
+    expect(addMonths('2026-11-16', 12)).toBe('2027-11-16')
+    expect(addMonths('2026-12-15', 1)).toBe('2027-01-15')
+    expect(addMonths('2026-01-31', 1)).toBe('2026-02-28')
+    expect(addMonths('2028-01-31', 1)).toBe('2028-02-29')
+    expect(addMonths('2026-03-31', -1)).toBe('2026-02-28')
   })
   it('diffDays đếm số ngày từ a đến b (có thể âm)', () => {
     expect(diffDays('2026-11-16', '2026-12-16')).toBe(30)

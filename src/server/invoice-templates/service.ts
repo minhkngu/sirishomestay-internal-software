@@ -1,4 +1,5 @@
 import { asc, eq } from 'drizzle-orm'
+import { getTableColumns } from 'drizzle-orm'
 import { invoiceTemplates, invoices, leases, rooms } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
@@ -98,23 +99,77 @@ export async function previewInvoiceTemplateHtml(
   const { renderInvoiceFromTemplate } = await import('@/server/pdf')
   return renderInvoiceFromTemplate(SAMPLE_INVOICE, input, { sample: true })
 }
-/** Xem nhanh một mẫu hoá đơn đã lưu với dữ liệu mẫu, để chọn mẫu cho hợp đồng; mẫu cũ dựng theo khối vẫn xem được. */
-export async function previewInvoiceTemplateById(db: Pick<DB, 'select'>, templateId: string): Promise<Uint8Array> {
-  const [t] = await db.select().from(invoiceTemplates).where(eq(invoiceTemplates.id, templateId))
-  if (!t) throw new NotFoundError()
+/** Phiên bản bộ dựng bản xem; đổi số này khi cách dựng PDF thay đổi để bản xem đã lưu được dựng lại. */
+export const INVOICE_PREVIEW_VERSION = 1
+
+type TemplateRow = typeof invoiceTemplates.$inferSelect
+async function renderPreview(t: Pick<TemplateRow, 'body' | 'style' | 'config'>): Promise<Uint8Array> {
   const pdf = await import('@/server/pdf')
   return t.body
     ? pdf.renderInvoiceFromTemplate(SAMPLE_INVOICE, { body: t.body, style: t.style as TemplateStyle }, { sample: true })
     : pdf.renderInvoicePdf(SAMPLE_INVOICE, invoiceTemplateSchema.parse(t.config), { sample: true })
 }
+/** Xem nhanh một mẫu hoá đơn đã lưu với dữ liệu mẫu, để chọn mẫu cho hợp đồng; mẫu cũ dựng theo khối vẫn xem được. */
+export async function previewInvoiceTemplateById(db: Pick<DB, 'select'>, templateId: string): Promise<Uint8Array> {
+  const [t] = await db.select().from(invoiceTemplates).where(eq(invoiceTemplates.id, templateId))
+  if (!t) throw new NotFoundError()
+  return renderPreview(t)
+}
+/** Dựng bản xem và lưu vào mẫu; lỗi dựng không làm hỏng việc lưu mẫu (bản xem để trống, dựng lại ở lần xem sau). */
+export async function storeInvoiceTemplatePreview(
+  db: Pick<DB, 'select' | 'update'>,
+  templateId: string,
+): Promise<string | null> {
+  try {
+    const [t] = await db.select().from(invoiceTemplates).where(eq(invoiceTemplates.id, templateId))
+    if (!t) return null
+    const base64 = Buffer.from(await renderPreview(t)).toString('base64')
+    await db
+      .update(invoiceTemplates)
+      .set({ previewPdf: base64, previewVersion: INVOICE_PREVIEW_VERSION })
+      .where(eq(invoiceTemplates.id, templateId))
+    return base64
+  } catch {
+    return null
+  }
+}
+/** Bản xem (base64) của mẫu: dùng lại bản đã lưu, dựng và lưu lại nếu thiếu hoặc bộ dựng đã đổi phiên bản. */
+export async function getInvoiceTemplatePreview(db: DB, templateId: string): Promise<string> {
+  const [t] = await db.select().from(invoiceTemplates).where(eq(invoiceTemplates.id, templateId))
+  if (!t) throw new NotFoundError()
+  if (t.previewPdf && t.previewVersion === INVOICE_PREVIEW_VERSION) return t.previewPdf
+  const base64 = await storeInvoiceTemplatePreview(db, templateId)
+  if (base64 === null) throw new ValidationError('Không dựng được bản xem mẫu hoá đơn')
+  return base64
+}
+/** Bản xem của mọi mẫu (id → base64) cho trang danh sách mẫu. */
+export async function listInvoiceTemplatePreviews(
+  db: DB,
+  ctx: AccessContext,
+  ids?: string[],
+): Promise<Record<string, string>> {
+  void ctx
+  const all = await db
+    .select({ id: invoiceTemplates.id })
+    .from(invoiceTemplates)
+    .orderBy(asc(invoiceTemplates.createdAt))
+  const rows = ids ? all.filter((r) => ids.includes(r.id)) : all
+  const entries = await Promise.all(
+    rows.map(async (r) => [r.id, await getInvoiceTemplatePreview(db, r.id).catch(() => null)] as const),
+  )
+  return Object.fromEntries(entries.filter((e): e is readonly [string, string] => e[1] !== null))
+}
 export async function listInvoiceTemplates(db: Pick<DB, 'select'>, ctx: AccessContext) {
   void ctx
-  return db.select().from(invoiceTemplates).orderBy(asc(invoiceTemplates.createdAt))
+  const { previewPdf, previewVersion, ...columns } = getTableColumns(invoiceTemplates)
+  void previewPdf
+  void previewVersion
+  return db.select(columns).from(invoiceTemplates).orderBy(asc(invoiceTemplates.createdAt))
 }
 export async function createInvoiceTemplate(db: DB, ctx: AccessContext, input: TemplateInput) {
   assertCan(ctx, 'settings')
   const data = checked(input)
-  return db.transaction(async (tx) => {
+  const created = await db.transaction(async (tx) => {
     const [row] = await tx.insert(invoiceTemplates).values(data).returning()
     await recordAudit(tx, ctx, {
       action: 'create',
@@ -124,14 +179,16 @@ export async function createInvoiceTemplate(db: DB, ctx: AccessContext, input: T
     })
     return row
   })
+  await storeInvoiceTemplatePreview(db, created.id)
+  return created
 }
 export async function updateInvoiceTemplate(db: DB, ctx: AccessContext, id: string, input: TemplateInput) {
   assertCan(ctx, 'settings')
   const data = checked(input)
-  return db.transaction(async (tx) => {
+  const updated = await db.transaction(async (tx) => {
     const [row] = await tx
       .update(invoiceTemplates)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...data, previewPdf: null, previewVersion: null, updatedAt: new Date() })
       .where(eq(invoiceTemplates.id, id))
       .returning()
     if (!row) throw new NotFoundError()
@@ -143,6 +200,8 @@ export async function updateInvoiceTemplate(db: DB, ctx: AccessContext, id: stri
     })
     return row
   })
+  await storeInvoiceTemplatePreview(db, updated.id)
+  return updated
 }
 export async function setDefaultInvoiceTemplate(db: DB, ctx: AccessContext, id: string) {
   assertCan(ctx, 'settings')
