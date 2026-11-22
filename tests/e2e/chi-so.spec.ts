@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { chooseSelectOption } from './helpers'
 
 test.skip(!process.env.E2E_BASE_URL, 'Cần E2E_BASE_URL trỏ tới môi trường thử có dữ liệu mẫu')
 
@@ -14,12 +15,11 @@ test('menu Chỉ số và trang có hai tab Ghi chỉ số, Đồng hồ', async
   await expect(page.getByRole('link', { name: 'Điện nước', exact: true })).toHaveCount(0)
   await page.goto('/meters')
   await expect(page.getByRole('heading', { name: 'Chỉ số', exact: true })).toBeVisible()
-  await expect(page.getByLabel('Kỳ')).toBeVisible()
+  await expect(page.getByLabel('Kỳ ghi')).toBeVisible()
   await page.getByRole('link', { name: 'Đồng hồ', exact: true }).click()
   await expect(page).toHaveURL(/tab=meters/)
-  await expect(page.getByLabel('Kỳ')).toHaveCount(0)
-  await page.getByLabel('Cơ sở', { exact: true }).selectOption({ label: 'Thảo Điền' })
-  await page.getByRole('button', { name: 'Xem đồng hồ' }).click()
-  await expect(page.getByRole('columnheader', { name: 'Dòng phí' })).toBeVisible()
+  await expect(page.getByLabel('Kỳ ghi')).toHaveCount(0)
+  await chooseSelectOption(page, 'Toà', /Thảo Điền/)
+  await expect(page.getByRole('columnheader', { name: 'Phí & hợp đồng' })).toBeVisible()
   await expect(page.getByRole('row').nth(1)).toContainText(/Điện|Nước|\(/)
 })
