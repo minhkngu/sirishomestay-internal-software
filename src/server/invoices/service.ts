@@ -3,13 +3,10 @@ import { z } from 'zod'
 import {
   addenda,
   facilities,
-  feeTypes,
-  feeUnits,
   invoiceLines,
   invoices,
   invoiceFeeQuantities,
   leaseFeeMeters,
-  leaseFees,
   leaseFeeSnapshots,
   leaseOccupants,
   leases,
@@ -20,7 +17,6 @@ import {
   pendingAdjustments,
   rooms,
   tenants,
-  utilityRates,
 } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
@@ -41,7 +37,6 @@ import type {
   OneOffCharge,
   PendingAdjustment,
   Proration,
-  UtilityRate,
 } from '@/domain/types'
 import { finalizeTermination } from '@/server/addenda/finalize'
 import { recordAudit, recordAuditBatch } from '@/server/audit'
@@ -91,15 +86,9 @@ async function leasesData(
 ): Promise<Map<string, { lease: Lease; addenda: Addendum[] }>> {
   const out = new Map<string, { lease: Lease; addenda: Addendum[] }>()
   if (!ids.length) return out
-  const [rows, occupants, feeRows, addendaRows, snapshots] = await Promise.all([
+  const [rows, occupants, addendaRows, snapshots] = await Promise.all([
     db.select().from(leases).where(inArray(leases.id, ids)),
     db.select().from(leaseOccupants).where(inArray(leaseOccupants.leaseId, ids)),
-    db
-      .select({ fee: leaseFees, type: feeTypes, unit: feeUnits })
-      .from(leaseFees)
-      .innerJoin(feeTypes, eq(leaseFees.feeTypeId, feeTypes.id))
-      .innerJoin(feeUnits, eq(feeTypes.unitId, feeUnits.id))
-      .where(inArray(leaseFees.leaseId, ids)),
     db
       .select()
       .from(addenda)
@@ -121,39 +110,24 @@ async function leasesData(
       monthlyRent: row.monthlyRent,
       depositAmount: row.depositAmount,
       billingCycleMonths: row.billingCycleMonths,
-      billWaterByMeter: row.billWaterByMeter,
-      feeModel: row.feeModel as 'legacy' | 'snapshot',
       dueRule: row.dueRule as DueRule | null,
       proration: row.proration as Proration | null,
       occupantIds:
         (firstOccupants?.oldOccupantIds as string[] | undefined) ??
         occupants.filter((x) => x.leaseId === row.id).map((x) => x.tenantId),
-      fees:
-        row.feeModel === 'snapshot'
-          ? snapshots
-              .filter((f) => f.leaseId === row.id)
-              .map((f) => ({
-                leaseFeeId: f.id,
-                feeTypeId: f.feeTypeId,
-                name: f.name,
-                unit: f.unit,
-                billing: f.billing as ContractFee['billing'],
-                quantityFrom: f.quantitySource === 'occupants' ? ('occupants' as const) : ('manual' as const),
-                quantitySource: f.quantitySource as NonNullable<ContractFee['quantitySource']>,
-                quantity: f.quantity,
-                unitPrice: f.unitPrice,
-              }))
-          : feeRows
-              .filter((f) => f.fee.leaseId === row.id)
-              .map(({ fee, type, unit }) => ({
-                feeTypeId: type.id,
-                name: type.name,
-                unit: unit.name,
-                billing: type.billing as ContractFee['billing'],
-                quantityFrom: type.quantityFrom as ContractFee['quantityFrom'],
-                quantity: fee.quantity,
-                unitPrice: fee.unitPrice,
-              })),
+      fees: snapshots
+        .filter((f) => f.leaseId === row.id)
+        .map((f) => ({
+          leaseFeeId: f.id,
+          feeTypeId: f.feeTypeId,
+          name: f.name,
+          unit: f.unit,
+          billing: f.billing as ContractFee['billing'],
+          quantityFrom: f.quantitySource === 'occupants' ? ('occupants' as const) : ('manual' as const),
+          quantitySource: f.quantitySource as NonNullable<ContractFee['quantitySource']>,
+          quantity: f.quantity,
+          unitPrice: f.unitPrice,
+        })),
     }
     out.set(row.id, { lease, addenda: mine.map(toAddendum) })
   }
@@ -204,10 +178,9 @@ async function loadCalcInputs(
       ]),
     ),
   ]
-  const [settings, ms, rates, oneOffs, pending] = await Promise.all([
+  const [settings, ms, oneOffs, pending] = await Promise.all([
     getSettings(db),
     roomIds.length ? db.select().from(meters).where(inArray(meters.roomId, roomIds)) : [],
-    db.select().from(utilityRates).where(eq(utilityRates.facilityId, facilityId)),
     leaseIds.length ? db.select().from(oneOffCharges).where(inArray(oneOffCharges.leaseId, leaseIds)) : [],
     leaseIds.length ? db.select().from(pendingAdjustments).where(inArray(pendingAdjustments.leaseId, leaseIds)) : [],
   ])
@@ -229,7 +202,7 @@ async function loadCalcInputs(
           ),
         )
     : []
-  return { settings, meters: ms, rates, oneOffs, pending, readings, feeMeterLinks }
+  return { settings, meters: ms, oneOffs, pending, readings, feeMeterLinks }
 }
 type CalcInputs = Awaited<ReturnType<typeof loadCalcInputs>>
 function calculateWith(
@@ -253,7 +226,6 @@ function calculateWith(
     readings: inputs.readings as MeterReading[],
     feeMeterLinks: inputs.feeMeterLinks,
     periodQuantities,
-    rates: inputs.rates as UtilityRate[],
     oneOffs: inputs.oneOffs
       .filter((x) => x.leaseId === lease.id)
       .map((x) => ({ ...x, kind: x.kind as OneOffCharge['kind'], invoicedInId: x.invoiceId })),
@@ -565,7 +537,7 @@ export async function approveInvoice(
     const before = await getInvoice(tx, ctx, id)
     if (before.status !== 'draft') throw new ValidationError('Hoá đơn đã được duyệt')
     const [lease, settings] = await Promise.all([leaseData(tx, before.leaseId), getSettings(tx)])
-    if (lease.feeModel === 'snapshot') {
+    if (before.kind === 'monthly') {
       const calculated = await calculate(
         tx,
         lease,
@@ -713,8 +685,7 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
     const tx = tx0 as unknown as DB
     const inv = await getInvoice(tx, ctx, id)
     const old = await tx.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, id))
-    const [leaseRow] = await tx.select({ feeModel: leases.feeModel }).from(leases).where(eq(leases.id, inv.leaseId))
-    if (leaseRow?.feeModel === 'snapshot') {
+    if (inv.kind === 'monthly') {
       const protectedLine = (l: { id?: string; type: string; quantity: number; unitPrice: number; meta?: unknown }) => {
         const meta = l.meta as { leaseFeeId?: unknown } | null
         return typeof meta?.leaseFeeId === 'string'
@@ -728,7 +699,7 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
     }
     const next = data.map((l) => {
       const protectedFee =
-        leaseRow?.feeModel === 'snapshot' && typeof (l.meta as { leaseFeeId?: unknown } | null)?.leaseFeeId === 'string'
+        inv.kind === 'monthly' && typeof (l.meta as { leaseFeeId?: unknown } | null)?.leaseFeeId === 'string'
           ? old.find((previous) => previous.id === l.id)
           : undefined
       return {

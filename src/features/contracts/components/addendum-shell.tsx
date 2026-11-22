@@ -1,4 +1,5 @@
 'use client'
+import { BareSelect } from './contract-form-ui'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition, type ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -150,10 +151,15 @@ export const Field = ({ label, children }: { label: string; children: ReactNode 
 export const inputCls = 'h-8 rounded border px-2'
 export const TargetSelect = ({ value, onChange }: { value: string; onChange: (v: 'next' | 'current') => void }) => (
   <Field label="Điều chỉnh tiền kỳ đang tính">
-    <select className={inputCls} value={value} onChange={(e) => onChange(e.target.value as 'next')}>
-      <option value="next">Cộng vào hoá đơn kỳ sau</option>
-      <option value="current">Ghi thẳng vào hoá đơn đã duyệt</option>
-    </select>
+    <BareSelect
+      ariaLabel="Điều chỉnh tiền kỳ đang tính"
+      value={value}
+      onValueChange={(next) => onChange(next as 'next' | 'current')}
+      options={[
+        { value: 'next', label: 'Cộng vào hoá đơn kỳ sau' },
+        { value: 'current', label: 'Ghi thẳng vào hoá đơn đã duyệt' },
+      ]}
+    />
   </Field>
 )
 export function ReadingInputs({
