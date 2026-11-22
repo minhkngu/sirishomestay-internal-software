@@ -19,7 +19,7 @@ describe('ghi thu theo hợp đồng', () => {
     const [facility] = await db.insert(facilities).values({ code: 'TD', name: 'Thảo Điền' }).returning(); facilityId = facility.id
     const [room] = await db.insert(rooms).values({ facilityId, code: '301' }).returning()
     const [tenant] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: facilityId, fullName: 'Khách', phone: '+84901234567', idNumber: '012345678901' }).returning()
-    const [lease] = await db.insert(leases).values({ code: 'HD1', roomId: room.id, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-12-31', monthlyRent: 9000000, depositAmount: 9000000 }).returning(); leaseId = lease.id
+    const [lease] = await db.insert(leases).values({ code: 'HD1', roomId: room.id, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-12-31', monthlyRent: 9000000, depositAmount: 0 }).returning(); leaseId = lease.id
     for (const period of ['2026-07', '2026-08']) {
       const [inv] = await createDrafts(db, ctx(), { facilityId, period })
       await approveInvoice(db, ctx(), inv.id, {})

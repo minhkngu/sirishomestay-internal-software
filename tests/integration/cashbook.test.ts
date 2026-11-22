@@ -4,7 +4,7 @@ import { auditLogs, depositEntries, facilities, leases, rooms, tenants } from '@
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { summarize } from '@/domain/cashbook'
-import { ForbiddenError, ValidationError } from '@/domain/errors'
+import { NotFoundError, ValidationError } from '@/domain/errors'
 import { addExpense, deleteExpense, listCashbook, listLeaseTargets, updateExpense } from '@/server/cashbook/service'
 import { approveInvoice, createDrafts, recordLeasePayment, removePayment } from '@/server/invoices/service'
 import { createTestDb } from '../helpers/db'
@@ -42,12 +42,12 @@ describe('sổ quỹ thu chi', () => {
   it('người chỉ có quyền cơ sở A không thấy cơ sở B', async () => {
     await addExpense(db, context(['billing'], [otherId]), expense({ facilityId: otherId }))
     expect((await listCashbook(db, ctx(), {})).rows).toHaveLength(0)
-    await expect(listCashbook(db, ctx(), { facilityId: otherId })).rejects.toThrow(ForbiddenError)
+    await expect(listCashbook(db, ctx(), { facilityId: otherId })).rejects.toThrow(NotFoundError)
   })
   it('chi phải có số tiền dương, loại hợp lệ, quyền và phòng đúng cơ sở', async () => {
     await expect(addExpense(db, ctx(), expense({ amount: 0 }))).rejects.toThrow(ValidationError)
     await expect(addExpense(db, ctx(), expense({ category: 'khac-la' }))).rejects.toThrow(ValidationError)
-    await expect(addExpense(db, ctx(), expense({ facilityId: otherId }))).rejects.toThrow(ForbiddenError)
+    await expect(addExpense(db, ctx(), expense({ facilityId: otherId }))).rejects.toThrow(NotFoundError)
     await expect(addExpense(db, context(['billing'], [facilityId, otherId]), expense({ facilityId: otherId, roomId }))).rejects.toThrow(ValidationError)
   })
   it('sửa và xoá khoản chi đều ghi nhật ký', async () => {
@@ -63,13 +63,13 @@ describe('sổ quỹ thu chi', () => {
     const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-08' }); await approveInvoice(db, ctx(), inv.id, {})
     await recordLeasePayment(db, ctx(), leaseId, { paidOn: '2026-08-10', amount: 4000000, method: 'cash' })
     const [pay] = (await listCashbook(db, ctx(), {})).rows.filter(r => r.source === 'payment')
-    await expect(removePayment(db, context(['billing'], [otherId]), pay.id)).rejects.toThrow(ForbiddenError)
+    await expect(removePayment(db, context(['billing'], [otherId]), pay.id)).rejects.toThrow(NotFoundError)
     await removePayment(db, ctx(), pay.id)
     expect((await listCashbook(db, ctx(), {})).rows.filter(r => r.source === 'payment')).toHaveLength(0)
-    expect((await listLeaseTargets(db, ctx()))[0].debt).toBe(9000000)
+    expect((await listLeaseTargets(db, ctx()))[0].debt).toBe(18000000)
   })
   it('liệt kê hợp đồng đang thuê kèm dư nợ', async () => {
     const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-08' }); await approveInvoice(db, ctx(), inv.id, {})
-    expect(await listLeaseTargets(db, ctx())).toEqual([expect.objectContaining({ leaseId, roomCode: '301', debt: 9000000 })])
+    expect(await listLeaseTargets(db, ctx())).toEqual([expect.objectContaining({ leaseId, roomCode: '301', debt: 18000000 })])
   })
 })

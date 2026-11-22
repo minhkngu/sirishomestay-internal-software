@@ -187,7 +187,7 @@ describe('buildMonthlyInvoice', () => {
   const base = {
     facilityId: 'TD', period: '2026-11', proration: 'days_30' as const, meters: [meterE], readings, feeMeterLinks: [{ leaseFeeId: 'e1', meterId: 'me' }], oneOffs: [], pending: [], addenda: [],
   }
-  it('dòng điện có đoạn ước tính có hậu tố nhãn, dòng thường giữ nguyên mô tả', () => {
+  it('dòng điện luôn mang tên phí, kể cả khi có đoạn ước tính', () => {
     const l = lease({ ...terms() })
     const normal = buildMonthlyInvoice({ ...base, lease: l, meters: [{ ...meterE, id: 'me' }], readings: [{ meterId: 'me', period: '2026-10', readOn: '2026-10-31', value: 1100 }, { meterId: 'me', period: '2026-09', readOn: '2026-09-30', value: 1000 }] })
     const oldE: Meter = { id: 'old', roomId: 'R1', utility: 'electric', installedOn: '2025-01-01', startReading: 0, removedOn: '2026-10-20', finalReading: 1060, finalReadingEstimated: true }
@@ -195,7 +195,7 @@ describe('buildMonthlyInvoice', () => {
     const est = buildMonthlyInvoice({ ...base, lease: l, feeMeterLinks: [{ leaseFeeId: 'e1', meterId: 'new' }], meters: [oldE, newE], readings: [{ meterId: 'old', period: '2026-09', readOn: '2026-09-30', value: 1000 }, { meterId: 'new', period: '2026-10', readOn: '2026-10-31', value: 40 }] })
     const desc = (r: typeof normal) => r.lines.find((x) => x.meta?.leaseFeeId === 'e1')!.description
     expect(desc(normal)).not.toContain('ước tính')
-    expect(desc(est).endsWith(' (ước tính)')).toBe(true)
+    expect(desc(est)).toBe(desc(normal))
   })
   it('tiền phòng + phí cố định kỳ N, điện tháng N−1, phí lẻ và điều chỉnh đang chờ', () => {
     const r = buildMonthlyInvoice({

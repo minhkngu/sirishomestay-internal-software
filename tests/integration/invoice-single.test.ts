@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { facilities, invoices, leases, rooms, tenants } from '@/db'
+import { facilities, invoiceLines, invoices, leases, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ForbiddenError, ValidationError } from '@/domain/errors'
@@ -36,7 +36,7 @@ describe('hoá đơn lẻ', () => {
     const p = await previewLease(db, ctx(), { leaseId, period: '2026-07' })
     expect(p.leaseId).toBe(leaseId)
     expect(p.period).toEqual({ start: '2026-07-01', end: '2026-07-31' })
-    expect(p.lines[0]).toMatchObject({ type: 'rent', amount: 9000000 })
+    expect(p.lines.find(l => l.type === 'rent')).toMatchObject({ amount: 9000000 })
   })
   it('tạo một nháp có hạn ngày 5 của tháng hoá đơn, không đụng phòng khác', async () => {
     const inv = await createDraftForLease(db, ctx(), { leaseId, period: '2026-07' })
@@ -45,10 +45,13 @@ describe('hoá đơn lẻ', () => {
     expect(all).toHaveLength(1)
     expect(all.find(x => x.leaseId === otherLeaseId)).toBeUndefined()
   })
-  it('kỳ đã lập thì từ chối, vẫn một hoá đơn', async () => {
-    await createDraftForLease(db, ctx(), { leaseId, period: '2026-07' })
-    await expect(createDraftForLease(db, ctx(), { leaseId, period: '2026-07' })).rejects.toThrow(ValidationError)
-    expect(await db.select().from(invoices).where(eq(invoices.leaseId, leaseId))).toHaveLength(1)
+  it('kỳ đã có hoá đơn vẫn lập thêm được, hoá đơn thêm không có tiền phòng', async () => {
+    const first = await createDraftForLease(db, ctx(), { leaseId, period: '2026-07' })
+    const second = await createDraftForLease(db, ctx(), { leaseId, period: '2026-07' })
+    expect(await db.select().from(invoices).where(eq(invoices.leaseId, leaseId))).toHaveLength(2)
+    const rentOf = async (id: string) => (await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, id))).filter(l => l.type === 'rent')
+    expect(await rentOf(first.id)).toHaveLength(1)
+    expect(await rentOf(second.id)).toHaveLength(0)
   })
   it('kỳ ngoài hiệu lực hợp đồng thì từ chối', async () => {
     await expect(createDraftForLease(db, ctx(), { leaseId, period: '2028-03' })).rejects.toThrow(ValidationError)
@@ -56,13 +59,16 @@ describe('hoá đơn lẻ', () => {
   it('thiếu quyền billing thì từ chối', async () => {
     await expect(createDraftForLease(db, context(['meters'], facilityId), { leaseId, period: '2026-07' })).rejects.toThrow(ForbiddenError)
   })
-  it('hai lần tạo song song cùng phòng cùng tháng: một thành công, mã không trùng', async () => {
+  it('hai lần tạo song song cùng phòng cùng tháng: cả hai thành công, mã không trùng, chỉ một có tiền phòng', async () => {
     const results = await Promise.allSettled([
       createDraftForLease(db, ctx(), { leaseId, period: '2026-07' }),
       createDraftForLease(db, ctx(), { leaseId, period: '2026-07' }),
     ])
-    expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(1)
-    expect(await db.select().from(invoices).where(eq(invoices.leaseId, leaseId))).toHaveLength(1)
+    expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(2)
+    const rows = await db.select().from(invoices).where(eq(invoices.leaseId, leaseId))
+    expect(new Set(rows.map(r => r.code)).size).toBe(2)
+    const lines = await db.select().from(invoiceLines)
+    expect(lines.filter(l => l.type === 'rent')).toHaveLength(1)
   })
   it('sinh hàng loạt cũng đặt hạn theo tháng hoá đơn', async () => {
     const rows = await createDrafts(db, ctx(), { facilityId, period: '2026-07' })

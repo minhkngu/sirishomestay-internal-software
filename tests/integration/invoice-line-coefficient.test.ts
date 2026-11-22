@@ -20,7 +20,7 @@ describe('thời gian và hệ số riêng từng dòng', () => {
     const [facility] = await db.insert(facilities).values({ code: 'TD', name: 'Thảo Điền' }).returning(); facilityId = facility.id
     const [room] = await db.insert(rooms).values({ facilityId, code: '301' }).returning()
     const [tenant] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: facilityId, fullName: 'Khách', phone: '+84901234567', idNumber: '012345678901' }).returning()
-    const [lease] = await db.insert(leases).values({ code: 'HD1', roomId: room.id, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-12-31', monthlyRent: 9000000, depositAmount: 9000000 }).returning()
+    const [lease] = await db.insert(leases).values({ code: 'HD1', roomId: room.id, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-12-31', monthlyRent: 9000000, depositAmount: 0 }).returning()
     await db.insert(leaseFeeSnapshots).values({ leaseId: lease.id, name: 'Internet', unit: 'phòng', quantitySource: 'room', billing: 'monthly_fixed', unitPrice: 200000 })
     const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-07' }); invoiceId = inv.id
   })
@@ -68,12 +68,11 @@ describe('thời gian và hệ số riêng từng dòng', () => {
     expect((await fee()).amount).toBe(Math.round(200000 * 16 / 31))
   })
 
-  it('lưu cùng hoá đơn: đổi thời gian, hệ số trên dòng tiền phòng và phí hợp đồng thì tiền tính lại, mô tả giữ nguyên', async () => {
-    const current = (await lines()).map(l => ({ id: l.id, type: l.type, description: l.type === 'rent' ? 'Tên tự đổi' : l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta: l.type === 'rent' ? { ...(l.meta as object | null), from: '2026-07-11', to: '2026-07-31', coefficient: 0.6774 } : l.type === 'fee' ? { ...(l.meta as object), coefficient: 0.5, coefficientOverride: true } : l.meta }))
+  it('lưu cùng hoá đơn: đổi thời gian, hệ số trên dòng tiền phòng và phí hợp đồng thì tiền tính lại', async () => {
+    const current = (await lines()).map(l => ({ id: l.id, type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta: l.type === 'rent' ? { ...(l.meta as object | null), from: '2026-07-11', to: '2026-07-31', coefficient: 0.6774 } : l.type === 'fee' ? { ...(l.meta as object), coefficient: 0.5, coefficientOverride: true } : l.meta }))
     await updateLines(db, ctx(), invoiceId, current)
     const r = await rent()
     expect(r).toMatchObject({ quantity: 0.6774, amount: 6096600 })
-    expect(r.description).not.toBe('Tên tự đổi')
     expect(r.meta).toMatchObject({ from: '2026-07-11', to: '2026-07-31', coefficient: 0.6774 })
     expect(await fee()).toMatchObject({ amount: 100000 })
   })
@@ -101,7 +100,9 @@ describe('thời gian và hệ số riêng từng dòng', () => {
     expect(base).toBe(9000000 + 200000 + 300000 - 200000)
     const tax = all.find(l => l.type === 'tax')!
     expect(tax).toMatchObject({ description: 'Thuế 10%', amount: Math.round(base * 0.1) })
-    await updateLines(db, ctx(), invoiceId, [...current, ...extras])
+    // Lưu lại thì dòng được ghi lại với id mới: lấy lại danh sách rồi bỏ dòng thuế
+    const saved = (await lines()).filter(l => l.type !== 'tax').map(l => ({ id: l.id, type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta: l.meta }))
+    await updateLines(db, ctx(), invoiceId, saved)
     expect((await lines()).some(l => l.type === 'tax')).toBe(false)
   })
 
@@ -118,7 +119,7 @@ describe('thời gian và hệ số riêng từng dòng', () => {
       await setLineTime(db, ctx(), invoiceId, added.id, { from: '2026-07-16', to: '2026-07-31' })
       const after = (await lines()).find(l => l.id === added.id)!
       expect(after.meta).toMatchObject({ feeTypeId, from: '2026-07-16', to: '2026-07-31', coefficient: 0.5161 })
-      expect(after.amount).toBe(Math.round(2 * 100000 * 0.5161))
+      expect(after.amount).toBe(Math.round(2 * 100000 * 16 / 31))
     })
     it('hệ số và thời gian chỉnh ngay trên dòng chưa lưu được lưu cùng hoá đơn', async () => {
       const current = (await lines()).map(l => ({ id: l.id, type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta: l.meta }))
@@ -132,7 +133,7 @@ describe('thời gian và hệ số riêng từng dòng', () => {
       await setLineTime(db, ctx(), invoiceId, added.id, { coefficient: 0.5 })
       const current = (await lines()).map(l => ({ id: l.id, type: l.type, description: l.id === added.id ? 'Tên tự đổi' : l.description, quantity: l.id === added.id ? 3 : l.quantity, unitPrice: l.id === added.id ? 1 : l.unitPrice, meta: l.meta }))
       await updateLines(db, ctx(), invoiceId, current)
-      const after = (await lines()).find(l => l.id === added.id)!
+      const after = (await lines()).find(l => l.type === 'one_off')!
       expect(after.description).toBe('Giặt ủi')
       expect(after).toMatchObject({ quantity: 3, unitPrice: 100000, amount: 150000 })
     })

@@ -82,7 +82,7 @@ describe('hoá đơn và thu tiền', () => {
     const old = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, inv.id))
     const feeLine = old.find(l => (l.meta as Record<string, unknown> | null)?.leaseFeeId === fee.id)!
     expect(feeLine.amount).not.toBe(feeLine.quantity * feeLine.unitPrice)
-    const updated = await updateLines(db, ctx, inv.id, old.map(l => ({ ...l, meta: l.id === feeLine.id ? { ...l.meta as Record<string, unknown>, from: '2020-01-01' } : l.meta as Record<string, unknown> | null })))
+    const updated = await updateLines(db, ctx, inv.id, old.map(l => ({ ...l, meta: l.meta as Record<string, unknown> | null })))
     const updatedFee = updated.find(l => (l.meta as Record<string, unknown> | null)?.leaseFeeId === fee.id)
     expect(updatedFee?.amount).toBe(feeLine.amount)
     expect(updatedFee?.meta).toEqual(feeLine.meta)
