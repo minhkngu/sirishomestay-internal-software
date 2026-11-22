@@ -57,6 +57,27 @@ describe('buildReminders', () => {
     expect(kinds(r)).toEqual(['meters_missing', 'open_incidents'])
     expect(r.map((x) => x.count)).toEqual([1, 1])
   })
+  it('ngày kết thúc là sáng khách dọn đi: ngày đó đã khẩn, trước đó là cảnh báo kèm ngày dọn đi', () => {
+    const l = {
+      id: 'l',
+      code: 'HD',
+      facilityId: 'TD',
+      roomCode: '1',
+      tenantName: 'K',
+      endDate: TODAY,
+      signStatus: 'signed',
+      followedUp: false,
+    }
+    const item = (endDate: string) =>
+      buildReminders({ ...empty, leases: [{ ...l, endDate }] }, ctx(['tenants_contracts'], ['TD']), TODAY, S)[0]
+        .items[0]
+    expect(item('2026-11-17')).toMatchObject({ severity: 'warning' })
+    expect(item('2026-11-17').sub).toContain('dọn đi sáng 17/11/2026')
+    expect(item(TODAY)).toMatchObject({ severity: 'danger' })
+    expect(item(TODAY).sub).toContain('dọn đi sáng nay')
+    expect(item('2026-11-14')).toMatchObject({ severity: 'danger' })
+    expect(item('2026-11-14').sub).toContain('quá hạn 2 ngày')
+  })
   it('hợp đồng hết hạn trong 30 ngày có; đã có phụ lục thanh lý thì không', () => {
     const l = {
       id: 'l',

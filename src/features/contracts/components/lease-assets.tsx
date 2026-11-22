@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { MoneyInput } from '@/components/ui/money-input'
 import { assetEntry } from '../lease-photo-retry'
+import { BareSelect } from './contract-form-ui'
 
 export type AssetOption = {
   id: string
@@ -24,6 +26,8 @@ export type AssetRemoval =
 export type AssetChanges = { addAssetIds: string[]; newAssets: NewAsset[]; remove: AssetRemoval[] }
 export const emptyChanges = (): AssetChanges => ({ addAssetIds: [], newAssets: [], remove: [] })
 const noPhotos: File[] = []
+const actionMenuClass =
+  'absolute left-0 top-full z-10 grid min-w-44 rounded-xl border border-border/80 bg-popover p-1.5 shadow-lg' // taste-skill-ignore: menu nổi
 
 function PhotoPreview({
   file,
@@ -47,12 +51,18 @@ function PhotoPreview({
   }, [file])
   return (
     <div className="relative">
-      {/* eslint-disable-next-line @next/next/no-img-element -- xem trước ảnh vừa chọn bằng data URL, next/image không xử lý được */}
-      {url && <img src={url} alt={`Ảnh ${name} ${index + 1}`} className="size-16 rounded border object-cover" />}
+      {url && (
+        // eslint-disable-next-line @next/next/no-img-element -- xem trước ảnh vừa chọn bằng data URL, next/image không xử lý được
+        <img
+          src={url}
+          alt={`Ảnh ${name} ${index + 1}`}
+          className="size-16 rounded-lg border border-border/70 object-cover"
+        />
+      )}
       <button
         type="button"
         aria-label={`Xóa ảnh ${index + 1} của ${name}`}
-        className="absolute right-0 top-0 rounded bg-background px-1"
+        className="absolute right-0 top-0 rounded-md bg-background/90 px-1 text-sm text-muted-foreground hover:text-destructive"
         onClick={onRemove}
       >
         ×
@@ -64,7 +74,7 @@ function PhotoPreview({
 function AssetPhotos({ name, files, onChange }: { name: string; files: File[]; onChange: (files: File[]) => void }) {
   return (
     <div className="space-y-2">
-      <label className="block text-sm">
+      <label className="block space-y-1.5 text-xs text-muted-foreground">
         Ảnh lúc bàn giao
         <Input
           aria-label={`Ảnh ${name}`}
@@ -163,15 +173,15 @@ export function LeaseAssets({
   const roomAssets = assets.filter((a) => a.locationKind === 'room' && a.locationId === roomId)
   const candidates = assets.filter((a) => a.facilityId === facilityId && !roomAssets.some((r) => r.id === a.id))
   const fields = (asset: { code: string; name: string; model: string; condition: string }) => (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <div>
-        <strong className="text-sm">{asset.name}</strong>
-        <span className="ml-2 text-sm text-muted-foreground">
+        <p className="text-[13px] font-medium text-foreground">{asset.name}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
           {asset.code}
           {asset.model ? ` · ${asset.model}` : ''}
-        </span>
+        </p>
       </div>
-      <label className="block text-sm">
+      <label className="block space-y-1.5 text-xs text-muted-foreground">
         Tình trạng lúc bàn giao
         <Input
           aria-label={`Tình trạng ${asset.name}`}
@@ -188,22 +198,34 @@ export function LeaseAssets({
     </div>
   )
   return (
-    <section className="space-y-3 rounded-lg border p-4">
-      <button type="button" className="font-semibold" aria-expanded={open} onClick={() => setOpen(!open)}>
-        Tài sản bàn giao {open ? '▾' : '▸'}
+    <div className="space-y-3">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-2 rounded-lg bg-muted/30 px-3 py-2.5 text-left"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        <span className="text-[13px] font-medium text-foreground">Tài sản bàn giao</span>
+        <ChevronDown className={`size-4 text-muted-foreground transition-transform ${open ? '' : '-rotate-90'}`} />
       </button>
       {open && (
         <div className="space-y-3">
-          {!roomId && <p className="text-sm">Chọn phòng để xem tài sản.</p>}
+          {!roomId && (
+            <p className="rounded-xl border border-dashed border-border/80 px-3 py-4 text-sm text-muted-foreground">
+              Chọn phòng để xem tài sản.
+            </p>
+          )}
           {roomId && roomAssets.length === 0 && changes.addAssetIds.length === 0 && changes.newAssets.length === 0 && (
-            <p className="text-sm text-muted-foreground">Phòng chưa có tài sản bàn giao.</p>
+            <p className="rounded-xl border border-dashed border-border/80 px-3 py-4 text-sm text-muted-foreground">
+              Phòng chưa có tài sản bàn giao.
+            </p>
           )}
           {roomAssets.map((asset) => {
             const removal = changes.remove.find((r) => r.assetId === asset.id)
             return (
-              <div key={asset.id} className="space-y-2 rounded-lg border bg-card p-3">
+              <div key={asset.id} className="space-y-3 rounded-xl border border-border/70 bg-card p-3.5">
                 {removal ? (
-                  <p className="text-sm">
+                  <p className="text-[13px] text-foreground">
                     {asset.name} · {removalLabel(removal)}
                   </p>
                 ) : (
@@ -213,7 +235,7 @@ export function LeaseAssets({
                   <div className="relative">
                     <button
                       type="button"
-                      className="text-sm underline"
+                      className="text-xs font-medium text-primary hover:underline hover:underline-offset-2"
                       onClick={() => {
                         setMenu(menu === asset.id ? null : asset.id)
                         setMoving(null)
@@ -222,68 +244,60 @@ export function LeaseAssets({
                       {removal ? 'Đổi cách xử lý' : 'Xử lý tài sản'}
                     </button>
                     {menu === asset.id && (
-                      <div className="absolute left-0 top-full z-10 grid min-w-40 rounded border bg-card p-1 shadow">
+                      <div className={actionMenuClass}>
                         <button
                           type="button"
-                          className="p-2 text-left text-sm hover:bg-muted"
+                          className="rounded-lg p-2 text-left text-[13px] hover:bg-muted"
                           onClick={() => setMoving(moving === asset.id ? null : asset.id)}
                         >
                           Di chuyển
                         </button>
                         {moving === asset.id && (
-                          <div className="m-1 grid gap-1">
-                            <select
-                              aria-label={`Loại đích ${asset.name}`}
-                              className="rounded border p-2 text-sm"
+                          <div className="m-1 grid gap-1.5">
+                            <BareSelect
+                              ariaLabel={`Loại đích ${asset.name}`}
                               value={moveKind}
-                              onChange={(e) => {
-                                setMoveKind(e.target.value as '' | 'warehouse' | 'room')
+                              onValueChange={(value) => {
+                                setMoveKind(value as '' | 'warehouse' | 'room')
                                 setMoveFacility('')
                                 setMoveRoom('')
                               }}
-                            >
-                              <option value="">— kho hoặc phòng —</option>
-                              <option value="warehouse">Kho</option>
-                              <option value="room">Phòng</option>
-                            </select>
+                              options={[
+                                { value: '', label: '— kho hoặc phòng —' },
+                                { value: 'warehouse', label: 'Kho' },
+                                { value: 'room', label: 'Phòng' },
+                              ]}
+                            />
                             {moveKind && (
-                              <select
-                                aria-label={`Tòa ${asset.name}`}
-                                className="rounded border p-2 text-sm"
+                              <BareSelect
+                                ariaLabel={`Tòa ${asset.name}`}
                                 value={moveFacility}
-                                onChange={(e) => {
-                                  setMoveFacility(e.target.value)
+                                onValueChange={(value) => {
+                                  setMoveFacility(value)
                                   setMoveRoom('')
                                 }}
-                              >
-                                <option value="">— chọn tòa —</option>
-                                {moveTargets.facilities.map((f) => (
-                                  <option key={f.id} value={f.id}>
-                                    {f.name}
-                                  </option>
-                                ))}
-                              </select>
+                                options={[
+                                  { value: '', label: '— Chọn tòa —' },
+                                  ...moveTargets.facilities.map((f) => ({ value: f.id, label: f.name })),
+                                ]}
+                              />
                             )}
                             {moveKind === 'room' && moveFacility && (
-                              <select
-                                aria-label={`Phòng đích ${asset.name}`}
-                                className="rounded border p-2 text-sm"
+                              <BareSelect
+                                ariaLabel={`Phòng đích ${asset.name}`}
                                 value={moveRoom}
-                                onChange={(e) => setMoveRoom(e.target.value)}
-                              >
-                                <option value="">— chọn phòng —</option>
-                                {(moveTargets.facilities.find((f) => f.id === moveFacility)?.rooms ?? [])
-                                  .filter((r) => r.id !== roomId)
-                                  .map((r) => (
-                                    <option key={r.id} value={r.id}>
-                                      {r.code}
-                                    </option>
-                                  ))}
-                              </select>
+                                onValueChange={setMoveRoom}
+                                options={[
+                                  { value: '', label: '— Chọn phòng —' },
+                                  ...(moveTargets.facilities.find((f) => f.id === moveFacility)?.rooms ?? [])
+                                    .filter((r) => r.id !== roomId)
+                                    .map((r) => ({ value: r.id, label: r.code })),
+                                ]}
+                              />
                             )}
                             <button
                               type="button"
-                              className="rounded border p-2 text-sm disabled:opacity-50"
+                              className="h-8 rounded-lg border border-border/80 bg-card px-2 text-xs font-medium disabled:opacity-50"
                               disabled={
                                 !(moveKind === 'warehouse' ? moveFacility : moveKind === 'room' ? moveRoom : '')
                               }
@@ -304,7 +318,7 @@ export function LeaseAssets({
                         )}
                         <button
                           type="button"
-                          className="p-2 text-left text-sm hover:bg-muted"
+                          className="rounded-lg p-2 text-left text-[13px] hover:bg-muted"
                           onClick={() => setRemoval({ assetId: asset.id, action: 'dispose' })}
                         >
                           Thanh lý
@@ -312,7 +326,7 @@ export function LeaseAssets({
                         {removal && (
                           <button
                             type="button"
-                            className="p-2 text-left text-sm"
+                            className="rounded-lg p-2 text-left text-[13px] text-primary"
                             onClick={() => {
                               onChange({ ...changes, remove: changes.remove.filter((r) => r.assetId !== asset.id) })
                               setMenu(null)
@@ -334,11 +348,11 @@ export function LeaseAssets({
             const asset = assets.find((a) => a.id === id)
             return (
               asset && (
-                <div key={id} className="space-y-2 rounded-lg border bg-card p-3">
+                <div key={id} className="space-y-3 rounded-xl border border-border/70 bg-card p-3.5">
                   {fields(asset)}
                   <button
                     type="button"
-                    className="text-sm underline"
+                    className="text-xs font-medium text-primary hover:underline hover:underline-offset-2"
                     onClick={() => {
                       onForget(asset.code)
                       onChange({ ...changes, addAssetIds: changes.addAssetIds.filter((x) => x !== id) })
@@ -351,11 +365,11 @@ export function LeaseAssets({
             )
           })}
           {changes.newAssets.map((asset) => (
-            <div key={asset.code} className="space-y-2 rounded-lg border bg-card p-3">
+            <div key={asset.code} className="space-y-3 rounded-xl border border-border/70 bg-card p-3.5">
               {fields(asset)}
               <button
                 type="button"
-                className="text-sm underline"
+                className="text-xs font-medium text-primary hover:underline hover:underline-offset-2"
                 onClick={() => {
                   onForget(asset.code)
                   onChange({ ...changes, newAssets: changes.newAssets.filter((a) => a.code !== asset.code) })
@@ -367,31 +381,31 @@ export function LeaseAssets({
           ))}
           {roomId && canManageAssets && (
             <>
-              <Button type="button" variant="outline" aria-expanded={adding} onClick={() => setAdding(!adding)}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-expanded={adding}
+                onClick={() => setAdding(!adding)}
+              >
                 <span aria-hidden="true">{adding ? '−' : '+'}</span> Thêm tài sản
               </Button>
               {adding && (
-                <div className="space-y-3">
-                  <label className="block text-sm">
-                    Thêm tài sản có sẵn
-                    <select
-                      className="block w-full rounded border p-2"
+                <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3.5">
+                  <div className="space-y-1.5 text-xs text-muted-foreground">
+                    <span>Thêm tài sản có sẵn</span>
+                    <BareSelect
+                      ariaLabel="Thêm tài sản có sẵn"
                       value=""
-                      onChange={(e) => {
-                        if (e.target.value)
-                          onChange({ ...changes, addAssetIds: [...changes.addAssetIds, e.target.value] })
+                      onValueChange={(id) => {
+                        if (id) onChange({ ...changes, addAssetIds: [...changes.addAssetIds, id] })
                       }}
-                    >
-                      <option value="">— chọn tài sản —</option>
-                      {candidates
+                      options={candidates
                         .filter((a) => !changes.addAssetIds.includes(a.id))
-                        .map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {a.name} {a.model}
-                          </option>
-                        ))}
-                    </select>
-                  </label>
+                        .map((a) => ({ value: a.id, label: `${a.name} ${a.model}` }))}
+                      placeholder="— Chọn tài sản —"
+                    />
+                  </div>
                   <div className="grid gap-2 sm:grid-cols-3">
                     <Input
                       aria-label="Mã tài sản mới"
@@ -428,6 +442,7 @@ export function LeaseAssets({
                   <Button
                     type="button"
                     variant="outline"
+                    size="sm"
                     disabled={
                       !code.trim() ||
                       !name.trim() ||
@@ -460,6 +475,6 @@ export function LeaseAssets({
           )}
         </div>
       )}
-    </section>
+    </div>
   )
 }
