@@ -324,7 +324,10 @@ async function refreshMeterLines(tx: DB, inv: InvoiceRow, lease: Lease, strict =
   for (const fee of lease.fees.filter(f => f.quantitySource === 'meter' && f.leaseFeeId)) {
     const line = calculated.lines.find(l => l.meta?.leaseFeeId === fee.leaseFeeId)
     if (!line) continue
-    await tx.delete(invoiceLines).where(and(eq(invoiceLines.invoiceId, inv.id), sql`${invoiceLines.meta}->>'leaseFeeId' = ${fee.leaseFeeId}`))
+    const where = and(eq(invoiceLines.invoiceId, inv.id), sql`${invoiceLines.meta}->>'leaseFeeId' = ${fee.leaseFeeId}`)
+    const [saved] = await tx.select({ quantity: invoiceLines.quantity, amount: invoiceLines.amount }).from(invoiceLines).where(where).limit(1)
+    if (saved && saved.quantity === line.quantity && saved.amount === line.amount) continue
+    await tx.delete(invoiceLines).where(where)
     await tx.insert(invoiceLines).values({ ...line, invoiceId: inv.id })
   }
 }
@@ -716,6 +719,10 @@ async function buildMeterPanels(db: DB, leaseId: string, periodStart: string, mo
 }
 export async function getInvoiceDetail(db: DB, ctx: AccessContext, id: string) {
   const inv = await getInvoice(db, ctx, id)
+  // Hoá đơn nháp: dòng điện nước luôn theo chỉ số hiện có (chỉ số có thể vừa được sửa ở tab Chỉ số); lỗi tính thì giữ dòng đã lưu
+  if (inv.status === 'draft' && inv.kind === 'monthly') {
+    await db.transaction(async tx0 => { const tx = tx0 as unknown as DB; await refreshMeterLines(tx, inv, await leaseData(tx, inv.leaseId)) }).catch(() => undefined)
+  }
   const [lines, pays, [row], periodFees, quantities, leaseFees] = await Promise.all([
     db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, id)).orderBy(asc(invoiceLines.createdAt)),
     db.select().from(payments).where(eq(payments.invoiceId, id)).orderBy(asc(payments.paidOn), asc(payments.createdAt)),

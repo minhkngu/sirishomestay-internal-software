@@ -71,6 +71,12 @@ describe('sửa chỉ số điện trong hoá đơn', () => {
     const waterLine = (await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, invoiceId))).find(l => (l.meta as { leaseFeeId?: string } | null)?.leaseFeeId === waterFee.id)
     expect(waterLine?.amount ?? 0).toBe(0)
   })
+  it('mở hoá đơn nháp thì dòng điện theo chỉ số mới nhất dù chỉ số vừa được sửa ở nơi khác', async () => {
+    expect((await electricLine()).quantity).toBe(100)
+    await db.update(meterReadings).set({ value: 260 }).where(and(eq(meterReadings.meterId, meterId), eq(meterReadings.period, '2026-11')))
+    const detail = await getInvoiceDetail(db, ctx(), invoiceId)
+    expect(detail.lines.find(l => (l.meta as { leaseFeeId?: string } | null)?.leaseFeeId === feeId)).toMatchObject({ quantity: 160, amount: 560000 })
+  })
   it('hoá đơn tháng sau đã duyệt dùng số này thì từ chối', async () => {
     await db.insert(invoices).values({ code: 'TD-HD-202701-0001', leaseId, facilityId, kind: 'monthly', periodStart: '2027-01-01', periodEnd: '2027-01-31', issueDate: '2027-01-01', status: 'approved' })
     await expect(updateInvoiceMeterReading(db, ctx(), invoiceId, { leaseFeeId: feeId, value: 260 })).rejects.toThrow(ValidationError)
