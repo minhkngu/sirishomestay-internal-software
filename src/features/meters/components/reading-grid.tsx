@@ -5,10 +5,11 @@ import { useRouter } from 'next/navigation'
 import { useRef, useState, useTransition } from 'react'
 import { MoreHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { formatDateVN } from '@/domain/dates'
 import { cn } from '@/lib/utils'
-import { saveReadingsAction } from '@/server/meters/actions'
+import { saveOpeningsAction, saveReadingsAction } from '@/server/meters/actions'
 import { meterTypeName } from '../meter-types'
 import { ReplaceMeterDialog } from './replace-meter-dialog'
 
@@ -21,6 +22,8 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, unitByType = {}
   const router = useRouter()
   const [pending, start] = useTransition()
   const [values, setValues] = useState<Record<string, string>>({})
+  // Số đầu kỳ cũng sửa được: lưu vào lần ghi liền trước kỳ (chỉ số tháng trước, chỉ số ban đầu hoặc số lúc lắp)
+  const [openings, setOpenings] = useState<Record<string, string>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [msg, setMsg] = useState<string | null>(null)
   const [onlyOccupied, setOnlyOccupied] = useState(true)
@@ -53,7 +56,11 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, unitByType = {}
   const progressPct = progressCells.length ? Math.round((recorded / progressCells.length) * 100) : 0
 
   const feeRows = shownRows.flatMap((row) => visibleFeeMeters(row))
-  const dirty = Object.values(values).filter((value) => value.trim() !== '').length
+  const allCells = rows.flatMap((row) => [row.electric, row.water, ...(row.feeMeters ?? []).map((fee) => fee.cell)].filter((cell): cell is GridCell => Boolean(cell)))
+  const changedOpenings = Object.entries(openings).filter(([meterId, value]) => /^\d+$/.test(value.trim()) && Number(value) !== allCells.find((cell) => cell.meterId === meterId)?.previous)
+  const openingValue = (cell: GridCell) => { const text = openings[cell.meterId]; return text !== undefined && /^\d+$/.test(text.trim()) ? Number(text) : cell.previous }
+  const dirty = Object.values(values).filter((value) => value.trim() !== '').length + changedOpenings.length
+  const openingInput = (cell: GridCell) => <Input inputMode="numeric" aria-label="Số đầu kỳ" value={openings[cell.meterId] ?? String(cell.previous)} onChange={(event) => setOpenings((cur) => ({ ...cur, [cell.meterId]: event.target.value }))} className="ml-auto h-9 w-28 text-right tabular-nums" />
 
   function onKey(event: React.KeyboardEvent, meterId: string) {
     if (event.key !== 'Enter') return
@@ -64,15 +71,31 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, unitByType = {}
   function save() {
     setMsg(null)
     const batch = Object.entries(values).filter(([, value]) => value.trim() !== '').map(([meterId, value]) => ({ meterId, value: Number(value), readOn }))
-    if (batch.length === 0) { setMsg('Chưa nhập chỉ số nào'); return }
+    const openingBatch = changedOpenings.map(([meterId, value]) => ({ meterId, value: Number(value) }))
+    if (batch.length === 0 && openingBatch.length === 0) { setMsg('Chưa nhập chỉ số nào'); return }
     start(async () => {
-      const result = await saveReadingsAction(period, batch)
-      if (!result.ok) { setMsg(result.error); return }
-      setErrors(Object.fromEntries(result.data.errors.map((error) => [error.meterId, error.message])))
-      const saved = new Set(batch.map((row) => row.meterId))
-      result.data.errors.forEach((error) => saved.delete(error.meterId))
-      setValues(Object.fromEntries(Object.entries(values).filter(([meterId]) => !saved.has(meterId))))
-      setMsg(`Đã lưu ${result.data.saved} chỉ số${result.data.errors.length ? `, ${result.data.errors.length} dòng lỗi` : ''}`)
+      const failed: Record<string, string> = {}
+      let savedCount = 0
+      // Số đầu kỳ lưu trước, để số cuối kỳ kiểm theo số đầu mới
+      if (openingBatch.length > 0) {
+        const result = await saveOpeningsAction(period, openingBatch)
+        if (!result.ok) { setMsg(result.error); return }
+        result.data.errors.forEach((error) => { failed[error.meterId] = error.message })
+        savedCount += result.data.saved
+        setOpenings((cur) => Object.fromEntries(Object.entries(cur).filter(([meterId]) => failed[meterId] !== undefined)))
+      }
+      if (batch.length > 0) {
+        const result = await saveReadingsAction(period, batch)
+        if (!result.ok) { setMsg(result.error); return }
+        result.data.errors.forEach((error) => { failed[error.meterId] = error.message })
+        savedCount += result.data.saved
+        const saved = new Set(batch.map((row) => row.meterId))
+        result.data.errors.forEach((error) => saved.delete(error.meterId))
+        setValues(Object.fromEntries(Object.entries(values).filter(([meterId]) => !saved.has(meterId))))
+      }
+      setErrors(failed)
+      const failCount = Object.keys(failed).length
+      setMsg(`Đã lưu ${savedCount} chỉ số${failCount ? `, ${failCount} dòng lỗi` : ''}`)
       router.refresh()
       onSaved?.()
     })
@@ -117,7 +140,7 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, unitByType = {}
   }
   const usageOf = (cell: GridCell) => {
     const typed = values[cell.meterId] !== undefined && values[cell.meterId].trim() !== ''
-    const usage = typed ? Number(values[cell.meterId]) - cell.previous : cell.usage
+    const usage = typed ? Number(values[cell.meterId]) - openingValue(cell) : cell.usage
     return usage != null && Number.isFinite(usage) ? usage : null
   }
   const flags = (cell: GridCell) => (cell.abnormal || cell.replaced) && (
@@ -211,7 +234,7 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, unitByType = {}
                         </td>
                         {item.cell ? (
                           <>
-                            <td className="px-4 py-2.5 text-right align-top tabular-nums text-muted-foreground"><div className="pt-2">{fmt(item.cell.previous)}</div><div className="text-[11px] text-muted-foreground/80">{openingDate(item.cell)}</div></td>
+                            <td className="px-4 py-2.5 text-right align-top tabular-nums text-muted-foreground"><div>{openingInput(item.cell)}</div><div className="mt-0.5 text-[11px] text-muted-foreground/80">{openingDate(item.cell)}</div></td>
                             <td className="px-4 py-2.5 text-right align-top">{closingInput(item)}</td>
                             <td className="px-4 py-2.5 text-right align-top tabular-nums text-foreground">
                               <div className="pt-2">{usageOf(item.cell) != null ? <>{fmt(usageOf(item.cell)!)}{item.unit && <span className="ml-1 text-[11px] text-muted-foreground">{item.unit}</span>}</> : '—'}</div>
@@ -238,7 +261,7 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, unitByType = {}
                     </div>
                     {item.cell ? (
                       <div className="grid grid-cols-3 items-start gap-2 text-xs">
-                        <div><div className="text-muted-foreground">Số đầu kỳ</div><div className="mt-1 h-9 pt-2 tabular-nums text-foreground">{fmt(item.cell.previous)}</div><div className="text-[11px] text-muted-foreground/80">{openingDate(item.cell)}</div></div>
+                        <div><div className="text-muted-foreground">Số đầu kỳ</div><div className="mt-1">{openingInput(item.cell)}</div><div className="text-[11px] text-muted-foreground/80">{openingDate(item.cell)}</div></div>
                         <div><div className="font-medium text-foreground">Số cuối kỳ</div><div className="mt-1">{closingInput(item)}</div></div>
                         <div className="text-right"><div className="text-muted-foreground">Tiêu thụ</div><div className="mt-1 h-9 pt-2 tabular-nums text-foreground">{usageOf(item.cell) != null ? fmt(usageOf(item.cell)!) : '—'}</div>{flags(item.cell)}</div>
                       </div>

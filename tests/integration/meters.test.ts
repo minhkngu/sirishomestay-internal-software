@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { facilities, leaseFeeMeters, leaseFeeSnapshots, leases, meterReadings, meters, rooms, tenants } from '@/db'
-import { addRoomMeter, createDefaultMeters, ensureFeeMeter, listMeterOverview, listReadingSheet, saveReadings, replaceMeter, suggestMeterFinalReading, listReadingHistory, listLeaseMeterInitials, updateMeterReading, deleteMeterReading } from '@/server/meters/service'
+import { addRoomMeter, createDefaultMeters, ensureFeeMeter, listMeterOverview, listReadingSheet, saveReadings, replaceMeter, suggestMeterFinalReading, listReadingHistory, listLeaseMeterInitials, saveOpenings, updateMeterReading, deleteMeterReading } from '@/server/meters/service'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import type { AccessContext, Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'
@@ -47,6 +47,21 @@ describe('meters', () => {
     return (await db.insert(leases).values({ code, roomId, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-01-01', monthlyRent: 1, depositAmount: 1, ...over }).returning())[0]
   }
 
+  it('sửa số đầu kỳ: số đầu là chỉ số chốt tháng trước thì sửa chỉ số đó; không vượt số sau, không thấp hơn số trước nữa', async () => {
+    await read('E101', '2026-10', '2026-10-31', 1100)
+    const ok = await saveOpenings(db, hung(), '2026-10', [{ meterId: m.E101, value: 1050 }])
+    expect(ok).toMatchObject({ saved: 1, errors: [] })
+    expect((await db.select().from(meterReadings).where(eq(meterReadings.meterId, m.E101))).find((r) => r.period === '2026-09')?.value).toBe(1050)
+    const tooHigh = await saveOpenings(db, hung(), '2026-10', [{ meterId: m.E101, value: 1200 }])
+    expect(tooHigh.saved).toBe(0)
+    expect(tooHigh.errors).toHaveLength(1)
+  })
+  it('sửa số đầu kỳ của đồng hồ chưa có lần ghi nào thì sửa số lúc lắp; thiếu quyền cơ sở thì từ chối', async () => {
+    await addMeter(r101, 'water', 'W101B', 5)
+    expect(await saveOpenings(db, hung(), '2026-10', [{ meterId: m.W101B, value: 9 }])).toMatchObject({ saved: 1, errors: [] })
+    expect((await db.select().from(meters).where(eq(meters.id, m.W101B)))[0].startReading).toBe(9)
+    await expect(saveOpenings(db, ctxOf(['meters'], [fb]), '2026-10', [{ meterId: m.E101, value: 1 }])).rejects.toThrow(NotFoundError)
+  })
   it('bảng ghi: mỗi phòng có chỉ số kỳ trước, chỉ số kỳ này, tiêu thụ và tiến độ theo phòng có người ở', async () => {
     await occupy(r101, 'A1'); await occupy(r102, 'A2')
     await read('E101', '2026-10', '2026-10-31', 1100)

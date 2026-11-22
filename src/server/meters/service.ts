@@ -128,6 +128,43 @@ export async function saveReadings(db: DB, ctx: AccessContext, period: string, r
   return db.transaction(async (tx) => applyReadings(tx as unknown as DB, ctx, period, rows))
 }
 
+/**
+ * Sửa số đầu kỳ của đồng hồ cho một tháng: số đầu là lần ghi liền trước tháng đó. Nếu là chỉ số chốt của tháng trước thì sửa chỉ số đó
+ * (cùng kiểm tra như ghi chỉ số, tháng đã dùng trong hoá đơn đã duyệt thì khoá); nếu là chỉ số ban đầu (bàn giao) hoặc số lúc lắp thì sửa thẳng, chỉ cần không vượt số sau nó.
+ */
+export async function saveOpenings(db: DB, ctx: AccessContext, period: string, rows: Array<{ meterId: string; value: number }>): Promise<{ saved: number; errors: ReadingError[] }> {
+  periodRange(period)
+  return db.transaction(async (tx0) => {
+    const tx = tx0 as unknown as DB
+    const errors: ReadingError[] = []
+    let saved = 0
+    for (const row of rows) {
+      const [info] = await tx.select({ m: meters, facilityId: rooms.facilityId }).from(meters).innerJoin(rooms, eq(rooms.id, meters.roomId)).where(eq(meters.id, row.meterId))
+      if (!info) throw new NotFoundError()
+      assertCan(ctx, 'meters', info.facilityId)
+      if (!Number.isInteger(row.value) || row.value < 0) { errors.push({ meterId: row.meterId, message: 'Chỉ số không hợp lệ' }); continue }
+      const all = (await tx.select().from(meterReadings).where(eq(meterReadings.meterId, row.meterId))).sort((a, b) => (a.readOn < b.readOn ? -1 : a.readOn > b.readOn ? 1 : 0))
+      const from = `${period}-01`
+      const before = all.filter((r) => r.readOn < from)
+      const target = before[before.length - 1]
+      if (target?.kind === 'monthly') {
+        const r = await applyReadings(tx, ctx, target.period, [{ meterId: row.meterId, value: row.value, readOn: target.readOn }])
+        saved += r.saved; errors.push(...r.errors)
+        continue
+      }
+      const next = all.find((r) => r.readOn >= from)
+      const floor = target ? (before[before.length - 2]?.value ?? info.m.startReading) : 0
+      if (row.value < floor) { errors.push({ meterId: row.meterId, message: DECREASE }); continue }
+      if (next && row.value > next.value) { errors.push({ meterId: row.meterId, message: 'Chỉ số lớn hơn chỉ số của kỳ sau' }); continue }
+      if (target) await tx.update(meterReadings).set({ value: row.value, updatedAt: new Date() }).where(eq(meterReadings.id, target.id))
+      else await tx.update(meters).set({ startReading: row.value, updatedAt: new Date() }).where(eq(meters.id, row.meterId))
+      await recordAudit(tx, ctx, { action: 'update', entity: 'meter_readings', facilityId: info.facilityId, summary: `Sửa số đầu kỳ ${period}`, after: { meterId: row.meterId, value: row.value } })
+      saved++
+    }
+    return { saved, errors }
+  })
+}
+
 /** Lõi của `saveReadings` chạy trong transaction của người gọi (vd. sửa chỉ số ngay trong hoá đơn). */
 export async function applyReadings(tx: DB, ctx: AccessContext, period: string, rows: ReadingInput[]): Promise<{ saved: number; errors: ReadingError[] }> {
   const [start, end] = periodRange(period)

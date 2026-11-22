@@ -4,11 +4,16 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/db/client'
 import { toActionResult } from '@/lib/action-result'
 import { getAccessContext } from '@/server/session'
-import { listReadingSheet, addRoomMeter, deleteMeterReading, deleteMeterReadings, replaceMeter, saveReadings, updateMeterReading, suggestMeterFinalReading, type ReadingInput } from './service'
+import { listReadingSheet, saveOpenings, addRoomMeter, deleteMeterReading, deleteMeterReadings, replaceMeter, saveReadings, updateMeterReading, suggestMeterFinalReading, type ReadingInput } from './service'
 
 export async function saveReadingsAction(period: string, rows: ReadingInput[]) {
   const ctx = await getAccessContext()
   return toActionResult(async () => { const r = await saveReadings(db, ctx, period, rows); revalidatePath('/meters'); return r })
+}
+
+export async function saveOpeningsAction(period: string, rows: Array<{ meterId: string; value: number }>) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => { const r = await saveOpenings(db, ctx, period, rows); revalidatePath('/meters'); revalidatePath('/invoices'); return r })
 }
 
 export async function replaceMeterAction(roomId: string, utility: 'electric' | 'water', input: { removedOn: string; finalReading: number; newSerial?: string; startReading: number; estimated?: boolean; note?: string }) {
