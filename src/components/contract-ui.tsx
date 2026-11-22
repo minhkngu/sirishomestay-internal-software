@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils'
 import { diffDays } from '@/domain/dates'
+import { SIGN_STATUS_LABELS, signStatusLabel } from '@/domain/sign-labels'
 
 /** Nhãn trạng thái hợp đồng: chip nhạt, chữ đậm cùng tông, viền một bậc. */
 export function StatusChip({
@@ -30,7 +31,7 @@ export function StatusChip({
 export function SignChip({ status, className }: { status: string; className?: string }) {
   return (
     <StatusChip tone={status === 'signed' ? 'positive' : 'neutral'} className={className}>
-      {status === 'signed' ? 'Đã ký' : 'Chưa ký'}
+      {signStatusLabel(status)}
     </StatusChip>
   )
 }
@@ -38,7 +39,7 @@ export function SignChip({ status, className }: { status: string; className?: st
 /** Trạng thái ký ba bậc như danh sách cũ: nháp, đã xuất, đã ký. */
 export function SignStateChip({ status, className }: { status: string; className?: string }) {
   const tone = status === 'signed' ? 'positive' : status === 'exported' ? 'warning' : 'neutral'
-  const label = status === 'signed' ? 'Đã ký' : status === 'exported' ? 'Đã xuất' : 'Nháp'
+  const label = status === 'signed' || status === 'exported' ? SIGN_STATUS_LABELS[status] : SIGN_STATUS_LABELS.draft
   return (
     <StatusChip tone={tone} className={className}>
       {label}
