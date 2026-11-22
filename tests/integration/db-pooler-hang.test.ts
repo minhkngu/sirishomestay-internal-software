@@ -77,6 +77,9 @@ it('không gửi dồn truy vấn trên một kết nối (Supavisor treo khi b�
   try {
     const { db } = await import('@/db/client')
     const all = Promise.allSettled([db.execute(sql`select 1`), db.execute(sql`select 2`)])
+    // Chờ truy vấn đầu tới pooler (máy tải nặng có thể chậm hơn vài trăm ms), rồi cho truy vấn thứ hai thêm thời gian:
+    // nếu client gửi dồn, Parse thứ hai sẽ tới trong khoảng này.
+    await vi.waitFor(() => expect(pooler.stats.parses).toBeGreaterThanOrEqual(1), { timeout: 5000, interval: 50 })
     await new Promise((r) => setTimeout(r, 500))
     expect(pooler.stats.parses).toBe(1)
     await all
