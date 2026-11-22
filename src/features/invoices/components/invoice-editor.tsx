@@ -135,16 +135,18 @@ function MeterReadingsPanel({ panel, editable, consumption, staged, onStage, sta
   const [openText, setOpenText] = useState('')
   const [, setError] = useState('')
   const last = panel.rows[panel.rows.length - 1]
-  const rowLabel = (r: MeterPanel['rows'][number]) => staged[r.period] !== undefined ? `Tháng ${periodLabel(r.period)} · ${Number(staged[r.period]).toLocaleString('vi-VN')} (chưa lưu)` : `Tháng ${periodLabel(r.period)} · ${r.value == null ? 'chưa chốt' : r.value.toLocaleString('vi-VN')}`
-  const items = [...panel.rows.map((r) => ({ value: r.period, label: rowLabel(r) })), ...(editable ? [{ value: NEW_READING, label: '＋ Chốt chỉ số' }] : [])]
-  const row = panel.rows.find((r) => r.period === period)
-  // Số đầu kỳ: nếu tháng liền trước đang được điền (chưa lưu) thì lấy số đó
-  const prevRow = row ? panel.rows[panel.rows.indexOf(row) - 1] : undefined
+  // Danh sách tháng hiện số đầu – số cuối (không hiện mức tiêu thụ)
   const openingOf = (r: MeterPanel['rows'][number]) => {
     if (r.openingSource !== 'monthly') return stagedOpening[r.period] !== undefined ? Number(stagedOpening[r.period]) : r.opening
     const prev = panel.rows[panel.rows.indexOf(r) - 1]
     return prev && staged[prev.period] !== undefined ? Number(staged[prev.period]) : r.opening
   }
+  const fmt = (n: number | null | undefined) => n == null ? '—' : n.toLocaleString('vi-VN')
+  const rowLabel = (r: MeterPanel['rows'][number]) => staged[r.period] !== undefined ? `Tháng ${periodLabel(r.period)} · ${fmt(openingOf(r))} – ${fmt(Number(staged[r.period]))} (chưa lưu)` : r.value == null ? `Tháng ${periodLabel(r.period)} · chưa chốt` : `Tháng ${periodLabel(r.period)} · ${fmt(openingOf(r))} – ${fmt(r.value)}`
+  const items = [...panel.rows.map((r) => ({ value: r.period, label: rowLabel(r) })), ...(editable ? [{ value: NEW_READING, label: '＋ Chốt chỉ số' }] : [])]
+  const row = panel.rows.find((r) => r.period === period)
+  // Số đầu kỳ: nếu tháng liền trước đang được điền (chưa lưu) thì lấy số đó
+  const prevRow = row ? panel.rows[panel.rows.indexOf(row) - 1] : undefined
   // Số đầu kỳ chính là chỉ số chốt của tháng liền trước: sửa được khi tháng đó nằm trong danh sách (cùng quy tắc 3 tháng gần nhất)
   // Số đầu là chốt tháng trước thì sửa qua tháng đó; là chỉ số bàn giao hoặc chỉ số ban đầu thì sửa trực tiếp, không khoá
   const openingEditable = editable && !!row && (row.openingSource !== 'monthly' || !!prevRow)
