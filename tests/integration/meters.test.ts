@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { facilities, leaseFeeMeters, leaseFeeSnapshots, leases, meterReadings, meters, rooms, tenants } from '@/db'
-import { addRoomMeter, createDefaultMeters, ensureFeeMeter, listMeterOverview, listReadingSheet, saveReadings, replaceMeter, suggestMeterFinalReading, listReadingHistory, updateMeterReading, deleteMeterReading } from '@/server/meters/service'
+import { addRoomMeter, createDefaultMeters, ensureFeeMeter, listMeterOverview, listReadingSheet, saveReadings, replaceMeter, suggestMeterFinalReading, listReadingHistory, listLeaseMeterInitials, updateMeterReading, deleteMeterReading } from '@/server/meters/service'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import type { AccessContext, Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'
@@ -320,6 +320,38 @@ describe('meters', () => {
       await expect(listReadingHistory(db, ctxOf(['meters'], [fb]), fa, '2026-09', '2026-10')).rejects.toThrow(NotFoundError)
       await expect(listReadingHistory(db, ctxOf(['billing'], [fa]), fa, '2026-09', '2026-10')).rejects.toThrow(ForbiddenError)
       await expect(listReadingHistory(db, hung(), fa, '2026-13', '2026-10')).rejects.toThrow(ValidationError)
+    })
+  })
+
+  describe('chỉ số đầu của phí hợp đồng', () => {
+    async function feeLease(startDate: string) {
+      const [tenant] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: fa, fullName: 'Khách đầu', phone: '+84901239999', idNumber: '012345699999' }).returning()
+      const [lease] = await db.insert(leases).values({ code: 'HD-DAU', roomId: r101, tenantId: tenant.id, startDate, endDate: '2027-12-31', monthlyRent: 1, depositAmount: 1 }).returning()
+      const [fee] = await db.insert(leaseFeeSnapshots).values({ leaseId: lease.id, name: 'Điện', unit: 'kWh', quantitySource: 'meter', billing: 'per_occurrence', unitPrice: 3500 }).returning()
+      await db.insert(leaseFeeMeters).values({ leaseFeeId: fee.id, meterId: m.E101 })
+      return { lease, fee }
+    }
+
+    it('lấy lần chốt bàn giao sớm nhất từ ngày bắt đầu hợp đồng, bỏ qua lần chốt trước đó', async () => {
+      const { fee } = await feeLease('2026-10-15')
+      await db.insert(meterReadings).values({ meterId: m.E101, period: '2025-01', readOn: '2025-01-01', value: 500, kind: 'handover' })
+      const [current] = await db.insert(meterReadings).values({ meterId: m.E101, period: '2026-10', readOn: '2026-10-15', value: 1250, kind: 'handover' }).returning()
+      expect(await listLeaseMeterInitials(db, hung(), fee.leaseId)).toEqual({
+        [fee.id]: { meterId: m.E101, meterCode: null, value: 1250, readOn: '2026-10-15', readingId: current.id },
+      })
+    })
+
+    it('không có lần chốt sau ngày bắt đầu thì dùng chỉ số lúc lắp đồng hồ', async () => {
+      const { fee } = await feeLease('2026-10-15')
+      await db.insert(meterReadings).values({ meterId: m.E101, period: '2025-01', readOn: '2025-01-01', value: 500, kind: 'handover' })
+      expect(await listLeaseMeterInitials(db, hung(), fee.leaseId)).toEqual({
+        [fee.id]: { meterId: m.E101, meterCode: null, value: 0, readOn: '2025-01-01', readingId: null },
+      })
+    })
+
+    it('người không có quyền meters nhận rỗng', async () => {
+      const { lease } = await feeLease('2026-10-15')
+      expect(await listLeaseMeterInitials(db, ctxOf(['tenants_contracts'], [fa]), lease.id)).toEqual({})
     })
   })
 

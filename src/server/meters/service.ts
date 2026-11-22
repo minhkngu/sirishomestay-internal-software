@@ -414,14 +414,20 @@ export async function deleteMeterReadings(db: DB, ctx: AccessContext, ids: strin
   return { deleted, skipped: unique.length - deleted }
 }
 
-/** Đồng hồ của các phí tính theo đồng hồ trong một hợp đồng, kèm chỉ số đầu: chỉ số bàn giao sớm nhất, không có thì chỉ số lúc lắp. Khoá theo id dòng phí hợp đồng. */
-export async function listLeaseMeterInitials(db: DB, ctx: AccessContext, leaseId: string): Promise<Record<string, { meterCode: string | null; value: number; readOn: string }>> {
-  const links = await db.select({ leaseFeeId: leaseFeeMeters.leaseFeeId, meterId: leaseFeeMeters.meterId, code: meters.code, startReading: meters.startReading, installedOn: meters.installedOn, facilityId: rooms.facilityId })
-    .from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).innerJoin(meters, eq(meters.id, leaseFeeMeters.meterId)).innerJoin(rooms, eq(rooms.id, meters.roomId))
+/** Đồng hồ của các phí tính theo đồng hồ trong một hợp đồng, kèm chỉ số đầu: lần chốt sớm nhất từ ngày bắt đầu hợp đồng, không có thì chỉ số lúc lắp. Khoá theo id dòng phí hợp đồng. */
+export type LeaseMeterInitial = { meterId: string; meterCode: string | null; value: number; readOn: string; readingId: string | null }
+
+export async function listLeaseMeterInitials(db: DB, ctx: AccessContext, leaseId: string): Promise<Record<string, LeaseMeterInitial>> {
+  const links = await db.select({ leaseFeeId: leaseFeeMeters.leaseFeeId, meterId: leaseFeeMeters.meterId, code: meters.code, startReading: meters.startReading, installedOn: meters.installedOn, facilityId: rooms.facilityId, startDate: leases.startDate })
+    .from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).innerJoin(leases, eq(leases.id, leaseFeeSnapshots.leaseId)).innerJoin(meters, eq(meters.id, leaseFeeMeters.meterId)).innerJoin(rooms, eq(rooms.id, meters.roomId))
     .where(eq(leaseFeeSnapshots.leaseId, leaseId))
   if (links.length === 0) return {}
   // Chỉ người có quyền Chỉ số của toà mới thấy số này; người khác xem hợp đồng bình thường, không có phần chỉ số
   if (!can(ctx, 'meters', links[0].facilityId)) return {}
-  const handovers = await db.select({ meterId: meterReadings.meterId, readOn: meterReadings.readOn, value: meterReadings.value }).from(meterReadings).where(and(inArray(meterReadings.meterId, links.map(l => l.meterId)), eq(meterReadings.kind, 'handover'))).orderBy(asc(meterReadings.readOn))
-  return Object.fromEntries(links.map(l => { const h = handovers.find(x => x.meterId === l.meterId); return [l.leaseFeeId, { meterCode: l.code, value: h?.value ?? l.startReading, readOn: h?.readOn ?? l.installedOn }] }))
+  const handovers = await db.select({ id: meterReadings.id, meterId: meterReadings.meterId, readOn: meterReadings.readOn, value: meterReadings.value }).from(meterReadings).where(and(inArray(meterReadings.meterId, links.map(l => l.meterId)), eq(meterReadings.kind, 'handover'))).orderBy(asc(meterReadings.readOn))
+  return Object.fromEntries(links.map(l => {
+    // Chốt trước ngày bắt đầu hợp đồng là của khách cũ, không phải chỉ số đầu của hợp đồng này
+    const h = handovers.find(x => x.meterId === l.meterId && x.readOn >= l.startDate)
+    return [l.leaseFeeId, { meterId: l.meterId, meterCode: l.code, value: h?.value ?? l.startReading, readOn: h?.readOn ?? l.installedOn, readingId: h?.id ?? null }]
+  }))
 }

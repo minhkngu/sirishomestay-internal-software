@@ -66,6 +66,14 @@ describe('sửa chỉ số điện trong hoá đơn', () => {
     expect((await electricLine()).amount).toBe(560000)
   })
 
+  it('chỉ số đầu của bảng đồng hồ lấy lần chốt từ ngày bắt đầu hợp đồng, bỏ qua lần chốt cũ hơn', async () => {
+    await db.insert(meterReadings).values([
+      { meterId, period: '2025-01', readOn: '2025-01-01', value: 500, kind: 'handover' },
+      { meterId, period: '2026-01', readOn: '2026-01-01', value: 1250, kind: 'handover' },
+    ])
+    const d = await getInvoiceDetail(db, ctx(), invoiceId)
+    expect(d.meterPanels[0].initial).toEqual({ value: 1250, readOn: '2026-01-01' })
+  })
   it('chi tiết hoá đơn liệt kê các chỉ số đã chốt của đồng hồ (3 tháng gần nhất), thiếu thì để trống', async () => {
     const d = await getInvoiceDetail(db, ctx(), invoiceId)
     expect(d.meterPanels).toHaveLength(1)
