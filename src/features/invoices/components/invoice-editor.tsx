@@ -29,6 +29,8 @@ import {
   updateInvoiceMeterReadingAction,
   updateInvoiceOpeningReadingAction,
   createInvoiceFromEditorAction,
+  savePreviewMeterReadingAction,
+  savePreviewOpeningReadingAction,
   updateLinesAction,
 } from '@/server/invoices/actions'
 
@@ -142,7 +144,7 @@ function MeterReadingsPanel({ panel, editable, consumption, staged, onStage, sta
     return prev && staged[prev.period] !== undefined ? Number(staged[prev.period]) : r.opening
   }
   const fmt = (n: number | null | undefined) => n == null ? '—' : n.toLocaleString('vi-VN')
-  const rowLabel = (r: MeterPanel['rows'][number]) => staged[r.period] !== undefined ? `Tháng ${periodLabel(r.period)} · ${fmt(openingOf(r))} – ${fmt(Number(staged[r.period]))} (chưa lưu)` : r.value == null ? `Tháng ${periodLabel(r.period)} · chưa chốt` : `Tháng ${periodLabel(r.period)} · ${fmt(openingOf(r))} – ${fmt(r.value)}`
+  const rowLabel = (r: MeterPanel['rows'][number]) => staged[r.period] !== undefined ? `Tháng ${periodLabel(r.period)} · ${fmt(openingOf(r))} – ${fmt(Number(staged[r.period]))} ` : r.value == null ? `Tháng ${periodLabel(r.period)} · chưa chốt` : `Tháng ${periodLabel(r.period)} · ${fmt(openingOf(r))} – ${fmt(r.value)}`
   const items = [...panel.rows.map((r) => ({ value: r.period, label: rowLabel(r) })), ...(editable ? [{ value: NEW_READING, label: '＋ Chốt chỉ số' }] : [])]
   const row = panel.rows.find((r) => r.period === period)
   // Số đầu kỳ: nếu tháng liền trước đang được điền (chưa lưu) thì lấy số đó
@@ -204,7 +206,7 @@ function MeterReadingsPanel({ panel, editable, consumption, staged, onStage, sta
         const c = staged[last.period] !== undefined ? Number(staged[last.period]) : last.value
         return <p className="mt-1.5 tabular-nums">Số đầu kỳ <span className="font-medium text-foreground">{o == null ? '—' : o.toLocaleString('vi-VN')}</span> · Số cuối kỳ <span className="font-medium text-foreground">{c == null ? '—' : c.toLocaleString('vi-VN')}</span></p>
       })()}
-      <p className="mt-0.5">Tiêu thụ: <span className="font-medium tabular-nums text-foreground">{consumption.toLocaleString('vi-VN')} {panel.unit}</span>{Object.keys(staged).length > 0 && ' (tính lại sau khi lưu)'}</p>
+      <p className="mt-0.5">Tiêu thụ: <span className="font-medium tabular-nums text-foreground">{consumption.toLocaleString('vi-VN')} {panel.unit}</span></p>
       {row && (
         <FormDialog open onOpenChange={(o) => { if (!o) setPeriod(null) }} title={`Chốt chỉ số ${panel.name}`} description={`Tháng ${periodLabel(row.period)}${row.value == null ? ' · chưa chốt' : ` · đang là ${row.value.toLocaleString('vi-VN')}`}. Bấm Lưu để lưu luôn số này (cùng các thay đổi khác của hoá đơn), ghi về tab Chỉ số và tính lại tiền.`} size="sm">
           <div className="space-y-4 pb-1">
@@ -247,7 +249,25 @@ function MeterReadingsPanel({ panel, editable, consumption, staged, onStage, sta
 export function InvoiceEditor(p: Props) {
   const router = useRouter()
   const [pending, start] = useTransition()
-  const [lines, setLines] = useState<EditorLine[]>(p.lines.filter((l) => l.type !== 'tax').map((l) => ({ ...l, unitPriceText: String(l.unitPrice) })))
+  const [rawLines, setLines] = useState<EditorLine[]>(p.lines.filter((l) => l.type !== 'tax').map((l) => ({ ...l, unitPriceText: String(l.unitPrice) })))
+  const [staged, setStaged] = useState<Record<string, string>>({})
+  const [stagedOpening, setStagedOpening] = useState<Record<string, string>>({})
+  const stagedOpeningFor = (leaseFeeId: string) => Object.fromEntries(Object.entries(stagedOpening).filter(([key]) => key.startsWith(`${leaseFeeId}|`)).map(([key, value]) => [key.split('|')[1], value]))
+  const stagedFor = (leaseFeeId: string) => Object.fromEntries(Object.entries(staged).filter(([key]) => key.startsWith(`${leaseFeeId}|`)).map(([key, value]) => [key.split('|')[1], value]))
+  // Chỉ số điền xong thì số tiêu thụ và thành tiền dòng điện nước tính ngay (không đợi lưu hoá đơn): số cuối kỳ trừ số đầu kỳ của tháng liền trước tháng hoá đơn
+  const lines = rawLines.map((l) => {
+    const panel = p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId)
+    const last = panel?.rows[panel.rows.length - 1]
+    if (!panel || !last) return l
+    const st = stagedFor(panel.leaseFeeId), so = stagedOpeningFor(panel.leaseFeeId)
+    if (!Object.keys(st).length && !Object.keys(so).length) return l
+    const prev = panel.rows[panel.rows.length - 2]
+    const closing = st[last.period] !== undefined ? Number(st[last.period]) : last.value
+    const opening = last.openingSource !== 'monthly' ? (so[last.period] !== undefined ? Number(so[last.period]) : last.opening) : (prev && st[prev.period] !== undefined ? Number(st[prev.period]) : last.opening)
+    if (closing == null || opening == null || closing < opening) return l
+    const quantity = closing - opening
+    return { ...l, quantity, amount: Math.round(quantity * l.unitPrice) }
+  })
   const taxLine = p.lines.find((l) => l.type === 'tax')
   const [taxRate, setTaxRate] = useState(typeof taxLine?.meta?.rate === 'number' ? String(taxLine.meta.rate) : '')
   const [due, setDue] = useState(p.dueDateIso ?? p.dueDefaultIso)
@@ -266,17 +286,27 @@ export function InvoiceEditor(p: Props) {
   const set = (i: number, patch: Partial<EditorLine>) =>
     setLines(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)))
 
-  const [staged, setStaged] = useState<Record<string, string>>({})
-  const [stagedOpening, setStagedOpening] = useState<Record<string, string>>({})
-  const stagedOpeningFor = (leaseFeeId: string) => Object.fromEntries(Object.entries(stagedOpening).filter(([key]) => key.startsWith(`${leaseFeeId}|`)).map(([key, value]) => [key.split('|')[1], value]))
-  const stagedFor = (leaseFeeId: string) => Object.fromEntries(Object.entries(staged).filter(([key]) => key.startsWith(`${leaseFeeId}|`)).map(([key, value]) => [key.split('|')[1], value]))
+  /** Hoá đơn mới chưa lưu: chỉ số ghi thẳng vào bảng chỉ số ngay khi điền xong (hoá đơn không cần có trước). */
+  const savePreviewReadings = (leaseFeeId: string, readings: Record<string, string>, openings: Record<string, string>) => start(async () => {
+    const n = p.newInvoice
+    if (!n) return
+    for (const [period, value] of Object.entries(openings)) {
+      const r = await savePreviewOpeningReadingAction({ leaseId: n.leaseId, invoicePeriod: n.period, leaseFeeId, period, value: Number(value) })
+      if (!r.ok) { toast.error(r.error ?? 'Không lưu được số đầu kỳ'); return }
+    }
+    for (const [period, value] of Object.entries(readings)) {
+      const r = await savePreviewMeterReadingAction({ leaseId: n.leaseId, invoicePeriod: n.period, leaseFeeId, period, value: Number(value) })
+      if (!r.ok) { toast.error(r.error ?? 'Không lưu được chỉ số'); return }
+    }
+    toast.success('Đã lưu chỉ số')
+  })
   /** Lưu một lượt mọi thông tin của hoá đơn: chỉ số đã điền, các dòng (kể cả thời gian, số lượng) và hạn thanh toán. */
   const persist = async (extra?: { staged: Record<string, string>; opening: Record<string, string> }): Promise<string | null> => {
     const taxLine = validRate > 0 ? [{ type: 'tax', description: `Thuế ${validRate}%`, quantity: 1, unitPrice: tax, meta: { rate: validRate } }] : []
     // Hoá đơn mới: lúc bấm Lưu mới thật sự tạo, rồi mở hoá đơn vừa lưu
     if (!p.id) {
       if (!p.newInvoice) return 'Thiếu thông tin hợp đồng và tháng'
-      const created = await createInvoiceFromEditorAction({ leaseId: p.newInvoice.leaseId, period: p.newInvoice.period, lines: [...lines.map((l) => ({ type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta: l.meta })), ...taxLine], dueDate: due || undefined, note: note.trim() || undefined, readings: Object.entries(staged).map(([key, value]) => ({ leaseFeeId: key.split('|')[0], period: key.split('|')[1], value: Number(value) })), openings: Object.entries(stagedOpening).map(([key, value]) => ({ leaseFeeId: key.split('|')[0], period: key.split('|')[1], value: Number(value) })) })
+      const created = await createInvoiceFromEditorAction({ leaseId: p.newInvoice.leaseId, period: p.newInvoice.period, lines: [...lines.map((l) => ({ type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta: l.meta })), ...taxLine], dueDate: due || undefined, note: note.trim() || undefined })
       if (!created.ok) return created.error ?? 'Không tạo được hoá đơn'
       createdId.current = created.data.id
       return null
@@ -412,7 +442,7 @@ export function InvoiceEditor(p: Props) {
                     {isTimeBased(l) && !isMeterLine(l) ? <LineTime line={l} defaultFrom={p.start} defaultTo={p.end} fullMonth={p.fullMonth} proration={p.proration} editable={p.status === 'draft'} onChange={(meta) => set(i, timePatch(l, meta))} /> : <span className="text-muted-foreground/60">—</span>}
                   </td>
                   <td className="p-2.5 align-top">
-                    {(() => { const panel = p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId); return panel ? <MeterReadingsPanel panel={panel} editable={p.status === 'draft'} consumption={l.quantity} staged={stagedFor(panel.leaseFeeId)} onStage={(period, value) => setStaged((cur) => ({ ...cur, [`${panel.leaseFeeId}|${period}`]: value }))} onApply={(readings, openings) => { if (p.id) saveAll({ staged: Object.fromEntries(Object.entries(readings).map(([k, v]) => [`${panel.leaseFeeId}|${k}`, v])), opening: Object.fromEntries(Object.entries(openings).map(([k, v]) => [`${panel.leaseFeeId}|${k}`, v])) }) }} stagedOpening={stagedOpeningFor(panel.leaseFeeId)} onStageOpening={(period, value) => setStagedOpening((cur) => ({ ...cur, [`${panel.leaseFeeId}|${period}`]: value }))} /> : <span className="text-muted-foreground/60">—</span> })()}
+                    {(() => { const panel = p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId); return panel ? <MeterReadingsPanel panel={panel} editable={p.status === 'draft'} consumption={l.quantity} staged={stagedFor(panel.leaseFeeId)} onStage={(period, value) => setStaged((cur) => ({ ...cur, [`${panel.leaseFeeId}|${period}`]: value }))} onApply={(readings, openings) => { if (!p.id) savePreviewReadings(panel.leaseFeeId, readings, openings); else saveAll({ staged: Object.fromEntries(Object.entries(readings).map(([k, v]) => [`${panel.leaseFeeId}|${k}`, v])), opening: Object.fromEntries(Object.entries(openings).map(([k, v]) => [`${panel.leaseFeeId}|${k}`, v])) }) }} stagedOpening={stagedOpeningFor(panel.leaseFeeId)} onStageOpening={(period, value) => setStagedOpening((cur) => ({ ...cur, [`${panel.leaseFeeId}|${period}`]: value }))} /> : <span className="text-muted-foreground/60">—</span> })()}
                   </td>
                   <td className="p-2.5 align-top">
                     {isMeterLine(l)

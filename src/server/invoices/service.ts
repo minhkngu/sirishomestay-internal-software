@@ -336,24 +336,15 @@ const meterReadingEditSchema = z.object({ leaseFeeId: z.uuid(), period: z.string
 const recentPeriods = (invoiceMonth: string) => { const p1 = prevMonthOf(invoiceMonth), p2 = prevMonthOf(p1); return [prevMonthOf(p2), p2, p1] }
 const prevMonthOf = (ym: string) => { const [y, m] = ym.split('-').map(Number); return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}` }
 const nextMonthOf = (ym: string) => { const [y, m] = ym.split('-').map(Number); return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}` }
-/**
- * Sửa chỉ số chốt của tháng trước ngay trong hoá đơn nháp: ghi thẳng vào bảng chỉ số (cùng kiểm tra như tab Chỉ số)
- * rồi tính lại dòng phí theo đồng hồ. Đồng hồ thay giữa tháng hoặc có chỉ số bàn giao thì phải sửa ở tab Chỉ số.
- */
-export async function updateInvoiceMeterReading(db: DB, ctx: AccessContext, invoiceId: string, input: { leaseFeeId: string; period?: string; value: number }): Promise<void> {
-  const data = parse(meterReadingEditSchema, input)
-  await db.transaction(async tx0 => {
-    const tx = tx0 as unknown as DB
-    await tx.select({ id: invoices.id }).from(invoices).where(eq(invoices.id, invoiceId)).for('update')
-    const inv = await getInvoice(tx, ctx, invoiceId)
-    assertCan(ctx, 'meters', inv.facilityId)
-    if (inv.status !== 'draft' || inv.kind !== 'monthly') throw new ValidationError('Chỉ sửa chỉ số trong hoá đơn tháng còn nháp')
-    const [fee] = await tx.select().from(leaseFeeSnapshots).where(and(eq(leaseFeeSnapshots.id, data.leaseFeeId), eq(leaseFeeSnapshots.leaseId, inv.leaseId)))
+/** Nơi ghi chỉ số khi chốt trong hoá đơn: hoá đơn nháp đã có (id) hoặc bản xem trước chưa lưu (id = null). */
+type ReadingTarget = { id: string | null; leaseId: string; facilityId: string; periodStart: string }
+async function writeMeterReading(tx: DB, ctx: AccessContext, t: ReadingTarget, data: { leaseFeeId: string; period?: string; value: number }) {
+    const [fee] = await tx.select().from(leaseFeeSnapshots).where(and(eq(leaseFeeSnapshots.id, data.leaseFeeId), eq(leaseFeeSnapshots.leaseId, t.leaseId)))
     if (!fee || fee.quantitySource !== 'meter') throw new ValidationError('Phí không thuộc hợp đồng hoặc không tính theo đồng hồ')
     const [link] = await tx.select({ meterId: leaseFeeMeters.meterId }).from(leaseFeeMeters).where(eq(leaseFeeMeters.leaseFeeId, fee.id))
     if (!link) throw new ValidationError('Phí chưa gắn đồng hồ')
     const [meter] = await tx.select().from(meters).where(eq(meters.id, link.meterId))
-    const invoiceMonth = inv.periodStart.slice(0, 7)
+    const invoiceMonth = t.periodStart.slice(0, 7)
     // Sửa/thêm được chỉ số của 3 tháng liền trước tháng hoá đơn; mặc định là tháng liền trước (chỉ số chốt cuối kỳ dùng)
     const recent = recentPeriods(invoiceMonth)
     const period = data.period ?? recent[2]
@@ -365,29 +356,33 @@ export async function updateInvoiceMeterReading(db: DB, ctx: AccessContext, invo
     if (meter.removedOn || replaced) throw new ValidationError('Đồng hồ có thay đổi trong tháng, hãy sửa ở tab Chỉ số')
     // Chỉ số tháng P là số cuối của hoá đơn tháng P+1 và số đầu của hoá đơn tháng P+2; hoá đơn khác đã duyệt thì không đổi số
     const users = [nextMonthOf(period), nextMonthOf(nextMonthOf(period))]
-    const approved = await tx.select({ id: invoices.id, periodStart: invoices.periodStart }).from(invoices).where(and(eq(invoices.leaseId, inv.leaseId), eq(invoices.status, 'approved')))
-    if (approved.some(a => a.id !== inv.id && users.includes(a.periodStart.slice(0, 7)))) throw new ValidationError('Hoá đơn tháng khác đã duyệt và dùng chỉ số này, không sửa được')
+    const approved = await tx.select({ id: invoices.id, periodStart: invoices.periodStart }).from(invoices).where(and(eq(invoices.leaseId, t.leaseId), eq(invoices.status, 'approved')))
+    if (approved.some(a => a.id !== t.id && users.includes(a.periodStart.slice(0, 7)))) throw new ValidationError('Hoá đơn tháng khác đã duyệt và dùng chỉ số này, không sửa được')
     const [current] = await tx.select().from(meterReadings).where(and(eq(meterReadings.meterId, meter.id), eq(meterReadings.period, period), eq(meterReadings.kind, 'monthly')))
     const result = await applyReadings(tx, ctx, period, [{ meterId: meter.id, value: data.value, readOn: current?.readOn ?? to }])
     if (result.errors.length) throw new ValidationError(result.errors[0].message)
-    await refreshMeterLines(tx, inv, await leaseData(tx, inv.leaseId))
-    await tx.update(invoices).set({ updatedAt: new Date() }).where(eq(invoices.id, invoiceId))
-    await recordAudit(tx, ctx, { action: 'update', entity: 'invoice', entityId: invoiceId, facilityId: inv.facilityId, summary: `Sửa chỉ số ${fee.name} tháng ${period} trong hoá đơn`, before: { value: current?.value ?? null }, after: { value: data.value, period } })
-  })
+  return { fee, period, current }
 }
 /**
- * Sửa số đầu kỳ của hoá đơn nháp khi số đó đến từ chỉ số bàn giao hoặc chỉ số ban đầu của đồng hồ (nhập lúc chọn phí, chọn đồng hồ).
- * Hoá đơn đầu lấy số này tham khảo nên sửa được, không khoá; số đầu là chốt tháng trước thì sửa ở chỉ số của tháng đó.
+ * Sửa chỉ số chốt của tháng trước ngay trong hoá đơn nháp: ghi thẳng vào bảng chỉ số (cùng kiểm tra như tab Chỉ số)
+ * rồi tính lại dòng phí theo đồng hồ. Đồng hồ thay giữa tháng thì phải sửa ở tab Chỉ số.
  */
-export async function updateInvoiceOpeningReading(db: DB, ctx: AccessContext, invoiceId: string, input: { leaseFeeId: string; period: string; value: number }): Promise<void> {
-  const data = parse(z.object({ leaseFeeId: z.uuid(), period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/), value: z.number().int().min(0) }), input)
+export async function updateInvoiceMeterReading(db: DB, ctx: AccessContext, invoiceId: string, input: { leaseFeeId: string; period?: string; value: number }): Promise<void> {
+  const data = parse(meterReadingEditSchema, input)
   await db.transaction(async tx0 => {
     const tx = tx0 as unknown as DB
     await tx.select({ id: invoices.id }).from(invoices).where(eq(invoices.id, invoiceId)).for('update')
     const inv = await getInvoice(tx, ctx, invoiceId)
     assertCan(ctx, 'meters', inv.facilityId)
-    if (inv.status !== 'draft' || inv.kind !== 'monthly') throw new ValidationError('Chỉ sửa số đầu trong hoá đơn tháng còn nháp')
-    const [link] = await tx.select({ meterId: leaseFeeMeters.meterId }).from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).where(and(eq(leaseFeeMeters.leaseFeeId, data.leaseFeeId), eq(leaseFeeSnapshots.leaseId, inv.leaseId)))
+    if (inv.status !== 'draft' || inv.kind !== 'monthly') throw new ValidationError('Chỉ sửa chỉ số trong hoá đơn tháng còn nháp')
+    const { fee, period, current } = await writeMeterReading(tx, ctx, inv, data)
+    await refreshMeterLines(tx, inv, await leaseData(tx, inv.leaseId))
+    await tx.update(invoices).set({ updatedAt: new Date() }).where(eq(invoices.id, invoiceId))
+    await recordAudit(tx, ctx, { action: 'update', entity: 'invoice', entityId: invoiceId, facilityId: inv.facilityId, summary: `Sửa chỉ số ${fee.name} tháng ${period} trong hoá đơn`, before: { value: current?.value ?? null }, after: { value: data.value, period } })
+  })
+}
+async function writeOpeningReading(tx: DB, t: ReadingTarget, data: { leaseFeeId: string; period: string; value: number }) {
+    const [link] = await tx.select({ meterId: leaseFeeMeters.meterId }).from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).where(and(eq(leaseFeeMeters.leaseFeeId, data.leaseFeeId), eq(leaseFeeSnapshots.leaseId, t.leaseId)))
     if (!link) throw new ValidationError('Phí không thuộc hợp đồng hoặc chưa gắn đồng hồ')
     const [meter] = await tx.select().from(meters).where(eq(meters.id, link.meterId))
     const all = (await tx.select().from(meterReadings).where(eq(meterReadings.meterId, meter.id))).sort((a, b) => (a.readOn < b.readOn ? -1 : 1))
@@ -403,9 +398,48 @@ export async function updateInvoiceOpeningReading(db: DB, ctx: AccessContext, in
     } else {
       await tx.update(meters).set({ startReading: data.value, updatedAt: new Date() }).where(eq(meters.id, meter.id))
     }
+  return { target, meter }
+}
+/**
+ * Sửa số đầu kỳ của hoá đơn nháp khi số đó đến từ chỉ số bàn giao hoặc chỉ số ban đầu của đồng hồ (nhập lúc chọn phí, chọn đồng hồ).
+ * Hoá đơn đầu lấy số này tham khảo nên sửa được, không khoá; số đầu là chốt tháng trước thì sửa ở chỉ số của tháng đó.
+ */
+export async function updateInvoiceOpeningReading(db: DB, ctx: AccessContext, invoiceId: string, input: { leaseFeeId: string; period: string; value: number }): Promise<void> {
+  const data = parse(z.object({ leaseFeeId: z.uuid(), period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/), value: z.number().int().min(0) }), input)
+  await db.transaction(async tx0 => {
+    const tx = tx0 as unknown as DB
+    await tx.select({ id: invoices.id }).from(invoices).where(eq(invoices.id, invoiceId)).for('update')
+    const inv = await getInvoice(tx, ctx, invoiceId)
+    assertCan(ctx, 'meters', inv.facilityId)
+    if (inv.status !== 'draft' || inv.kind !== 'monthly') throw new ValidationError('Chỉ sửa số đầu trong hoá đơn tháng còn nháp')
+    const { target, meter } = await writeOpeningReading(tx, inv, data)
     await refreshMeterLines(tx, inv, await leaseData(tx, inv.leaseId))
     await tx.update(invoices).set({ updatedAt: new Date() }).where(eq(invoices.id, invoiceId))
     await recordAudit(tx, ctx, { action: 'update', entity: 'invoice', entityId: invoiceId, facilityId: inv.facilityId, summary: `Sửa số đầu kỳ đồng hồ trong hoá đơn`, before: { value: target?.value ?? meter.startReading }, after: { value: data.value, period: data.period } })
+  })
+}
+/** Bản xem trước hoá đơn chưa lưu: chỉ số điền ở đây ghi thẳng vào bảng chỉ số, như khi chốt trong hoá đơn đã có. */
+async function previewReadingTarget(tx: DB, ctx: AccessContext, leaseId: string, invoicePeriod: string): Promise<ReadingTarget> {
+  const period = parse(z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/), invoicePeriod)
+  const [row] = await tx.select({ facilityId: rooms.facilityId }).from(leases).innerJoin(rooms, eq(rooms.id, leases.roomId)).where(eq(leases.id, leaseId))
+  if (!row) throw new NotFoundError()
+  assertCan(ctx, 'meters', row.facilityId)
+  return { id: null, leaseId, facilityId: row.facilityId, periodStart: `${period}-01` }
+}
+export async function savePreviewMeterReading(db: DB, ctx: AccessContext, input: { leaseId: string; invoicePeriod: string; leaseFeeId: string; period?: string; value: number }): Promise<void> {
+  const data = parse(meterReadingEditSchema, { leaseFeeId: input.leaseFeeId, period: input.period, value: input.value })
+  await db.transaction(async tx0 => {
+    const tx = tx0 as unknown as DB
+    await writeMeterReading(tx, ctx, await previewReadingTarget(tx, ctx, input.leaseId, input.invoicePeriod), data)
+  })
+}
+export async function savePreviewOpeningReading(db: DB, ctx: AccessContext, input: { leaseId: string; invoicePeriod: string; leaseFeeId: string; period: string; value: number }): Promise<void> {
+  const data = parse(z.object({ leaseFeeId: z.uuid(), period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/), value: z.number().int().min(0) }), { leaseFeeId: input.leaseFeeId, period: input.period, value: input.value })
+  await db.transaction(async tx0 => {
+    const tx = tx0 as unknown as DB
+    const t = await previewReadingTarget(tx, ctx, input.leaseId, input.invoicePeriod)
+    const { target, meter } = await writeOpeningReading(tx, t, data)
+    await recordAudit(tx, ctx, { action: 'update', entity: 'meter_readings', facilityId: t.facilityId, summary: 'Sửa số đầu kỳ đồng hồ khi lập hoá đơn', before: { value: target?.value ?? meter.startReading }, after: { value: data.value, period: data.period } })
   })
 }
 const DECREASE_MSG = 'Số đầu nhỏ hơn chỉ số trước đó của đồng hồ'

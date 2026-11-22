@@ -4,7 +4,7 @@ import { facilities, invoiceLines, invoices, leaseFeeMeters, leaseFeeSnapshots, 
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ForbiddenError, ValidationError } from '@/domain/errors'
-import { approveInvoice, createDrafts, deleteInvoice, getInvoiceDetail, updateInvoiceMeterReading } from '@/server/invoices/service'
+import { approveInvoice, createDrafts, deleteInvoice, getInvoiceDetail, savePreviewMeterReading, updateInvoiceMeterReading } from '@/server/invoices/service'
 import { listReadingSheet } from '@/server/meters/service'
 import { updateLease } from '@/server/contracts/service'
 import { createTestDb } from '../helpers/db'
@@ -76,6 +76,14 @@ describe('sửa chỉ số điện trong hoá đơn', () => {
     await db.update(meterReadings).set({ value: 260 }).where(and(eq(meterReadings.meterId, meterId), eq(meterReadings.period, '2026-11')))
     const detail = await getInvoiceDetail(db, ctx(), invoiceId)
     expect(detail.lines.find(l => (l.meta as { leaseFeeId?: string } | null)?.leaseFeeId === feeId)).toMatchObject({ quantity: 160, amount: 560000 })
+  })
+  it('bản xem trước chưa lưu: chỉ số ghi thẳng vào bảng chỉ số, không tạo hoá đơn', async () => {
+    const before = (await db.select().from(invoices)).length
+    await savePreviewMeterReading(db, ctx(), { leaseId, invoicePeriod: '2026-12', leaseFeeId: feeId, value: 260 })
+    expect((await db.select().from(meterReadings).where(and(eq(meterReadings.meterId, meterId), eq(meterReadings.period, '2026-11'))))[0].value).toBe(260)
+    expect((await db.select().from(invoices)).length).toBe(before)
+    await expect(savePreviewMeterReading(db, ctx(), { leaseId, invoicePeriod: '2026-12', leaseFeeId: feeId, value: 90 })).rejects.toThrow(ValidationError)
+    await expect(savePreviewMeterReading(db, context(['billing'], facilityId), { leaseId, invoicePeriod: '2026-12', leaseFeeId: feeId, value: 300 })).rejects.toThrow(ForbiddenError)
   })
   it('hoá đơn tháng sau đã duyệt dùng số này thì từ chối', async () => {
     await db.insert(invoices).values({ code: 'TD-HD-202701-0001', leaseId, facilityId, kind: 'monthly', periodStart: '2027-01-01', periodEnd: '2027-01-31', issueDate: '2027-01-01', status: 'approved' })

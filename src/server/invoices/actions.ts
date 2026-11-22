@@ -6,7 +6,7 @@ import type { DueRule, Proration } from '@/domain/types'
 import { toActionResult } from '@/lib/action-result'
 import { getAccessContext } from '@/server/session'
 import { getStorage } from '@/server/storage'
-import { saveInvoiceFeeQuantities, addPayment, approveInvoice, createDraftForLease, createDrafts, createInvoiceFromEditor, deleteInvoice, exportReceipt, listInvoiceableLeases, previewBatch, previewLease, leaseDebt, recordLeasePayment, removePayment, setInvoiceDueDate, setInvoiceNote, setLineTime, setPeriod, unapproveInvoice, updateInvoiceMeterReading, updateInvoiceOpeningReading, updateLines } from './service'
+import { saveInvoiceFeeQuantities, addPayment, approveInvoice, createDraftForLease, createDrafts, createInvoiceFromEditor, deleteInvoice, exportReceipt, listInvoiceableLeases, previewBatch, previewLease, leaseDebt, recordLeasePayment, removePayment, setInvoiceDueDate, setInvoiceNote, setLineTime, setPeriod, unapproveInvoice, updateInvoiceMeterReading, savePreviewMeterReading, savePreviewOpeningReading, updateInvoiceOpeningReading, updateLines } from './service'
 
 const refresh = () => { revalidatePath('/invoices', 'layout'); revalidatePath('/contracts', 'layout'); revalidatePath('/cashbook') }
 export async function previewBatchAction(input: { facilityId: string; period: string }) {
@@ -104,4 +104,12 @@ export async function leaseDebtAction(leaseId: string) {
 export async function setLineTimeAction(invoiceId: string, lineId: string, input: { from?: string; to?: string; coefficient?: number }) {
   const ctx = await getAccessContext()
   return toActionResult(async () => { await setLineTime(db, ctx, invoiceId, lineId, input); refresh(); return {} })
+}
+export async function savePreviewMeterReadingAction(input: { leaseId: string; invoicePeriod: string; leaseFeeId: string; period?: string; value: number }) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => { await savePreviewMeterReading(db, ctx, input); revalidatePath('/meters'); return {} })
+}
+export async function savePreviewOpeningReadingAction(input: { leaseId: string; invoicePeriod: string; leaseFeeId: string; period: string; value: number }) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => { await savePreviewOpeningReading(db, ctx, input); revalidatePath('/meters'); return {} })
 }
