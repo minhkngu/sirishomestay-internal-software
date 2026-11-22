@@ -156,7 +156,7 @@ export async function quickContractDataAction(kind: 'lease' | 'deposit', id: str
           }
         }),
         canEditMeters,
-        options: types.map(t => ({ id: t.id, name: t.name, unit: unitName.get(t.unitId) ?? '', price: resolveFeePrice(t.defaultPrice, prices[t.id] ?? {}, l.facilityId), meter: t.quantityFrom === 'meter', source: t.quantityFrom === 'manual' ? 'legacy_fixed' : t.quantityFrom })),
+        options: types.map(t => ({ id: t.id, name: t.name, unit: unitName.get(t.unitId) ?? '', price: resolveFeePrice(t.defaultPrice, prices[t.id] ?? {}, l.facilityId), meter: t.quantityFrom === 'meter', source: (t.quantityFrom === 'manual' ? 'legacy_fixed' : t.quantityFrom) as 'occupants' | 'room' | 'meter' | 'period_input' | 'legacy_fixed' })),
         roomMeters,
       }
     })() : null

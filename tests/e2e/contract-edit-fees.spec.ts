@@ -84,6 +84,7 @@ test.describe('sửa phí và chỉ số đầu trong popup hợp đồng', () =
     await expect(modal.getByLabel('Đơn giá Điện')).toHaveValue('3.500')
     await expect(modal.getByLabel('Đồng hồ Điện')).toHaveCount(0)
     await expect(modal.getByLabel('Chỉ số đầu Điện')).toHaveCount(0)
-    await expect(modal.getByText('1.250')).toBeVisible()
+    await expect(modal.getByText('Chỉ số đầu', { exact: false })).toBeVisible()
+    await expect(modal.getByText('1.250')).toHaveCount(0)
   })
 })

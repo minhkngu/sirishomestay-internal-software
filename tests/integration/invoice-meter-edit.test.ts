@@ -80,9 +80,9 @@ describe('sửa chỉ số điện trong hoá đơn', () => {
     expect(d.meterPanels).toHaveLength(1)
     expect(d.meterPanels[0]).toMatchObject({ leaseFeeId: feeId, name: 'Điện' })
     expect(d.meterPanels[0].rows).toEqual([
-      { period: '2026-09', readOn: null, value: null },
-      { period: '2026-10', readOn: '2026-10-31', value: 100 },
-      { period: '2026-11', readOn: '2026-11-30', value: 200 },
+      { period: '2026-09', readOn: null, value: null, opening: 0, openingSource: 'start' },
+      { period: '2026-10', readOn: '2026-10-31', value: 100, opening: 0, openingSource: 'start' },
+      { period: '2026-11', readOn: '2026-11-30', value: 200, opening: 100, openingSource: 'monthly' },
     ])
   })
   it('sửa chỉ số tháng đầu kỳ (tháng 10) trong hoá đơn tháng 12: lượng dùng tính lại', async () => {
@@ -110,7 +110,7 @@ describe('sửa chỉ số đầu hợp đồng khi đã có hoá đơn', () => 
     const [room] = await db.insert(rooms).values({ facilityId, code: '301' }).returning(); roomId = room.id
     const [tenant] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: facilityId, fullName: 'Khách', phone: '+84901234567', idNumber: '012345678901' }).returning(); tenantId = tenant.id
     const [lease] = await db.insert(leases).values({ code: 'HD1', roomId, tenantId, startDate: '2026-01-01', endDate: '2027-12-31', monthlyRent: 9000000, depositAmount: 9000000 }).returning(); leaseId = lease.id
-    const [meter] = await db.insert(meters).values({ roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 }).returning(); meterId = meter.id
+    const [meter] = await db.insert(meters).values({ roomId, utility: 'electric', installedOn: '2025-12-01', startReading: 0 }).returning(); meterId = meter.id
     await db.insert(meterReadings).values([
       { meterId, period: '2026-01', readOn: '2026-01-01', value: 1250, kind: 'handover' },
       { meterId, period: '2026-01', readOn: '2026-01-31', value: 1300, kind: 'monthly' },
