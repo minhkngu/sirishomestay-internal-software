@@ -125,6 +125,7 @@ export async function setOpeningValue(tx: DB, ctx: AccessContext, meterId: strin
   if (!Number.isInteger(value) || value < 0) throw new ValidationError('Chỉ số không hợp lệ')
   const [reading] = await tx.select().from(meterReadings).where(and(eq(meterReadings.meterId, meterId), eq(meterReadings.period, period), eq(meterReadings.kind, 'monthly')))
   if (!reading) throw new ValidationError('chưa có số cuối kỳ của tháng này, hãy nhập số cuối kỳ cùng số đầu')
+  if (value > reading.value) throw new ValidationError(`không được lớn hơn số cuối kỳ ${reading.value.toLocaleString('vi-VN')} của tháng này`)
   await tx.update(meterReadings).set({ opening: value, updatedAt: new Date() }).where(eq(meterReadings.id, reading.id))
   await recordAudit(tx, ctx, { action: 'update', entity: 'meter_readings', entityId: reading.id, facilityId: info.facilityId, summary: `Sửa số đầu kỳ ${period}`, before: { opening: reading.opening }, after: { meterId, opening: value } })
   return { facilityId: info.facilityId, before: reading.opening }
@@ -170,6 +171,10 @@ export async function applyReadings(tx: DB, ctx: AccessContext, period: string, 
       if (row.opening !== undefined && (!Number.isInteger(row.opening) || row.opening < 0)) { fail('Số đầu kỳ không hợp lệ'); continue }
       // Số đầu tự điền bằng số cuối lần ghi liền trước (hoặc số lúc lắp) tại thời điểm ghi; sau đó độc lập, sửa riêng được
       const prior = existing.filter((r) => r.meterId === m.id && !(r.period === period && r.kind === 'monthly') && r.readOn < row.readOn).sort((a, b) => (a.readOn < b.readOn ? -1 : 1)).pop()
+      // Số cuối không bao giờ nhỏ hơn số đầu của chính lần ghi đó (số đầu gửi kèm, hoặc đã lưu, hoặc số cuối lần ghi trước)
+      const own = existing.find((r) => r.meterId === m.id && r.period === period && r.kind === 'monthly')
+      const openingNow = row.opening ?? own?.opening ?? prior?.value ?? m.startReading
+      if (row.value < openingNow) { fail(`Số cuối kỳ ${row.value.toLocaleString('vi-VN')} không được nhỏ hơn số đầu kỳ ${openingNow.toLocaleString('vi-VN')}`); continue }
       await tx.insert(meterReadings).values({ meterId: m.id, period, readOn: row.readOn, value: row.value, opening: row.opening ?? prior?.value ?? m.startReading })
         .onConflictDoUpdate({ target: [meterReadings.meterId, meterReadings.period], targetWhere: sql`${meterReadings.kind} = 'monthly'`, set: { value: row.value, readOn: row.readOn, updatedAt: new Date(), ...(row.opening !== undefined ? { opening: row.opening } : {}) } })
       const i = existing.findIndex((r) => r.meterId === m.id && r.period === period && r.kind === 'monthly')
