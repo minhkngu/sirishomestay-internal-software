@@ -132,19 +132,20 @@ test('bấm mã hoá đơn xem PDF, tải ảnh ngay trong popup; trang chi ti�
   await expect(page.getByRole('heading', { name: 'Chi tiết hoá đơn' })).toBeVisible()
 })
 
-test('tạo hoá đơn lẻ từ popup: toà → phòng → tháng → xem trước → tạo', async ({ page }) => {
+test('tạo hoá đơn lẻ từ popup: toà → phòng → tháng → xem trước chưa lưu → lưu thay đổi mới tạo', async ({ page }) => {
   await login(page, /^Admin/)
   await page.goto('/invoices')
   await page.waitForLoadState('networkidle')
   await page.getByRole('link', { name: 'Tạo hoá đơn lẻ' }).click()
   await page.getByLabel('Toà', { exact: true }).click()
-  await page.getByRole('option').first().click()
+  // Chọn toà có hợp đồng thuê (toà thử không có phòng để lập hoá đơn)
+  await page.getByRole('option', { name: /Bình Thạnh|Thảo Điền/ }).first().click()
   await page.getByLabel('Phòng', { exact: true }).click()
   await page.getByRole('option').first().click()
-  // Chọn xong tháng thì hoá đơn nháp được tạo và mở ra để sửa
+  // Chọn xong tháng chỉ hiện bản xem trước chưa lưu; hoá đơn chỉ được tạo khi bấm Lưu thay đổi
   await page.getByLabel('Tháng').fill('2031-07')
   await expect(page.getByRole('button', { name: 'Lưu thay đổi' })).toBeVisible()
-  await expect(page.getByText('Nháp').first()).toBeVisible()
+  await expect(page.getByText('Chưa lưu').first()).toBeVisible()
 })
 
 test('thêm phí ngoài vào hoá đơn nháp bằng hộp thoại chọn phí giống màn hợp đồng', async ({ page }) => {
@@ -153,6 +154,9 @@ test('thêm phí ngoài vào hoá đơn nháp bằng hộp thoại chọn phí g
   await page.waitForLoadState('networkidle')
   await page.locator('a[href^="/invoices/"]').filter({ hasNotText: 'Tạo' }).first().click()
   await page.waitForLoadState('networkidle')
+  // Đợi trình sửa hoá đơn hiện đủ dòng rồi mới đếm (máy chủ dev tải trang chậm)
+  await expect(page.getByRole('button', { name: 'Thêm phí' })).toBeVisible()
+  await expect(page.getByTitle('Xoá dòng').first()).toBeAttached()
   const before = await page.getByTitle('Xoá dòng').count()
   await page.getByRole('button', { name: 'Thêm phí' }).click()
   await expect(page.getByRole('heading', { name: 'Chọn phí dịch vụ' })).toBeVisible()
