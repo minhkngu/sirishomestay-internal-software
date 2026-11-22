@@ -85,9 +85,13 @@ describe('sửa chỉ số điện trong hoá đơn', () => {
     await expect(savePreviewMeterReading(db, ctx(), { leaseId, invoicePeriod: '2026-12', leaseFeeId: feeId, value: 90 })).rejects.toThrow(ValidationError)
     await expect(savePreviewMeterReading(db, context(['billing'], facilityId), { leaseId, invoicePeriod: '2026-12', leaseFeeId: feeId, value: 300 })).rejects.toThrow(ForbiddenError)
   })
-  it('hoá đơn tháng sau đã duyệt dùng số này thì từ chối', async () => {
-    await db.insert(invoices).values({ code: 'TD-HD-202701-0001', leaseId, facilityId, kind: 'monthly', periodStart: '2027-01-01', periodEnd: '2027-01-31', issueDate: '2027-01-01', status: 'approved' })
-    await expect(updateInvoiceMeterReading(db, ctx(), invoiceId, { leaseFeeId: feeId, value: 260 })).rejects.toThrow(ValidationError)
+  it('hoá đơn tháng sau đã duyệt vẫn giữ số đã lưu khi chỉ số được sửa; chỉ hoá đơn nháp áp dụng số mới', async () => {
+    const [approved] = await db.insert(invoices).values({ code: 'TD-HD-202701-0001', leaseId, facilityId, kind: 'monthly', periodStart: '2027-01-01', periodEnd: '2027-01-31', issueDate: '2027-01-01', status: 'approved' }).returning()
+    await db.insert(invoiceLines).values({ invoiceId: approved.id, type: 'fee', description: 'Điện', quantity: 100, unitPrice: 3500, amount: 350000, meta: { leaseFeeId: feeId } })
+    await updateInvoiceMeterReading(db, ctx(), invoiceId, { leaseFeeId: feeId, value: 260 })
+    expect((await electricLine()).amount).toBe(560000)
+    const kept = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, approved.id))
+    expect(kept.map(l => [l.quantity, l.amount])).toEqual([[100, 350000]])
   })
   it('thiếu quyền meters thì từ chối', async () => {
     await expect(updateInvoiceMeterReading(db, context(['billing'], facilityId), invoiceId, { leaseFeeId: feeId, value: 260 })).rejects.toThrow(ForbiddenError)

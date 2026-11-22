@@ -2,7 +2,6 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
-import { Lock } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { DateField } from '@/components/date-field'
@@ -29,7 +28,7 @@ export function ReadingHistory({ rows, facilityName }: { rows: ReadingHistoryRow
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
-  const selectable = rows.filter((r) => !r.lockedBy)
+  const selectable = rows
   const chosen = selectable.filter((r) => selected.has(r.id))
   const allChosen = selectable.length > 0 && chosen.length === selectable.length
   const toggle = (id: string) => setSelected((cur) => { const next = new Set(cur); if (next.has(id)) next.delete(id); else next.add(id); return next })
@@ -78,10 +77,9 @@ export function ReadingHistory({ rows, facilityName }: { rows: ReadingHistoryRow
     })
   }
 
-  const lockIcon = (r: ReadingHistoryRow) => r.lockedBy ? <span title={`Đang dùng trong hoá đơn ${r.lockedBy} đã duyệt, không sửa được`} className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Lock className="size-3" />{r.lockedBy}</span> : null
   const meterCell = (r: ReadingHistoryRow) => <><div className="text-foreground">{r.meterName}</div>{r.meterCode && <div className="text-[11px] text-muted-foreground">{r.meterCode}</div>}</>
   const roomCell = (r: ReadingHistoryRow) => `Phòng ${r.roomCode} · ${facilityName}`
-  const actions = (r: ReadingHistoryRow) => r.lockedBy ? <div className="flex justify-end">{lockIcon(r)}</div> : (
+  const actions = (r: ReadingHistoryRow) => (
     <div className="flex justify-end gap-1.5">
       <Button size="sm" variant="outline" disabled={pending} onClick={() => openEdit(r)}>Sửa</Button>
       <Button size="sm" variant="outline" disabled={pending} className="border-rose-200/80 text-rose-700 hover:bg-rose-50 hover:text-rose-800" onClick={() => setDeleting(r)}>Xoá</Button>
@@ -110,7 +108,7 @@ export function ReadingHistory({ rows, facilityName }: { rows: ReadingHistoryRow
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className="border-t border-border/60">
-                <td className="px-4 py-2.5">{!r.lockedBy && <input type="checkbox" aria-label={`Chọn ${r.meterName} phòng ${r.roomCode} tháng ${monthLabel(r.period)}`} className="size-3.5 rounded border-border text-primary focus:ring-primary/30" checked={selected.has(r.id)} onChange={() => toggle(r.id)} />}</td>
+                <td className="px-4 py-2.5"><input type="checkbox" aria-label={`Chọn ${r.meterName} phòng ${r.roomCode} tháng ${monthLabel(r.period)}`} className="size-3.5 rounded border-border text-primary focus:ring-primary/30" checked={selected.has(r.id)} onChange={() => toggle(r.id)} /></td>
                 <td className="px-4 py-2.5">{meterCell(r)}</td>
                 <td className="px-4 py-2.5 text-foreground">{roomCell(r)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{fmt(r.opening)}</td>
@@ -126,7 +124,7 @@ export function ReadingHistory({ rows, facilityName }: { rows: ReadingHistoryRow
         {rows.map((r) => (
           <li key={r.id} className="space-y-2 px-4 py-3">
             <div className="flex items-start gap-2">
-              {!r.lockedBy && <input type="checkbox" aria-label={`Chọn ${r.meterName} phòng ${r.roomCode} tháng ${monthLabel(r.period)}`} className="mt-1 size-3.5 rounded border-border text-primary focus:ring-primary/30" checked={selected.has(r.id)} onChange={() => toggle(r.id)} />}
+              <input type="checkbox" aria-label={`Chọn ${r.meterName} phòng ${r.roomCode} tháng ${monthLabel(r.period)}`} className="mt-1 size-3.5 rounded border-border text-primary focus:ring-primary/30" checked={selected.has(r.id)} onChange={() => toggle(r.id)} />
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium text-foreground">{r.meterName}</div>
                 <div className="mt-0.5 text-[11px] text-muted-foreground">{roomCell(r)} · chốt {formatDateVN(r.readOn)}</div>

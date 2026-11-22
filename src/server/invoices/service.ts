@@ -354,10 +354,7 @@ async function writeMeterReading(tx: DB, ctx: AccessContext, t: ReadingTarget, d
     const replaced = sameKind.some(m => m.id !== meter.id && ((m.removedOn && m.removedOn >= from) || m.installedOn >= from))
     // Chỉ số bàn giao độc lập với chuỗi chỉ số tháng: có bàn giao trong tháng vẫn chốt được số cuối tháng (kiểm số giảm đã có ở applyReadings)
     if (meter.removedOn || replaced) throw new ValidationError('Đồng hồ có thay đổi trong tháng, hãy sửa ở tab Chỉ số')
-    // Chỉ số tháng P là số cuối của hoá đơn tháng P+1 và số đầu của hoá đơn tháng P+2; hoá đơn khác đã duyệt thì không đổi số
-    const users = [nextMonthOf(period), nextMonthOf(nextMonthOf(period))]
-    const approved = await tx.select({ id: invoices.id, periodStart: invoices.periodStart }).from(invoices).where(and(eq(invoices.leaseId, t.leaseId), eq(invoices.status, 'approved')))
-    if (approved.some(a => a.id !== t.id && users.includes(a.periodStart.slice(0, 7)))) throw new ValidationError('Hoá đơn tháng khác đã duyệt và dùng chỉ số này, không sửa được')
+    // Hoá đơn đã duyệt giữ nguyên số đã lưu trên hoá đơn; sửa chỉ số chỉ làm hoá đơn nháp áp dụng số mới
     const [current] = await tx.select().from(meterReadings).where(and(eq(meterReadings.meterId, meter.id), eq(meterReadings.period, period), eq(meterReadings.kind, 'monthly')))
     const result = await applyReadings(tx, ctx, period, [{ meterId: meter.id, value: data.value, readOn: current?.readOn ?? to }])
     if (result.errors.length) throw new ValidationError(result.errors[0].message)

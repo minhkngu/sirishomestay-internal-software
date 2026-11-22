@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { facilities, leaseFeeMeters, leaseFeeSnapshots, leases, meterReadings, meters, rooms, tenants } from '@/db'
+import { facilities, invoices, leaseFeeMeters, leaseFeeSnapshots, leases, meterReadings, meters, rooms, tenants } from '@/db'
 import { addRoomMeter, createDefaultMeters, ensureFeeMeter, listMeterOverview, listReadingSheet, saveReadings, replaceMeter, suggestMeterFinalReading, listReadingHistory, listLeaseMeterInitials, saveOpenings, updateMeterReading, deleteMeterReading } from '@/server/meters/service'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import type { AccessContext, Permission } from '@/domain/access'
@@ -47,17 +47,24 @@ describe('meters', () => {
     return (await db.insert(leases).values({ code, roomId, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-01-01', monthlyRent: 1, depositAmount: 1, ...over }).returning())[0]
   }
 
-  it('sửa số đầu kỳ thế nào cũng được: sửa chỉ số chốt tháng trước, chuỗi chỉ số điều chỉnh theo', async () => {
+  it('sửa số đầu kỳ: sửa chỉ số chốt tháng trước, hạ xuống thì các số trước đó theo xuống; không được lớn hơn chỉ số sau', async () => {
     await read('E101', '2026-10', '2026-10-31', 1100)
-    expect(await saveOpenings(db, hung(), '2026-10', [{ meterId: m.E101, value: 1050 }])).toMatchObject({ saved: 1, errors: [] })
     const value = async (period: string) => (await db.select().from(meterReadings).where(eq(meterReadings.meterId, m.E101))).find((r) => r.period === period)?.value
+    expect(await saveOpenings(db, hung(), '2026-10', [{ meterId: m.E101, value: 1050 }])).toMatchObject({ saved: 1, errors: [] })
     expect(await value('2026-09')).toBe(1050)
-    // Cao hơn số chốt sau thì số chốt sau được nâng lên bằng nó; thấp hơn số chốt trước thì các số trước được hạ xuống
-    expect(await saveOpenings(db, hung(), '2026-10', [{ meterId: m.E101, value: 1200 }])).toMatchObject({ saved: 1, errors: [] })
-    expect([await value('2026-09'), await value('2026-10')]).toEqual([1200, 1200])
+    const tooHigh = await saveOpenings(db, hung(), '2026-10', [{ meterId: m.E101, value: 1200 }])
+    expect(tooHigh.saved).toBe(0)
+    expect(tooHigh.errors[0].message).toContain('không được lớn hơn chỉ số sau')
+    expect(await value('2026-09')).toBe(1050)
     await read('E101', '2026-08', '2026-08-31', 900)
     expect(await saveOpenings(db, hung(), '2026-10', [{ meterId: m.E101, value: 800 }])).toMatchObject({ saved: 1, errors: [] })
     expect([await value('2026-08'), await value('2026-09')]).toEqual([800, 800])
+  })
+  it('chỉ số tháng đã dùng trong hoá đơn đã duyệt vẫn sửa được, hoá đơn đã duyệt giữ số cũ', async () => {
+    const tenant = (await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: fa, fullName: 'Khách', phone: '+84901230001', idNumber: '0123456789001' }).returning())[0]
+    const lease = (await db.insert(leases).values({ code: 'HD-L', roomId: r101, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-01-01', monthlyRent: 1, depositAmount: 0 }).returning())[0]
+    await db.insert(invoices).values({ code: 'BT-HD-202610-0001', leaseId: lease.id, facilityId: fa, kind: 'monthly', periodStart: '2026-10-01', periodEnd: '2026-10-31', issueDate: '2026-10-01', status: 'approved' })
+    expect(await saveReadings(db, hung(), '2026-09', [{ meterId: m.E101, value: 1010, readOn: '2026-09-30' }])).toMatchObject({ saved: 1, errors: [] })
   })
   it('sửa số đầu kỳ của đồng hồ chưa có lần ghi nào thì sửa số lúc lắp; thiếu quyền cơ sở thì từ chối', async () => {
     await addMeter(r101, 'water', 'W101B', 5)

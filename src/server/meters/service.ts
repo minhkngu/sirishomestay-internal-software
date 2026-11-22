@@ -104,21 +104,6 @@ export async function listReadingSheet(db: DB, ctx: AccessContext, facilityId: s
   return { rows, progress: { recorded: withElectric.filter((r) => r.electric!.current != null).length, total: withElectric.length } }
 }
 
-/**
- * Chỉ số tháng P là số cuối của hoá đơn tháng P+1 và số đầu của hoá đơn tháng P+2: hoá đơn tháng đã duyệt thì khoá hai kỳ đó.
- * Trả về mã hoá đơn đang khoá theo phòng và kỳ.
- */
-async function lockedReadings(tx: Pick<DB, 'select'>, roomIds: string[]): Promise<Map<string, string>> {
-  const out = new Map<string, string>()
-  if (roomIds.length === 0) return out
-  const approved = await tx.select({ roomId: leases.roomId, code: invoices.code, periodStart: invoices.periodStart }).from(invoices).innerJoin(leases, eq(leases.id, invoices.leaseId)).where(and(inArray(leases.roomId, roomIds), eq(invoices.status, 'approved'), eq(invoices.kind, 'monthly')))
-  for (const a of approved) {
-    const month = a.periodStart.slice(0, 7)
-    for (const p of [shiftPeriod(month, -1), shiftPeriod(month, -2)]) if (!out.has(`${a.roomId}|${p}`)) out.set(`${a.roomId}|${p}`, a.code)
-  }
-  return out
-}
-const lockMessage = (code: string) => `Chỉ số đã dùng trong hoá đơn ${code} đã duyệt, bỏ duyệt hoá đơn trước khi đổi`
 
 export type ReadingInput = { meterId: string; value: number; readOn: string }
 export type ReadingError = { meterId: string; message: string }
@@ -129,9 +114,9 @@ export async function saveReadings(db: DB, ctx: AccessContext, period: string, r
 }
 
 /**
- * Đặt số đầu kỳ của đồng hồ cho một tháng, sửa thế nào cũng được: số đầu là lần ghi liền trước tháng đó (chỉ số chốt tháng trước, chỉ số ban đầu,
- * hoặc số lúc lắp). Để chuỗi chỉ số vẫn không giảm, các lần ghi trước đó cao hơn số mới bị hạ xuống bằng nó, các lần ghi sau đó thấp hơn bị nâng lên bằng nó.
- * Chỉ số tháng đã dùng trong hoá đơn đã duyệt thì khoá (bỏ duyệt trước khi đổi).
+ * Đặt số đầu kỳ của đồng hồ cho một tháng: số đầu là lần ghi liền trước tháng đó (chỉ số chốt tháng trước, chỉ số ban đầu, hoặc số lúc lắp).
+ * Không được lớn hơn chỉ số sau nó; các lần ghi trước đó cao hơn số mới thì hạ xuống bằng số mới để chuỗi không giảm.
+ * Hoá đơn đã duyệt giữ nguyên số đã lưu trên hoá đơn; chỉ hoá đơn nháp áp dụng số sau khi sửa.
  */
 export async function setOpeningValue(tx: DB, ctx: AccessContext, meterId: string, period: string, value: number): Promise<{ facilityId: string; before: number }> {
   const [info] = await tx.select({ m: meters, facilityId: rooms.facilityId }).from(meters).innerJoin(rooms, eq(rooms.id, meters.roomId)).where(eq(meters.id, meterId))
@@ -142,12 +127,9 @@ export async function setOpeningValue(tx: DB, ctx: AccessContext, meterId: strin
   const from = `${period}-01`
   const before = all.filter((r) => r.readOn < from)
   const target = before[before.length - 1]
-  const touched = [...(target ? [target] : []), ...before.slice(0, -1).filter((r) => r.value > value), ...all.filter((r) => r.readOn >= from && r.value < value)]
-  const locked = await lockedReadings(tx, [info.m.roomId])
-  for (const r of touched) {
-    const by = r.kind === 'monthly' ? locked.get(`${info.m.roomId}|${r.period}`) : null
-    if (by && r.value !== value) throw new ValidationError(lockMessage(by))
-  }
+  const next = all.find((r) => r.readOn >= from)
+  if (next && value > next.value) throw new ValidationError(`không được lớn hơn chỉ số sau đó ${next.value.toLocaleString('vi-VN')} (ghi ngày ${next.readOn.split('-').reverse().join('/')})`)
+  const touched = [...(target ? [target] : []), ...before.slice(0, -1).filter((r) => r.value > value)]
   for (const r of touched) if (r.value !== value) await tx.update(meterReadings).set({ value, updatedAt: new Date() }).where(eq(meterReadings.id, r.id))
   if (!target || info.m.startReading > value) await tx.update(meters).set({ startReading: value, updatedAt: new Date() }).where(eq(meters.id, meterId))
   await recordAudit(tx, ctx, { action: 'update', entity: 'meter_readings', facilityId: info.facilityId, summary: `Sửa số đầu kỳ ${period}`, before: { value: target?.value ?? info.m.startReading }, after: { meterId, value } })
@@ -179,7 +161,6 @@ export async function applyReadings(tx: DB, ctx: AccessContext, period: string, 
     if (found.length !== ids.length) throw new NotFoundError()
     for (const f of found) assertCan(ctx, 'meters', f.facilityId)
     const existing = ids.length ? await tx.select().from(meterReadings).where(inArray(meterReadings.meterId, ids)) : []
-    const locked = await lockedReadings(tx, [...new Set(found.map((f) => f.m.roomId))])
 
     const errors: ReadingError[] = []
     let saved = 0
@@ -189,8 +170,6 @@ export async function applyReadings(tx: DB, ctx: AccessContext, period: string, 
       const m = info.m
       const fail = (message: string) => errors.push({ meterId: row.meterId, message })
       if (!Number.isInteger(row.value) || row.value < 0) { fail('Chỉ số không hợp lệ'); continue }
-      const lockedBy = locked.get(`${m.roomId}|${period}`)
-      if (lockedBy) { fail(lockMessage(lockedBy)); continue }
       if (row.readOn < start || row.readOn > end) { fail('Ngày ghi không thuộc kỳ này'); continue }
       if (m.installedOn > row.readOn) { fail('Đồng hồ chưa được lắp vào ngày này'); continue }
       if (m.removedOn) { fail('Đồng hồ này đã được gỡ, hãy ghi trên đồng hồ mới'); continue }
@@ -444,8 +423,6 @@ export type ReadingHistoryRow = {
   kind: 'monthly' | 'handover'; period: string; readOn: string
   /** Số đầu của lần chốt: số chốt liền trước; dòng bàn giao đầu hợp đồng lấy bằng số cuối. */
   opening: number; closing: number; usage: number
-  /** Mã hoá đơn đã duyệt đang dùng chỉ số tháng này; có thì không sửa, xoá được. Chỉ số bàn giao không khoá. */
-  lockedBy: string | null
 }
 
 const typeName = (name: string) => name.replace(/\s*\([^)]*\)\s*$/, '').trim()
@@ -455,7 +432,6 @@ export async function listReadingHistory(db: DB, ctx: AccessContext, facilityId:
   assertCan(ctx, 'meters', facilityId)
   periodRange(from); periodRange(to)
   const overview = await listMeterOverview(db, ctx, facilityId)
-  const locked = await lockedReadings(db, [...new Set(overview.map((o) => o.roomId))])
   const rows: ReadingHistoryRow[] = []
   for (const m of overview) {
     const asc = [...m.readings].sort((a, b) => (a.readOn < b.readOn ? -1 : a.readOn > b.readOn ? 1 : 0))
@@ -463,7 +439,7 @@ export async function listReadingHistory(db: DB, ctx: AccessContext, facilityId:
     for (const r of asc) {
       // Chỉ số ban đầu (bàn giao) chỉ để tham khảo khi lập hoá đơn đầu, không phải lần chốt: không hiện trong danh sách
       if (r.kind === 'monthly' && r.period >= from && r.period <= to) {
-        rows.push({ id: r.id, meterId: m.meterId, roomId: m.roomId, roomCode: m.roomCode, floor: m.floor, meterName: typeName(m.meterName), meterCode: m.meterCode, unit: m.unit, kind: r.kind, period: r.period, readOn: r.readOn, opening: prev, closing: r.value, usage: Math.max(r.value - prev, 0), lockedBy: r.kind === 'monthly' ? (locked.get(`${m.roomId}|${r.period}`) ?? null) : null })
+        rows.push({ id: r.id, meterId: m.meterId, roomId: m.roomId, roomCode: m.roomCode, floor: m.floor, meterName: typeName(m.meterName), meterCode: m.meterCode, unit: m.unit, kind: r.kind, period: r.period, readOn: r.readOn, opening: prev, closing: r.value, usage: Math.max(r.value - prev, 0) })
       }
       prev = r.value
     }
@@ -475,13 +451,10 @@ async function readingForEdit(tx: DB, ctx: AccessContext, id: string) {
   const [found] = await tx.select({ r: meterReadings, m: meters, facilityId: rooms.facilityId, roomCode: rooms.code }).from(meterReadings).innerJoin(meters, eq(meters.id, meterReadings.meterId)).innerJoin(rooms, eq(rooms.id, meters.roomId)).where(eq(meterReadings.id, id))
   if (!found) throw new NotFoundError()
   assertCan(ctx, 'meters', found.facilityId)
-  // Chỉ số tháng khoá khi hoá đơn dùng nó đã duyệt; chỉ số bàn giao (nhập lúc chọn đồng hồ) chỉ để tham khảo cho hoá đơn đầu, không khoá
-  const lockedBy = found.r.kind === 'monthly' ? (await lockedReadings(tx, [found.m.roomId])).get(`${found.m.roomId}|${found.r.period}`) : null
-  if (lockedBy) throw new ValidationError(lockMessage(lockedBy))
   return found
 }
 
-/** Sửa số chốt và ngày chốt; cùng kiểm tra với lúc ghi (không nhỏ hơn lần trước, không lớn hơn lần sau), chặn khi hoá đơn dùng nó đã duyệt. */
+/** Sửa số chốt và ngày chốt; cùng kiểm tra với lúc ghi (không nhỏ hơn lần trước, không lớn hơn lần sau). Hoá đơn đã duyệt giữ số đã lưu. */
 export async function updateMeterReading(db: DB, ctx: AccessContext, id: string, input: { value: number; readOn: string }): Promise<void> {
   await db.transaction(async (tx0) => {
     const tx = tx0 as unknown as DB
@@ -502,7 +475,7 @@ export async function updateMeterReading(db: DB, ctx: AccessContext, id: string,
   })
 }
 
-/** Xoá một lần chốt (tháng hoặc bàn giao), chặn khi hoá đơn dùng nó đã duyệt. */
+/** Xoá một lần chốt (tháng hoặc bàn giao). Hoá đơn đã duyệt giữ số đã lưu. */
 export async function deleteMeterReading(db: DB, ctx: AccessContext, id: string): Promise<void> {
   await db.transaction(async (tx0) => {
     const tx = tx0 as unknown as DB
@@ -512,7 +485,7 @@ export async function deleteMeterReading(db: DB, ctx: AccessContext, id: string)
   })
 }
 
-/** Xoá nhiều lần chốt một lúc: dòng đã khoá (hoá đơn dùng nó đã duyệt) hoặc không thuộc quyền thì bỏ qua và đếm lại. */
+/** Xoá nhiều lần chốt một lúc: dòng đã khoá hoặc không thuộc quyền thì bỏ qua và đếm lại. */
 export async function deleteMeterReadings(db: DB, ctx: AccessContext, ids: string[]): Promise<{ deleted: number; skipped: number }> {
   const unique = [...new Set(ids)].slice(0, 500)
   let deleted = 0
