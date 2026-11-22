@@ -148,13 +148,15 @@ export async function saveOpenings(db: DB, ctx: AccessContext, period: string, r
       const before = all.filter((r) => r.readOn < from)
       const target = before[before.length - 1]
       if (target?.kind === 'monthly') {
+        const earlier = before[before.length - 2]
+        if (row.value < (earlier?.value ?? info.m.startReading)) { errors.push({ meterId: row.meterId, message: earlier ? `không được nhỏ hơn chỉ số trước đó ${earlier.value.toLocaleString('vi-VN')} (ghi ngày ${earlier.readOn.split('-').reverse().join('/')}), hãy sửa chỉ số đó trước` : DECREASE }); continue }
         const r = await applyReadings(tx, ctx, target.period, [{ meterId: row.meterId, value: row.value, readOn: target.readOn }])
         saved += r.saved; errors.push(...r.errors)
         continue
       }
       const next = all.find((r) => r.readOn >= from)
       const floor = target ? (before[before.length - 2]?.value ?? info.m.startReading) : 0
-      if (row.value < floor) { errors.push({ meterId: row.meterId, message: DECREASE }); continue }
+      if (row.value < floor) { errors.push({ meterId: row.meterId, message: 'không được nhỏ hơn chỉ số trước đó' }); continue }
       if (next && row.value > next.value) { errors.push({ meterId: row.meterId, message: 'Chỉ số lớn hơn chỉ số của kỳ sau' }); continue }
       if (target) await tx.update(meterReadings).set({ value: row.value, updatedAt: new Date() }).where(eq(meterReadings.id, target.id))
       else await tx.update(meters).set({ startReading: row.value, updatedAt: new Date() }).where(eq(meters.id, row.meterId))

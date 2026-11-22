@@ -24,6 +24,7 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, unitByType = {}
   const [values, setValues] = useState<Record<string, string>>({})
   // Số đầu kỳ cũng sửa được: lưu vào lần ghi liền trước kỳ (chỉ số tháng trước, chỉ số ban đầu hoặc số lúc lắp)
   const [openings, setOpenings] = useState<Record<string, string>>({})
+  const [openingErrors, setOpeningErrors] = useState<Record<string, string>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [msg, setMsg] = useState<string | null>(null)
   const [onlyOccupied, setOnlyOccupied] = useState(true)
@@ -60,7 +61,7 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, unitByType = {}
   const changedOpenings = Object.entries(openings).filter(([meterId, value]) => /^\d+$/.test(value.trim()) && Number(value) !== allCells.find((cell) => cell.meterId === meterId)?.previous)
   const openingValue = (cell: GridCell) => { const text = openings[cell.meterId]; return text !== undefined && /^\d+$/.test(text.trim()) ? Number(text) : cell.previous }
   const dirty = Object.values(values).filter((value) => value.trim() !== '').length + changedOpenings.length
-  const openingInput = (cell: GridCell) => <Input inputMode="numeric" aria-label="Số đầu kỳ" value={openings[cell.meterId] ?? String(cell.previous)} onChange={(event) => setOpenings((cur) => ({ ...cur, [cell.meterId]: event.target.value }))} className="ml-auto h-9 w-28 text-right tabular-nums" />
+  const openingInput = (cell: GridCell) => <><Input inputMode="numeric" aria-label="Số đầu kỳ" value={openings[cell.meterId] ?? String(cell.previous)} onChange={(event) => { setOpenings((cur) => ({ ...cur, [cell.meterId]: event.target.value })); setOpeningErrors((cur) => { const next = { ...cur }; delete next[cell.meterId]; return next }) }} className={cn('ml-auto h-9 w-28 text-right tabular-nums', openingErrors[cell.meterId] && 'border-destructive bg-destructive/5')} />{openingErrors[cell.meterId] && <p role="alert" className="mt-1 text-[11px] leading-snug text-destructive">Số đầu: {openingErrors[cell.meterId]}</p>}</>
 
   function onKey(event: React.KeyboardEvent, meterId: string) {
     if (event.key !== 'Enter') return
@@ -75,14 +76,15 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, unitByType = {}
     if (batch.length === 0 && openingBatch.length === 0) { setMsg('Chưa nhập chỉ số nào'); return }
     start(async () => {
       const failed: Record<string, string> = {}
+      const openFailed: Record<string, string> = {}
       let savedCount = 0
       // Số đầu kỳ lưu trước, để số cuối kỳ kiểm theo số đầu mới
       if (openingBatch.length > 0) {
         const result = await saveOpeningsAction(period, openingBatch)
         if (!result.ok) { setMsg(result.error); return }
-        result.data.errors.forEach((error) => { failed[error.meterId] = error.message })
+        result.data.errors.forEach((error) => { openFailed[error.meterId] = error.message })
         savedCount += result.data.saved
-        setOpenings((cur) => Object.fromEntries(Object.entries(cur).filter(([meterId]) => failed[meterId] !== undefined)))
+        setOpenings((cur) => Object.fromEntries(Object.entries(cur).filter(([meterId]) => openFailed[meterId] !== undefined)))
       }
       if (batch.length > 0) {
         const result = await saveReadingsAction(period, batch)
@@ -94,7 +96,8 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, unitByType = {}
         setValues(Object.fromEntries(Object.entries(values).filter(([meterId]) => !saved.has(meterId))))
       }
       setErrors(failed)
-      const failCount = Object.keys(failed).length
+      setOpeningErrors(openFailed)
+      const failCount = Object.keys(failed).length + Object.keys(openFailed).length
       setMsg(`Đã lưu ${savedCount} chỉ số${failCount ? `, ${failCount} dòng lỗi` : ''}`)
       router.refresh()
       onSaved?.()
