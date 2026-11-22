@@ -22,4 +22,7 @@ test('trang Chỉ số là một danh sách theo tháng, có nút Chốt chỉ s
   await expect(page.getByRole('link', { name: 'Lịch sử', exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'Chốt chỉ số', exact: true }).click()
   await expect(page.getByLabel('Tháng chốt')).toBeVisible()
+  await expect(page.getByLabel('Toà chốt')).toBeVisible()
+  await expect(page.getByLabel('Phòng chốt')).toBeVisible()
+  await expect(page.getByLabel('Loại đồng hồ chốt')).toBeVisible()
 })

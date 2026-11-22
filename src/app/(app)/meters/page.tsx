@@ -68,7 +68,7 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
       <PageHeader title="Chỉ số" action={facilityId ? (
         <div className="flex items-center gap-2">
           <AddMeterButton rooms={addMeterRooms} types={meterTypes.filter((t) => !t.isSystem).map((t) => ({ name: t.name, unit: t.unit }))} />
-          <CloseReadingsButton facilityId={facilityId} periodOptions={periodOptions} defaultPeriod={period} today={today} unitByType={unitByType} />
+          <CloseReadingsButton facilities={facs.map((f) => ({ value: f.id, label: f.name }))} defaultFacilityId={facilityId} meterOptions={meterOptions} periodOptions={periodOptions} defaultPeriod={period} today={today} unitByType={unitByType} />
         </div>
       ) : undefined} />
       <p className="-mt-2 text-sm text-muted-foreground">Các đồng hồ đã chốt trong tháng; bấm Chốt chỉ số để điền số cho đồng hồ chưa chốt.</p>
