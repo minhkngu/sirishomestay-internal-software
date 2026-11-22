@@ -11,7 +11,6 @@ export type LeaseFeeInput = {
   initialReading?: number
   existingMeterId?: string
 }
-export type LegacyFeeInput = { feeTypeId: string; quantity: number; unitPrice: number }
 export type LeaseInput = {
   roomId: string
   tenantId: string
@@ -35,12 +34,10 @@ export type LeaseInput = {
     >
     conditions?: Array<{ assetCode: string; condition: string }>
   }
-  feeModel?: 'legacy' | 'snapshot'
-  fees?: LegacyFeeInput[] | LeaseFeeInput[]
+  fees?: LeaseFeeInput[]
   dueRule?: unknown
   proration?: Proration | null
   billingCycleMonths?: number
-  billWaterByMeter?: boolean
 }
 
 export type LeaseCreated = {

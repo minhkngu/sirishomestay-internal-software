@@ -15,6 +15,10 @@ type Props = {
   capture?: boolean
   multiple?: boolean
   label?: string
+  /** Cỡ nút, để nút tải lên đứng cùng hàng với các nút khác. */
+  size?: 'default' | 'sm' | 'xs'
+  /** Kiểu nút, để nút tải lên không tranh vai với nút chính của màn hình. */
+  variant?: 'default' | 'outline' | 'ghost'
   /** nhãn/tên hiển thị cho tệp (mặc định lấy tên file) */
   nameFor?: (file: File) => string
   meta?: Record<string, unknown>
@@ -64,6 +68,8 @@ export function FileUpload({
   capture,
   multiple,
   label = 'Tải tệp lên',
+  size,
+  variant,
   nameFor,
   meta,
   onUploaded,
@@ -102,7 +108,7 @@ export function FileUpload({
         className="hidden"
         onChange={(e) => onChange(e.target.files)}
       />
-      <Button type="button" onClick={() => input.current?.click()} disabled={busy}>
+      <Button type="button" size={size} variant={variant} onClick={() => input.current?.click()} disabled={busy}>
         {busy ? 'Đang tải…' : label}
       </Button>
       {error && <p className="text-sm text-destructive">{error}</p>}

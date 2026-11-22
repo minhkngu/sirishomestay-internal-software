@@ -1,15 +1,5 @@
 import { eq, and, asc, inArray, like, lte, ne } from 'drizzle-orm'
-import {
-  depositEntries,
-  feeTypes,
-  feeUnits,
-  leaseFees,
-  leaseFeeSnapshots,
-  leaseOccupants,
-  leases,
-  rooms,
-  tenants,
-} from '@/db'
+import { depositEntries, leaseFeeSnapshots, leaseOccupants, leases, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, facilityScope, type AccessContext } from '@/domain/access'
 import { NotFoundError } from '@/domain/errors'
@@ -30,34 +20,15 @@ export async function nextLeaseCode(tx: Pick<DB, 'select'>, facilityCode: string
 }
 
 export async function contractFees(tx: Pick<DB, 'select'>, leaseId: string): Promise<ContractFee[]> {
-  const [lease] = await tx.select({ feeModel: leases.feeModel }).from(leases).where(eq(leases.id, leaseId))
-  if (lease?.feeModel === 'snapshot') {
-    const rows = await tx.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, leaseId))
-    return rows.map((f) => ({
-      leaseFeeId: f.id,
-      feeTypeId: f.feeTypeId,
-      name: f.name,
-      unit: f.unit,
-      billing: f.billing as ContractFee['billing'],
-      quantityFrom: f.quantitySource === 'occupants' ? ('occupants' as const) : ('manual' as const),
-      quantitySource: f.quantitySource as NonNullable<ContractFee['quantitySource']>,
-      quantity: f.quantity,
-      unitPrice: f.unitPrice,
-    }))
-  }
-  const rows = await tx
-    .select({ f: leaseFees, t: feeTypes, u: feeUnits })
-    .from(leaseFees)
-    .innerJoin(feeTypes, eq(feeTypes.id, leaseFees.feeTypeId))
-    .innerJoin(feeUnits, eq(feeUnits.id, feeTypes.unitId))
-    .where(eq(leaseFees.leaseId, leaseId))
-  return rows.map(({ f, t, u }) => ({
+  const rows = await tx.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, leaseId))
+  return rows.map((f) => ({
     leaseFeeId: f.id,
-    feeTypeId: t.id,
-    name: t.name,
-    unit: u.name,
-    billing: t.billing as ContractFee['billing'],
-    quantityFrom: t.quantityFrom as ContractFee['quantityFrom'],
+    feeTypeId: f.feeTypeId,
+    name: f.name,
+    unit: f.unit,
+    billing: f.billing as ContractFee['billing'],
+    quantityFrom: f.quantitySource === 'occupants' ? ('occupants' as const) : ('manual' as const),
+    quantitySource: f.quantitySource as NonNullable<ContractFee['quantitySource']>,
     quantity: f.quantity,
     unitPrice: f.unitPrice,
   }))
