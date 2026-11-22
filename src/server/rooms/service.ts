@@ -23,6 +23,7 @@ import { leaseData, loadAddenda } from '@/server/invoices/service'
 import { contractTermsAt } from '@/domain/contract-terms'
 import type { LeaseTerms } from '@/domain/types'
 import { getFacility } from '../facilities/service'
+import { createDefaultMeters } from '../meters/service'
 import { bulkInput, roomInput, roomUpdateInput, type BulkInput, type RoomInput } from './schemas'
 
 export type Room = typeof rooms.$inferSelect
@@ -135,6 +136,7 @@ export async function createRoom(db: DB, ctx: AccessContext, input: RoomInput): 
       .values({ ...roomData, areaM2: roomData.areaM2?.toString() ?? null })
       .returning()
     await setRoomAmenities(tx, r.id, ids)
+    await createDefaultMeters(tx, [r.id], todayVN())
     await recordAudit(tx, ctx, {
       action: 'create',
       entity: 'room',
@@ -272,6 +274,11 @@ export async function createRoomsBulk(
           })),
         )
         .returning()
+      await createDefaultMeters(
+        tx,
+        created.map((r) => r.id),
+        todayVN(),
+      )
       if (ids.length)
         await tx
           .insert(roomAmenities)
