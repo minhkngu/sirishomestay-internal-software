@@ -2,11 +2,13 @@ import { and, eq } from 'drizzle-orm'
 import { facilities, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
+import { todayVN } from '@/domain/dates'
 import { ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/modules/platform'
 import { findDuplicateField, toTenantRow } from '@/modules/tenants'
 import type { Tenant } from '@/modules/tenants'
 import type { ImportTarget } from './targets'
+import { createDefaultMeters } from '@/modules/meters'
 import { applyOpsRows } from './ops'
 import { OPS_TARGETS, type ImportError, type NormalizedRow, type OpsTarget } from './validate'
 
@@ -155,6 +157,7 @@ export async function runImport(
             .insert(rooms)
             .values({ facilityId: fac.id, code: d.code, ...patch })
             .returning()
+          await createDefaultMeters(tx, [room.id], todayVN())
           await recordAudit(tx, ctx, {
             action: 'create',
             entity: 'room',

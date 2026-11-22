@@ -16,7 +16,6 @@ import {
   payments,
   rooms,
   tenants,
-  utilityRates,
 } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
@@ -247,9 +246,6 @@ describe('khôi phục hợp đồng', () => {
       .insert(meters)
       .values({ roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 })
       .returning()
-    await db
-      .insert(utilityRates)
-      .values({ facilityId, utility: 'electric', effectiveFrom: '2026-01-01', pricePerUnit: 1000 })
     const [old] = await db
       .insert(meterReadings)
       .values({ meterId: meter.id, period: '2026-08', readOn: '2026-08-31', value: 100 })
@@ -274,9 +270,6 @@ describe('khôi phục hợp đồng', () => {
       .insert(meters)
       .values({ roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 })
       .returning()
-    await db
-      .insert(utilityRates)
-      .values({ facilityId, utility: 'electric', effectiveFrom: '2026-01-01', pricePerUnit: 1000 })
     await db.insert(meterReadings).values({ meterId: meter.id, period: '2026-08', readOn: '2026-08-31', value: 100 })
     const [existing] = await db
       .insert(meterReadings)

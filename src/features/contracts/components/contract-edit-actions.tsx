@@ -31,6 +31,7 @@ import {
   updateLeaseAssetsAction,
   refreshContractDocumentsAction,
 } from '@/modules/leasing/actions'
+import { FormSelect, BareSelect } from './contract-form-ui'
 
 type Common = { id: string; roomId: string; tenantId: string; depositAmount: number; signStatus: string }
 type Contract =
@@ -70,7 +71,7 @@ export type FeeData = {
     meterInit?: { initialReading: number; existingMeterId?: string }
   }[]
   meterSupported: boolean
-  roomMeters: { id: string; feeTypeId: string | null; label: string; busy: boolean }[]
+  roomMeters: { id: string; label: string; busy: boolean }[]
   options: { id: string; name: string; unit: string; price: number; meter: boolean }[]
 }
 
@@ -472,37 +473,21 @@ export function ContractEditActions({
             Hoá đơn và các khoản tiền cọc hiện có sẽ được giữ nguyên. Vui lòng tự kiểm tra và điều chỉnh nếu cần.
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
-              <Label htmlFor="edit-room">Phòng</Label>
-              <select
-                id="edit-room"
-                value={roomId}
-                onChange={(e) => setRoomId(e.target.value)}
-                className="h-9 w-full rounded-lg border bg-background px-2 text-sm"
-              >
-                {rooms.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <FormSelect
+              id="edit-room"
+              label="Phòng"
+              value={roomId}
+              onValueChange={setRoomId}
+              options={rooms.map((o) => ({ value: o.id, label: o.label }))}
+            />
             {!editOccupants && (
-              <div className="space-y-1">
-                <Label htmlFor="edit-tenant">Bên thuê</Label>
-                <select
-                  id="edit-tenant"
-                  value={tenantId}
-                  onChange={(e) => setTenantId(e.target.value)}
-                  className="h-9 w-full rounded-lg border bg-background px-2 text-sm"
-                >
-                  {tenants.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <FormSelect
+                id="edit-tenant"
+                label="Bên thuê"
+                value={tenantId}
+                onValueChange={setTenantId}
+                options={tenants.map((o) => ({ value: o.id, label: o.label }))}
+              />
             )}
             <div className="space-y-1">
               <Label htmlFor="edit-rent">Giá thuê (VND/tháng)</Label>
@@ -934,34 +919,28 @@ export function ContractEditActions({
           if (!o) setMeterFee(null)
         }}
         title={meterFee ? `Thêm phí ${meterFee.name}` : 'Thêm phí'}
-        description="Bắt buộc chọn đồng hồ và nhập chỉ số ban đầu. Dùng lại đồng hồ có sẵn của phòng hoặc tạo đồng hồ mới."
+        description="Bắt buộc chọn một đồng hồ của phòng và nhập chỉ số hiện tại. Mỗi đồng hồ chỉ gắn với một dòng phí."
         size="sm"
       >
         {meterFee && (
           <div className="space-y-3">
             <div className="space-y-1">
               <Label htmlFor="meter-pick">Đồng hồ</Label>
-              <select
+              <BareSelect
                 id="meter-pick"
+                ariaLabel="Đồng hồ"
                 value={meterId}
-                onChange={(e) => setMeterId(e.target.value)}
-                className="h-9 w-full rounded-lg border bg-background px-2 text-sm"
-              >
-                <option value="">— Chọn đồng hồ —</option>
-                <option value="__new__">Tạo đồng hồ mới</option>
-                {(feeData?.roomMeters ?? [])
-                  .filter((m) => m.feeTypeId === meterFee.id && !m.busy)
-                  .map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.label}
-                    </option>
-                  ))}
-              </select>
+                onValueChange={setMeterId}
+                options={[
+                  { value: '', label: '— Chọn đồng hồ —' },
+                  ...(feeData?.roomMeters ?? [])
+                    .filter((m) => !m.busy && !feeRows.some((r) => r.meterInit?.existingMeterId === m.id))
+                    .map((m) => ({ value: m.id, label: m.label })),
+                ]}
+              />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="meter-reading">
-                {meterId && meterId !== '__new__' ? 'Chỉ số hiện tại của đồng hồ' : 'Chỉ số ban đầu'}
-              </Label>
+              <Label htmlFor="meter-reading">Chỉ số hiện tại của đồng hồ</Label>
               <Input
                 id="meter-reading"
                 inputMode="numeric"
@@ -983,10 +962,7 @@ export function ContractEditActions({
                     unitPrice: meterFee.price,
                     price: String(meterFee.price),
                     locked: false,
-                    meterInit: {
-                      initialReading: Number(meterReading),
-                      existingMeterId: meterId === '__new__' ? undefined : meterId,
-                    },
+                    meterInit: { initialReading: Number(meterReading), existingMeterId: meterId },
                   },
                 ])
                 setMeterFee(null)
