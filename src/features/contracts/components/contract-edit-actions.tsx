@@ -34,7 +34,31 @@ export type Person = { id: string; name: string; idNumber: string | null; phone:
 export type RenderCreatePerson = (p: { facility: { id: string; name: string }; onCreated: (person: Person) => void }) => React.ReactNode
 export type RenderCreateFee = (p: { units: { id: string; name: string }[]; onCreated: (fee: { id: string; name: string; unit: string; price: number; draft: Record<string, unknown> }) => void }) => React.ReactNode
 
-export type FeeData = { editable: boolean; units: { id: string; name: string }[]; current: { leaseFeeId: string | null; feeTypeId: string | null; name: string; unit: string; unitPrice: number; locked: boolean; draft?: Record<string, unknown>; meterInit?: { initialReading: number; existingMeterId?: string } }[]; meterSupported: boolean; roomMeters: { id: string; label: string; busy: boolean }[]; options: { id: string; name: string; unit: string; price: number; meter: boolean }[] }
+export type FeeSource = 'occupants' | 'room' | 'meter' | 'period_input' | 'legacy_fixed'
+export type FeeData = {
+  editable: boolean
+  units: { id: string; name: string }[]
+  current: {
+    leaseFeeId: string | null; feeTypeId: string | null; name: string; unit: string; unitPrice: number
+    /** Cách tính số lượng của phí, hiện ở popup sửa. */
+    quantitySource: FeeSource; quantity: number
+    /** Đồng hồ đang gắn (chỉ phí theo đồng hồ và người dùng có quyền meters). */
+    meterId: string | null; meterLabel: string | null
+    /** Chỉ số đầu của phí: lần chốt sớm nhất từ ngày bắt đầu hợp đồng, hoặc chỉ số lúc lắp. */
+    opening: { readingId: string | null; value: number; readOn: string } | null
+    draft?: Record<string, unknown>
+    /** @deprecated Dùng quantitySource === 'meter'. */
+    locked?: boolean
+    /** @deprecated Dùng meterId/opening. */
+    meterInit?: { initialReading: number; existingMeterId?: string }
+  }[]
+  /** Người dùng có quyền meters của toà: được xem và sửa đồng hồ, chỉ số đầu. */
+  canEditMeters: boolean
+  roomMeters: { id: string; label: string; busy: boolean }[]
+  options: { id: string; name: string; unit: string; price: number; meter: boolean }[]
+  /** @deprecated Không dùng. */
+  meterSupported?: boolean
+}
 
 export function ContractEditActions({ contract, canDelete, rooms, tenants, mode, onCompleted, onSaved, occupants, people, templates, feeData, documents, assets, facility, renderCreatePerson, renderCreateFee }: {
   /** Gọi sau khi lưu xong (thay cho `onCompleted`), để quay về hợp đồng vừa sửa. */ onSaved?: () => void; facility?: { id: string; name: string }; /** Form tạo nhanh khách / loại phí do tầng route cấp (thuộc tính năng khác). */ renderCreatePerson?: RenderCreatePerson; renderCreateFee?: RenderCreateFee; contract: Contract; canDelete: boolean; rooms: Option[]; tenants: Option[]; /** Người ở hiện tại và những người có thể thêm (chỉ hợp đồng thuê). */ occupants?: Person[]; people?: Person[]; /** Phí dịch vụ của hợp đồng thuê và các loại phí đã cài đặt để thêm. */ feeData?: FeeData | null; /** Mẫu hợp đồng và mẫu hoá đơn của hợp đồng thuê; lưu cùng nút "Lưu thay đổi". */ templates?: { contract: { id: string; name: string; isDefault: boolean }[]; contractId: string | null; invoice: { id: string; name: string; isDefault: boolean }[]; invoiceId: string | null }; /** Tài sản trong phòng (chỉ hợp đồng thuê, cần quyền tài sản). */ assets?: { inRoom: AssetRow[]; available: AssetRow[] } | null; /** Giấy tờ, sổ cọc của hợp đồng; chỉnh dạng nháp, lưu cùng nút "Lưu thay đổi". */ documents?: { signedFileId: string | null; entries: DepositRow[]; canEditDeposit: boolean }; mode?: 'edit' | 'delete'; onCompleted?: () => void }) {
