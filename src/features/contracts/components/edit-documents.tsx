@@ -1,10 +1,11 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatDateVN, todayVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
+import { BareSelect } from './contract-form-ui'
 
 export type DepositRow = { id: string; date: string; type: string; amount: number; status: string }
 export type DocsDraft = {
@@ -60,7 +61,7 @@ export function EditDocuments({ kind, signed, signedFileId, entries, canEditDepo
               <td className="py-1.5 pr-3">{done ? 'Sẽ hoàn tất' : e.status === 'done' ? 'Đã xong' : 'Chờ'}</td><td className="py-1.5 pr-3">{formatVND(balances[i])}</td>
               <td className="py-1.5">{canEditDeposit && e.status === 'pending' && (done
                 ? <div className="flex items-center gap-1"><Input aria-label="Ngày hoàn tất" type="date" className="h-7 w-36" value={done.date} onChange={ev => set({ doneEntries: { ...draft.doneEntries, [e.id]: { ...done, date: ev.target.value } } })} />
-                  <select aria-label="Hình thức" className="h-7 rounded-lg border bg-background px-1 text-xs" value={done.method} onChange={ev => set({ doneEntries: { ...draft.doneEntries, [e.id]: { ...done, method: ev.target.value as 'cash' } } })}>{Object.entries(METHOD).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+                  <BareSelect ariaLabel="Hình thức" value={done.method} onValueChange={method => set({ doneEntries: { ...draft.doneEntries, [e.id]: { ...done, method: method as 'cash' } } })} options={Object.entries(METHOD).map(([k, v]) => ({ value: k, label: v }))} className="h-7 w-36 rounded-lg px-2 py-0 text-xs" />
                   <Button type="button" size="sm" variant="ghost" onClick={() => { const rest = { ...draft.doneEntries }; delete rest[e.id]; set({ doneEntries: rest }) }}>Bỏ</Button></div>
                 : <Button type="button" size="sm" variant="outline" onClick={() => set({ doneEntries: { ...draft.doneEntries, [e.id]: { date: todayVN(), method: 'cash' } } })}>Hoàn tất</Button>)}</td>
             </tr>
@@ -77,16 +78,16 @@ export function EditDocuments({ kind, signed, signedFileId, entries, canEditDepo
 
 function NewEntry({ onAdd }: { onAdd: (entry: DocsDraft['newEntries'][number]) => void }) {
   const dateRef = useRef<HTMLInputElement>(null)
-  const typeRef = useRef<HTMLSelectElement>(null)
   const amountRef = useRef<HTMLInputElement>(null)
+  const [type, setType] = useState<'topup' | 'collect' | 'deduct' | 'refund' | 'forfeit'>('topup')
   return <div className="flex flex-wrap items-end gap-2 text-sm">
     <label className="grid gap-0.5 text-xs">Ngày<Input ref={dateRef} type="date" className="h-8" defaultValue={todayVN()} /></label>
-    <label className="grid gap-0.5 text-xs">Loại<select ref={typeRef} className="h-8 rounded-lg border bg-background px-2 text-sm">{['topup', 'collect', 'deduct', 'refund', 'forfeit'].map(k => <option key={k} value={k}>{TYPE[k]}</option>)}</select></label>
+    <div className="grid gap-0.5 text-xs"><span>Loại</span><BareSelect ariaLabel="Loại" value={type} onValueChange={value => setType(value as 'topup' | 'collect' | 'deduct' | 'refund' | 'forfeit')} options={['topup', 'collect', 'deduct', 'refund', 'forfeit'].map(k => ({ value: k, label: TYPE[k] }))} className="h-8 w-28 rounded-lg px-2 py-0 text-xs" /></div>
     <label className="grid gap-0.5 text-xs">Số tiền<Input ref={amountRef} type="number" min="1" step="1" className="h-8 w-32" /></label>
     <Button type="button" size="sm" variant="outline" onClick={() => {
       const amount = Number(amountRef.current?.value)
       if (!dateRef.current?.value || !Number.isSafeInteger(amount) || amount < 1) return
-      onAdd({ key: crypto.randomUUID(), date: dateRef.current.value, type: typeRef.current!.value as 'topup', amount })
+      onAdd({ key: crypto.randomUUID(), date: dateRef.current.value, type, amount })
       if (amountRef.current) amountRef.current.value = ''
     }}>Thêm dòng</Button>
   </div>

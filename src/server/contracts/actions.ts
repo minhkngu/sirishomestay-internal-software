@@ -128,17 +128,17 @@ export async function quickContractDataAction(kind: 'lease' | 'deposit', id: str
       const unitName = new Map(units.map(u => [u.id, u.name]))
       const { meters, leaseFeeMeters, leaseFeeSnapshots, leases } = await import('@/db')
       const { and, eq, isNull } = await import('drizzle-orm')
-      const meterRows = await db.select({ id: meters.id, feeTypeId: meters.feeTypeId, name: leaseFeeSnapshots.name }).from(meters).innerJoin(leaseFeeMeters, eq(leaseFeeMeters.meterId, meters.id)).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).where(and(eq(meters.roomId, l.roomId), eq(meters.utility, 'fee'), isNull(meters.removedOn)))
+      const meterRows = await db.select({ id: meters.id, utility: meters.utility, name: meters.name, code: meters.code, serial: meters.serial }).from(meters).where(and(eq(meters.roomId, l.roomId), isNull(meters.removedOn)))
       const busyRows = await db.select({ meterId: leaseFeeMeters.meterId }).from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).innerJoin(leases, eq(leases.id, leaseFeeSnapshots.leaseId)).where(eq(leases.status, 'active'))
       const busyIds = new Set(busyRows.map(r => r.meterId))
-      const roomMeters = [...new Map(meterRows.map(m => [m.id, m])).values()]
+      const roomMeters = meterRows.map(m => ({ id: m.id, label: `${m.name || (m.utility === 'electric' ? 'Điện' : m.utility === 'water' ? 'Nước' : 'Đồng hồ')}${m.code ? ` · ${m.code}` : ''}${m.serial ? ` · ${m.serial}` : ''}` }))
       return {
         editable: true,
         units: units.map(u => ({ id: u.id, name: u.name })),
         current: l.fees.map(f => ({ leaseFeeId: f.leaseFeeId ?? null, feeTypeId: f.feeTypeId, name: f.name, unit: f.unit, unitPrice: f.unitPrice, locked: f.quantitySource === 'meter' })),
         meterSupported: true,
         options: types.map(t => ({ id: t.id, name: t.name, unit: unitName.get(t.unitId) ?? '', price: resolveFeePrice(t.defaultPrice, prices[t.id] ?? {}, l.facilityId), meter: t.quantityFrom === 'meter' })),
-        roomMeters: roomMeters.map(m => ({ id: m.id, feeTypeId: m.feeTypeId, label: m.name, busy: busyIds.has(m.id) })),
+        roomMeters: roomMeters.map(m => ({ id: m.id, label: m.label, busy: busyIds.has(m.id) })),
       }
     })() : null
     const { listFacilities } = await import('@/server/facilities/service')

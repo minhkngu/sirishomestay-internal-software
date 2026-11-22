@@ -13,8 +13,13 @@ import { getAccessContext } from '@/server/session'
 import { getSettings } from '@/server/settings/service'
 import { listDepositContracts, listLeases } from '@/server/contracts/service'
 import { ContractListView } from './contract-actions'
+import { NewContract } from './new-contract'
+import { NewContractQueryModal } from './new-contract-query-modal'
 
-export default async function ContractsPage() {
+type ContractsSearchParams = Record<string, string | string[] | undefined>
+
+export default async function ContractsPage({ searchParams }: { searchParams: Promise<ContractsSearchParams> }) {
+  const sp = await searchParams
   const ctx = await getAccessContext()
   try { assertCan(ctx, 'tenants_contracts') } catch { notFound() }
   // Nạp mọi hợp đồng trong quyền một lần; lọc theo tab, cơ sở và phân trang làm ở trình duyệt
@@ -26,6 +31,15 @@ export default async function ContractsPage() {
   ])
   const pendingFiles = can(ctx, 'delete_contracts') ? (await db.select({ facilityId: files.facilityId }).from(files).where(eq(files.ownerType, 'pending_contract_delete'))).filter(f => f.facilityId ? can(ctx, 'delete_contracts', f.facilityId) : ctx.isAdmin).length : 0
   const pendingRestoreFiles = (await db.select({ facilityId: files.facilityId }).from(files).where(eq(files.ownerType, 'pending_contract_restore'))).filter(f => f.facilityId ? can(ctx, 'tenants_contracts', f.facilityId) : ctx.isAdmin).length
+  const modalKind = sp.new === 'deposit' ? 'deposit' : sp.new === 'lease' ? 'lease' : null
+  const closeParams = new URLSearchParams()
+  for (const [key, value] of Object.entries(sp)) {
+    if (['new', 'kind', 'room', 'tenant', 'deposit'].includes(key)) continue
+    if (typeof value === 'string' && value) closeParams.set(key, value)
+    else if (Array.isArray(value)) for (const item of value) closeParams.append(key, item)
+  }
+  const closeHref = `/contracts${closeParams.size ? `?${closeParams.toString()}` : ''}`
+  const text = (value: string | string[] | undefined) => typeof value === 'string' && value ? value : undefined
   return (
     <div className="space-y-5">
       {pendingFiles > 0 && <PendingFileCleanup count={pendingFiles} />}
@@ -51,6 +65,11 @@ export default async function ContractsPage() {
         warningDays={settings.contractWarningDays}
         deleteFacilityIds={facs.filter(f => can(ctx, 'delete_contracts', f.id)).map(f => f.id)}
       />
+      {modalKind && (
+        <NewContractQueryModal kind={modalKind} closeHref={closeHref}>
+          <NewContract sp={{ kind: modalKind, room: text(sp.room), tenant: text(sp.tenant), deposit: text(sp.deposit) }} showHeading={false} />
+        </NewContractQueryModal>
+      )}
     </div>
   )
 }

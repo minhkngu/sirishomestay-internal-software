@@ -5,8 +5,8 @@ import { cn } from '@/lib/utils'
 import { InvoiceTemplatesManager } from './invoice-templates-manager'
 import { TemplatesManager } from './templates-manager'
 
-type InvoiceTemplate = { id: string; name: string; isDefault: boolean; isSystem: boolean; hasBody: boolean; style: 'formal' | 'modern'; body: string | null }
-type WordTemplate = { id: string; docType: string; name: string; hasFile: boolean; hasBody: boolean; isDefault: boolean; style: 'formal' | 'modern'; body: string | null }
+type InvoiceTemplate = { id: string; name: string; isDefault: boolean; isSystem: boolean; hasBody: boolean; style: 'formal' | 'modern'; body: string | null; preview: string | null }
+type WordTemplate = { id: string; docType: string; name: string; hasFile: boolean; hasBody: boolean; isDefault: boolean; style: 'formal' | 'modern'; body: string | null; preview: string | null }
 
 const TABS = [
   { id: 'invoice', label: 'Mẫu hóa đơn' },

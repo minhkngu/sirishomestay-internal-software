@@ -1,4 +1,5 @@
 'use client'
+import { BareSelect } from './contract-form-ui'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition, type ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -58,7 +59,7 @@ export function AddendumShell({ label, kind, leaseId, input, create, children, d
 export const Field = ({ label, children }: { label: string; children: ReactNode }) => <label className="grid gap-1">{label}{children}</label>
 export const inputCls = 'h-8 rounded border px-2'
 export const TargetSelect = ({ value, onChange }: { value: string; onChange: (v: 'next' | 'current') => void }) => (
-  <Field label="Điều chỉnh tiền kỳ đang tính"><select className={inputCls} value={value} onChange={(e) => onChange(e.target.value as 'next')}><option value="next">Cộng vào hoá đơn kỳ sau</option><option value="current">Ghi thẳng vào hoá đơn đã duyệt</option></select></Field>
+  <Field label="Điều chỉnh tiền kỳ đang tính"><BareSelect ariaLabel="Điều chỉnh tiền kỳ đang tính" value={value} onValueChange={next => onChange(next as 'next' | 'current')} options={[{ value: 'next', label: 'Cộng vào hoá đơn kỳ sau' }, { value: 'current', label: 'Ghi thẳng vào hoá đơn đã duyệt' }]} /></Field>
 )
 export function ReadingInputs({ meters, values, onChange, title }: { meters: MeterOption[]; values: Record<string, string>; onChange: (v: Record<string, string>) => void; title: string }) {
   if (!meters.length) return null

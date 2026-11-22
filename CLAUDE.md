@@ -27,6 +27,8 @@ Web nội bộ cho nhân viên Siris quản lý cơ sở, phòng, khách thuê, 
 - New code: vào `src/modules/<mảng>/` của mảng sở hữu; mảng chưa chuyển thì viết ở chỗ cũ và chuyển cùng module.
 - Chi tiết: đọc [docs/architecture.md](docs/architecture.md) trước khi sửa — mảng nào đã chuyển, luồng yêu cầu, quy tắc nghiệp vụ, bẫy đã biết. Đổi cấu trúc thì cập nhật file đó.
 
+- Điện nước: mỗi phòng luôn có sẵn hai đồng hồ điện, nước (tạo cùng phòng, không xoá được; chỉ thêm đồng hồ khác). Điện, nước là phí của hợp đồng tính theo đồng hồ: mỗi dòng phí gắn đúng một đồng hồ của phòng đó, đồng hồ đã gắn không dùng cho phí khác, đơn giá lấy từ hợp đồng (giá trong Cài đặt chỉ là giá tham khảo). Không có kiểu tính theo bảng giá cơ sở.
+
 ## Conventions
 - Service nhận `(db, ctx, input)`, `ctx` từ `getAccessContext()`; kiểm quyền bằng `can()` ở `src/domain/access.ts`.
 - Server action bọc service bằng `toActionResult` rồi `revalidatePath`; input là `unknown`, parse bằng zod trong service.

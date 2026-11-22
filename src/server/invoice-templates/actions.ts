@@ -3,10 +3,11 @@
 import { revalidatePath } from 'next/cache'
 import { db } from '@/db/client'
 import { toActionResult } from '@/lib/action-result'
+import { assertCan } from '@/domain/access'
 import { getAccessContext } from '@/server/session'
 import type { TemplateStyle } from '@/domain/doc-template'
 import { restoreDefaultInvoiceTemplates } from './defaults'
-import { createInvoiceTemplate, previewInvoiceTemplateById, previewInvoiceTemplateHtml, deleteInvoiceTemplate, previewInvoiceTemplate, selectInvoiceTemplate, selectLeaseInvoiceTemplate, setDefaultInvoiceTemplate, updateInvoiceTemplate } from './service'
+import { createInvoiceTemplate, getInvoiceTemplatePreview, previewInvoiceTemplateById, previewInvoiceTemplateHtml, deleteInvoiceTemplate, previewInvoiceTemplate, selectInvoiceTemplate, selectLeaseInvoiceTemplate, setDefaultInvoiceTemplate, updateInvoiceTemplate } from './service'
 
 const refresh = () => { revalidatePath('/templates'); revalidatePath('/contracts', 'layout'); revalidatePath('/invoices', 'layout') }
 export async function previewInvoiceTemplateAction(config: unknown) {
@@ -45,4 +46,10 @@ export async function previewInvoiceTemplateByIdAction(id: string) {
 export async function restoreDefaultInvoiceTemplatesAction() {
   const ctx = await getAccessContext()
   return toActionResult(async () => { const created = await restoreDefaultInvoiceTemplates(db, ctx); refresh(); return { created } })
+}
+
+/** Lấy bản xem đã lưu của một mẫu hoá đơn khi bấm mở (không dựng lại nếu đã có). */
+export async function getInvoiceTemplatePreviewAction(id: string) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => { assertCan(ctx, 'settings'); return { base64: await getInvoiceTemplatePreview(db, id) } })
 }

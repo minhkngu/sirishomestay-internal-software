@@ -2,7 +2,7 @@ import { eq, sql } from 'drizzle-orm'
 import { describe, it, expect, beforeEach } from 'vitest'
 import { facilities, feeTypes, feeTypePrices, feeUnits } from '@/db'
 import {
-  setFeeDefault, listFeeDefaults, setFeeTypePrice, removeFeeTypePrice, listFeeTypePrices, createFeeUnit, listFeeUnits, createFeeType, updateFeeType, archiveFeeType, restoreFeeType, listFeeTypes, ensureUtilityFeeTypes, createRate, listRates, saveFeeFacilities,
+  setFeeDefault, listFeeDefaults, setFeeTypePrice, removeFeeTypePrice, listFeeTypePrices, createFeeUnit, listFeeUnits, createFeeType, updateFeeType, archiveFeeType, restoreFeeType, listFeeTypes, ensureUtilityFeeTypes, saveFeeFacilities,
 } from '@/server/fees/service'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import type { AccessContext, Permission } from '@/domain/access'
@@ -127,30 +127,18 @@ describe('fees & rates', () => {
     expect(await listFeeTypes(db, admin)).toHaveLength(0)
   })
 
-  it('chỉ nhóm settings tạo/sửa loại phí, đơn vị, đơn giá', async () => {
+  it('chỉ nhóm settings tạo/sửa loại phí, đơn vị', async () => {
     const staff = ctxOf(['billing'], [fa])
     await expect(createFeeUnit(db, staff, { name: 'kg' })).rejects.toThrow(ForbiddenError)
-    await expect(createRate(db, staff, { facilityId: fa, utility: 'electric', pricePerUnit: 3500, effectiveFrom: '2026-01-01' })).rejects.toThrow(ForbiddenError)
   })
 
-  it('tạo Điện và Nước lần đầu với giá utility_rates mới nhất', async () => {
-    await createRate(db, admin, { facilityId: fa, utility: 'electric', pricePerUnit: 3500, effectiveFrom: '2026-01-01' })
-    await createRate(db, admin, { facilityId: fa, utility: 'electric', pricePerUnit: 3800, effectiveFrom: '2026-11-01' })
-    await createRate(db, admin, { facilityId: fb, utility: 'electric', pricePerUnit: 4000, effectiveFrom: '2026-01-01' })
-    await createRate(db, admin, { facilityId: fa, utility: 'water', pricePerUnit: 15000, effectiveFrom: '2026-01-01' })
+  it('tạo Điện và Nước lần đầu, tính theo đồng hồ, giá tham khảo 0', async () => {
     const { electric, water } = await ensureUtilityFeeTypes(db, admin)
-    expect(electric).toMatchObject({ name: 'Điện', defaultPrice: 3800, quantityFrom: 'meter', billing: 'per_occurrence', isActive: true })
-    expect(water).toMatchObject({ name: 'Nước', defaultPrice: 15000, quantityFrom: 'meter' })
+    expect(electric).toMatchObject({ name: 'Điện', defaultPrice: 0, quantityFrom: 'meter', billing: 'per_occurrence', isActive: true })
+    expect(water).toMatchObject({ name: 'Nước', defaultPrice: 0, quantityFrom: 'meter' })
     const units = await db.select().from(feeUnits)
     expect(units.find(u => u.id === electric.unitId)?.name).toBe('kWh')
     expect(units.find(u => u.id === water.unitId)?.name).toBe('m³')
-    expect((await listFeeTypePrices(db, admin))[electric.id]).toEqual({ [fb]: 4000 })
-  })
-
-  it('bỏ qua đơn giá có ngày hiệu lực ở tương lai khi lấy giá mặc định', async () => {
-    await createRate(db, admin, { facilityId: fa, utility: 'electric', pricePerUnit: 3500, effectiveFrom: '2026-01-01' })
-    await createRate(db, admin, { facilityId: fa, utility: 'electric', pricePerUnit: 9999, effectiveFrom: '2999-01-01' })
-    expect((await ensureUtilityFeeTypes(db, admin)).electric.defaultPrice).toBe(3500)
   })
 
   it('chạy lần hai không tạo trùng và không ghi đè giá đã sửa', async () => {
@@ -162,23 +150,8 @@ describe('fees & rates', () => {
     expect((await db.select().from(feeTypes)).filter(t => t.name === 'Điện' || t.name === 'Nước')).toHaveLength(2)
   })
 
-  it('không có utility_rates thì giá mặc định bằng 0 và cần quyền settings', async () => {
-    expect((await ensureUtilityFeeTypes(db, admin)).water.defaultPrice).toBe(0)
+  it('nạp Điện và Nước cần quyền settings', async () => {
     await expect(ensureUtilityFeeTypes(db, ctxOf(['billing'], [fa]))).rejects.toThrow(ForbiddenError)
-  })
-
-  it('đơn giá theo cơ sở có ngày hiệu lực; trùng ngày hiệu lực báo lỗi tiếng Việt', async () => {
-    await createRate(db, admin, { facilityId: fa, utility: 'electric', pricePerUnit: 3500, effectiveFrom: '2026-01-01' })
-    await createRate(db, admin, { facilityId: fa, utility: 'electric', pricePerUnit: 3800, effectiveFrom: '2026-11-01' })
-    await expect(createRate(db, admin, { facilityId: fa, utility: 'electric', pricePerUnit: 4000, effectiveFrom: '2026-11-01' })).rejects.toThrow('Đã có đơn giá với ngày hiệu lực này')
-    expect((await listRates(db, admin, fa)).map((r) => r.pricePerUnit)).toEqual([3800, 3500])
-    await expect(createRate(db, admin, { facilityId: fa, utility: 'water', pricePerUnit: -1, effectiveFrom: '2026-01-01' })).rejects.toThrow()
-  })
-
-  it('người chỉ có cơ sở A không xem được đơn giá của B', async () => {
-    await createRate(db, admin, { facilityId: fb, utility: 'electric', pricePerUnit: 3500, effectiveFrom: '2026-01-01' })
-    await expect(listRates(db, ctxOf(['billing'], [fa]), fb)).rejects.toThrow(NotFoundError)
-    expect(await listRates(db, ctxOf(['billing'], [fb]), fb)).toHaveLength(1)
   })
 
   describe('saveFeeFacilities (nút Áp dụng trong popup theo toà)', () => {

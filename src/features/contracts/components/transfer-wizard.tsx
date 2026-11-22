@@ -1,4 +1,5 @@
 'use client'
+import { BareSelect } from './contract-form-ui'
 import { useState } from 'react'
 import { createTransferAction } from '@/server/addenda/actions'
 import { AddendumShell, Field, inputCls, ReadingInputs, TargetSelect, toReadings, type MeterOption } from './addendum-shell'
@@ -14,7 +15,7 @@ export function TransferWizard({ leaseId, currentRoomId, freeRooms, meters, toda
   return (
     <AddendumShell label="Chuyển phòng" kind="transfer" leaseId={leaseId} input={input} create={createTransferAction} defaultOpen={defaultOpen} onCompleted={onCompleted}>
       <Field label="Ngày chuyển"><input type="date" className={inputCls} value={effectiveDate} onChange={(e) => setEffective(e.target.value)} /></Field>
-      <Field label="Phòng mới (phòng trống)"><select className={inputCls} value={newRoomId} onChange={(e) => setRoom(e.target.value)}><option value="">— Chọn phòng —</option>{freeRooms.map((r) => <option key={r.id} value={r.id}>{r.code}</option>)}</select></Field>
+      <Field label="Phòng mới (phòng trống)"><BareSelect ariaLabel="Phòng mới (phòng trống)" value={newRoomId} onValueChange={setRoom} options={freeRooms.map((r) => ({ value: r.id, label: r.code }))} placeholder="— Chọn phòng —" /></Field>
       <Field label="Giá thuê mới (để trống nếu không đổi)"><MoneyInput className={inputCls} value={rent} onValueChange={setRent} /></Field>
       <ReadingInputs title="Chỉ số phòng cũ tại ngày chuyển" meters={meters.filter((m) => m.roomId === currentRoomId)} values={readings} onChange={setReadings} />
       <ReadingInputs title="Chỉ số phòng mới tại ngày chuyển" meters={meters.filter((m) => m.roomId === newRoomId)} values={readings} onChange={setReadings} />

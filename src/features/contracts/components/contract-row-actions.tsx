@@ -2,8 +2,10 @@
 
 import { useRef, useState, useTransition } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { ArrowLeftRight, CalendarPlus, FilePenLine, RotateCcw, Trash2, UserRoundPlus, CircleStop } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { ArrowLeftRight, CalendarPlus, FilePenLine, MoreHorizontal, RotateCcw, Trash2, UserRoundPlus, CircleStop } from 'lucide-react'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { cn } from '@/lib/utils'
 import { IconTip, IconTipGroup } from '@/components/ui/tooltip'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { quickContractDataAction, previewContractRestoreAction, restoreContractAction } from '@/server/contracts/actions'
@@ -12,6 +14,7 @@ import { ContractEditActions, type RenderCreateFee, type RenderCreatePerson } fr
 import { ExtensionDialog } from './extension-dialog'
 import { TerminationWizard } from './termination-wizard'
 import { TransferWizard } from './transfer-wizard'
+import { BareSelect } from './contract-form-ui'
 
 type Action = 'edit' | 'delete' | 'termination' | 'assignment' | 'extension' | 'transfer' | 'restore'
 type Data = Extract<Awaited<ReturnType<typeof quickContractDataAction>>, { ok: true }>['data']
@@ -26,7 +29,7 @@ const ACTIONS = [
   { key: 'restore', label: 'Khôi phục hợp đồng', icon: RotateCcw },
 ] as const
 
-export function ContractRowActions({ id, kind, active, canDelete, redirectAfterDelete, renderCreatePerson, renderCreateFee }: { id: string; kind: 'lease' | 'deposit'; active: boolean; canDelete: boolean; redirectAfterDelete?: string; /** Các mục sửa kèm theo (phí phát sinh, mẫu hoá đơn, giấy tờ, sổ cọc...) do tầng route cấp vì chúng thuộc nhiều tính năng. */ renderCreatePerson?: RenderCreatePerson; renderCreateFee?: RenderCreateFee }) {
+export function ContractRowActions({ id, kind, active, canDelete, redirectAfterDelete, presentation = 'row', renderCreatePerson, renderCreateFee }: { id: string; kind: 'lease' | 'deposit'; active: boolean; canDelete: boolean; redirectAfterDelete?: string; /** 'row' xếp mọi thao tác thành một hàng biểu tượng; 'detail' đưa thao tác chính ra nút có nhãn, phần còn lại vào menu. */ presentation?: 'row' | 'detail'; /** Các mục sửa kèm theo (phí phát sinh, mẫu hoá đơn, giấy tờ, sổ cọc...) do tầng route cấp vì chúng thuộc nhiều tính năng. */ renderCreatePerson?: RenderCreatePerson; renderCreateFee?: RenderCreateFee }) {
   const router = useRouter()
   const pathname = usePathname()
   const [action, setAction] = useState<Action | null>(null)
@@ -55,14 +58,48 @@ export function ContractRowActions({ id, kind, active, canDelete, redirectAfterD
     })
   }
   const label = ACTIONS.find(item => item.key === action)?.label ?? ''
+  // Menu nổi: cần đục hoàn toàn, không dùng backdrop blur của component dùng chung.
+  const menuClass = 'w-56 border-border/80 bg-popover shadow-lg backdrop-blur-none' // taste-skill-ignore
+  const available = ACTIONS.filter(item => (item.key !== 'delete' || canDelete) && (!['termination', 'assignment', 'extension', 'transfer'].includes(item.key) || (kind === 'lease' && active)))
+  const rest = available.filter((item) => item.key !== 'edit')
   return <>
-    <IconTipGroup><div className="grid grid-flow-col grid-rows-2 justify-start gap-0.5">
-      {ACTIONS.filter(item => (item.key !== 'delete' || canDelete) && (!['termination', 'assignment', 'extension', 'transfer'].includes(item.key) || (kind === 'lease' && active))).map(item => <IconTip key={item.key} label={item.label}><Button type="button" variant="ghost" size="icon-sm" aria-label={item.label} onPointerEnter={item.key === 'edit' ? prefetch : undefined} onFocus={item.key === 'edit' ? prefetch : undefined} onClick={() => open(item.key)}><item.icon className="size-4" /></Button></IconTip>)}
-    </div></IconTipGroup>
+    {presentation === 'row' ? (
+      <IconTipGroup><div className="flex flex-wrap items-center justify-end gap-0.5">
+        {available.map(item => <IconTip key={item.key} label={item.label}><Button type="button" variant="ghost" size="icon-xs" aria-label={item.label} className="text-muted-foreground hover:text-foreground" onPointerEnter={item.key === 'edit' ? prefetch : undefined} onFocus={item.key === 'edit' ? prefetch : undefined} onClick={() => open(item.key)}><item.icon className="size-4" /></Button></IconTip>)}
+      </div></IconTipGroup>
+    ) : (
+      <div className="flex items-center gap-2">
+        <Button type="button" size="sm" variant={kind === 'lease' ? 'default' : 'outline'} onPointerEnter={prefetch} onFocus={prefetch} onClick={() => open('edit')}>
+          <FilePenLine className="size-3.5" />
+          Sửa hợp đồng
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            aria-label="Thao tác khác"
+            className={cn(buttonVariants({ variant: 'outline', size: 'icon-sm' }))}
+          >
+            <MoreHorizontal className="size-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className={menuClass}>
+            {rest.map((item) => (
+              <DropdownMenuItem
+                key={item.key}
+                variant={item.key === 'delete' ? 'destructive' : 'default'}
+                onClick={() => open(item.key)}
+              >
+                <item.icon className="size-4" />
+                {item.label}
+              </DropdownMenuItem>
+            ))}
+            {rest.length === 0 && <DropdownMenuItem disabled>Không có thao tác khác</DropdownMenuItem>}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    )}
     <Dialog open={action !== null} onOpenChange={open => { if (!open) close() }}>
       <DialogContent className={`max-h-[94vh] overflow-y-auto ${action === 'edit' ? 'sm:max-w-3xl' : 'sm:max-w-2xl'}`}>
         <DialogHeader><DialogTitle>{label}</DialogTitle><DialogDescription>Hợp đồng và dữ liệu liên quan sẽ được kiểm tra trước khi lưu.</DialogDescription></DialogHeader>
-        {pending && !data && !preview && !error && <div className="space-y-3" aria-busy="true"><div className="h-4 w-1/2 animate-pulse rounded bg-muted" /><div className="h-40 animate-pulse rounded-xl bg-muted" /><div className="h-24 animate-pulse rounded-xl bg-muted" /></div>}
+        {pending && !data && !preview && !error && <div className="space-y-3" aria-busy="true"><div className="h-4 w-1/2 rounded bg-muted" /><div className="h-40 rounded-xl bg-muted" /><div className="h-24 rounded-xl bg-muted" /></div>}
         {error && <p role="alert" className="text-destructive">{error}</p>}
         {data && (action === 'edit' || action === 'delete') && <ContractEditActions assets={data.assetData} documents={{ signedFileId: data.extras?.signedFileId ?? null, entries: data.extras?.depositEntries ?? [], canEditDeposit: data.extras?.billing ?? false }} facility={data.facility} renderCreatePerson={renderCreatePerson} renderCreateFee={renderCreateFee} contract={data.contract} canDelete={canDelete} rooms={data.rooms} tenants={data.tenants} occupants={kind === 'lease' ? data.occupants : undefined} people={kind === 'lease' && data.form ? data.people : undefined} feeData={kind === 'lease' ? data.feeData : undefined} templates={data.extras ? { contract: data.extras.contractTemplates, contractId: data.extras.contractTemplateId, invoice: data.extras.invoiceTemplates, invoiceId: data.extras.invoiceTemplateId } : undefined} mode={action} onCompleted={action === 'delete' && redirectAfterDelete ? () => router.replace(redirectAfterDelete) : close} onSaved={saved} />}
         {data?.form && action === 'extension' && <ExtensionDialog leaseId={id} endDate={data.form.endDate} today={data.form.today} defaultOpen onCompleted={close} />}
@@ -70,7 +107,7 @@ export function ContractRowActions({ id, kind, active, canDelete, redirectAfterD
         {data?.form && action === 'termination' && <TerminationWizard leaseId={id} meters={data.form.meters.filter(m => m.roomId === data.form!.currentRoomId)} today={data.form.today} defaultOpen onCompleted={close} />}
         {data?.form && action === 'assignment' && <form className="space-y-4" onSubmit={event => { event.preventDefault(); setError(''); start(async () => { const result = await createAssignmentAction(id, { effectiveDate: date, newTenantId: recipient }); if (!result.ok) setError(result.error); else close() }) }}>
           <p>Người nhận kế thừa hợp đồng; người cũ được đưa khỏi danh sách người ở. Bản hợp đồng đã ký được giữ nguyên.</p>
-          <label className="grid gap-1">Người nhận<select required value={recipient} onChange={event => setRecipient(event.target.value)} className="h-9 rounded border px-2"><option value="">Chọn người nhận</option>{data.tenants.filter(t => t.id !== data.contract.tenantId).map(t => <option key={t.id} value={t.id}>{t.label}</option>)}</select></label>
+          <div className="grid gap-1"><span className="text-sm font-medium">Người nhận</span><BareSelect ariaLabel="Người nhận" value={recipient} onValueChange={setRecipient} options={data.tenants.filter(t => t.id !== data.contract.tenantId).map(t => ({ value: t.id, label: t.label }))} placeholder="Chọn người nhận" /></div>
           <label className="grid gap-1">Ngày hiệu lực<input required type="date" value={date} onChange={event => setDate(event.target.value)} className="h-9 rounded border px-2" /></label>
           <Button disabled={pending} type="submit">Lưu phụ lục</Button>
         </form>}
