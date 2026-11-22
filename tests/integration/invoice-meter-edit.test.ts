@@ -54,6 +54,14 @@ describe('sửa chỉ số điện trong hoá đơn', () => {
     await db.insert(meters).values({ roomId, utility: 'electric', installedOn: '2026-11-15', startReading: 0 })
     await expect(updateInvoiceMeterReading(db, ctx(), invoiceId, { leaseFeeId: feeId, value: 260 })).rejects.toThrow('tab Chỉ số')
   })
+  it('có chỉ số bàn giao trong tháng vẫn chốt được số cuối tháng bằng số bàn giao', async () => {
+    await db.delete(meterReadings).where(and(eq(meterReadings.meterId, meterId), eq(meterReadings.period, '2026-11')))
+    await db.insert(meterReadings).values({ meterId, period: '2026-11', readOn: '2026-11-21', value: 200, kind: 'handover' })
+    await updateInvoiceMeterReading(db, ctx(), invoiceId, { leaseFeeId: feeId, value: 200 })
+    const rows = await db.select().from(meterReadings).where(and(eq(meterReadings.meterId, meterId), eq(meterReadings.period, '2026-11')))
+    expect(rows.map(r => r.kind).sort()).toEqual(['handover', 'monthly'])
+    expect(rows.find(r => r.kind === 'monthly')?.value).toBe(200)
+  })
   it('hoá đơn tháng sau đã duyệt dùng số này thì từ chối', async () => {
     await db.insert(invoices).values({ code: 'TD-HD-202701-0001', leaseId, facilityId, kind: 'monthly', periodStart: '2027-01-01', periodEnd: '2027-01-31', issueDate: '2027-01-01', status: 'approved' })
     await expect(updateInvoiceMeterReading(db, ctx(), invoiceId, { leaseFeeId: feeId, value: 260 })).rejects.toThrow(ValidationError)

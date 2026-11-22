@@ -354,9 +354,9 @@ export async function updateInvoiceMeterReading(db: DB, ctx: AccessContext, invo
     if (!recent.includes(period)) throw new ValidationError('Chỉ sửa được chỉ số của 3 tháng liền trước tháng hoá đơn')
     const from = `${period}-01`, to = `${period}-${String(new Date(Date.UTC(Number(period.slice(0, 4)), Number(period.slice(5)), 0)).getUTCDate()).padStart(2, '0')}`
     const sameKind = (await tx.select().from(meters).where(eq(meters.roomId, meter.roomId))).filter(m => meter.utility === 'fee' ? m.id === meter.id : m.utility === meter.utility)
-    const handover = await tx.select({ id: meterReadings.id }).from(meterReadings).where(and(eq(meterReadings.meterId, meter.id), eq(meterReadings.kind, 'handover'), sql`${meterReadings.readOn} >= ${from}`, sql`${meterReadings.readOn} <= ${to}`)).limit(1)
     const replaced = sameKind.some(m => m.id !== meter.id && ((m.removedOn && m.removedOn >= from) || m.installedOn >= from))
-    if (meter.removedOn || replaced || handover.length) throw new ValidationError('Đồng hồ có thay đổi hoặc chỉ số bàn giao trong tháng, hãy sửa ở tab Chỉ số')
+    // Chỉ số bàn giao độc lập với chuỗi chỉ số tháng: có bàn giao trong tháng vẫn chốt được số cuối tháng (kiểm số giảm đã có ở applyReadings)
+    if (meter.removedOn || replaced) throw new ValidationError('Đồng hồ có thay đổi trong tháng, hãy sửa ở tab Chỉ số')
     // Chỉ số tháng P là số cuối của hoá đơn tháng P+1 và số đầu của hoá đơn tháng P+2; hoá đơn khác đã duyệt thì không đổi số
     const users = [nextMonthOf(period), nextMonthOf(nextMonthOf(period))]
     const approved = await tx.select({ id: invoices.id, periodStart: invoices.periodStart }).from(invoices).where(and(eq(invoices.leaseId, inv.leaseId), eq(invoices.status, 'approved')))
