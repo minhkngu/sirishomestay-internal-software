@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
 import {
+  meters,
   feeTypes,
   feeUnits,
   leaseFeeMeters,
@@ -104,7 +105,6 @@ describe('sửa và xoá hợp đồng', () => {
       .returning()
     const { lease } = await contracts.createLease(db, admin, {
       ...input(),
-      feeModel: 'snapshot',
       fees: [{ feeTypeId: giat.id, name: 'x', unit: 'x', quantitySource: 'room', unitPrice: 50_000 }],
     })
     const [old] = await db.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, lease.id))
@@ -152,19 +152,32 @@ describe('sửa và xoá hợp đồng', () => {
     await contracts.updateLease(db, admin, lease.id, input(), false)
     expect(await db.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, lease.id))).toHaveLength(1)
   })
-  it('thêm phí điện theo đồng hồ khi sửa hợp đồng: bắt buộc chỉ số đầu, gắn đồng hồ mới; hợp đồng cũ bị từ chối', async () => {
+  it('thêm phí điện theo đồng hồ khi sửa hợp đồng: bắt buộc chọn đồng hồ của phòng và chỉ số đầu', async () => {
     const [unit] = await db.insert(feeUnits).values({ name: 'kWh' }).returning()
     const [dien] = await db
       .insert(feeTypes)
       .values({ name: 'Điện', unitId: unit.id, defaultPrice: 3500, billing: 'per_occurrence', quantityFrom: 'meter' })
       .returning()
-    const { lease } = await contracts.createLease(db, admin, { ...input(), feeModel: 'snapshot', fees: [] })
+    const { lease } = await contracts.createLease(db, admin, { ...input(), fees: [] })
+    const [meter] = await db
+      .insert(meters)
+      .values({ roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 })
+      .returning()
     await expect(
       contracts.updateLease(
         db,
         admin,
         lease.id,
-        { ...input(), fees: [{ feeTypeId: dien.id, unitPrice: 3500 }] },
+        { ...input(), fees: [{ feeTypeId: dien.id, unitPrice: 3500, initialReading: 120 }] },
+        false,
+      ),
+    ).rejects.toThrow('Chọn đồng hồ')
+    await expect(
+      contracts.updateLease(
+        db,
+        admin,
+        lease.id,
+        { ...input(), fees: [{ feeTypeId: dien.id, unitPrice: 3500, existingMeterId: meter.id }] },
         false,
       ),
     ).rejects.toThrow('chỉ số')
@@ -172,44 +185,12 @@ describe('sửa và xoá hợp đồng', () => {
       db,
       admin,
       lease.id,
-      { ...input(), fees: [{ feeTypeId: dien.id, unitPrice: 3500, initialReading: 120 }] },
+      { ...input(), fees: [{ feeTypeId: dien.id, unitPrice: 3500, initialReading: 120, existingMeterId: meter.id }] },
       false,
     )
     const [fee] = await db.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, lease.id))
     expect([fee.name, fee.quantitySource, fee.unitPrice]).toEqual(['Điện', 'meter', 3500])
     expect(await db.select().from(leaseFeeMeters).where(eq(leaseFeeMeters.leaseFeeId, fee.id))).toHaveLength(1)
-    // hợp đồng kiểu cũ: tự chuyển sang bản chụp phí khi thêm phí điện, giữ phí cũ
-    const room2 = (await db.insert(rooms).values({ facilityId, code: '102' }).returning())[0].id
-    const [giat] = await db
-      .insert(feeTypes)
-      .values({ name: 'Giặt', unitId: unit.id, defaultPrice: 50_000, quantityFrom: 'room' })
-      .returning()
-    const legacy = await contracts.createLease(db, admin, {
-      ...input(),
-      roomId: room2,
-      fees: [{ feeTypeId: giat.id, quantity: 1, unitPrice: 50_000 }] as never,
-    })
-    const [oldFee] = await contracts.getLease(db, admin, legacy.lease.id).then((l) => l.fees)
-    await contracts.updateLease(
-      db,
-      admin,
-      legacy.lease.id,
-      {
-        ...input(),
-        roomId: room2,
-        fees: [
-          { leaseFeeId: oldFee.leaseFeeId, unitPrice: 55_000 },
-          { feeTypeId: dien.id, unitPrice: 3500, initialReading: 10 },
-        ],
-      },
-      false,
-    )
-    const rows = await db.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, legacy.lease.id))
-    expect(rows.map((r) => [r.name, r.unitPrice]).sort()).toEqual([
-      ['Giặt', 55_000],
-      ['Điện', 3500],
-    ])
-    expect((await db.select().from(leases).where(eq(leases.id, legacy.lease.id)))[0].feeModel).toBe('snapshot')
   })
   it('cập nhật tài sản trong phòng của hợp đồng: thêm, tạo mới, chuyển về kho, thanh lý', async () => {
     const { lease } = await contracts.createLease(db, admin, input())

@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useTransition, type ReactNode } from 'react'
+import { FileDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { exportContractAction } from '../../server/contracts/actions'
 
 export type TemplateOption = { id: string; name: string; isDefault: boolean }
@@ -16,6 +18,7 @@ export function ExportMenu({
   actionSlot,
   hideTemplateSelect,
   compact,
+  bare,
 }: {
   kind: 'lease' | 'deposit'
   id: string
@@ -29,6 +32,8 @@ export function ExportMenu({
   hideTemplateSelect?: boolean
   /** Chỉ hiện nút Tải Word, không khung và tiêu đề. */
   compact?: boolean
+  /** Chỉ hiện hàng chọn mẫu + nút xuất, không khung và tiêu đề (đặt trong panel có sẵn). */
+  bare?: boolean
 }) {
   const [pending, start] = useTransition()
   const [templateId, setTemplateId] = useState(
@@ -57,54 +62,89 @@ export function ExportMenu({
     return (
       <span className="flex items-center gap-2">
         {templates.length > 0 && (
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => doExport('docx')}
-            className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
-          >
+          <Button type="button" size="sm" variant="outline" disabled={pending} onClick={() => doExport('docx')}>
+            <FileDown className="size-3.5" />
             {pending ? 'Đang xuất…' : 'Tải Word'}
-          </button>
+          </Button>
         )}
         {error && <span className="text-xs text-destructive">{error}</span>}
       </span>
     )
 
-  return (
-    <section className="space-y-2 rounded-lg border bg-card p-4">
-      <h2 className="font-medium">Xuất giấy tờ</h2>
+  if (bare)
+    return (
       <div className="flex flex-wrap items-center gap-2">
         {templates.length > 0 && !hideTemplateSelect && (
-          <select
-            aria-label="Chọn mẫu"
+          <Select
             value={templateId}
-            onChange={(e) => setTemplateId(e.target.value)}
-            className="h-8 rounded-lg border px-2 text-sm"
+            onValueChange={(value) => value && setTemplateId(value)}
+            items={templates.map((t) => ({ value: t.id, label: `${t.name}${t.isDefault ? ' (mặc định)' : ''}` }))}
           >
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-                {t.isDefault ? ' (mặc định)' : ''}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger aria-label="Chọn mẫu" className="h-9 min-w-56 border-border/80 bg-card text-[13px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {templates.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.name}
+                  {t.isDefault ? ' (mặc định)' : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         )}
         {templateSlot}
+        {templates.length > 0 && (
+          <Button type="button" size="sm" variant="outline" disabled={pending} onClick={() => doExport('docx')}>
+            <FileDown className="size-3.5" />
+            {pending ? 'Đang xuất…' : 'Xuất Word'}
+          </Button>
+        )}
+        {actionSlot}
+        {templates.length === 0 && (
+          <p className="text-sm text-muted-foreground">Chưa có mẫu Word cho loại giấy tờ này.</p>
+        )}
+        {msg && <p className="w-full text-sm text-primary">{msg}</p>}
+        {error && <p className="w-full text-sm text-destructive">{error}</p>}
+      </div>
+    )
+
+  return (
+    <section className="space-y-3 rounded-2xl border border-border/80 bg-card p-5">
+      <h2 className="text-sm font-semibold text-foreground">Xuất giấy tờ</h2>
+      <div className="flex flex-wrap items-center gap-2">
+        {templates.length > 0 && !hideTemplateSelect && (
+          <Select
+            value={templateId}
+            onValueChange={(value) => value && setTemplateId(value)}
+            items={templates.map((t) => ({ value: t.id, label: `${t.name}${t.isDefault ? ' (mặc định)' : ''}` }))}
+          >
+            <SelectTrigger aria-label="Chọn mẫu" className="h-9 min-w-56 border-border/80 bg-card text-[13px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {templates.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.name}
+                  {t.isDefault ? ' (mặc định)' : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        {templateSlot}
+        {templates.length > 0 && (
+          <Button size="sm" disabled={pending} onClick={() => doExport('docx')}>
+            <FileDown className="size-3.5" />
+            {pending ? 'Đang xuất…' : 'Xuất Word'}
+          </Button>
+        )}
+        {actionSlot}
       </div>
       {templates.length === 0 && (
         <p className="text-sm text-muted-foreground">Chưa có mẫu Word cho loại giấy tờ này (Cài đặt → Mẫu giấy tờ).</p>
       )}
-      <div className="flex flex-wrap items-center gap-2">
-        {templates.length > 0 && (
-          <>
-            <Button size="sm" disabled={pending} onClick={() => doExport('docx')}>
-              Xuất Word
-            </Button>
-          </>
-        )}
-        {actionSlot}
-      </div>
-      {msg && <p className="text-sm text-green-700">{msg}</p>}
+      {msg && <p className="text-sm text-primary">{msg}</p>}
       {error && <p className="text-sm text-destructive">{error}</p>}
     </section>
   )
