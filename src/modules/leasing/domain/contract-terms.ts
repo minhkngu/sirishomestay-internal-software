@@ -5,7 +5,6 @@ import type { Addendum, ISODate, Lease, LeaseTerms } from '@/domain/types'
 export function contractTermsAt(lease: Lease, addenda: Addendum[], date: ISODate): LeaseTerms {
   const t: LeaseTerms = {
     billingCycleMonths: lease.billingCycleMonths ?? 1,
-    billWaterByMeter: lease.billWaterByMeter ?? true,
     roomId: lease.roomId,
     startDate: lease.startDate,
     endDate: lease.endDate,

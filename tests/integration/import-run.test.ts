@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { facilities, rooms, tenants, auditLogs } from '@/db'
+import { facilities, rooms, tenants, auditLogs, meters } from '@/db'
 import { parseWorkbook } from '@/lib/excel'
 import { suggestMapping } from '@/modules/import/domain/targets'
 import { validateRows } from '@/modules/import/server/import/validate'
@@ -55,6 +55,13 @@ describe('runImport', () => {
     expect(await db.select().from(rooms)).toHaveLength(3)
     const [r] = await db.select().from(rooms).where(eq(rooms.code, '102'))
     expect(r.listPrice).toBe(5500000)
+  })
+
+  it('nhập Excel tạo phòng mới cũng có đủ hai công tơ, chạy lại không tạo thêm', async () => {
+    const { valid } = await load(await roomsWorkbook(), 'rooms')
+    await runImport(db, admin, 'rooms', valid)
+    await runImport(db, admin, 'rooms', valid)
+    expect(await db.select().from(meters)).toHaveLength(3 * 2)
   })
 
   it('nhập khách: lần 2 created 0; đổi SĐT rồi chạy lại → updated 1', async () => {
