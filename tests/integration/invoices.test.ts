@@ -9,7 +9,6 @@ import {
   tenants,
   meters,
   meterReadings,
-  utilityRates,
   auditLogs,
   files,
   invoices,
@@ -79,7 +78,6 @@ describe('hoá đơn và thu tiền', () => {
   })
   it('lưu số lượng phí theo kỳ vào hóa đơn nháp và từ chối sửa sau duyệt', async () => {
     const ctx = context(['billing'], facilityId)
-    await db.update(leases).set({ feeModel: 'snapshot' }).where(eq(leases.id, leaseId))
     const [fee] = await db
       .insert(leaseFeeSnapshots)
       .values({ leaseId, name: 'Dọn', unit: 'lần', quantitySource: 'period_input', unitPrice: 7000 })
@@ -112,7 +110,6 @@ describe('hoá đơn và thu tiền', () => {
 
   it('không duyệt hóa đơn snapshot khi thiếu số lượng phí', async () => {
     const ctx = context(['billing'], facilityId)
-    await db.update(leases).set({ feeModel: 'snapshot' }).where(eq(leases.id, leaseId))
     const [fee] = await db
       .insert(leaseFeeSnapshots)
       .values({ leaseId, name: 'Dọn', unit: 'lần', quantitySource: 'period_input', unitPrice: 7000 })
@@ -125,7 +122,6 @@ describe('hoá đơn và thu tiền', () => {
 
   it('không cho sửa hoặc xóa dòng phí snapshot trực tiếp trong hóa đơn', async () => {
     const ctx = context(['billing'], facilityId)
-    await db.update(leases).set({ feeModel: 'snapshot' }).where(eq(leases.id, leaseId))
     const [fee] = await db
       .insert(leaseFeeSnapshots)
       .values({ leaseId, name: 'Dọn', unit: 'lần', quantitySource: 'period_input', unitPrice: 7000 })
@@ -154,7 +150,7 @@ describe('hoá đơn và thu tiền', () => {
 
   it('giữ thành tiền phí theo kỳ lẻ khi sửa mô tả hóa đơn', async () => {
     const ctx = context(['billing'], facilityId)
-    await db.update(leases).set({ feeModel: 'snapshot', startDate: '2026-12-16' }).where(eq(leases.id, leaseId))
+    await db.update(leases).set({ startDate: '2026-12-16' }).where(eq(leases.id, leaseId))
     const [fee] = await db
       .insert(leaseFeeSnapshots)
       .values({ leaseId, name: 'Phòng', unit: 'phòng', quantitySource: 'room', unitPrice: 300000 })
@@ -184,7 +180,6 @@ describe('hoá đơn và thu tiền', () => {
 
   it('đổi tháng hóa đơn yêu cầu nhập lại số lượng theo kỳ', async () => {
     const ctx = context(['billing'], facilityId)
-    await db.update(leases).set({ feeModel: 'snapshot' }).where(eq(leases.id, leaseId))
     const [fee] = await db
       .insert(leaseFeeSnapshots)
       .values({ leaseId, name: 'Dọn', unit: 'lần', quantitySource: 'period_input', unitPrice: 7000 })
@@ -199,7 +194,6 @@ describe('hoá đơn và thu tiền', () => {
 
   it('hóa đơn phí đồng hồ dùng đúng đơn giá hợp đồng, không cộng điện nước ngầm', async () => {
     const ctx = context(['billing'], facilityId)
-    await db.update(leases).set({ feeModel: 'snapshot' }).where(eq(leases.id, leaseId))
     const [fee] = await db
       .insert(leaseFeeSnapshots)
       .values({ leaseId, name: 'Bất kỳ', unit: 'đơn vị', quantitySource: 'meter', unitPrice: 5000 })
@@ -225,9 +219,18 @@ describe('hoá đơn và thu tiền', () => {
       { meterId: meter.id, period: '2026-10', readOn: '2026-10-31', value: 100 },
       { meterId: meter.id, period: '2026-11', readOn: '2026-11-30', value: 200 },
     ])
-    await db
-      .insert(utilityRates)
-      .values({ facilityId, utility: 'electric', effectiveFrom: '2026-01-01', pricePerUnit: 3500 })
+    const [electricFee] = await db
+      .insert(leaseFeeSnapshots)
+      .values({
+        leaseId,
+        name: 'Điện',
+        unit: 'kWh',
+        quantitySource: 'meter',
+        billing: 'per_occurrence',
+        unitPrice: 3500,
+      })
+      .returning()
+    await db.insert(leaseFeeMeters).values({ leaseFeeId: electricFee.id, meterId: meter.id })
     await addOneOff(db, ctx, leaseId, {
       kind: 'service',
       description: 'Giặt ủi',
@@ -238,7 +241,7 @@ describe('hoá đơn và thu tiền', () => {
     const rows = await createDrafts(db, ctx, { facilityId, period: '2026-12' })
     expect(rows).toHaveLength(1)
     expect(rows[0].lines.map((line: { type: string }) => line.type)).toEqual(
-      expect.arrayContaining(['rent', 'electric', 'one_off']),
+      expect.arrayContaining(['rent', 'fee', 'one_off']),
     )
     expect(await createDrafts(db, ctx, { facilityId, period: '2026-12' })).toHaveLength(0)
     await setPeriod(db, ctx, rows[0].id, { start: '2026-12-01', end: '2027-02-28' })

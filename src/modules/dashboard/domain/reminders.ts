@@ -49,6 +49,16 @@ export const MAX_ITEMS = 8
 
 const daysBetween = (a: string, b: string) =>
   Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000)
+/** Ngày kết thúc hợp đồng là sáng khách dọn đi (ở hết ngày liền trước): đến ngày đó là khẩn, quá ngày đó là quá hạn. */
+const departureNote = (endDate: string, today: string) => {
+  const left = daysBetween(today, endDate)
+  return left > 0
+    ? `dọn đi sáng ${formatDateVN(endDate)}`
+    : left === 0
+      ? 'dọn đi sáng nay'
+      : `quá hạn ${-left} ngày (dọn đi sáng ${formatDateVN(endDate)})`
+}
+
 export function buildReminders(s: Snapshot, ctx: AccessContext, today: string, settings: ReminderSettings): Reminder[] {
   const out: Reminder[] = []
   const add = (kind: ReminderKind, title: string, href: string, items: ReminderItem[]) => {
@@ -99,9 +109,9 @@ export function buildReminders(s: Snapshot, ctx: AccessContext, today: string, s
       .sort((a, b) => a.endDate.localeCompare(b.endDate))
       .map((l) => ({
         label: `${l.code} · phòng ${l.roomCode}`,
-        sub: `${l.tenantName} · hết hạn ${formatDateVN(l.endDate)}`,
+        sub: `${l.tenantName} · ${departureNote(l.endDate, today)}`,
         href: `/contracts/${l.id}`,
-        severity: l.endDate < today ? ('danger' as const) : ('warning' as const),
+        severity: l.endDate <= today ? ('danger' as const) : ('warning' as const),
       })),
   )
   add(

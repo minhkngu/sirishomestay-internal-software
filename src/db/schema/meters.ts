@@ -10,12 +10,19 @@ export const meters = pgTable('meters', {
     .notNull()
     .references(() => rooms.id),
   utility: text('utility').notNull(),
+  /** Tên đồng hồ trong phòng (Điện, Nước, Máy giặt...), hiện ở mọi nơi chọn hoặc liệt kê đồng hồ. */
+  name: text('name').notNull().default(''),
+  /** Mã định danh tự sinh, duy nhất toàn hệ thống: DH-<mã toà>-<mã phòng>-<số thứ tự trong phòng>. */
+  code: text('code').unique(),
   feeTypeId: uuid('fee_type_id').references(() => feeTypes.id), // electric | water
   serial: text('serial'),
   installedOn: date('installed_on', { mode: 'string' }).notNull(),
   startReading: integer('start_reading').notNull().default(0),
   removedOn: date('removed_on', { mode: 'string' }),
   finalReading: integer('final_reading'),
+  /** Chỉ số cuối do nhân viên ước tính (công tơ hỏng, không đọc được), kèm lý do. */
+  finalReadingEstimated: boolean('final_reading_estimated').notNull().default(false),
+  estimateNote: text('estimate_note'),
   isDemo: boolean('is_demo').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

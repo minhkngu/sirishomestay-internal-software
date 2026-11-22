@@ -83,7 +83,7 @@ export async function updateLease(
       if (!template || template.docType !== 'lease' || !template.body)
         throw new ValidationError('Mẫu hợp đồng không hợp lệ hoặc chưa sẵn sàng')
     }
-    if (input.fees !== undefined) await applyLeaseFeeEdits(tx, ctx, id, before.feeModel, input.fees, input.roomId)
+    if (input.fees !== undefined) await applyLeaseFeeEdits(tx, ctx, id, input.fees, input.roomId)
     await captureContractVersion(tx, ctx, 'lease', id, 'edit')
     const [after] = await tx
       .update(leases)

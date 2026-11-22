@@ -63,10 +63,12 @@ type Props = {
   deferCreate?: boolean
   /** Chỉ cho chọn các loại khách này (mặc định cả ba). */
   kinds?: Kind[]
+  /** Bỏ khung card khi form đã nằm trong popup. */
+  bare?: boolean
   tenant?: { id: string; kind: Kind; homeFacilityId: string; note: string } & Record<string, string | null>
 }
 
-export function TenantForm({ facilities, tenant, onCreated, kinds, deferCreate }: Props) {
+export function TenantForm({ facilities, tenant, onCreated, kinds, deferCreate, bare = false }: Props) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [kind, setKind] = useState<Kind>(tenant?.kind ?? kinds?.[0] ?? 'foreign')
@@ -124,7 +126,7 @@ export function TenantForm({ facilities, tenant, onCreated, kinds, deferCreate }
   }
 
   return (
-    <div className="max-w-2xl space-y-4 rounded-lg border bg-card p-4 sm:p-6">
+    <div className={bare ? 'space-y-4' : 'max-w-2xl space-y-4 rounded-lg border bg-card p-4 sm:p-6'}>
       <div className="flex flex-wrap gap-2" role="tablist">
         {(kinds ?? (Object.keys(TENANT_KIND_LABELS) as Kind[])).map((k) => (
           <button

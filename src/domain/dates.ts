@@ -55,6 +55,14 @@ export function addDays(iso: string, n: number): string {
   return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`
 }
 
+/** Cộng/trừ tháng, giữ nguyên ngày; tháng đích ngắn hơn thì lấy ngày cuối tháng. */
+export function addMonths(iso: string, n: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const target = new Date(Date.UTC(y, m - 1 + n, 1))
+  const last = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate()
+  return `${target.getUTCFullYear()}-${pad(target.getUTCMonth() + 1)}-${pad(Math.min(d, last))}`
+}
+
 const toUtc = (iso: string) => {
   const [y, m, d] = iso.split('-').map(Number)
   return Date.UTC(y, m - 1, d)
