@@ -7,17 +7,13 @@ import { MoneyInput } from '@/components/ui/money-input'
 import { availableMeters, resolveMeterIds } from '../lease-fee-meters'
 import { BareSelect } from './contract-form-ui'
 import { FeePickerDialog, type FeeOption } from '@/components/fee-picker-dialog'
+import { FEE_SOURCE_LABEL } from '../fee-source-label'
 
 export type { FeeOption }
 export type RoomFeeMeter = { id: string; roomId: string; label: string; utility: 'electric' | 'water' | 'fee'; busy: boolean }
 export type FeeDraft = { key: string; feeTypeId: string | null; name: string; unit: string; quantitySource: 'occupants' | 'room' | 'meter' | 'period_input'; price: string; quantity: string; initialReading: string; existingMeterId?: string; legacyFixed?: boolean }
 
-const sourceLabel: Record<FeeDraft['quantitySource'], string> = {
-  occupants: 'Theo số người ở',
-  room: 'Theo phòng',
-  meter: 'Theo đồng hồ',
-  period_input: 'Nhập số lượng mỗi kỳ',
-}
+const sourceLabel: Record<FeeDraft['quantitySource'], string> = FEE_SOURCE_LABEL
 
 export function LeaseFees({ feeTypes, roomMeters, roomId, fees, onChange, onAddCommon, renderCreateFee, onCreated, facilityId }: { facilityId?: string; renderCreateFee?: (p: { onCreated: (fee: FeeOption) => void }) => ReactNode; onCreated?: (fee: FeeOption) => void; feeTypes: FeeOption[]; roomMeters: RoomFeeMeter[]; roomId: string; fees: FeeDraft[]; onChange: (fees: FeeDraft[]) => void; onAddCommon: (id: string) => void }) {
   const [adding, setAdding] = useState(false)

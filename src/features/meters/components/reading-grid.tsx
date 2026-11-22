@@ -6,12 +6,13 @@ import { useRef, useState, useTransition } from 'react'
 import { MoreHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { formatDateVN } from '@/domain/dates'
 import { cn } from '@/lib/utils'
 import { saveReadingsAction } from '@/server/meters/actions'
 import { meterTypeName } from '../meter-types'
 import { ReplaceMeterDialog } from './replace-meter-dialog'
 
-export type GridCell = { meterId: string; serial: string | null; previous: number; current: number | null; usage: number | null; abnormal: boolean; replaced: boolean }
+export type GridCell = { meterId: string; serial: string | null; previous: number; previousReadOn: string; previousKind: 'monthly' | 'handover' | 'start'; current: number | null; usage: number | null; abnormal: boolean; replaced: boolean }
 export type GridRow = { roomId: string; roomCode: string; floor?: string | null; occupied?: boolean; electric: GridCell | null; water: GridCell | null; feeMeters?: Array<{ name: string; cell: GridCell }> }
 
 const fmt = (value: number) => value.toLocaleString('vi-VN')
@@ -85,9 +86,8 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, unitByType = {}
     return list.map((item, i) => ({ ...item, first: i === 0 }))
   })
   const [yy, mm] = period.split('-').map(Number)
-  const prev = new Date(Date.UTC(yy, mm - 2, 1))
   const closingLabel = `Tháng ${mm}/${yy}`
-  const openingLabel = `Tháng ${prev.getUTCMonth() + 1}/${prev.getUTCFullYear()}`
+  const openingDate = (cell: GridCell) => `${cell.previousKind === 'start' ? 'lúc lắp' : 'chốt'} ${formatDateVN(cell.previousReadOn)}`
 
   function closingInput(item: Item) {
     const cell = item.cell!
@@ -153,7 +153,7 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, unitByType = {}
               ? 'Kỳ này chưa có đồng hồ để ghi.'
               : <>Đã ghi <strong className="font-medium text-foreground">{recorded}/{progressCells.length}</strong> đồng hồ {roomFiltered ? 'trong phòng đang xem' : 'trên phòng có người ở'}{abnormal > 0 && <span className="text-amber-800"> · {abnormal} bất thường</span>}.</>}
           </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">Số đầu kỳ là số chốt {openingLabel.replace('Tháng ', 'tháng ')}; số cuối kỳ là số chốt {closingLabel.replace('Tháng ', 'tháng ')}.</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Số đầu kỳ là lần chốt gần nhất trước kỳ; số cuối kỳ là số chốt {closingLabel.replace('Tháng ', 'tháng ')}.</p>
           {progressCells.length > 0 && (
             <div className="mt-2 h-1 w-44 overflow-hidden rounded-full bg-muted">
               <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${progressPct}%` }} />
@@ -187,7 +187,7 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, unitByType = {}
                     <tr className="text-xs text-muted-foreground">
                       <th className="px-4 py-2.5 text-left font-normal">Phòng</th>
                       <th className="px-4 py-2.5 text-left font-normal">Đồng hồ</th>
-                      <th className="px-4 py-2.5 text-right font-normal">Số đầu kỳ<div className="text-[11px] text-muted-foreground/80">chốt {openingLabel}</div></th>
+                      <th className="px-4 py-2.5 text-right font-normal">Số đầu kỳ<div className="text-[11px] text-muted-foreground/80">chốt gần nhất</div></th>
                       <th className="px-4 py-2.5 text-right font-medium text-foreground">Số cuối kỳ<div className="text-[11px] font-normal text-muted-foreground/80">{closingLabel}</div></th>
                       <th className="px-4 py-2.5 text-right font-normal">Tiêu thụ</th>
                       <th className="w-10 px-2 py-2.5" aria-label="Thao tác" />
@@ -203,7 +203,7 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, unitByType = {}
                         </td>
                         {item.cell ? (
                           <>
-                            <td className="px-4 py-2.5 text-right align-top tabular-nums text-muted-foreground"><div className="pt-2">{fmt(item.cell.previous)}</div></td>
+                            <td className="px-4 py-2.5 text-right align-top tabular-nums text-muted-foreground"><div className="pt-2">{fmt(item.cell.previous)}</div><div className="text-[11px] text-muted-foreground/80">{openingDate(item.cell)}</div></td>
                             <td className="px-4 py-2.5 text-right align-top">{closingInput(item)}</td>
                             <td className="px-4 py-2.5 text-right align-top tabular-nums text-foreground">
                               <div className="pt-2">{usageOf(item.cell) != null ? <>{fmt(usageOf(item.cell)!)}{item.unit && <span className="ml-1 text-[11px] text-muted-foreground">{item.unit}</span>}</> : '—'}</div>
@@ -230,7 +230,7 @@ export function ReadingGrid({ rows, period, readOn, meterFilter, unitByType = {}
                     </div>
                     {item.cell ? (
                       <div className="grid grid-cols-3 items-start gap-2 text-xs">
-                        <div><div className="text-muted-foreground">Số đầu kỳ</div><div className="mt-1 h-9 pt-2 tabular-nums text-foreground">{fmt(item.cell.previous)}</div></div>
+                        <div><div className="text-muted-foreground">Số đầu kỳ</div><div className="mt-1 h-9 pt-2 tabular-nums text-foreground">{fmt(item.cell.previous)}</div><div className="text-[11px] text-muted-foreground/80">{openingDate(item.cell)}</div></div>
                         <div><div className="font-medium text-foreground">Số cuối kỳ</div><div className="mt-1">{closingInput(item)}</div></div>
                         <div className="text-right"><div className="text-muted-foreground">Tiêu thụ</div><div className="mt-1 h-9 pt-2 tabular-nums text-foreground">{usageOf(item.cell) != null ? fmt(usageOf(item.cell)!) : '—'}</div>{flags(item.cell)}</div>
                       </div>

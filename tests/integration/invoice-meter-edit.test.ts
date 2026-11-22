@@ -4,8 +4,9 @@ import { facilities, invoiceLines, invoices, leaseFeeMeters, leaseFeeSnapshots, 
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ForbiddenError, ValidationError } from '@/domain/errors'
-import { approveInvoice, createDrafts, getInvoiceDetail, updateInvoiceMeterReading } from '@/server/invoices/service'
+import { approveInvoice, createDrafts, deleteInvoice, getInvoiceDetail, updateInvoiceMeterReading } from '@/server/invoices/service'
 import { listReadingSheet } from '@/server/meters/service'
+import { updateLease } from '@/server/contracts/service'
 import { createTestDb } from '../helpers/db'
 
 const context = (permissions: Permission[], facilityId: string): AccessContext => ({ userId: crypto.randomUUID(), email: 'test@example.com', fullName: 'Test', permissions: new Set(permissions), facilityIds: new Set([facilityId]), isAdmin: false })
@@ -66,14 +67,22 @@ describe('sửa chỉ số điện trong hoá đơn', () => {
     expect((await electricLine()).amount).toBe(560000)
   })
 
+  it('chỉ số đầu của bảng đồng hồ lấy lần chốt từ ngày bắt đầu hợp đồng, bỏ qua lần chốt cũ hơn', async () => {
+    await db.insert(meterReadings).values([
+      { meterId, period: '2025-01', readOn: '2025-01-01', value: 500, kind: 'handover' },
+      { meterId, period: '2026-01', readOn: '2026-01-01', value: 1250, kind: 'handover' },
+    ])
+    const d = await getInvoiceDetail(db, ctx(), invoiceId)
+    expect(d.meterPanels[0].initial).toEqual({ value: 1250, readOn: '2026-01-01' })
+  })
   it('chi tiết hoá đơn liệt kê các chỉ số đã chốt của đồng hồ (3 tháng gần nhất), thiếu thì để trống', async () => {
     const d = await getInvoiceDetail(db, ctx(), invoiceId)
     expect(d.meterPanels).toHaveLength(1)
     expect(d.meterPanels[0]).toMatchObject({ leaseFeeId: feeId, name: 'Điện' })
     expect(d.meterPanels[0].rows).toEqual([
-      { period: '2026-09', readOn: null, value: null },
-      { period: '2026-10', readOn: '2026-10-31', value: 100 },
-      { period: '2026-11', readOn: '2026-11-30', value: 200 },
+      { period: '2026-09', readOn: null, value: null, opening: 0, openingSource: 'start' },
+      { period: '2026-10', readOn: '2026-10-31', value: 100, opening: 0, openingSource: 'start' },
+      { period: '2026-11', readOn: '2026-11-30', value: 200, opening: 100, openingSource: 'monthly' },
     ])
   })
   it('sửa chỉ số tháng đầu kỳ (tháng 10) trong hoá đơn tháng 12: lượng dùng tính lại', async () => {
@@ -88,5 +97,40 @@ describe('sửa chỉ số điện trong hoá đơn', () => {
   it('tháng ngoài 3 tháng gần nhất thì từ chối', async () => {
     await expect(updateInvoiceMeterReading(db, ctx(), invoiceId, { leaseFeeId: feeId, period: '2026-05', value: 10 })).rejects.toThrow(ValidationError)
     await expect(updateInvoiceMeterReading(db, ctx(), invoiceId, { leaseFeeId: feeId, period: '2026-12', value: 300 })).rejects.toThrow(ValidationError)
+  })
+})
+
+describe('sửa chỉ số đầu hợp đồng khi đã có hoá đơn', () => {
+  let db: DB, facilityId: string, leaseId: string, roomId: string, tenantId: string, meterId: string, feeId: string
+  const ctx = () => context(['billing', 'meters', 'tenants_contracts'], facilityId)
+  const electricLine = async (invoiceId: string) => (await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, invoiceId))).find(l => (l.meta as { leaseFeeId?: string } | null)?.leaseFeeId === feeId)!
+  beforeEach(async () => {
+    db = await createTestDb()
+    const [facility] = await db.insert(facilities).values({ code: 'TD', name: 'Thảo Điền' }).returning(); facilityId = facility.id
+    const [room] = await db.insert(rooms).values({ facilityId, code: '301' }).returning(); roomId = room.id
+    const [tenant] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: facilityId, fullName: 'Khách', phone: '+84901234567', idNumber: '012345678901' }).returning(); tenantId = tenant.id
+    const [lease] = await db.insert(leases).values({ code: 'HD1', roomId, tenantId, startDate: '2026-01-01', endDate: '2027-12-31', monthlyRent: 9000000, depositAmount: 9000000 }).returning(); leaseId = lease.id
+    const [meter] = await db.insert(meters).values({ roomId, utility: 'electric', installedOn: '2025-12-01', startReading: 0 }).returning(); meterId = meter.id
+    await db.insert(meterReadings).values([
+      { meterId, period: '2026-01', readOn: '2026-01-01', value: 1250, kind: 'handover' },
+      { meterId, period: '2026-01', readOn: '2026-01-31', value: 1300, kind: 'monthly' },
+    ])
+    const [fee] = await db.insert(leaseFeeSnapshots).values({ leaseId, name: 'Điện', unit: 'kWh', quantitySource: 'meter', billing: 'per_occurrence', unitPrice: 3500 }).returning(); feeId = fee.id
+    await db.insert(leaseFeeMeters).values({ leaseFeeId: feeId, meterId })
+  })
+
+  it('hoá đơn đã lập giữ số cũ, xoá và lập lại thì dùng chỉ số đầu mới', async () => {
+    const [old] = await createDrafts(db, context(['billing'], facilityId), { facilityId, period: '2026-02' })
+    expect((await electricLine(old.id)).quantity).toBe(50)
+
+    await updateLease(db, ctx(), leaseId, {
+      roomId, tenantId, startDate: '2026-01-01', endDate: '2027-12-31', monthlyRent: 9000000, depositAmount: 9000000,
+      fees: [{ leaseFeeId: feeId, unitPrice: 3500, existingMeterId: meterId, initialReading: 1280 }],
+    }, false)
+    expect((await electricLine(old.id)).quantity).toBe(50)
+
+    await deleteInvoice(db, context(['billing'], facilityId), old.id)
+    const [fresh] = await createDrafts(db, context(['billing'], facilityId), { facilityId, period: '2026-02' })
+    expect((await electricLine(fresh.id)).quantity).toBe(20)
   })
 })

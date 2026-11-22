@@ -113,7 +113,6 @@ const CONTENT: Record<TemplateDocType, Content> = {
     intro: ['Hôm nay, ngày [ngay_ban_giao], Bên A bàn giao phòng [so_phong] tại cơ sở [co_so] cho Bên B theo hợp đồng [ma_hop_dong].', BEN_A, BEN_B],
     articles: [
       { t: 'Tài sản bàn giao', p: ['@bang:tai_san'] },
-      { t: 'Chỉ số điện, nước lúc nhận phòng', p: ['@bang:chi_so'] },
       { t: 'Xác nhận', p: ['Hai bên đã cùng kiểm tra và thống nhất tình trạng tài sản như trên. Biên bản lập thành hai bản, mỗi bên giữ một bản.'] },
     ],
     sign: ['Bên giao (Siris)', 'Bên nhận (khách thuê)'],
@@ -124,7 +123,6 @@ const CONTENT: Record<TemplateDocType, Content> = {
     intro: ['Hôm nay, ngày [ngay_ban_giao], Bên B trả lại phòng [so_phong] tại cơ sở [co_so] cho Bên A theo hợp đồng [ma_hop_dong].', BEN_A, BEN_B],
     articles: [
       { t: 'Tài sản khi trả phòng', p: ['@bang:tai_san'] },
-      { t: 'Chỉ số điện, nước lúc trả phòng', p: ['@bang:chi_so'] },
       { t: 'Tiền phạt', p: ['Tổng tiền phạt do hư hỏng hoặc mất tài sản: [tong_phat].'] },
       { t: 'Xác nhận', p: ['Hai bên đã cùng kiểm tra và thống nhất tình trạng tài sản như trên. Biên bản lập thành hai bản, mỗi bên giữ một bản.'] },
     ],

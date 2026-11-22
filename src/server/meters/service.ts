@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
 import { facilities, invoices, leaseFeeMeters, leaseFeeSnapshots, leases, meterReadings, meters, rooms } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, can, type AccessContext } from '@/domain/access'
@@ -29,7 +29,10 @@ const toReading = (r: typeof meterReadings.$inferSelect): MeterReading => ({ met
 export type MeterCell = {
   meterId: string
   serial: string | null
+  /** Số đầu kỳ: lần chốt gần nhất (tháng hoặc bàn giao) trước cuối kỳ, không có thì chỉ số lúc lắp. */
   previous: number
+  previousReadOn: string
+  previousKind: 'monthly' | 'handover' | 'start'
   current: number | null
   usage: number | null
   abnormal: boolean
@@ -72,10 +75,14 @@ export async function listReadingSheet(db: DB, ctx: AccessContext, facilityId: s
     const rs = allReadings.map(toReading)
     const active = ms.find((m) => !m.removedOn) ?? ms[ms.length - 1]
     const mine = rs.filter((r) => r.meterId === active.id).sort((a, b) => (a.readOn < b.readOn ? -1 : 1))
-    const before = mine.filter((r) => r.readOn < start)
-    const previous = before.length ? before[before.length - 1].value : active.startReading
+    // Số đầu kỳ là lần chốt gần nhất trước cuối kỳ, trừ dòng chốt tháng của chính kỳ đang ghi
+    const checkpoints = mine.filter((r) => r.readOn <= end && !(r.period === period && r.kind === 'monthly'))
+    const latest = checkpoints[checkpoints.length - 1]
+    const previous = latest?.value ?? active.startReading
+    const previousReadOn = latest?.readOn ?? active.installedOn
+    const previousKind: MeterCell['previousKind'] = latest?.kind ?? 'start'
     const currentReading = mine.find((r) => r.period === period && r.kind !== 'handover')
-    const { usage } = safeUsage(ms, rs, start, end)
+    const { usage: replacedUsage } = safeUsage(ms, rs, start, end)
     const history: number[] = []
     for (let i = 1; i <= 3; i++) {
       const p = shiftPeriod(period, -i)
@@ -85,7 +92,9 @@ export async function listReadingSheet(db: DB, ctx: AccessContext, facilityId: s
     }
     const avg = history.length ? history.reduce((a, b) => a + b, 0) / history.length : 0
     const replaced = ms.length > 1 && ms.some((m) => (m.removedOn && m.removedOn >= start && m.removedOn <= end) || (m.installedOn >= start && m.installedOn <= end && m.id !== ms[0].id))
-    return { meterId: active.id, serial: active.serial ?? null, previous, current: currentReading?.value ?? null, usage, abnormal: usage != null && avg > 0 && usage > 2 * avg, replaced }
+    // Thay đồng hồ giữa kỳ thì mức dùng cộng phần đồng hồ cũ; không thay thì lấy số cuối trừ số đầu của cùng đồng hồ
+    const usage = replaced ? replacedUsage : currentReading ? Math.max(currentReading.value - previous, 0) : null
+    return { meterId: active.id, serial: active.serial ?? null, previous, previousReadOn, previousKind, current: currentReading?.value ?? null, usage, abnormal: usage != null && avg > 0 && usage > 2 * avg, replaced }
   }
 
   const feeIds = allMeters.filter(m => m.utility === 'fee' && !m.removedOn).map(m => m.id)
@@ -263,6 +272,59 @@ export async function ensureFeeMeter(tx: DB, ctx: AccessContext, input: { roomId
   return { id: found.id }
 }
 
+/** Sửa đồng hồ và chỉ số đầu của một phí theo đồng hồ trong transaction lưu hợp đồng. Không đụng hoá đơn đã lập. */
+export async function updateLeaseFeeMeter(tx: DB, ctx: AccessContext, input: { leaseId: string; leaseFeeId: string; roomId: string; meterId: string; initialReading: number; startDate: string }): Promise<void> {
+  const [fee] = await tx.select({ id: leaseFeeSnapshots.id, leaseId: leaseFeeSnapshots.leaseId, name: leaseFeeSnapshots.name, source: leaseFeeSnapshots.quantitySource }).from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.id, input.leaseFeeId))
+  if (!fee || fee.leaseId !== input.leaseId) throw new ValidationError('Phí không thuộc hợp đồng này')
+  if (fee.source !== 'meter') throw new ValidationError(`Phí ${fee.name} không tính theo đồng hồ`)
+  const [room] = await tx.select().from(rooms).where(eq(rooms.id, input.roomId))
+  if (!room) throw new NotFoundError()
+  assertCan(ctx, 'meters', room.facilityId)
+  const [meter] = await tx.select().from(meters).where(eq(meters.id, input.meterId)).for('update')
+  if (!meter || meter.roomId !== room.id || meter.removedOn) throw new ValidationError('Đồng hồ không thuộc phòng này hoặc đã được gỡ', { existingMeterId: 'Chọn đồng hồ của phòng' })
+  // Mỗi đồng hồ chỉ gắn một dòng phí của hợp đồng đang chạy khác
+  const [busy] = await tx.select({ id: leaseFeeMeters.leaseFeeId }).from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).innerJoin(leases, eq(leases.id, leaseFeeSnapshots.leaseId)).where(and(eq(leaseFeeMeters.meterId, meter.id), eq(leases.status, 'active'), ne(leases.id, input.leaseId)))
+  if (busy) throw new ValidationError('Đồng hồ đang gắn với phí của hợp đồng khác', { existingMeterId: 'Chọn đồng hồ khác' })
+  if (!Number.isSafeInteger(input.initialReading) || input.initialReading < 0 || input.initialReading > 2_147_483_647) throw new ValidationError('Nhập chỉ số ban đầu hợp lệ', { initialReading: 'Nhập chỉ số nguyên không âm' })
+
+  const [link] = await tx.select().from(leaseFeeMeters).where(eq(leaseFeeMeters.leaseFeeId, input.leaseFeeId))
+  // Ngày chốt của chỉ số đầu: lần chốt đầu của đồng hồ đang dùng từ ngày bắt đầu hợp đồng, không có thì ngày bắt đầu
+  const currentHandovers = link ? await tx.select().from(meterReadings).where(and(eq(meterReadings.meterId, link.meterId), eq(meterReadings.kind, 'handover'))).orderBy(asc(meterReadings.readOn)) : []
+  const readOn = currentHandovers.find((r) => r.readOn >= input.startDate)?.readOn ?? input.startDate
+  if (meter.installedOn > readOn) throw new ValidationError('Đồng hồ chưa được lắp vào ngày này', { initialReading: 'Chọn chỉ số từ ngày lắp đồng hồ' })
+
+  const readings = await tx.select().from(meterReadings).where(eq(meterReadings.meterId, meter.id))
+  const earlier = readings.filter((r) => r.readOn < readOn).sort((a, b) => (a.readOn < b.readOn ? 1 : -1))[0]
+  const later = readings.filter((r) => r.readOn > readOn).sort((a, b) => (a.readOn < b.readOn ? -1 : 1))[0]
+  // Không có lần chốt trước thì mốc dưới là chỉ số lúc lắp
+  const floor = earlier ? earlier.value : meter.startReading
+  if (input.initialReading < floor) throw new ValidationError(`Chỉ số đầu không được nhỏ hơn chỉ số lần chốt trước (${floor})`, { initialReading: `Không nhỏ hơn ${floor}` })
+  if (later && input.initialReading > later.value) throw new ValidationError(`Chỉ số đầu không được lớn hơn chỉ số lần chốt sau (${later.value})`, { initialReading: `Không lớn hơn ${later.value}` })
+  const sameDay = readings.find((r) => r.kind === 'handover' && r.readOn === readOn)
+
+  if (link && link.meterId === meter.id) {
+    if (sameDay) {
+      await tx.update(meterReadings).set({ value: input.initialReading, updatedAt: new Date() }).where(eq(meterReadings.id, sameDay.id))
+      await recordAudit(tx, ctx, { action: 'update', entity: 'meter_readings', entityId: sameDay.id, facilityId: room.facilityId, summary: `Sửa chỉ số đầu phí ${fee.name} đồng hồ phòng ${room.code}`, before: sameDay, after: { value: input.initialReading } })
+    } else if (!readings.some((r) => r.kind === 'handover')) {
+      // Dữ liệu cũ chưa có dòng chốt bàn giao: chỉ số đầu nằm ở đồng hồ
+      await tx.update(meters).set({ startReading: input.initialReading }).where(eq(meters.id, meter.id))
+      await recordAudit(tx, ctx, { action: 'update', entity: 'meter', entityId: meter.id, facilityId: room.facilityId, summary: `Sửa chỉ số đầu phí ${fee.name} đồng hồ phòng ${room.code}`, before: { startReading: meter.startReading }, after: { startReading: input.initialReading } })
+    } else {
+      const [created] = await tx.insert(meterReadings).values({ meterId: meter.id, period: readOn.slice(0, 7), kind: 'handover', readOn, value: input.initialReading }).returning()
+      await recordAudit(tx, ctx, { action: 'create', entity: 'meter_readings', entityId: created.id, facilityId: room.facilityId, summary: `Ghi chỉ số đầu phí ${fee.name} đồng hồ phòng ${room.code}`, after: created })
+    }
+    return
+  }
+
+  // Đổi đồng hồ: giữ dòng chốt của đồng hồ cũ làm lịch sử, ghi/khớp chỉ số đầu cho đồng hồ mới tại cùng ngày chốt
+  if (sameDay && sameDay.value !== input.initialReading) throw new ValidationError(`Đồng hồ đã có chỉ số bàn giao ${sameDay.value} trong ngày này`, { initialReading: `Nhập đúng chỉ số đã chốt: ${sameDay.value}` })
+  if (link) await tx.update(leaseFeeMeters).set({ meterId: meter.id }).where(eq(leaseFeeMeters.leaseFeeId, input.leaseFeeId))
+  else await tx.insert(leaseFeeMeters).values({ leaseFeeId: input.leaseFeeId, meterId: meter.id })
+  if (!sameDay) await tx.insert(meterReadings).values({ meterId: meter.id, period: readOn.slice(0, 7), kind: 'handover', readOn, value: input.initialReading })
+  await recordAudit(tx, ctx, { action: 'update', entity: 'meter', entityId: meter.id, facilityId: room.facilityId, summary: `Đổi đồng hồ phí ${fee.name} sang phòng ${room.code}`, before: { meterId: link?.meterId ?? null }, after: { meterId: meter.id, initialReading: input.initialReading, readOn } })
+}
+
 /** Thêm một đồng hồ (loại khác) cho phòng; đồng hồ điện, nước mặc định đã có sẵn. Không có thao tác xoá đồng hồ. */
 export async function addRoomMeter(db: DB, ctx: AccessContext, roomId: string, input: { name: string; startReading: number; installedOn: string; serial?: string }): Promise<{ id: string }> {
   return db.transaction(async (tx) => {
@@ -285,6 +347,10 @@ export async function addRoomMeter(db: DB, ctx: AccessContext, roomId: string, i
 export type MeterOverviewRow = {
   meterId: string; roomId: string; roomCode: string; floor: string | null
   meterName: string; meterCode: string | null; feeName: string | null; unit: string | null; leaseCode: string | null
+  /** Ngày bắt đầu hợp đồng đang chạy đang dùng đồng hồ; null khi không có hợp đồng đang chạy. */
+  leaseStartDate: string | null
+  /** Ngày bắt đầu của mọi hợp đồng từng gắn đồng hồ, để nhận ra dòng chốt đầu hợp đồng trong lịch sử. */
+  leaseStartDates: string[]
   serial: string | null; startReading: number; installedOn: string; removedOn: string | null
   finalReadingEstimated: boolean; estimateNote: string | null
   /** Chỉ số mới nhất theo ngày ghi (chốt tháng hoặc bàn giao), null nếu chưa có. */
@@ -317,6 +383,8 @@ export async function listMeterOverview(db: DB, ctx: AccessContext, facilityId: 
       meterId: meter.id, roomId: room.id, roomCode: room.code, floor: room.floor, meterName: meter.name || legacy?.name || 'Đồng hồ', meterCode: meter.code,
       feeName: link?.name ?? legacy?.name ?? null, unit: link?.unit ?? legacy?.unit ?? null,
       leaseCode: link?.status === 'active' ? link.leaseCode : null,
+      leaseStartDate: link?.status === 'active' ? link.startDate : null,
+      leaseStartDates: [...new Set(mine.map(l => l.startDate))],
       serial: meter.serial, startReading: meter.startReading, installedOn: meter.installedOn, removedOn: meter.removedOn,
       finalReadingEstimated: meter.finalReadingEstimated, estimateNote: meter.estimateNote,
       lastReading: (readingsByMeter.get(meter.id) ?? [])[0] ? { value: readingsByMeter.get(meter.id)![0].value, readOn: readingsByMeter.get(meter.id)![0].readOn } : null,
@@ -332,8 +400,8 @@ export type ReadingHistoryRow = {
   /** Tên loại đồng hồ (đã bỏ mã trong ngoặc) để lọc và hiển thị. */
   meterName: string; meterCode: string | null; unit: string | null
   kind: 'monthly' | 'handover'; period: string; readOn: string
-  /** Chỉ số bàn giao đứng riêng, không có số đầu và mức dùng (null). */
-  opening: number | null; closing: number; usage: number | null
+  /** Số đầu của lần chốt: số chốt liền trước; dòng bàn giao đầu hợp đồng lấy bằng số cuối. */
+  opening: number; closing: number; usage: number
   /** Mã hoá đơn đã duyệt đang dùng chỉ số tháng này; có thì không sửa, xoá được. Chỉ số bàn giao không khoá. */
   lockedBy: string | null
 }
@@ -352,7 +420,9 @@ export async function listReadingHistory(db: DB, ctx: AccessContext, facilityId:
     let prev = m.startReading
     for (const r of asc) {
       if (r.period >= from && r.period <= to) {
-        rows.push({ id: r.id, meterId: m.meterId, roomId: m.roomId, roomCode: m.roomCode, floor: m.floor, meterName: typeName(m.meterName), meterCode: m.meterCode, unit: m.unit, kind: r.kind, period: r.period, readOn: r.readOn, opening: r.kind === 'handover' ? null : prev, closing: r.value, usage: r.kind === 'handover' ? null : Math.max(r.value - prev, 0), lockedBy: r.kind === 'monthly' ? (locked.get(`${m.roomId}|${r.period}`) ?? null) : null })
+        // Dòng bàn giao đầu hợp đồng mở chuỗi chỉ số: số đầu bằng số cuối, mức dùng 0
+        const opensLease = r.kind === 'handover' && m.leaseStartDates.includes(r.readOn)
+        rows.push({ id: r.id, meterId: m.meterId, roomId: m.roomId, roomCode: m.roomCode, floor: m.floor, meterName: typeName(m.meterName), meterCode: m.meterCode, unit: m.unit, kind: r.kind, period: r.period, readOn: r.readOn, opening: opensLease ? r.value : prev, closing: r.value, usage: opensLease ? 0 : Math.max(r.value - prev, 0), lockedBy: r.kind === 'monthly' ? (locked.get(`${m.roomId}|${r.period}`) ?? null) : null })
       }
       prev = r.value
     }
@@ -414,14 +484,20 @@ export async function deleteMeterReadings(db: DB, ctx: AccessContext, ids: strin
   return { deleted, skipped: unique.length - deleted }
 }
 
-/** Đồng hồ của các phí tính theo đồng hồ trong một hợp đồng, kèm chỉ số đầu: chỉ số bàn giao sớm nhất, không có thì chỉ số lúc lắp. Khoá theo id dòng phí hợp đồng. */
-export async function listLeaseMeterInitials(db: DB, ctx: AccessContext, leaseId: string): Promise<Record<string, { meterCode: string | null; value: number; readOn: string }>> {
-  const links = await db.select({ leaseFeeId: leaseFeeMeters.leaseFeeId, meterId: leaseFeeMeters.meterId, code: meters.code, startReading: meters.startReading, installedOn: meters.installedOn, facilityId: rooms.facilityId })
-    .from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).innerJoin(meters, eq(meters.id, leaseFeeMeters.meterId)).innerJoin(rooms, eq(rooms.id, meters.roomId))
+/** Đồng hồ của các phí tính theo đồng hồ trong một hợp đồng, kèm chỉ số đầu: lần chốt sớm nhất từ ngày bắt đầu hợp đồng, không có thì chỉ số lúc lắp. Khoá theo id dòng phí hợp đồng. */
+export type LeaseMeterInitial = { meterId: string; meterCode: string | null; value: number; readOn: string; readingId: string | null }
+
+export async function listLeaseMeterInitials(db: DB, ctx: AccessContext, leaseId: string): Promise<Record<string, LeaseMeterInitial>> {
+  const links = await db.select({ leaseFeeId: leaseFeeMeters.leaseFeeId, meterId: leaseFeeMeters.meterId, code: meters.code, startReading: meters.startReading, installedOn: meters.installedOn, facilityId: rooms.facilityId, startDate: leases.startDate })
+    .from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).innerJoin(leases, eq(leases.id, leaseFeeSnapshots.leaseId)).innerJoin(meters, eq(meters.id, leaseFeeMeters.meterId)).innerJoin(rooms, eq(rooms.id, meters.roomId))
     .where(eq(leaseFeeSnapshots.leaseId, leaseId))
   if (links.length === 0) return {}
   // Chỉ người có quyền Chỉ số của toà mới thấy số này; người khác xem hợp đồng bình thường, không có phần chỉ số
   if (!can(ctx, 'meters', links[0].facilityId)) return {}
-  const handovers = await db.select({ meterId: meterReadings.meterId, readOn: meterReadings.readOn, value: meterReadings.value }).from(meterReadings).where(and(inArray(meterReadings.meterId, links.map(l => l.meterId)), eq(meterReadings.kind, 'handover'))).orderBy(asc(meterReadings.readOn))
-  return Object.fromEntries(links.map(l => { const h = handovers.find(x => x.meterId === l.meterId); return [l.leaseFeeId, { meterCode: l.code, value: h?.value ?? l.startReading, readOn: h?.readOn ?? l.installedOn }] }))
+  const handovers = await db.select({ id: meterReadings.id, meterId: meterReadings.meterId, readOn: meterReadings.readOn, value: meterReadings.value }).from(meterReadings).where(and(inArray(meterReadings.meterId, links.map(l => l.meterId)), eq(meterReadings.kind, 'handover'))).orderBy(asc(meterReadings.readOn))
+  return Object.fromEntries(links.map(l => {
+    // Chốt trước ngày bắt đầu hợp đồng là của khách cũ, không phải chỉ số đầu của hợp đồng này
+    const h = handovers.find(x => x.meterId === l.meterId && x.readOn >= l.startDate)
+    return [l.leaseFeeId, { meterId: l.meterId, meterCode: l.code, value: h?.value ?? l.startReading, readOn: h?.readOn ?? l.installedOn, readingId: h?.id ?? null }]
+  }))
 }

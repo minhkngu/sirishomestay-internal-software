@@ -143,7 +143,8 @@ export type DocEntities = {
   addendum?: { effectiveDate: string; newEndDate?: string | null; newMonthlyRent?: number | null; newDepositAmount?: number | null; newRoomCode?: string | null }
   fees?: { name: string; unit: string; quantity: number; unitPrice: number }[]
   invoice?: { code: string; periodStart: string; periodEnd: string; dueDate?: string | null; note?: string; paid?: number; bank?: { bankName: string; accountNumber: string; accountName: string } | null; lines: { description: string; quantity: number; unitPrice: number; amount: number }[] }
-  handover?: { date: string; items: { code: string; name: string; condition: string; penalty?: number }[]; readings: { kind: 'electric' | 'water' | 'fee'; label?: string; serial: string; value: number }[] }
+  /** `readings` không còn dùng: biên bản bàn giao đã bỏ chỉ số; mẫu cũ vẫn nhận mảng rỗng. */
+  handover?: { date: string; items: { code: string; name: string; condition: string; penalty?: number }[]; readings?: { kind: 'electric' | 'water' | 'fee'; label?: string; serial: string; value: number }[] }
   payment?: { code: string; paidOn: string; amount: number; method: string; receivedBy: string }
 }
 

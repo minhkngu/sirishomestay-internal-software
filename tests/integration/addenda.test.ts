@@ -154,7 +154,7 @@ describe('phụ lục hợp đồng', () => {
       await electricFee(m.id)
       await db.insert(assets).values({ code: 'TV1', name: 'TV', value: 500000, locationKind: 'room', locationId: roomId, facilityId })
       const h = await startHandover(db, ctx(), leaseId, 'check_out'); const d = await (await import('@/server/handovers/service')).getHandover(db, ctx(), h.id)
-      await saveHandover(db, ctx(), h.id, { items: [{ id: d.items[0].id, penalty: 500000 }], meterReadings: [] })
+      await saveHandover(db, ctx(), h.id, { items: [{ id: d.items[0].id, penalty: 500000 }] })
       return createTermination(db, ctx(), leaseId, { endDate: '2026-11-20', forfeit, readings: [{ meterId: m.id, value: 220 }] })
     }
     it('thanh lý 20/11, phạt 500.000: không mất cọc → −11.080.000', async () => {
