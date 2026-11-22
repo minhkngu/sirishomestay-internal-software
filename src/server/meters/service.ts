@@ -129,9 +129,31 @@ export async function saveReadings(db: DB, ctx: AccessContext, period: string, r
 }
 
 /**
- * Sửa số đầu kỳ của đồng hồ cho một tháng: số đầu là lần ghi liền trước tháng đó. Nếu là chỉ số chốt của tháng trước thì sửa chỉ số đó
- * (cùng kiểm tra như ghi chỉ số, tháng đã dùng trong hoá đơn đã duyệt thì khoá); nếu là chỉ số ban đầu (bàn giao) hoặc số lúc lắp thì sửa thẳng, chỉ cần không vượt số sau nó.
+ * Đặt số đầu kỳ của đồng hồ cho một tháng, sửa thế nào cũng được: số đầu là lần ghi liền trước tháng đó (chỉ số chốt tháng trước, chỉ số ban đầu,
+ * hoặc số lúc lắp). Để chuỗi chỉ số vẫn không giảm, các lần ghi trước đó cao hơn số mới bị hạ xuống bằng nó, các lần ghi sau đó thấp hơn bị nâng lên bằng nó.
+ * Chỉ số tháng đã dùng trong hoá đơn đã duyệt thì khoá (bỏ duyệt trước khi đổi).
  */
+export async function setOpeningValue(tx: DB, ctx: AccessContext, meterId: string, period: string, value: number): Promise<{ facilityId: string; before: number }> {
+  const [info] = await tx.select({ m: meters, facilityId: rooms.facilityId }).from(meters).innerJoin(rooms, eq(rooms.id, meters.roomId)).where(eq(meters.id, meterId))
+  if (!info) throw new NotFoundError()
+  assertCan(ctx, 'meters', info.facilityId)
+  if (!Number.isInteger(value) || value < 0) throw new ValidationError('Chỉ số không hợp lệ')
+  const all = (await tx.select().from(meterReadings).where(eq(meterReadings.meterId, meterId))).sort((a, b) => (a.readOn < b.readOn ? -1 : a.readOn > b.readOn ? 1 : 0))
+  const from = `${period}-01`
+  const before = all.filter((r) => r.readOn < from)
+  const target = before[before.length - 1]
+  const touched = [...(target ? [target] : []), ...before.slice(0, -1).filter((r) => r.value > value), ...all.filter((r) => r.readOn >= from && r.value < value)]
+  const locked = await lockedReadings(tx, [info.m.roomId])
+  for (const r of touched) {
+    const by = r.kind === 'monthly' ? locked.get(`${info.m.roomId}|${r.period}`) : null
+    if (by && r.value !== value) throw new ValidationError(lockMessage(by))
+  }
+  for (const r of touched) if (r.value !== value) await tx.update(meterReadings).set({ value, updatedAt: new Date() }).where(eq(meterReadings.id, r.id))
+  if (!target || info.m.startReading > value) await tx.update(meters).set({ startReading: value, updatedAt: new Date() }).where(eq(meters.id, meterId))
+  await recordAudit(tx, ctx, { action: 'update', entity: 'meter_readings', facilityId: info.facilityId, summary: `Sửa số đầu kỳ ${period}`, before: { value: target?.value ?? info.m.startReading }, after: { meterId, value } })
+  return { facilityId: info.facilityId, before: target?.value ?? info.m.startReading }
+}
+
 export async function saveOpenings(db: DB, ctx: AccessContext, period: string, rows: Array<{ meterId: string; value: number }>): Promise<{ saved: number; errors: ReadingError[] }> {
   periodRange(period)
   return db.transaction(async (tx0) => {
@@ -139,29 +161,10 @@ export async function saveOpenings(db: DB, ctx: AccessContext, period: string, r
     const errors: ReadingError[] = []
     let saved = 0
     for (const row of rows) {
-      const [info] = await tx.select({ m: meters, facilityId: rooms.facilityId }).from(meters).innerJoin(rooms, eq(rooms.id, meters.roomId)).where(eq(meters.id, row.meterId))
-      if (!info) throw new NotFoundError()
-      assertCan(ctx, 'meters', info.facilityId)
-      if (!Number.isInteger(row.value) || row.value < 0) { errors.push({ meterId: row.meterId, message: 'Chỉ số không hợp lệ' }); continue }
-      const all = (await tx.select().from(meterReadings).where(eq(meterReadings.meterId, row.meterId))).sort((a, b) => (a.readOn < b.readOn ? -1 : a.readOn > b.readOn ? 1 : 0))
-      const from = `${period}-01`
-      const before = all.filter((r) => r.readOn < from)
-      const target = before[before.length - 1]
-      if (target?.kind === 'monthly') {
-        const earlier = before[before.length - 2]
-        if (row.value < (earlier?.value ?? info.m.startReading)) { errors.push({ meterId: row.meterId, message: earlier ? `không được nhỏ hơn chỉ số trước đó ${earlier.value.toLocaleString('vi-VN')} (ghi ngày ${earlier.readOn.split('-').reverse().join('/')}), hãy sửa chỉ số đó trước` : DECREASE }); continue }
-        const r = await applyReadings(tx, ctx, target.period, [{ meterId: row.meterId, value: row.value, readOn: target.readOn }])
-        saved += r.saved; errors.push(...r.errors)
-        continue
+      try { await setOpeningValue(tx, ctx, row.meterId, period, row.value); saved++ } catch (e) {
+        if (!(e instanceof ValidationError)) throw e
+        errors.push({ meterId: row.meterId, message: e.message })
       }
-      const next = all.find((r) => r.readOn >= from)
-      const floor = target ? (before[before.length - 2]?.value ?? info.m.startReading) : 0
-      if (row.value < floor) { errors.push({ meterId: row.meterId, message: 'không được nhỏ hơn chỉ số trước đó' }); continue }
-      if (next && row.value > next.value) { errors.push({ meterId: row.meterId, message: 'Chỉ số lớn hơn chỉ số của kỳ sau' }); continue }
-      if (target) await tx.update(meterReadings).set({ value: row.value, updatedAt: new Date() }).where(eq(meterReadings.id, target.id))
-      else await tx.update(meters).set({ startReading: row.value, updatedAt: new Date() }).where(eq(meters.id, row.meterId))
-      await recordAudit(tx, ctx, { action: 'update', entity: 'meter_readings', facilityId: info.facilityId, summary: `Sửa số đầu kỳ ${period}`, after: { meterId: row.meterId, value: row.value } })
-      saved++
     }
     return { saved, errors }
   })

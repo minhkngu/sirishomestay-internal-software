@@ -47,14 +47,17 @@ describe('meters', () => {
     return (await db.insert(leases).values({ code, roomId, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-01-01', monthlyRent: 1, depositAmount: 1, ...over }).returning())[0]
   }
 
-  it('sửa số đầu kỳ: số đầu là chỉ số chốt tháng trước thì sửa chỉ số đó; không vượt số sau, không thấp hơn số trước nữa', async () => {
+  it('sửa số đầu kỳ thế nào cũng được: sửa chỉ số chốt tháng trước, chuỗi chỉ số điều chỉnh theo', async () => {
     await read('E101', '2026-10', '2026-10-31', 1100)
-    const ok = await saveOpenings(db, hung(), '2026-10', [{ meterId: m.E101, value: 1050 }])
-    expect(ok).toMatchObject({ saved: 1, errors: [] })
-    expect((await db.select().from(meterReadings).where(eq(meterReadings.meterId, m.E101))).find((r) => r.period === '2026-09')?.value).toBe(1050)
-    const tooHigh = await saveOpenings(db, hung(), '2026-10', [{ meterId: m.E101, value: 1200 }])
-    expect(tooHigh.saved).toBe(0)
-    expect(tooHigh.errors).toHaveLength(1)
+    expect(await saveOpenings(db, hung(), '2026-10', [{ meterId: m.E101, value: 1050 }])).toMatchObject({ saved: 1, errors: [] })
+    const value = async (period: string) => (await db.select().from(meterReadings).where(eq(meterReadings.meterId, m.E101))).find((r) => r.period === period)?.value
+    expect(await value('2026-09')).toBe(1050)
+    // Cao hơn số chốt sau thì số chốt sau được nâng lên bằng nó; thấp hơn số chốt trước thì các số trước được hạ xuống
+    expect(await saveOpenings(db, hung(), '2026-10', [{ meterId: m.E101, value: 1200 }])).toMatchObject({ saved: 1, errors: [] })
+    expect([await value('2026-09'), await value('2026-10')]).toEqual([1200, 1200])
+    await read('E101', '2026-08', '2026-08-31', 900)
+    expect(await saveOpenings(db, hung(), '2026-10', [{ meterId: m.E101, value: 800 }])).toMatchObject({ saved: 1, errors: [] })
+    expect([await value('2026-08'), await value('2026-09')]).toEqual([800, 800])
   })
   it('sửa số đầu kỳ của đồng hồ chưa có lần ghi nào thì sửa số lúc lắp; thiếu quyền cơ sở thì từ chối', async () => {
     await addMeter(r101, 'water', 'W101B', 5)

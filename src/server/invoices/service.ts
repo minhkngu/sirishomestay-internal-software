@@ -15,7 +15,7 @@ import type { Addendum, ContractFee, Invoice, MeterReading, DueRule, InvoiceLine
 import { finalizeTermination } from '@/server/addenda/finalize'
 import { recordAudit, recordAuditBatch } from '@/server/audit'
 import { registerExportOwnerResolver } from '@/server/files/owners'
-import { applyReadings } from '@/server/meters/service'
+import { applyReadings, setOpeningValue } from '@/server/meters/service'
 import { getSettings } from '@/server/settings/service'
 import { registerPdfLoader } from '@/server/templates/service'
 import { resolveBankAccount } from '@/domain/vietqr'
@@ -381,23 +381,16 @@ export async function updateInvoiceMeterReading(db: DB, ctx: AccessContext, invo
     await recordAudit(tx, ctx, { action: 'update', entity: 'invoice', entityId: invoiceId, facilityId: inv.facilityId, summary: `Sửa chỉ số ${fee.name} tháng ${period} trong hoá đơn`, before: { value: current?.value ?? null }, after: { value: data.value, period } })
   })
 }
-async function writeOpeningReading(tx: DB, t: ReadingTarget, data: { leaseFeeId: string; period: string; value: number }) {
-    const [link] = await tx.select({ meterId: leaseFeeMeters.meterId }).from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).where(and(eq(leaseFeeMeters.leaseFeeId, data.leaseFeeId), eq(leaseFeeSnapshots.leaseId, t.leaseId)))
-    if (!link) throw new ValidationError('Phí không thuộc hợp đồng hoặc chưa gắn đồng hồ')
-    const [meter] = await tx.select().from(meters).where(eq(meters.id, link.meterId))
-    const all = (await tx.select().from(meterReadings).where(eq(meterReadings.meterId, meter.id))).sort((a, b) => (a.readOn < b.readOn ? -1 : 1))
-    const before = all.filter(r => r.readOn < `${data.period}-01`)
-    const target = before[before.length - 1] ?? all.find(r => r.kind === 'handover' && r.readOn <= `${data.period}-31`)
-    const next = all.find(r => r.readOn >= `${data.period}-01` && r.id !== target?.id)
-    if (target && target.kind !== 'handover') throw new ValidationError('Số đầu là chỉ số chốt tháng trước, hãy sửa chỉ số của tháng đó')
-    if (next && data.value > next.value) throw new ValidationError('Số đầu không được lớn hơn chỉ số chốt sau đó')
-    if (target) {
-      const prev = before[before.length - 2]
-      if (prev && data.value < prev.value) throw new ValidationError(DECREASE_MSG)
-      await tx.update(meterReadings).set({ value: data.value, updatedAt: new Date() }).where(eq(meterReadings.id, target.id))
-    } else {
-      await tx.update(meters).set({ startReading: data.value, updatedAt: new Date() }).where(eq(meters.id, meter.id))
-    }
+async function writeOpeningReading(tx: DB, ctx: AccessContext, t: ReadingTarget, data: { leaseFeeId: string; period: string; value: number }) {
+  const [link] = await tx.select({ meterId: leaseFeeMeters.meterId }).from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).where(and(eq(leaseFeeMeters.leaseFeeId, data.leaseFeeId), eq(leaseFeeSnapshots.leaseId, t.leaseId)))
+  if (!link) throw new ValidationError('Phí không thuộc hợp đồng hoặc chưa gắn đồng hồ')
+  const [meter] = await tx.select().from(meters).where(eq(meters.id, link.meterId))
+  const all = (await tx.select().from(meterReadings).where(eq(meterReadings.meterId, meter.id))).sort((a, b) => (a.readOn < b.readOn ? -1 : 1))
+  const before = all.filter(r => r.readOn < `${data.period}-01`)
+  const target = before[before.length - 1] ?? all.find(r => r.kind === 'handover' && r.readOn <= `${data.period}-31`)
+  if (target && target.kind !== 'handover') throw new ValidationError('Số đầu là chỉ số chốt tháng trước, hãy sửa chỉ số của tháng đó')
+  // Số đầu sửa thế nào cũng được; chuỗi chỉ số được điều chỉnh theo (cùng quy tắc với hộp Chốt chỉ số)
+  await setOpeningValue(tx, ctx, meter.id, data.period, data.value)
   return { target, meter }
 }
 /**
@@ -412,7 +405,7 @@ export async function updateInvoiceOpeningReading(db: DB, ctx: AccessContext, in
     const inv = await getInvoice(tx, ctx, invoiceId)
     assertCan(ctx, 'meters', inv.facilityId)
     if (inv.status !== 'draft' || inv.kind !== 'monthly') throw new ValidationError('Chỉ sửa số đầu trong hoá đơn tháng còn nháp')
-    const { target, meter } = await writeOpeningReading(tx, inv, data)
+    const { target, meter } = await writeOpeningReading(tx, ctx, inv, data)
     await refreshMeterLines(tx, inv, await leaseData(tx, inv.leaseId))
     await tx.update(invoices).set({ updatedAt: new Date() }).where(eq(invoices.id, invoiceId))
     await recordAudit(tx, ctx, { action: 'update', entity: 'invoice', entityId: invoiceId, facilityId: inv.facilityId, summary: `Sửa số đầu kỳ đồng hồ trong hoá đơn`, before: { value: target?.value ?? meter.startReading }, after: { value: data.value, period: data.period } })
@@ -438,11 +431,10 @@ export async function savePreviewOpeningReading(db: DB, ctx: AccessContext, inpu
   await db.transaction(async tx0 => {
     const tx = tx0 as unknown as DB
     const t = await previewReadingTarget(tx, ctx, input.leaseId, input.invoicePeriod)
-    const { target, meter } = await writeOpeningReading(tx, t, data)
+    const { target, meter } = await writeOpeningReading(tx, ctx, t, data)
     await recordAudit(tx, ctx, { action: 'update', entity: 'meter_readings', facilityId: t.facilityId, summary: 'Sửa số đầu kỳ đồng hồ khi lập hoá đơn', before: { value: target?.value ?? meter.startReading }, after: { value: data.value, period: data.period } })
   })
 }
-const DECREASE_MSG = 'Số đầu nhỏ hơn chỉ số trước đó của đồng hồ'
 export async function approveInvoice(db: DB, ctx: AccessContext, id: string, input: { dueRule?: DueRule; dueDate?: string; approvedOn?: string }) {
   const valid = z.object({ dueRule: z.discriminatedUnion('kind', [z.object({ kind: z.literal('day_of_next_month'), day: z.number().int().min(1).max(31) }), z.object({ kind: z.literal('day_of_invoice_month'), day: z.number().int().min(1).max(31) }), z.object({ kind: z.literal('days_after_approval'), days: z.number().int().min(0).max(90) })]).optional(), dueDate: z.iso.date().optional(), approvedOn: z.iso.date().optional() }).parse(input)
   return db.transaction(async tx0 => {
