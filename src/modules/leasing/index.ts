@@ -1,6 +1,5 @@
 // Cổng phía server của module leasing: chỉ những gì nơi ngoài module đang dùng.
 export { DEPOSIT_ENTRY_LABELS, depositBalance, runningDepositBalances } from './domain/deposit'
-export { signStatusLabel } from './domain/sign-status'
 export { INVOICE_STATUS_LABELS } from './domain/labels'
 export { listAddenda } from './server/addenda/service'
 export { listOneOffs } from './server/charges/service'

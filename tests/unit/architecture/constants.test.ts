@@ -38,6 +38,12 @@ describe('hằng số chỉ có một nguồn', () => {
     expect(countMatches(/draft: 0\b/g)).toBe(1)
   })
 
+  it("nhãn trạng thái ký ('Đã xuất', 'Chưa ký' gộp) chỉ nằm trong src/domain/sign-labels.ts", () => {
+    // Khớp cả dạng map (`exported: 'Đã xuất'`) lẫn ternary (`=== 'exported' ? 'Đã xuất'`); thông báo "Đã xuất" sau khi xuất tệp không tính.
+    expect(filesMatching(/exported'?\s*[:?]\s*'Đã xuất'/)).toEqual(['src/domain/sign-labels.ts'])
+    expect(filesMatching(/\? 'Đã ký' : 'Chưa ký'/)).toEqual(['src/domain/sign-labels.ts'])
+  })
+
   it('chữ tình trạng tài sản (Tốt, Trầy xước, Hư, Mất) chỉ nằm trong src/domain/asset-labels.ts', () => {
     // Chỉ khớp nguyên cả chuỗi trong dấu nháy; schema DB giữ giá trị mặc định cố ý (db chỉ import type từ domain).
     const literal = /(['"`])(Tốt|Trầy xước|Hư|Mất)\1/
