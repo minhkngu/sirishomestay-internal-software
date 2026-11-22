@@ -12,7 +12,7 @@ import { previewTemplateByIdAction } from '@/server/templates/actions'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { FormDialog } from '@/components/form-dialog'
 import { formatVND } from '@/domain/money'
-import { todayVN } from '@/domain/dates'
+import { formatDateVN, todayVN } from '@/domain/dates'
 import { formatPhoneDisplay } from '@/domain/phone'
 import { createOccupantChangeAction } from '@/server/addenda/actions'
 import { createFeeTypeAction } from '@/server/fees/actions'
@@ -24,6 +24,7 @@ import { EditAssets, assetsDraftChanged, emptyAssetsDraft, type AssetRow } from 
 import { EditDocuments, docsDraftChanged, emptyDocsDraft, type DepositRow } from './edit-documents'
 import { deleteContractAction, retryContractFileCleanupAction, setSignStatusAction, updateDepositContractAction, updateLeaseAction, updateLeaseAssetsAction, refreshContractDocumentsAction } from '@/server/contracts/actions'
 import { FormSelect, BareSelect } from './contract-form-ui'
+import { FEE_SOURCE_LABEL, type FeeSource } from '../fee-source-label'
 
 type Common = { id: string; roomId: string; tenantId: string; depositAmount: number; signStatus: string }
 type Contract = (Common & { kind: 'lease'; startDate: string; endDate: string; monthlyRent: number; note: string }) | (Common & { kind: 'deposit'; expectedMoveIn: string; agreedRent: number })
@@ -34,7 +35,30 @@ export type Person = { id: string; name: string; idNumber: string | null; phone:
 export type RenderCreatePerson = (p: { facility: { id: string; name: string }; onCreated: (person: Person) => void }) => React.ReactNode
 export type RenderCreateFee = (p: { units: { id: string; name: string }[]; onCreated: (fee: { id: string; name: string; unit: string; price: number; draft: Record<string, unknown> }) => void }) => React.ReactNode
 
-export type FeeSource = 'occupants' | 'room' | 'meter' | 'period_input' | 'legacy_fixed'
+export type { FeeSource }
+/** Một dòng phí trong popup sửa: giữ cả giá trị ban đầu để biết người dùng có đổi đồng hồ/chỉ số không. */
+type FeeRow = {
+  key: string
+  leaseFeeId: string | null
+  feeTypeId: string | null
+  name: string
+  unit: string
+  quantitySource: FeeSource
+  quantity: number
+  price: string
+  meterId: string
+  initialReading: string
+  openingReadOn: string | null
+  originalMeterId: string
+  originalReading: string
+  draft?: Record<string, unknown>
+}
+
+function sourceFromDraft(draft: Record<string, unknown>): FeeSource {
+  const q = draft.quantityFrom
+  return q === 'occupants' || q === 'room' || q === 'meter' || q === 'period_input' ? q : 'legacy_fixed'
+}
+
 export type FeeData = {
   editable: boolean
   units: { id: string; name: string }[]
@@ -47,17 +71,11 @@ export type FeeData = {
     /** Chỉ số đầu của phí: lần chốt sớm nhất từ ngày bắt đầu hợp đồng, hoặc chỉ số lúc lắp. */
     opening: { readingId: string | null; value: number; readOn: string } | null
     draft?: Record<string, unknown>
-    /** @deprecated Dùng quantitySource === 'meter'. */
-    locked?: boolean
-    /** @deprecated Dùng meterId/opening. */
-    meterInit?: { initialReading: number; existingMeterId?: string }
   }[]
   /** Người dùng có quyền meters của toà: được xem và sửa đồng hồ, chỉ số đầu. */
   canEditMeters: boolean
   roomMeters: { id: string; label: string; busy: boolean }[]
-  options: { id: string; name: string; unit: string; price: number; meter: boolean }[]
-  /** @deprecated Không dùng. */
-  meterSupported?: boolean
+  options: { id: string; name: string; unit: string; price: number; meter: boolean; source: FeeSource }[]
 }
 
 export function ContractEditActions({ contract, canDelete, rooms, tenants, mode, onCompleted, onSaved, occupants, people, templates, feeData, documents, assets, facility, renderCreatePerson, renderCreateFee }: {
@@ -85,9 +103,18 @@ export function ContractEditActions({ contract, canDelete, rooms, tenants, mode,
   const [filter, setFilter] = useState('')
   const [creatingPerson, setCreatingPerson] = useState(false)
   const [creatingFee, setCreatingFee] = useState(false)
-  const [feeRows, setFeeRows] = useState((feeData?.current ?? []).map(f => ({ ...f, price: String(f.unitPrice) })))
+  const [feeRows, setFeeRows] = useState<FeeRow[]>(() => (feeData?.current ?? []).map((f, i) => ({
+    key: f.leaseFeeId ?? `fee-${i}`,
+    leaseFeeId: f.leaseFeeId, feeTypeId: f.feeTypeId, name: f.name, unit: f.unit,
+    quantitySource: f.quantitySource, quantity: f.quantity, price: String(f.unitPrice),
+    meterId: f.meterId ?? '', initialReading: f.opening ? String(f.opening.value) : '',
+    openingReadOn: f.opening?.readOn ?? null,
+    originalMeterId: f.meterId ?? '', originalReading: f.opening ? String(f.opening.value) : '',
+    draft: f.draft,
+  })))
+  const patchFee = (key: string, patch: Partial<FeeRow>) => setFeeRows(rows => rows.map(r => r.key === key ? { ...r, ...patch } : r))
   const [addingFee, setAddingFee] = useState(false)
-  const feeOptions = (feeData?.options ?? []).filter(o => o.meter || !feeRows.some(r => r.feeTypeId === o.id))
+  const feeOptions = (feeData?.options ?? []).filter(o => o.meter ? feeData?.canEditMeters === true : !feeRows.some(r => r.feeTypeId === o.id))
   // Phí theo đồng hồ (điện, nước): cần chỉ số ban đầu, và có thể dùng lại đồng hồ có sẵn của phòng
   const [meterFee, setMeterFee] = useState<NonNullable<FeeData['options']>[number] | null>(null)
   const [meterReading, setMeterReading] = useState('')
@@ -151,7 +178,11 @@ export function ContractEditActions({ contract, canDelete, rooms, tenants, mode,
       const finalOccIds = occ.filter(o => !o.isCompany).map(o => resolve(o.id))
       const common = { roomId, tenantId: finalTenantId, depositAmount: Number(deposit) }
       const result = contract.kind === 'lease'
-        ? await updateLeaseAction(contract.id, { ...common, startDate, endDate, monthlyRent: Number(rent), note, ...(feeData?.editable && { fees: feeRows.map((r, i) => ({ leaseFeeId: r.leaseFeeId ?? undefined, feeTypeId: feeTypeIds.get(i) ?? r.feeTypeId, unitPrice: Number(r.price), ...(r.meterInit && { initialReading: r.meterInit.initialReading, existingMeterId: r.meterInit.existingMeterId }) })) }), ...(templates && { contractTemplateId: contractTpl && contractTpl !== (templates.contractId ?? defaultContractTemplate) ? contractTpl : undefined, invoiceTemplateId: invoiceTpl || null }) }, signed)
+        ? await updateLeaseAction(contract.id, { ...common, startDate, endDate, monthlyRent: Number(rent), note, ...(feeData?.editable && { fees: feeRows.map((r, i) => {
+          // Chỉ gửi đồng hồ/chỉ số khi người dùng có quyền meters và đã đổi (hoặc dòng phí mới cần tạo)
+          const meterChanged = r.quantitySource === 'meter' && feeData.canEditMeters && (r.leaseFeeId === null || r.meterId !== r.originalMeterId || r.initialReading !== r.originalReading)
+          return { leaseFeeId: r.leaseFeeId ?? undefined, feeTypeId: feeTypeIds.get(i) ?? r.feeTypeId, unitPrice: Number(r.price), ...(meterChanged && { existingMeterId: r.meterId || undefined, initialReading: r.initialReading === '' ? undefined : Number(r.initialReading) }) }
+        }) }), ...(templates && { contractTemplateId: contractTpl && contractTpl !== (templates.contractId ?? defaultContractTemplate) ? contractTpl : undefined, invoiceTemplateId: invoiceTpl || null }) }, signed)
         : await updateDepositContractAction(contract.id, { ...common, expectedMoveIn: startDate, agreedRent: Number(rent) }, signed)
       if (!result.ok) { setError(result.error); return }
       if (editOccupants && [...finalOccIds].sort().join(',') !== initialIds) {
@@ -268,21 +299,41 @@ export function ContractEditActions({ contract, canDelete, rooms, tenants, mode,
           <p className="text-xs text-muted-foreground">Người ở được ghi nhận từ ngày lưu; hoá đơn tạo sau đó tự tính theo số người mới. Xoá người đại diện thì người ở kế tiếp trong danh sách sẽ thành đại diện; phải còn ít nhất một người. Khách hoặc loại phí mới chỉ được tạo khi bấm &ldquo;Lưu thay đổi&rdquo;.</p>
         </div>
       )}
-      {feeData && <div className="space-y-2 rounded-xl border p-3">
+      {feeData && <div className="space-y-3 rounded-xl border p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-semibold">Phí dịch vụ của hợp đồng</h3>
           {feeData.editable && <Button type="button" size="sm" variant="outline" onClick={() => { setCreatingFee(false); setAddingFee(true) }}>Thêm phí</Button>}
         </div>
         {feeRows.length === 0 && <p className="text-xs text-muted-foreground">Hợp đồng chưa có phí dịch vụ.</p>}
-        <div className="space-y-1.5">
-          {feeRows.map((r, i) => <div key={r.leaseFeeId ?? r.feeTypeId ?? i} className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="min-w-40 flex-1 font-medium">{r.name} <span className="font-normal text-muted-foreground">· {r.unit}</span></span>
-            {feeData.editable
-              ? <><Input aria-label={`Đơn giá ${r.name}`} className="h-8 w-36" type="number" min="0" step="1" value={r.price} onChange={e => setFeeRows(feeRows.map((x, j) => j === i ? { ...x, price: e.target.value } : x))} />
-                {r.locked ? <span className="w-12 text-xs text-muted-foreground">Theo đồng hồ</span> : r.meterInit ? <span className="text-xs text-muted-foreground">Đồng hồ, chỉ số đầu {r.meterInit.initialReading}</span> : <Button type="button" size="sm" variant="ghost" aria-label={`Xoá phí ${r.name}`} onClick={() => setFeeRows(feeRows.filter((_, j) => j !== i))}>Xoá</Button>}</>
-              : <span className="tabular-nums">{formatVND(r.unitPrice)}</span>}
-          </div>)}
+        <div className="space-y-2">
+          {feeRows.map(r => {
+            const meterChoices = feeData.roomMeters.filter(m => !m.busy && (m.id === r.meterId || !feeRows.some(x => x.key !== r.key && x.meterId === m.id)))
+            return <div key={r.key} className="rounded-xl border border-border/70 bg-muted/20 p-3.5">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="text-[13px] font-medium text-foreground">{r.name} <span className="font-normal text-muted-foreground">· {r.unit}</span></p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{FEE_SOURCE_LABEL[r.quantitySource]}{r.quantitySource === 'legacy_fixed' ? ` · số lượng ${r.quantity}` : ''}</p>
+                </div>
+                {feeData.editable && r.quantitySource !== 'meter' && <button type="button" aria-label={`Xoá phí ${r.name}`} className="text-xs font-medium text-muted-foreground transition-colors hover:text-destructive" onClick={() => setFeeRows(rows => rows.filter(x => x.key !== r.key))}>Xoá</button>}
+              </div>
+              {feeData.editable
+                ? <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label className="space-y-1.5 text-xs text-muted-foreground">Đơn giá<MoneyInput aria-label={`Đơn giá ${r.name}`} value={r.price} onValueChange={price => patchFee(r.key, { price })} /></label>
+                  {r.quantitySource === 'meter' && (feeData.canEditMeters
+                    ? <>
+                      <div className="space-y-1.5 text-xs text-muted-foreground"><span>Đồng hồ</span><BareSelect ariaLabel={`Đồng hồ ${r.name}`} value={r.meterId} onValueChange={meterId => patchFee(r.key, { meterId })} options={[{ value: '', label: '— Chọn đồng hồ —' }, ...meterChoices.map(m => ({ value: m.id, label: m.label }))]} /></div>
+                      <label className="space-y-1.5 text-xs text-muted-foreground">Chỉ số đầu<Input aria-label={`Chỉ số đầu ${r.name}`} inputMode="numeric" value={r.initialReading} onChange={e => patchFee(r.key, { initialReading: e.target.value })} />{r.openingReadOn && <span className="block text-[11px] text-muted-foreground">chốt {formatDateVN(r.openingReadOn)}</span>}</label>
+                    </>
+                    : <>
+                      <p className="text-xs text-muted-foreground">Đồng hồ <span className="text-foreground">{r.meterId ? feeData.roomMeters.find(m => m.id === r.meterId)?.label ?? '—' : '—'}</span></p>
+                      <p className="text-xs text-muted-foreground">Chỉ số đầu <span className="tabular-nums text-foreground">{r.originalReading || '—'}</span></p>
+                    </>)}
+                </div>
+                : <p className="mt-2 text-sm tabular-nums">{formatVND(Number(r.price))}</p>}
+            </div>
+          })}
         </div>
+        <p className="text-xs text-muted-foreground">Hoá đơn đã lập giữ nguyên số cũ. Muốn áp dụng chỉ số mới, xoá hoá đơn tháng đầu và lập lại.</p>
       </div>}
       {assets && <EditAssets inRoom={assets.inRoom} available={assets.available} draft={assetDraft} onChange={setAssetDraft} />}
       {documents && <EditDocuments kind={contract.kind} signed={signed} signedFileId={documents.signedFileId} entries={documents.entries} canEditDeposit={documents.canEditDeposit} draft={docs} onChange={setDocs} />}
@@ -312,7 +363,7 @@ export function ContractEditActions({ contract, canDelete, rooms, tenants, mode,
       {creatingFee && renderCreateFee
         ? <div className="space-y-3">
           <Button type="button" size="sm" variant="ghost" onClick={() => setCreatingFee(false)}>← Quay lại danh sách</Button>
-          {renderCreateFee({ units: feeData?.units ?? [], onCreated: fee => { setFeeRows([...feeRows, { leaseFeeId: null, feeTypeId: null, draft: fee.draft, name: fee.name, unit: fee.unit, unitPrice: fee.price, price: String(fee.price), locked: false }]); setCreatingFee(false); setAddingFee(false) } })}
+          {renderCreateFee({ units: feeData?.units ?? [], onCreated: fee => { setFeeRows(rows => [...rows, { key: crypto.randomUUID(), leaseFeeId: null, feeTypeId: null, draft: fee.draft, name: fee.name, unit: fee.unit, quantitySource: sourceFromDraft(fee.draft), quantity: 1, price: String(fee.price), meterId: '', initialReading: '', openingReadOn: null, originalMeterId: '', originalReading: '' }]); setCreatingFee(false); setAddingFee(false) } })}
         </div>
         : <div className="space-y-3">
           {renderCreateFee && <div className="flex justify-end"><Button type="button" size="sm" variant="outline" onClick={() => setCreatingFee(true)}>+ Tạo loại phí mới</Button></div>}
@@ -320,7 +371,7 @@ export function ContractEditActions({ contract, canDelete, rooms, tenants, mode,
             {feeOptions.map(o => <li key={o.id}>
               <button type="button" className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-muted disabled:opacity-50 disabled:hover:bg-transparent" onClick={() => {
                 if (o.meter) { setMeterFee(o); setMeterReading(''); setMeterId(''); return }
-                setFeeRows([...feeRows, { leaseFeeId: null, feeTypeId: o.id, name: o.name, unit: o.unit, unitPrice: o.price, price: String(o.price), locked: false }]); setAddingFee(false)
+                setFeeRows(rows => [...rows, { key: crypto.randomUUID(), leaseFeeId: null, feeTypeId: o.id, name: o.name, unit: o.unit, quantitySource: o.source, quantity: 1, price: String(o.price), meterId: '', initialReading: '', openingReadOn: null, originalMeterId: '', originalReading: '' }]); setAddingFee(false)
               }}>
                 <span className="font-medium">{o.name} <span className="font-normal text-muted-foreground">· {o.unit}{o.meter ? ' · theo đồng hồ' : ''}</span></span><span className="tabular-nums">{formatVND(o.price)}</span>
               </button>
@@ -338,9 +389,9 @@ export function ContractEditActions({ contract, canDelete, rooms, tenants, mode,
     </div>}
     <FormDialog open={meterFee !== null} onOpenChange={o => { if (!o) setMeterFee(null) }} title={meterFee ? `Thêm phí ${meterFee.name}` : 'Thêm phí'} description="Bắt buộc chọn một đồng hồ của phòng và nhập chỉ số hiện tại. Mỗi đồng hồ chỉ gắn với một dòng phí." size="sm">
       {meterFee && <div className="space-y-3">
-        <div className="space-y-1"><Label htmlFor="meter-pick">Đồng hồ</Label><BareSelect id="meter-pick" ariaLabel="Đồng hồ" value={meterId} onValueChange={setMeterId} options={[{ value: '', label: '— Chọn đồng hồ —' }, ...(feeData?.roomMeters ?? []).filter(m => !m.busy && !feeRows.some(r => r.meterInit?.existingMeterId === m.id)).map(m => ({ value: m.id, label: m.label }))]} /></div>
+        <div className="space-y-1"><Label htmlFor="meter-pick">Đồng hồ</Label><BareSelect id="meter-pick" ariaLabel="Đồng hồ" value={meterId} onValueChange={setMeterId} options={[{ value: '', label: '— Chọn đồng hồ —' }, ...(feeData?.roomMeters ?? []).filter(m => !m.busy && !feeRows.some(r => r.meterId === m.id)).map(m => ({ value: m.id, label: m.label }))]} /></div>
         <div className="space-y-1"><Label htmlFor="meter-reading">Chỉ số hiện tại của đồng hồ</Label><Input id="meter-reading" inputMode="numeric" value={meterReading} onChange={e => setMeterReading(e.target.value)} /></div>
-        <Button type="button" disabled={!meterId || !/^\d+$/.test(meterReading.trim())} onClick={() => { setFeeRows([...feeRows, { leaseFeeId: null, feeTypeId: meterFee.id, name: meterFee.name, unit: meterFee.unit, unitPrice: meterFee.price, price: String(meterFee.price), locked: false, meterInit: { initialReading: Number(meterReading), existingMeterId: meterId } }]); setMeterFee(null); setAddingFee(false) }}>Thêm vào hợp đồng</Button>
+        <Button type="button" disabled={!meterId || !/^\d+$/.test(meterReading.trim())} onClick={() => { setFeeRows(rows => [...rows, { key: crypto.randomUUID(), leaseFeeId: null, feeTypeId: meterFee.id, name: meterFee.name, unit: meterFee.unit, quantitySource: 'meter', quantity: 1, price: String(meterFee.price), meterId, initialReading: meterReading.trim(), openingReadOn: null, originalMeterId: meterId, originalReading: meterReading.trim() }]); setMeterFee(null); setAddingFee(false) }}>Thêm vào hợp đồng</Button>
       </div>}
     </FormDialog>
   </div>
