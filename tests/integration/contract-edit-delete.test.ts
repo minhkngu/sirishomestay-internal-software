@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { meters, feeTypes, feeUnits, leaseFeeMeters, leaseFeeSnapshots, addenda, assets, auditLogs, files, handoverItems, depositContracts, depositEntries, facilities, handovers, invoices, payments, oneOffCharges, incidents, rooms, leases, tenants, userProfiles, userPermissions } from '@/db'
+import { meters, meterReadings, feeTypes, feeUnits, leaseFeeMeters, leaseFeeSnapshots, addenda, assets, auditLogs, files, handoverItems, depositContracts, depositEntries, facilities, handovers, invoices, payments, oneOffCharges, incidents, rooms, leases, tenants, userProfiles, userPermissions } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
+import { ForbiddenError } from '@/domain/errors'
 import { createTestDb } from '../helpers/db'
 import * as contracts from '@/server/contracts/service'
 import { saveUserAccess } from '@/server/users/service'
@@ -199,6 +200,71 @@ describe('sửa và xoá hợp đồng', () => {
     expect(await db.select().from(leases).where(eq(leases.id, lease.id))).toHaveLength(1)
     expect((await db.select().from(files).where(eq(files.storageKey, 'foreign-file')))[0].ownerType).toBe('lease_photo')
     expect((await storage.read('foreign-file')).byteLength).toBe(1)
+  })
+
+  describe('sửa đồng hồ và chỉ số đầu của phí theo đồng hồ', () => {
+    const feeCtx = () => context(['tenants_contracts', 'meters'], [facilityId])
+    const baseInput = (startDate = '2026-01-01') => ({ ...input(), startDate })
+    async function setup(opts: { installedOn?: string; roomId?: string } = {}) {
+      const targetRoom = opts.roomId ?? roomId
+      const [unit] = await db.insert(feeUnits).values({ name: 'kWh' }).returning()
+      const [dien] = await db.insert(feeTypes).values({ name: 'Điện', unitId: unit.id, defaultPrice: 3500, billing: 'per_occurrence', quantityFrom: 'meter' }).returning()
+      const [meter] = await db.insert(meters).values({ roomId: targetRoom, utility: 'electric', installedOn: opts.installedOn ?? '2025-01-01', startReading: 0 }).returning()
+      const { lease } = await contracts.createLease(db, feeCtx(), { ...baseInput(), roomId: targetRoom, fees: [{ feeTypeId: dien.id, unitPrice: 3500, initialReading: 1250, existingMeterId: meter.id }] })
+      const [fee] = await db.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, lease.id))
+      return { lease, fee, meter }
+    }
+    const editFees = (leaseId: string, fees: { leaseFeeId: string; unitPrice: number; initialReading?: number; existingMeterId?: string }[], startDate = '2026-01-01') =>
+      contracts.updateLease(db, feeCtx(), leaseId, { ...baseInput(startDate), fees }, false)
+    const handovers = (meterId: string) => db.select().from(meterReadings).where(eq(meterReadings.meterId, meterId)).then((rows) => rows.filter((r) => r.kind === 'handover'))
+
+    it('sửa chỉ số đầu, giữ đơn giá và ghi audit', async () => {
+      const { lease, fee, meter } = await setup()
+      await editFees(lease.id, [{ leaseFeeId: fee.id, unitPrice: 4000, existingMeterId: meter.id, initialReading: 1300 }])
+      expect((await handovers(meter.id)).map((r) => r.value)).toEqual([1300])
+      expect((await db.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.id, fee.id)))[0].unitPrice).toBe(4000)
+      expect((await db.select().from(auditLogs)).some((a) => a.entity === 'meter_readings' && a.action === 'update')).toBe(true)
+    })
+
+    it('chặn số âm, nhỏ hơn lần chốt trước, lớn hơn lần chốt sau và trước ngày lắp', async () => {
+      const { lease, fee, meter } = await setup()
+      await db.insert(meterReadings).values({ meterId: meter.id, period: '2025-12', readOn: '2025-12-31', value: 500, kind: 'handover' })
+      const edit = (initialReading: number) => editFees(lease.id, [{ leaseFeeId: fee.id, unitPrice: 3500, existingMeterId: meter.id, initialReading }])
+      await expect(edit(-1)).rejects.toThrow('Chỉ số')
+      await expect(edit(400)).rejects.toThrow('nhỏ hơn')
+      await db.insert(meterReadings).values({ meterId: meter.id, period: '2026-02', readOn: '2026-02-28', value: 1400, kind: 'monthly' })
+      await expect(edit(1500)).rejects.toThrow('lớn hơn')
+
+      const [lateRoom] = await db.insert(rooms).values({ facilityId, code: '103' }).returning()
+      const late = await setup({ installedOn: '2026-02-01', roomId: lateRoom.id })
+      await expect(editFees(late.lease.id, [{ leaseFeeId: late.fee.id, unitPrice: 3500, existingMeterId: late.meter.id, initialReading: 1300 }])).rejects.toThrow('chưa được lắp')
+    })
+
+    it('đổi sang đồng hồ khác cùng phòng, chặn đồng hồ phòng khác và đồng hồ đang bận', async () => {
+      const { lease, fee, meter } = await setup()
+      const [other] = await db.insert(meters).values({ roomId, utility: 'electric', installedOn: '2025-01-01', startReading: 0 }).returning()
+      const [otherRoom] = await db.insert(rooms).values({ facilityId, code: '102' }).returning()
+      const [foreign] = await db.insert(meters).values({ roomId: otherRoom.id, utility: 'electric', installedOn: '2025-01-01', startReading: 0 }).returning()
+      await expect(editFees(lease.id, [{ leaseFeeId: fee.id, unitPrice: 3500, existingMeterId: foreign.id, initialReading: 1250 }])).rejects.toThrow('không thuộc phòng')
+
+      await editFees(lease.id, [{ leaseFeeId: fee.id, unitPrice: 3500, existingMeterId: other.id, initialReading: 1250 }])
+      expect((await db.select().from(leaseFeeMeters).where(eq(leaseFeeMeters.leaseFeeId, fee.id)))[0].meterId).toBe(other.id)
+      expect((await handovers(other.id)).map((r) => [r.readOn, r.value])).toEqual([['2026-01-01', 1250]])
+      expect((await handovers(meter.id)).map((r) => [r.readOn, r.value])).toEqual([['2026-01-01', 1250]]) // đồng hồ cũ giữ lịch sử
+
+      const [busyLease] = await db.insert(leases).values({ code: 'HD-BUSY', roomId: otherRoom.id, tenantId, startDate: '2026-01-01', endDate: '2026-12-31', monthlyRent: 1, depositAmount: 1, status: 'active' }).returning()
+      const [busyFee] = await db.insert(leaseFeeSnapshots).values({ leaseId: busyLease.id, name: 'Điện', unit: 'kWh', quantitySource: 'meter', billing: 'per_occurrence', unitPrice: 3500 }).returning()
+      await db.insert(leaseFeeMeters).values({ leaseFeeId: busyFee.id, meterId: meter.id })
+      await expect(editFees(lease.id, [{ leaseFeeId: fee.id, unitPrice: 3500, existingMeterId: meter.id, initialReading: 1250 }])).rejects.toThrow('hợp đồng khác')
+    })
+
+    it('người chỉ có quyền hợp đồng sửa được đơn giá nhưng không gửi được đồng hồ, chỉ số', async () => {
+      const { lease, fee, meter } = await setup()
+      const contractOnly = context(['tenants_contracts'], [facilityId])
+      await contracts.updateLease(db, contractOnly, lease.id, { ...baseInput(), fees: [{ leaseFeeId: fee.id, unitPrice: 4000 }] }, false)
+      expect((await db.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.id, fee.id)))[0].unitPrice).toBe(4000)
+      await expect(contracts.updateLease(db, contractOnly, lease.id, { ...baseInput(), fees: [{ leaseFeeId: fee.id, unitPrice: 4000, existingMeterId: meter.id, initialReading: 1300 }] }, false)).rejects.toThrow(ForbiddenError)
+    })
   })
 
 })
