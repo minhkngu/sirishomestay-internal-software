@@ -317,12 +317,14 @@ export async function saveInvoiceFeeQuantities(db: DB, ctx: AccessContext, invoi
 /** Tính lại các dòng phí theo đồng hồ của hoá đơn nháp từ bảng chỉ số; thiếu chỉ số thì báo lỗi. */
 async function refreshMeterLines(tx: DB, inv: InvoiceRow, lease: Lease): Promise<void> {
   const calculated = await calculate(tx, lease, inv.facilityId, inv.periodStart.slice(0, 7), { start: inv.periodStart, end: inv.periodEnd, coefficient: inv.coefficient ?? undefined }, inv.fullMonth, inv.proration as Proration | undefined, inv.id)
-  const missing = calculated.warnings.filter(w => w.startsWith('Chưa') || lease.fees.some(f => w.startsWith(`${f.name}:`)))
-  if (missing.length) throw new ValidationError(missing.join('; '))
+  // Đồng hồ khác chưa có chỉ số không cản việc chốt đồng hồ này: dòng của nó là 0 đồng kèm cảnh báo, điền sau
+  const blocking = calculated.warnings.filter(w => w.startsWith('Chưa có đồng hồ') || lease.fees.some(f => w.startsWith(`${f.name}:`)))
+  if (blocking.length) throw new ValidationError(blocking.join('; '))
   for (const fee of lease.fees.filter(f => f.quantitySource === 'meter' && f.leaseFeeId)) {
-    await tx.delete(invoiceLines).where(and(eq(invoiceLines.invoiceId, inv.id), sql`${invoiceLines.meta}->>'leaseFeeId' = ${fee.leaseFeeId}`))
     const line = calculated.lines.find(l => l.meta?.leaseFeeId === fee.leaseFeeId)
-    if (line) await tx.insert(invoiceLines).values({ ...line, invoiceId: inv.id })
+    if (!line) continue
+    await tx.delete(invoiceLines).where(and(eq(invoiceLines.invoiceId, inv.id), sql`${invoiceLines.meta}->>'leaseFeeId' = ${fee.leaseFeeId}`))
+    await tx.insert(invoiceLines).values({ ...line, invoiceId: inv.id })
   }
 }
 const meterReadingEditSchema = z.object({ leaseFeeId: z.uuid(), period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional(), value: z.number().int().safe().nonnegative().max(2_147_483_647) })

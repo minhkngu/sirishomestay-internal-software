@@ -62,6 +62,15 @@ describe('sửa chỉ số điện trong hoá đơn', () => {
     expect(rows.map(r => r.kind).sort()).toEqual(['handover', 'monthly'])
     expect(rows.find(r => r.kind === 'monthly')?.value).toBe(200)
   })
+  it('đồng hồ nước chưa có chỉ số không cản việc chốt chỉ số điện', async () => {
+    const [water] = await db.insert(meters).values({ roomId, utility: 'water', installedOn: '2026-01-01', startReading: 0 }).returning()
+    const [waterFee] = await db.insert(leaseFeeSnapshots).values({ leaseId, name: 'Nước', unit: 'm3', quantitySource: 'meter', billing: 'per_occurrence', unitPrice: 15000 }).returning()
+    await db.insert(leaseFeeMeters).values({ leaseFeeId: waterFee.id, meterId: water.id })
+    await updateInvoiceMeterReading(db, ctx(), invoiceId, { leaseFeeId: feeId, value: 260 })
+    expect((await electricLine()).amount).toBe(560000)
+    const waterLine = (await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, invoiceId))).find(l => (l.meta as { leaseFeeId?: string } | null)?.leaseFeeId === waterFee.id)
+    expect(waterLine?.amount ?? 0).toBe(0)
+  })
   it('hoá đơn tháng sau đã duyệt dùng số này thì từ chối', async () => {
     await db.insert(invoices).values({ code: 'TD-HD-202701-0001', leaseId, facilityId, kind: 'monthly', periodStart: '2027-01-01', periodEnd: '2027-01-31', issueDate: '2027-01-01', status: 'approved' })
     await expect(updateInvoiceMeterReading(db, ctx(), invoiceId, { leaseFeeId: feeId, value: 260 })).rejects.toThrow(ValidationError)
