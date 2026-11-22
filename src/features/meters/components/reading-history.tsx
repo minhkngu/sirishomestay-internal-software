@@ -40,7 +40,7 @@ export function ReadingHistory({ rows, facilityName }: { rows: ReadingHistoryRow
       setBulkDeleting(false)
       if (!r.ok) { toast.error(r.error); return }
       setSelected(new Set())
-      toast.success(`Đã xoá ${r.data.deleted} lần chốt${r.data.skipped ? `, bỏ qua ${r.data.skipped} dòng đã khoá` : ''}`)
+      toast.success(`Đã xoá ${r.data.deleted} lần chốt${r.data.skipped ? `, bỏ qua ${r.data.skipped} dòng không xoá được` : ''}`)
       router.refresh()
     })
   }
@@ -150,7 +150,7 @@ export function ReadingHistory({ rows, facilityName }: { rows: ReadingHistoryRow
         open={bulkDeleting}
         onOpenChange={setBulkDeleting}
         title={`Xoá ${chosen.length} lần chốt chỉ số?`}
-        description="Các lần chốt đã chọn sẽ bị xoá, dòng đã khoá được bỏ qua. Không thể hoàn tác."
+        description="Các lần chốt đã chọn sẽ bị xoá, Không thể hoàn tác."
         confirmLabel="Xoá"
         destructive
         onConfirm={removeMany}

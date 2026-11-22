@@ -485,7 +485,7 @@ export async function deleteMeterReading(db: DB, ctx: AccessContext, id: string)
   })
 }
 
-/** Xoá nhiều lần chốt một lúc: dòng đã khoá hoặc không thuộc quyền thì bỏ qua và đếm lại. */
+/** Xoá nhiều lần chốt một lúc: dòng không thuộc quyền hoặc không còn thì bỏ qua và đếm lại. */
 export async function deleteMeterReadings(db: DB, ctx: AccessContext, ids: string[]): Promise<{ deleted: number; skipped: number }> {
   const unique = [...new Set(ids)].slice(0, 500)
   let deleted = 0
