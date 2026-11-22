@@ -10,11 +10,13 @@ export function RouteModal({
   title,
   description,
   size,
+  closeHref,
   children,
 }: {
   title: string
   description?: string
   size?: FormDialogSize
+  /** Đóng popup bằng cách thay URL (dùng khi mở bằng query, không có trang trước để quay lại). */ closeHref?: string
   children: ReactNode
 }) {
   const router = useRouter()
@@ -25,7 +27,9 @@ export function RouteModal({
       description={description}
       size={size}
       onOpenChange={(open) => {
-        if (!open) router.back()
+        if (open) return
+        if (closeHref) router.replace(closeHref)
+        else router.back()
       }}
     >
       <RouteModalContext.Provider value>{children}</RouteModalContext.Provider>

@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { fillMeterReadings, meterValue } from './helpers'
+import { fillMeterReadings, meterValue, pickDate, pickTerm } from './helpers'
 
 test.skip(!process.env.E2E_BASE_URL, 'Cần E2E_BASE_URL trỏ tới môi trường thử có dữ liệu mẫu')
 async function login(page: Page, name: RegExp) {
@@ -55,25 +55,26 @@ test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → 
 
   await page.goto('/contracts/new?kind=deposit')
   await page.waitForLoadState('networkidle')
-  const roomOption = page.locator('#room option').filter({ hasText: 'Trống' }).first()
-  const roomId = await roomOption.getAttribute('value')
-  const facilityName = (await roomOption.textContent())!.split(' · ')[0].trim()
-  expect(roomId).toBeTruthy()
-  await page.locator('#room').selectOption(roomId!)
+  await page.getByLabel('Toà', { exact: true }).click()
   await page
-    .locator('#tenant')
-    .selectOption({ label: new RegExp(name) as never })
-    .catch(async () => {
-      const v = await page.locator('#tenant option').filter({ hasText: name }).first().getAttribute('value')
-      await page.locator('#tenant').selectOption(v!)
-    })
+    .getByRole('option', { name: /Bình Thạnh/ })
+    .first()
+    .click()
+  await page.getByLabel('Phòng', { exact: true }).click()
+  const roomOption = page.getByRole('option').filter({ hasText: 'Trống' }).first()
+  await expect(roomOption).toBeVisible()
+  const facilityName = 'Bình Thạnh'
+  await roomOption.click()
+  await page.getByLabel('Bên thuê', { exact: true }).click()
+  await page.getByPlaceholder('Tìm theo tên hoặc số điện thoại…').fill(name)
+  await page.getByRole('option').filter({ hasText: name }).first().click()
   await page.getByLabel('Tiền cọc giữ chỗ (VND)').fill('5000000')
   await page.getByLabel('Giá thuê thoả thuận (VND/tháng)').fill('9000000')
-  await page.getByLabel('Ngày vào ở dự kiến').fill('2026-12-01')
+  await pickDate(page, 'Ngày vào ở dự kiến', '2026-12-01')
   await page.getByRole('button', { name: 'Tạo hợp đồng cọc' }).click()
   await expect(page).toHaveURL(/\/contracts\/[a-f0-9-]+$/)
   await page.getByRole('link', { name: 'Chuyển thành hợp đồng thuê' }).click()
-  await page.getByRole('button', { name: '+12 tháng' }).click()
+  await pickTerm(page, 12)
   await fillMeterReadings(page)
   await page.getByRole('button', { name: 'Tạo hợp đồng thuê' }).click()
   await expect(page).toHaveURL(/\/contracts\/[a-f0-9-]+$/, { timeout: 60_000 })

@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm'
-import { feeTypes, feeUnits, utilityRates } from '@/db'
+import { feeTypes, feeUnits } from '@/db'
 import type { SeedModule } from './types'
 
 const UNITS = ['người', 'xe', 'phòng', 'kg', 'lần']
@@ -23,7 +23,7 @@ export const settingsSeed: SeedModule = {
   async isSeeded({ db }) {
     return (await db.select({ id: feeTypes.id }).from(feeTypes).where(eq(feeTypes.isDemo, true)).limit(1)).length > 0
   },
-  async run({ db, state, today }) {
+  async run({ db, state }) {
     const unitIds: Record<string, string> = {}
     for (const name of UNITS) {
       const [u] = await db.insert(feeUnits).values({ name, isDemo: true }).returning()
@@ -45,25 +45,5 @@ export const settingsSeed: SeedModule = {
       typeIds[f.name] = t.id
     }
     state.feeTypeIds = typeIds
-    const monthStart = `${today.slice(0, 7)}-01`
-    for (const facilityId of Object.values(state.facilityIds)) {
-      await db.insert(utilityRates).values([
-        {
-          facilityId,
-          utility: 'electric',
-          pricePerUnit: 3500,
-          effectiveFrom: `${today.slice(0, 4)}-01-01`,
-          isDemo: true,
-        },
-        { facilityId, utility: 'electric', pricePerUnit: 3800, effectiveFrom: monthStart, isDemo: true },
-        {
-          facilityId,
-          utility: 'water',
-          pricePerUnit: 18000,
-          effectiveFrom: `${today.slice(0, 4)}-01-01`,
-          isDemo: true,
-        },
-      ])
-    }
   },
 }
