@@ -4,7 +4,7 @@ import { depositEntries, facilities, invoiceLines, invoices, leases, rooms, tena
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
-import { createDraftForLease, createDrafts, createInvoiceFromEditor, previewNewInvoice } from '@/server/invoices/service'
+import { createDraftForLease, createDrafts, createInvoiceFromEditor, previewNewInvoice, updateLines } from '@/server/invoices/service'
 import { createTestDb } from '../helpers/db'
 
 const context = (permissions: Permission[], facilityId: string): AccessContext => ({ userId: crypto.randomUUID(), email: 'test@example.com', fullName: 'Test', permissions: new Set(permissions), facilityIds: new Set([facilityId]), isAdmin: false })
@@ -72,5 +72,27 @@ describe('tiền cọc còn thiếu trên hoá đơn', () => {
     await db.insert(depositEntries).values({ leaseId, type: 'collect', status: 'done', amount: 6000000, date: '2026-12-01', method: 'cash' })
     const inv = await createDraftForLease(db, ctx(), { leaseId, period: '2026-12' })
     expect(await depositOf(inv.id)).toMatchObject([{ amount: 3000000 }])
+  })
+})
+
+describe('kỳ hoá đơn theo dòng tiền phòng', () => {
+  let db: DB, facilityId: string, leaseId: string
+  const ctx = () => context(['billing'], facilityId)
+  beforeEach(async () => {
+    db = await createTestDb()
+    const [facility] = await db.insert(facilities).values({ code: 'TD', name: 'Thảo Điền' }).returning(); facilityId = facility.id
+    const [room] = await db.insert(rooms).values({ facilityId, code: '302' }).returning()
+    const [tenant] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: facilityId, fullName: 'Khách', phone: '+84901234567', idNumber: '012345678901' }).returning()
+    const [lease] = await db.insert(leases).values({ code: 'HD2', roomId: room.id, tenantId: tenant.id, startDate: '2026-11-15', endDate: '2027-12-31', monthlyRent: 9000000, depositAmount: 0 }).returning(); leaseId = lease.id
+  })
+  it('sửa thời gian dòng tiền phòng thì kỳ hoá đơn và kỳ kế tiếp đổi theo', async () => {
+    const first = await createDraftForLease(db, ctx(), { leaseId, period: '2026-11' })
+    const lines = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, first.id))
+    const send = lines.map(l => ({ id: l.id, type: l.type, description: l.description, quantity: l.type === 'rent' ? 0.5333 : l.quantity, unitPrice: l.unitPrice, meta: (l.type === 'rent' ? { ...(l.meta as object), from: '2026-11-15', to: '2026-11-30', coefficient: 0.5333 } : l.meta) as Record<string, unknown> | null }))
+    await updateLines(db, ctx(), first.id, send)
+    const [saved] = await db.select().from(invoices).where(eq(invoices.id, first.id))
+    expect([saved.periodStart, saved.periodEnd]).toEqual(['2026-11-15', '2026-11-30'])
+    const next = await createDraftForLease(db, ctx(), { leaseId, period: '2026-12' })
+    expect(next.periodStart).toBe('2026-12-01')
   })
 })

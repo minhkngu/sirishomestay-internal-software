@@ -190,3 +190,17 @@ export function settlementState(total: number, paid: number): 'unpaid' | 'partia
   if (paid >= total) return 'paid'
   return paid > 0 ? 'partial' : 'unpaid'
 }
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+/** Kỳ hoá đơn suy từ các dòng tiền phòng: ngày đầu sớm nhất, ngày cuối muộn nhất; không có dòng hợp lệ thì null. */
+export function rentPeriodOf(lines: Array<{ type: string; meta?: unknown }>): { start: string; end: string } | null {
+  let start: string | null = null, end: string | null = null
+  for (const l of lines) {
+    if (l.type !== 'rent') continue
+    const m = (l.meta ?? {}) as { from?: unknown; to?: unknown }
+    if (typeof m.from !== 'string' || typeof m.to !== 'string' || !ISO_DATE.test(m.from) || !ISO_DATE.test(m.to)) continue
+    if (start === null || m.from < start) start = m.from
+    if (end === null || m.to > end) end = m.to
+  }
+  return start !== null && end !== null ? { start, end } : null
+}

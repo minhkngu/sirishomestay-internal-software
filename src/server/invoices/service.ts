@@ -10,7 +10,7 @@ import { displayName } from '@/domain/tenant-name'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { midPeriodAdjustments } from '@/domain/adjustments'
 import { fullMonthCoefficient, monthsCoefficient } from '@/domain/proration'
-import { buildMonthlyInvoice, nextBillingPeriod, settlementState } from '@/domain/invoice-builder'
+import { buildMonthlyInvoice, nextBillingPeriod, rentPeriodOf, settlementState } from '@/domain/invoice-builder'
 import type { Addendum, ContractFee, Invoice, MeterReading, DueRule, InvoiceLineInput, Lease, Meter, OneOffCharge, PendingAdjustment, Proration } from '@/domain/types'
 import { finalizeTermination } from '@/server/addenda/finalize'
 import { recordAudit, recordAuditBatch } from '@/server/audit'
@@ -588,8 +588,11 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
     }
     await tx.delete(invoiceLines).where(eq(invoiceLines.invoiceId, id))
     const rows = next.length ? await tx.insert(invoiceLines).values(next).returning() : []
-    await tx.update(invoices).set({ updatedAt: new Date() }).where(eq(invoices.id, id))
-    await recordAudit(tx, ctx, { action: 'update', entity: 'invoice', entityId: id, facilityId: inv.facilityId, summary: inv.status === 'approved' ? 'Sửa dòng hoá đơn đã duyệt' : 'Sửa dòng hoá đơn', before: old, after: rows })
+    // Kỳ hoá đơn theo dòng tiền phòng, để hoá đơn kế tiếp nối đúng từ ngày cuối đã chỉnh
+    const rentPeriod = inv.kind === 'monthly' ? rentPeriodOf(rows) : null
+    const periodChanged = rentPeriod && (rentPeriod.start !== inv.periodStart || rentPeriod.end !== inv.periodEnd)
+    await tx.update(invoices).set({ updatedAt: new Date(), ...(rentPeriod && periodChanged ? { periodStart: rentPeriod.start, periodEnd: rentPeriod.end } : {}) }).where(eq(invoices.id, id))
+    await recordAudit(tx, ctx, { action: 'update', entity: 'invoice', entityId: id, facilityId: inv.facilityId, summary: (inv.status === 'approved' ? 'Sửa dòng hoá đơn đã duyệt' : 'Sửa dòng hoá đơn') + (rentPeriod && periodChanged ? ` (đổi kỳ ${inv.periodStart} – ${inv.periodEnd} thành ${rentPeriod.start} – ${rentPeriod.end})` : ''), before: old, after: rows })
     return rows
   })
 }
