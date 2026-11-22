@@ -43,4 +43,11 @@ describe('meterFeeUsage', () => {
     const r = meterFeeUsage({ ...base, lease: lease({ startDate: '2026-11-15' }), startDate: '2026-11-15', linked: m, meters: [m], readings: [reading('m', '2026-10-31', 100), reading('m', '2026-11-15', 120, 'handover'), reading('m', '2026-11-30', 150)] })
     expect(r.usage).toBe(30)
   })
+  it('đồng hồ lắp đúng ngày bắt đầu hợp đồng: chỉ số bàn giao là số đầu, hai số bằng nhau thì tiêu thụ 0', () => {
+    const m = electric('m', 'R1', { installedOn: '2026-11-21' })
+    const r = meterFeeUsage({ ...base, lease: lease({ startDate: '2026-11-21' }), startDate: '2026-11-21', linked: m, meters: [m], readings: [reading('m', '2026-11-21', 1232, 'handover'), reading('m', '2026-11-30', 1232)] })
+    expect(r.usage).toBe(0)
+    expect(r.missing).toEqual([])
+    expect(r.segments[0]).toMatchObject({ start: 1232, end: 1232 })
+  })
 })

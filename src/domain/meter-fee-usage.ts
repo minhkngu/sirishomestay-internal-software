@@ -26,7 +26,7 @@ export function meterFeeUsage(input: {
     const chain = chainOf(segment.terms.roomId)
     const first = index === 0
     const last = index + 1 === roomSegments.length
-    const start = first ? (beginsInRange && chain.some(m => m.installedOn < startDate) ? addDays(startDate, 1) : segment.from) : addDays(segment.from, 1)
+    const start = first ? (beginsInRange && chain.some(m => m.installedOn < startDate || hasReading(m, startDate)) ? addDays(startDate, 1) : segment.from) : addDays(segment.from, 1)
     const end = last ? segment.to : addDays(segment.to, 1)
     const boundary = first ? (beginsInRange ? startDate : null) : segment.from
     const endBoundary = last ? null : addDays(segment.to, 1)

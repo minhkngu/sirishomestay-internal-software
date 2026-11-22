@@ -315,10 +315,11 @@ export async function saveInvoiceFeeQuantities(db: DB, ctx: AccessContext, invoi
 }
 
 /** Tính lại các dòng phí theo đồng hồ của hoá đơn nháp từ bảng chỉ số; thiếu chỉ số thì báo lỗi. */
-async function refreshMeterLines(tx: DB, inv: InvoiceRow, lease: Lease): Promise<void> {
+/** `strict` (duyệt hoá đơn): còn thiếu chỉ số hoặc số lượng thì từ chối; khi chốt từng đồng hồ thì không chặn. */
+async function refreshMeterLines(tx: DB, inv: InvoiceRow, lease: Lease, strict = false): Promise<void> {
   const calculated = await calculate(tx, lease, inv.facilityId, inv.periodStart.slice(0, 7), { start: inv.periodStart, end: inv.periodEnd, coefficient: inv.coefficient ?? undefined }, inv.fullMonth, inv.proration as Proration | undefined, inv.id)
   // Đồng hồ khác chưa có chỉ số không cản việc chốt đồng hồ này: dòng của nó là 0 đồng kèm cảnh báo, điền sau
-  const blocking = calculated.warnings.filter(w => w.startsWith('Chưa có đồng hồ') || lease.fees.some(f => w.startsWith(`${f.name}:`)))
+  const blocking = calculated.warnings.filter(w => (strict ? w.startsWith('Chưa') : w.startsWith('Chưa có đồng hồ')) || lease.fees.some(f => w.startsWith(`${f.name}:`)))
   if (blocking.length) throw new ValidationError(blocking.join('; '))
   for (const fee of lease.fees.filter(f => f.quantitySource === 'meter' && f.leaseFeeId)) {
     const line = calculated.lines.find(l => l.meta?.leaseFeeId === fee.leaseFeeId)
@@ -411,7 +412,7 @@ export async function approveInvoice(db: DB, ctx: AccessContext, id: string, inp
     const tx = tx0 as unknown as DB; await tx.select({ id: invoices.id }).from(invoices).where(eq(invoices.id, id)).for('update'); const before = await getInvoice(tx, ctx, id); if (before.status !== 'draft') throw new ValidationError('Hoá đơn đã được duyệt')
     const [lease, settings] = await Promise.all([leaseData(tx, before.leaseId), getSettings(tx)])
     if (before.kind === 'monthly') {
-      await refreshMeterLines(tx, before, lease)
+      await refreshMeterLines(tx, before, lease, true)
     }
     const rule = valid.dueRule ?? lease.dueRule ?? settings.dueRule
     // Hạn đã có sẵn (đặt lúc tạo hoặc nhân viên sửa tay) thì giữ; chỉ tính mới khi chưa có hoặc người duyệt chọn quy tắc riêng
