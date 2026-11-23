@@ -3,7 +3,7 @@ import { meters, meterTypes } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, NotFoundError, type AccessContext } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
-import { recordAudit } from '@/server/audit'
+import { recordAudit } from '@/modules/platform'
 import { meterTypeInput, meterTypeUpdateInput } from './schemas'
 
 export type MeterType = typeof meterTypes.$inferSelect

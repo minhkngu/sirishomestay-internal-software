@@ -16,8 +16,8 @@ import type { AccessContext } from '@/domain/access'
 import { addDays } from '@/domain/dates'
 import { depositBalance } from '@/domain/deposit'
 import type { DepositEntry, ForfeitInput } from '@/domain/types'
-import { recordAudit } from '@/server/audit'
-import { getSettings } from '@/server/settings/service'
+import { recordAudit } from '@/modules/platform'
+import { getSettings } from '@/modules/platform'
 
 /**
  * Chạy khi hoá đơn thanh lý được duyệt: hợp đồng → ended; sổ cọc ghi `forfeit` (mất cọc) và `deduct` (phần cọc đã trừ vào hoá đơn)

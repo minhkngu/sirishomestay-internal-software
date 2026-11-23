@@ -6,8 +6,8 @@ import { NewInvoiceForm } from '@/features/invoices/components/new-invoice-form'
 import { listFacilities } from '@/server/facilities/service'
 import { listFeeTypePrices, listFeeTypes, listFeeUnits } from '@/server/fees/service'
 import { previewNewInvoice } from '@/server/invoices/service'
-import { getAccessContext } from '@/server/session'
-import { getSettings } from '@/server/settings/service'
+import { getAccessContext } from '@/modules/platform'
+import { getSettings } from '@/modules/platform'
 import { InvoiceEditorWithFees } from '../[id]/invoice-editor-with-fees'
 
 export type NewInvoiceParams = { facility?: string; lease?: string; period?: string }

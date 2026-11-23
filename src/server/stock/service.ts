@@ -4,7 +4,7 @@ import { facilities, rooms, stockItems, stockLevels, stockMoves } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, facilityScope, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
-import { recordAudit } from '@/server/audit'
+import { recordAudit } from '@/modules/platform'
 import type { Location } from '@/server/assets/service'
 
 const itemInput = z.object({

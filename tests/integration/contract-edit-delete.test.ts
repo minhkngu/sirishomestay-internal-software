@@ -32,8 +32,8 @@ import { ForbiddenError } from '@/domain/errors'
 import { createTestDb } from '../helpers/db'
 import * as contracts from '@/server/contracts/service'
 import { saveUserAccess } from '@/server/users/service'
-import { MemoryStorage } from '@/server/storage/memory'
-import { confirmUpload } from '@/server/files/service'
+import { MemoryStorage } from '@/modules/platform/server/storage/memory'
+import { confirmUpload } from '@/modules/platform/server/files/service'
 
 const context = (permissions: Permission[], facilityIds: string[], isAdmin = false): AccessContext => ({
   userId: crypto.randomUUID(),

@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import { db } from '@/db/client'
 import { assertCan } from '@/domain/access'
 import { listFacilities } from '@/server/facilities/service'
-import { getAccessContext } from '@/server/session'
+import { getAccessContext } from '@/modules/platform'
 import { listUsers } from '@/server/users/queries'
 import { UserForm } from '@/features/users/components/user-form'
 

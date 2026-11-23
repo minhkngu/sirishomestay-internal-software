@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { assertCan } from '@/domain/access'
-import { getAccessContext } from '@/server/session'
+import { getAccessContext } from '@/modules/platform'
 import { GenerateInvoices } from './generate-invoices'
 
 export default async function GenerateInvoicesPage() {

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { db } from '@/db/client'
 import { buttonVariants } from '@/components/ui/button'
-import { getAccessContext } from '@/server/session'
+import { getAccessContext } from '@/modules/platform'
 import { assertCan } from '@/domain/access'
 import { notFound } from 'next/navigation'
 import { listUsers } from '@/server/users/queries'

@@ -59,11 +59,21 @@ describe('đăng ký resolver và loader', () => {
     expect(missing).toEqual([])
   })
 
-  it('mọi actions.ts import registrations', () => {
+  it("mọi actions.ts có 'use server' import registrations", () => {
+    const isUseServer = (code: string) => /^(?:\s|\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)*(['"])use server\1/.test(code)
     const bad = [...walk(join(ROOT, 'src/server')), ...walk(join(ROOT, 'src/modules'))]
       .filter((f) => /(\\|\/)actions\.ts$/.test(f))
+      .filter((f) => isUseServer(read(f)))
       .filter((f) => !importsOf(read(f)).some((s) => registrationsSpecifier.test(s)))
       .map(rel)
+    expect(bad).toEqual([])
+  })
+
+  it('cổng module (index.ts, actions.ts, ui.ts) chỉ re-export, không import side-effect', () => {
+    const gates = walk(join(ROOT, 'src/modules'))
+      .map(rel)
+      .filter((f) => /^src\/modules\/[^/]+\/(index|actions|ui)\.ts$/.test(f))
+    const bad = gates.filter((f) => importsOf(read(join(ROOT, f))).length > 0)
     expect(bad).toEqual([])
   })
 

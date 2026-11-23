@@ -12,7 +12,7 @@ import {
   updateLease,
 } from '@/server/contracts/service'
 import { createExtension, createTermination } from '@/server/addenda/service'
-import { MemoryStorage } from '@/server/storage/memory'
+import { MemoryStorage } from '@/modules/platform/server/storage/memory'
 
 describe('lịch sử hợp đồng', () => {
   let db: DB, ctx: AccessContext, roomId: string, tenantId: string

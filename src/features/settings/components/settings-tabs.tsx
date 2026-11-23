@@ -10,8 +10,8 @@ import { AmenitySettings, type AmenityRow } from '@/features/settings/components
 import { MeterTypeSettings, type MeterTypeRow } from '@/features/settings/components/meter-type-settings'
 import { FeeSettings } from '@/features/settings/components/fee-settings'
 import { Msg, useRun } from '@/features/settings/components/use-run'
-import { updateSettingsAction } from '@/server/settings/actions'
-import type { Settings } from '@/server/settings/service'
+import { updateSettingsAction } from '@/modules/platform/actions'
+import type { Settings } from '@/modules/platform'
 
 type Fac = { id: string; name: string }
 type Unit = { id: string; name: string }

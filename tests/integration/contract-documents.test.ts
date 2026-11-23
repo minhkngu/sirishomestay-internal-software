@@ -6,7 +6,7 @@ import type { AccessContext } from '@/domain/access'
 import { createTestDb } from '../helpers/db'
 import * as contracts from '@/server/contracts/service'
 import { syncContractDocuments } from '@/server/contracts/documents'
-import { MemoryStorage } from '@/server/storage/memory'
+import { MemoryStorage } from '@/modules/platform/server/storage/memory'
 import { addHtmlTemplate } from '../helpers/templates'
 
 const admin: AccessContext = {

@@ -28,7 +28,7 @@ import {
   updateLease,
 } from '@/server/contracts/service'
 import { cleanupPendingRestoredFiles, previewContractRestore, restoreContract } from '@/server/contracts/restore'
-import { MemoryStorage } from '@/server/storage/memory'
+import { MemoryStorage } from '@/modules/platform/server/storage/memory'
 import { createExtension, createTermination } from '@/server/addenda/service'
 import { approveInvoice } from '@/server/invoices/service'
 

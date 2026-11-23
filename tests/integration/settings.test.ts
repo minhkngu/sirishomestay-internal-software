@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { getSettings, updateSettings, SETTINGS_DEFAULTS } from '@/server/settings/service'
+import { getSettings, updateSettings, SETTINGS_DEFAULTS } from '@/modules/platform/server/settings/service'
 import { ForbiddenError, type AccessContext, type Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'
 import type { DB } from '@/db/client'

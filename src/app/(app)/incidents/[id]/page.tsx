@@ -1,12 +1,12 @@
 import Link from 'next/link'
 import { db } from '@/db/client'
 import { formatVND } from '@/domain/money'
-import { FileUpload } from '@/components/file-upload'
+import { FileUpload } from '@/modules/platform/ui'
 import { orNotFound } from '@/lib/or-not-found'
-import { listFiles } from '@/server/files/service'
+import { listFiles } from '@/modules/platform'
 import { getIncident } from '@/server/incidents/service'
 import { roomCodesByIds } from '@/server/rooms/service'
-import { getAccessContext } from '@/server/session'
+import { getAccessContext } from '@/modules/platform'
 import { userNamesByIds } from '@/server/users/queries'
 
 const STATUS: Record<string, string> = { new: 'Mới', in_progress: 'Đang xử lý', done: 'Xong', cancelled: 'Đã huỷ' }

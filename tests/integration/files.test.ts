@@ -10,8 +10,8 @@ import {
   listFiles,
   getDownloadUrl,
   fileAccessPermission,
-} from '@/server/files/service'
-import { MemoryStorage } from '@/server/storage/memory'
+} from '@/modules/platform/server/files/service'
+import { MemoryStorage } from '@/modules/platform/server/storage/memory'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import type { AccessContext, Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'

@@ -3,8 +3,8 @@ import { files } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, can, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
-import { recordAudit } from '@/server/audit'
-import type { StorageAdapter } from '@/server/storage/types'
+import { recordAudit } from '../audit'
+import type { StorageAdapter } from '../storage/types'
 import { ALLOWED_TYPES, EXT, IMAGE_OWNERS, fileAccessPermission, resolveOwner, type OwnerType } from './owners'
 
 export { fileAccessPermission }

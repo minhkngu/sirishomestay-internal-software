@@ -18,8 +18,8 @@ import { meterSeed } from './meters'
 import { settingsSeed } from './settings'
 import { templateSeed } from './templates'
 import { tenantSeed } from './tenants'
-import { MemoryStorage } from '@/server/storage/memory'
-import type { StorageAdapter } from '@/server/storage/types'
+import { MemoryStorage } from '@/modules/platform/server/storage/memory'
+import type { StorageAdapter } from '@/modules/platform'
 import { userSeed } from './users'
 import type { AuthAdmin, SeedCtx, SeedModule } from './types'
 
@@ -110,7 +110,7 @@ async function main() {
     },
   }
   if ((process.env.STORAGE_DRIVER ?? 'supabase') === 'supabase') await ensureSeedBucket(supabase.storage)
-  const { getStorage } = await import('@/server/storage')
+  const { getStorage } = await import('@/modules/platform')
   await runSeed(db, auth, {
     today: todayVN(),
     password,

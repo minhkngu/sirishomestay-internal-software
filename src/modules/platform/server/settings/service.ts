@@ -3,7 +3,7 @@ import { appSettings } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
-import { recordAudit } from '@/server/audit'
+import { recordAudit } from '../audit'
 
 import type { BankAccount, DueRule } from '@/domain/types'
 import { bankAccountSchema } from './schemas'

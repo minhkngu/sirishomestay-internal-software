@@ -11,8 +11,8 @@ import { InvoiceFeeQuantities } from '@/features/invoices/components/invoice-fee
 import { InvoiceEditorWithFees } from './invoice-editor-with-fees'
 import { InvoiceStatus } from '@/features/invoices/components/invoice-status'
 import { getInvoiceDetail, tenantBalance } from '@/server/invoices/service'
-import { getAccessContext } from '@/server/session'
-import { getSettings } from '@/server/settings/service'
+import { getAccessContext } from '@/modules/platform'
+import { getSettings } from '@/modules/platform'
 import { listFeeTypePrices, listFeeTypes, listFeeUnits } from '@/server/fees/service'
 
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {

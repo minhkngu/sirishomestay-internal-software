@@ -4,7 +4,7 @@ import '@/modules/registrations'
 
 import { revalidatePath } from 'next/cache'
 import { db } from '@/db/client'
-import { getAccessContext } from '@/server/session'
+import { getAccessContext } from '../session'
 import { toActionResult } from '@/lib/action-result'
 import { updateSettings, type Settings } from './service'
 

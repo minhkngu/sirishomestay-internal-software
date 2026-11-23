@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { facilities, files } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
-import { countPendingContractFiles } from '@/server/files/service'
+import { countPendingContractFiles } from '@/modules/platform'
 import { createTestDb } from '../helpers/db'
 
 const context = (permissions: Permission[], facilityId: string, isAdmin = false): AccessContext => ({

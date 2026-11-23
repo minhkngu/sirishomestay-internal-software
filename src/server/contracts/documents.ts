@@ -3,8 +3,8 @@ import { files, handovers, leases } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
 import { NotFoundError } from '@/domain/errors'
-import { deleteFile } from '@/server/files/service'
-import type { StorageAdapter } from '@/server/storage/types'
+import { deleteFile } from '@/modules/platform'
+import type { StorageAdapter } from '@/modules/platform'
 import { exportDocument } from '@/server/templates/service'
 
 type Job = {

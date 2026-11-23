@@ -11,7 +11,7 @@ import {
   resolveInvoiceTemplateId,
   type InvoiceTemplateConfig,
 } from '@/domain/invoice-template'
-import { recordAudit } from '@/server/audit'
+import { recordAudit } from '@/modules/platform'
 
 type TemplateInput = { name: string; config?: unknown; body?: string; style?: TemplateStyle }
 function checked(input: TemplateInput) {

@@ -7,7 +7,7 @@ import { depositBalance } from '@/domain/deposit'
 import type { DepositEntry, LeaseTerms } from '@/domain/types'
 import { todayVN } from '@/domain/dates'
 import { contractTermsAt } from '@/domain/contract-terms'
-import { getSettings } from '@/server/settings/service'
+import { getSettings } from '@/modules/platform'
 import { leaseData, loadAddenda } from '@/server/invoices/service'
 import { getRoom, listRooms, roomAmenitiesOf, type Room } from '@/server/rooms/service'
 

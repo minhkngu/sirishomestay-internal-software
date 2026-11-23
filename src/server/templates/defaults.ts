@@ -11,7 +11,7 @@ import {
   type DocType,
   type TemplateDocType,
 } from '@/domain/template-fields'
-import { recordAudit } from '@/server/audit'
+import { recordAudit } from '@/modules/platform'
 import { isUsableTemplate, type DocTemplate } from './service'
 
 // ---------------------------------------------------------------- nội dung khởi đầu của từng loại

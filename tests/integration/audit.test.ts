@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { auditLogs } from '@/db'
-import { recordAudit, listAuditLogs } from '@/server/audit'
+import { recordAudit, listAuditLogs } from '@/modules/platform'
 import { ForbiddenError } from '@/domain/errors'
 import type { AccessContext } from '@/domain/access'
 import { createTestDb } from '../helpers/db'

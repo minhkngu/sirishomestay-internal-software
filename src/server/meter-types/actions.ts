@@ -8,7 +8,7 @@ import { db } from '@/db/client'
 import { ValidationError } from '@/domain/errors'
 import { toActionResult, type ActionResult } from '@/lib/action-result'
 import { fieldErrorsOf } from '@/lib/zod-errors'
-import { getAccessContext } from '@/server/session'
+import { getAccessContext } from '@/modules/platform'
 import { createMeterType, deleteMeterType, updateMeterType } from './service'
 
 async function guard<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {

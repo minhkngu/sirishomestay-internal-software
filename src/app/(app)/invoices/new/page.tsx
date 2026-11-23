@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { assertCan } from '@/domain/access'
-import { getAccessContext } from '@/server/session'
+import { getAccessContext } from '@/modules/platform'
 import { NewInvoice, type NewInvoiceParams } from './new-invoice'
 
 export default async function NewInvoicePage({ searchParams }: { searchParams: Promise<NewInvoiceParams> }) {

@@ -1,9 +1,9 @@
-import { RequirePermission } from '@/components/require-permission'
+import { RequirePermission } from '@/modules/platform'
 import { db } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
 import { formatVND } from '@/domain/money'
 import { orNotFound } from '@/lib/or-not-found'
-import { getAccessContext } from '@/server/session'
+import { getAccessContext } from '@/modules/platform'
 import { incidentsForAsset } from '@/server/incidents/service'
 import { assetHistory, assetLocationLabel, getAsset } from '@/server/assets/service'
 

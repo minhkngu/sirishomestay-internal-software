@@ -49,16 +49,16 @@ import type {
   PendingAdjustment,
   Proration,
 } from '@/domain/types'
-import { recordAudit } from '@/server/audit'
+import { recordAudit } from '@/modules/platform'
 import {
   captureContractVersion,
   recordTerminationHandover,
   recordTerminationReadings,
 } from '@/server/contracts/history'
-import { registerExportOwnerResolver, registerOwnerResolver } from '@/server/files/owners'
+import { registerExportOwnerResolver, registerOwnerResolver } from '@/modules/platform'
 import { leaseData, loadAddenda, nextInvoiceCode } from '@/server/invoices/service'
-import { getSettings } from '@/server/settings/service'
-import type { StorageAdapter } from '@/server/storage/types'
+import { getSettings } from '@/modules/platform'
+import type { StorageAdapter } from '@/modules/platform'
 import { exportDocument, registerDocLoader } from '@/server/templates/service'
 
 type AddendumRow = typeof addenda.$inferSelect

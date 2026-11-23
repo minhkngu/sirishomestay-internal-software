@@ -15,9 +15,9 @@ import {
 } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
-import { resolveOwner } from '@/server/files/owners'
+import { resolveOwner } from '@/modules/platform/server/files/owners'
 import { exportDocument } from '@/server/templates/service'
-import { MemoryStorage } from '@/server/storage/memory'
+import { MemoryStorage } from '@/modules/platform/server/storage/memory'
 import { createTestDb } from '../helpers/db'
 
 // Chỉ import registrations: nếu thiếu đăng ký thì resolver/loader báo "chưa được hỗ trợ".

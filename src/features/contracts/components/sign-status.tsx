@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
-import { FileUpload } from '@/components/file-upload'
+import { FileUpload } from '@/modules/platform/ui'
 import { setSignStatusAction } from '@/server/contracts/actions'
 import { SignChip } from '@/components/contract-ui'
 

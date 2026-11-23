@@ -16,7 +16,7 @@ import { can } from '@/domain/access'
 import { ReminderCard } from '@/features/dashboard/components/reminder-card'
 import { StatStrip } from '@/features/dashboard/components/stat-strip'
 import { getDashboard } from '@/server/dashboard/service'
-import { getAccessContext } from '@/server/session'
+import { getAccessContext } from '@/modules/platform'
 
 const SEVERITY_CONFIG = {
   danger: {

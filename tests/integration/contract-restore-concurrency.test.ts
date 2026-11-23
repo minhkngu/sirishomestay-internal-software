@@ -8,7 +8,7 @@ import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
 import { createLease, updateLease } from '@/server/contracts/service'
 import { previewContractRestore, restoreContract } from '@/server/contracts/restore'
-import { MemoryStorage } from '@/server/storage/memory'
+import { MemoryStorage } from '@/modules/platform/server/storage/memory'
 
 it.skipIf(!process.env.TEST_POSTGRES_URL)(
   'khôi phục đồng thời với sửa không làm mất thay đổi vừa lưu',

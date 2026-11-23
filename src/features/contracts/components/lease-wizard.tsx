@@ -16,7 +16,7 @@ import { convertDepositToLeaseAction, createLeaseAction } from '@/server/contrac
 import { cn } from '@/lib/utils'
 import { replaceSigner } from '../contract-occupants'
 import { assetEntry, buildHandoverPhotoTasks, uploadLeasePhotos, type PendingPhoto } from '../lease-photo-retry'
-import { uploadOne } from '@/components/file-upload'
+import { uploadOne } from '@/modules/platform/ui'
 import { meterFeeError, resolveMeterIds } from '../lease-fee-meters'
 import { LeaseFees, type FeeOption, type FeeDraft, type RoomFeeMeter } from './lease-fees'
 import { LeaseAssets, emptyChanges, type AssetOption, type MoveTargets } from './lease-assets'

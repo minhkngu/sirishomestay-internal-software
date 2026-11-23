@@ -1,4 +1,4 @@
-import { readUserId } from '@/server/auth-user'
+import { readUserId } from '@/lib/supabase/auth-user'
 import { publicEnv } from '@/lib/env'
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'

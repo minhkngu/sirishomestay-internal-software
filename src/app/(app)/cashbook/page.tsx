@@ -5,7 +5,7 @@ import { todayVN } from '@/domain/dates'
 import { listCashbook, listLeaseTargets } from '@/server/cashbook/service'
 import { listFacilities } from '@/server/facilities/service'
 import { listRooms } from '@/server/rooms/service'
-import { getAccessContext } from '@/server/session'
+import { getAccessContext } from '@/modules/platform'
 import { CashbookList, type ExpenseDetail } from '@/features/cashbook/components/cashbook-list'
 import { listExpenseDetails } from '@/server/cashbook/service'
 

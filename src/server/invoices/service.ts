@@ -43,10 +43,10 @@ import type {
   Proration,
 } from '@/domain/types'
 import { finalizeTermination } from '@/server/addenda/finalize'
-import { recordAudit, recordAuditBatch } from '@/server/audit'
-import { registerExportOwnerResolver } from '@/server/files/owners'
+import { recordAudit, recordAuditBatch } from '@/modules/platform'
+import { registerExportOwnerResolver } from '@/modules/platform'
 import { applyReadings, setLeaseInitialReading, setOpeningValue } from '@/server/meters/service'
-import { getSettings } from '@/server/settings/service'
+import { getSettings } from '@/modules/platform'
 import { exportDocument, registerPdfLoader } from '@/server/templates/service'
 import { resolveBankAccount } from '@/domain/vietqr'
 import { renderInvoiceFromTemplate, renderInvoicePdf, renderReceiptPdf } from '@/server/pdf'

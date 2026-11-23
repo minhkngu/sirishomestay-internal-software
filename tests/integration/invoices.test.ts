@@ -31,7 +31,7 @@ import {
   tenantBalance,
   updateLines,
 } from '@/server/invoices/service'
-import { MemoryStorage } from '@/server/storage/memory'
+import { MemoryStorage } from '@/modules/platform/server/storage/memory'
 import { createTestDb } from '../helpers/db'
 
 const context = (permissions: Permission[], facilityId: string): AccessContext => ({

@@ -13,7 +13,7 @@ import {
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
-import { recordAudit } from '@/server/audit'
+import { recordAudit } from '@/modules/platform'
 
 export type FeeType = typeof feeTypes.$inferSelect
 export type FeeUnit = typeof feeUnits.$inferSelect

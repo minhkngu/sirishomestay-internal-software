@@ -5,7 +5,7 @@ import { assertCan, can, type AccessContext } from '@/domain/access'
 import { depositHeld, depositMovement, expenseLabel, type LedgerRow } from '@/domain/cashbook'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { displayName } from '@/domain/tenant-name'
-import { recordAudit } from '@/server/audit'
+import { recordAudit } from '@/modules/platform'
 import { expenseInput, paymentEditInput } from './schemas'
 
 /** Cột ngày thuộc tháng YYYY-MM (cột kiểu date không dùng LIKE được). */
