@@ -2,7 +2,10 @@
 export type ISODate = string
 export type Proration = 'days_30' | 'actual_days'
 export type Utility = 'electric' | 'water'
-export type DueRule = { kind: 'day_of_next_month'; day: number } | { kind: 'days_after_approval'; days: number }
+export type DueRule =
+  | { kind: 'day_of_next_month'; day: number }
+  | { kind: 'days_after_approval'; days: number }
+  | { kind: 'day_of_invoice_month'; day: number }
 
 export type ContractFee = {
   feeTypeId: string | null
@@ -78,10 +81,21 @@ export type MeterReading = {
   readOn: ISODate
   value: number
   kind?: 'monthly' | 'handover'
+  /** Số đầu kỳ riêng của lần ghi; không có thì lấy theo lần ghi liền trước. */ opening?: number | null
 }
 
 export type InvoiceLineType =
-  'rent' | 'fee' | 'electric' | 'water' | 'one_off' | 'penalty' | 'adjustment' | 'deposit' | 'deposit_offset' | 'refund'
+  | 'rent'
+  | 'fee'
+  | 'electric'
+  | 'water'
+  | 'one_off'
+  | 'penalty'
+  | 'adjustment'
+  | 'deposit'
+  | 'deposit_offset'
+  | 'refund'
+  | 'tax'
 export type InvoiceLineInput = {
   type: InvoiceLineType
   description: string

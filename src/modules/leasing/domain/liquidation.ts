@@ -76,7 +76,7 @@ export function buildTerminationInvoice(input: TerminationInput): { lines: Invoi
   for (const f of input.meterFees) {
     lines.push({
       type: 'fee',
-      description: `${f.name} đến ${formatDateVN(endDate)} (${f.usage} ${f.unit})`,
+      description: f.name,
       quantity: f.usage,
       unitPrice: f.unitPrice,
       amount: Math.round(f.usage * f.unitPrice),

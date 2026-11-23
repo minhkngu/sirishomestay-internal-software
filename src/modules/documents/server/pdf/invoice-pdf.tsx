@@ -85,6 +85,7 @@ export function InvoiceDocument({
       <View style={styles.total}>
         <Text>Tổng cộng: {formatVND(data.total)} ₫</Text>
         <Text style={styles.words}>{numberToVietnameseWords(data.total)}</Text>
+        {data.note ? <Text style={{ marginTop: 8, fontSize: 9, textAlign: 'left' }}>Ghi chú: {data.note}</Text> : null}
       </View>
     ),
     payment: data.bank && (
