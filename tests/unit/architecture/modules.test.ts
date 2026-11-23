@@ -79,6 +79,7 @@ describe('MODULE_TIERS', () => {
       leasing: 4,
       import: 5,
       dashboard: 5,
+      cashbook: 5,
     })
   })
 

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AmenitySettings, FeeSettings, type AmenityRow } from '@/modules/facilities/ui'
+import { MeterTypeSettings, type MeterTypeRow } from '@/modules/meters/ui'
 import { Msg, useRun } from '@/components/use-run'
 import { updateSettingsAction } from '@/modules/platform/actions'
 import type { Settings } from '@/modules/platform'
@@ -31,6 +32,7 @@ type Props = {
   units: Unit[]
   feeTypes: FeeT[]
   amenities: AmenityRow[]
+  meterTypes: MeterTypeRow[]
 }
 
 function GeneralTab({ s }: { s: Settings }) {
@@ -40,6 +42,7 @@ function GeneralTab({ s }: { s: Settings }) {
   const [proration, setProration] = useState(s.proration)
   const [ruleKind, setRuleKind] = useState(s.dueRule.kind)
   const [day, setDay] = useState(String(s.dueRule.kind === 'day_of_next_month' ? s.dueRule.day : 5))
+  const [invoiceDay, setInvoiceDay] = useState(String(s.dueRule.kind === 'day_of_invoice_month' ? s.dueRule.day : 5))
   const [after, setAfter] = useState(String(s.dueRule.kind === 'days_after_approval' ? s.dueRule.days : 5))
   const [retention, setRetention] = useState(String(s.photoRetentionDays))
   return (
@@ -66,6 +69,25 @@ function GeneralTab({ s }: { s: Settings }) {
       </div>
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">Hạn thanh toán mặc định</legend>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="radio"
+            checked={ruleKind === 'day_of_invoice_month'}
+            onChange={() => setRuleKind('day_of_invoice_month')}
+          />{' '}
+          Ngày{' '}
+          <Input
+            aria-label="Ngày của tháng hoá đơn"
+            className="w-16"
+            inputMode="numeric"
+            value={invoiceDay}
+            onChange={(e) => {
+              setInvoiceDay(e.target.value)
+              setRuleKind('day_of_invoice_month')
+            }}
+          />{' '}
+          của chính tháng hoá đơn
+        </label>
         <label className="flex items-center gap-2 text-sm">
           <input
             type="radio"
@@ -113,9 +135,11 @@ function GeneralTab({ s }: { s: Settings }) {
               proration,
               photoRetentionDays: Number(retention),
               dueRule:
-                ruleKind === 'day_of_next_month'
-                  ? { kind: 'day_of_next_month', day: Number(day) }
-                  : { kind: 'days_after_approval', days: Number(after) },
+                ruleKind === 'day_of_invoice_month'
+                  ? { kind: 'day_of_invoice_month', day: Number(invoiceDay) }
+                  : ruleKind === 'day_of_next_month'
+                    ? { kind: 'day_of_next_month', day: Number(day) }
+                    : { kind: 'days_after_approval', days: Number(after) },
             }),
           )
         }
@@ -140,17 +164,30 @@ function BankAccountTab({ settings }: { settings: Settings }) {
   )
 }
 
-export function SettingsTabs({ settings, facilities, units, feeTypes, prices, defaults, amenities }: Props) {
+export function SettingsTabs({
+  settings,
+  facilities,
+  units,
+  feeTypes,
+  prices,
+  defaults,
+  amenities,
+  meterTypes,
+}: Props) {
   return (
     <Tabs defaultValue="general">
       <TabsList>
         <TabsTrigger value="general">Chung</TabsTrigger>
         <TabsTrigger value="fees">Phí dịch vụ</TabsTrigger>
+        <TabsTrigger value="meter-types">Loại đồng hồ</TabsTrigger>
         <TabsTrigger value="amenities">Tiện ích</TabsTrigger>
         <TabsTrigger value="bank">Tài khoản nhận tiền</TabsTrigger>
       </TabsList>
       <TabsContent value="general">
         <GeneralTab s={settings} />
+      </TabsContent>
+      <TabsContent value="meter-types">
+        <MeterTypeSettings types={meterTypes} />
       </TabsContent>
       <TabsContent value="amenities">
         <AmenitySettings amenities={amenities} />

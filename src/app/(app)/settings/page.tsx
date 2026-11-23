@@ -8,6 +8,7 @@ import {
   listFeeUnits,
   listFeeTypePrices,
 } from '@/modules/facilities'
+import { listMeterTypes } from '@/modules/meters'
 import { SettingsTabs } from './settings-tabs'
 
 export default async function SettingsPage() {
@@ -20,7 +21,7 @@ export default async function SettingsPage() {
 }
 
 async function Settings({ ctx }: { ctx: Awaited<ReturnType<typeof getAccessContext>> }) {
-  const [settings, facilities, units, feeTypes, prices, defaults, amenities] = await Promise.all([
+  const [settings, facilities, units, feeTypes, prices, defaults, amenities, meterTypes] = await Promise.all([
     getSettings(db),
     listFacilities(db, ctx),
     listFeeUnits(db),
@@ -28,11 +29,13 @@ async function Settings({ ctx }: { ctx: Awaited<ReturnType<typeof getAccessConte
     listFeeTypePrices(db, ctx),
     listFeeDefaults(db, ctx),
     listAmenities(db, ctx, { includeArchived: true }),
+    listMeterTypes(db),
   ])
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Cài đặt</h1>
       <SettingsTabs
+        meterTypes={meterTypes.map((t) => ({ id: t.id, name: t.name, unit: t.unit, isSystem: t.isSystem }))}
         amenities={amenities.map((a) => ({ id: a.id, name: a.name, isActive: a.isActive }))}
         defaults={defaults}
         settings={settings}

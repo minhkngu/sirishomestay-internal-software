@@ -14,7 +14,7 @@ import {
 import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
 import { addDays } from '@/domain/dates'
-import { depositBalance } from '../../domain/deposit'
+import { depositBalance } from '@/domain/deposit'
 import type { DepositEntry, ForfeitInput } from '@/domain/types'
 import { recordAudit, getSettings } from '@/modules/platform'
 
