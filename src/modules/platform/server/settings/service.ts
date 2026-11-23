@@ -13,7 +13,7 @@ export const SETTINGS_DEFAULTS = {
   visaWarningDays: 30,
   contractWarningDays: 30,
   proration: 'actual_days' as 'days_30' | 'actual_days',
-  dueRule: { kind: 'days_after_approval', days: 5 } as DueRule,
+  dueRule: { kind: 'day_of_invoice_month', day: 5 } as DueRule,
   photoRetentionDays: 30,
 }
 export type Settings = typeof SETTINGS_DEFAULTS
@@ -23,6 +23,10 @@ const days = z.number({ error: DAYS_MSG }).int(DAYS_MSG).min(1, DAYS_MSG).max(36
 export const dueRuleSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('day_of_next_month'),
+    day: z.number().int().min(1, 'Ngày phải từ 1 đến 31').max(31, 'Ngày phải từ 1 đến 31'),
+  }),
+  z.object({
+    kind: z.literal('day_of_invoice_month'),
     day: z.number().int().min(1, 'Ngày phải từ 1 đến 31').max(31, 'Ngày phải từ 1 đến 31'),
   }),
   z.object({

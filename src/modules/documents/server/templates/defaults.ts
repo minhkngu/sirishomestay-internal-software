@@ -239,7 +239,6 @@ const CONTENT: Record<TemplateDocType, Content> = {
     ],
     articles: [
       { t: 'Tài sản bàn giao', p: ['@bang:tai_san'] },
-      { t: 'Chỉ số điện, nước lúc nhận phòng', p: ['@bang:chi_so'] },
       {
         t: 'Xác nhận',
         p: [
@@ -264,7 +263,6 @@ const CONTENT: Record<TemplateDocType, Content> = {
     ],
     articles: [
       { t: 'Tài sản khi trả phòng', p: ['@bang:tai_san'] },
-      { t: 'Chỉ số điện, nước lúc trả phòng', p: ['@bang:chi_so'] },
       { t: 'Tiền phạt', p: ['Tổng tiền phạt do hư hỏng hoặc mất tài sản: [tong_phat].'] },
       {
         t: 'Xác nhận',
