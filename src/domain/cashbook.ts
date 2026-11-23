@@ -1,4 +1,4 @@
-import { depositBalance } from './deposit'
+import { DEPOSIT_ENTRY_LABELS, depositBalance } from './deposit'
 import type { DepositEntry } from './types'
 
 export type LedgerSource = 'payment' | 'deposit' | 'expense'
@@ -46,15 +46,15 @@ export function depositMovement(
   const counted = status === 'done' && (type === 'collect' || type === 'topup' || type === 'refund')
   switch (type) {
     case 'collect':
-      return { direction: 'in', counted, label: 'Thu cọc' }
+      return { direction: 'in', counted, label: DEPOSIT_ENTRY_LABELS.collect }
     case 'topup':
-      return { direction: 'in', counted, label: 'Thu cọc bổ sung' }
+      return { direction: 'in', counted, label: DEPOSIT_ENTRY_LABELS.topup }
     case 'refund':
-      return { direction: 'out', counted, label: 'Hoàn cọc' }
+      return { direction: 'out', counted, label: DEPOSIT_ENTRY_LABELS.refund }
     case 'deduct':
       return { direction: 'out', counted: false, label: 'Trừ cọc' }
     default:
-      return { direction: 'out', counted: false, label: 'Mất cọc' }
+      return { direction: 'out', counted: false, label: DEPOSIT_ENTRY_LABELS.forfeit }
   }
 }
 

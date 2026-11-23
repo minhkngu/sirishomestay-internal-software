@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { MoneyInput } from '@/components/ui/money-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { todayVN } from '@/domain/dates'
+import { DEPOSIT_ENTRY_LABELS } from '@/domain/deposit'
 import { formatVND } from '@/domain/money'
 import { addDepositEntryAction } from '@/server/charges/actions'
 
@@ -98,11 +99,10 @@ export function CollectRentDialog({
   )
 }
 
-const DEPOSIT_TYPES = [
-  { value: 'collect', label: 'Thu cọc' },
-  { value: 'topup', label: 'Thu cọc bổ sung' },
-  { value: 'refund', label: 'Hoàn cọc' },
-]
+const DEPOSIT_TYPES = (['collect', 'topup', 'refund'] as const).map((value) => ({
+  value,
+  label: DEPOSIT_ENTRY_LABELS[value],
+}))
 
 /** Ghi một dòng thu hoặc hoàn cọc đã xong vào sổ cọc của hợp đồng. */
 export function DepositDialog({
