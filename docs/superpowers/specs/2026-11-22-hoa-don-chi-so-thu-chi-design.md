@@ -34,7 +34,7 @@ Hợp đồng bắt đầu giữa tháng, người dùng chỉnh dòng tiền ph
 
 ### 4. Trang Chỉ số
 - Một trang, không tab. Bộ lọc: Toà, Phòng, Loại đồng hồ, Kỳ ghi. Nút `Thêm đồng hồ`, `Chốt chỉ số`.
-- Thân trang là bảng lịch sử các đồng hồ đã chốt trong tháng đang lọc: Đồng hồ, Phòng · Toà, Số đầu, Số cuối, Ngày chốt, Sửa/Xoá, chọn nhiều để xoá. Không có chip bàn giao, không có khoá.
+- Thân trang là bảng lịch sử các đồng hồ đã chốt trong tháng đang lọc: Đồng hồ, Phòng · Toà, Số đầu, Số cuối, Ngày chốt, Sửa/Xoá, chọn nhiều để xoá. Chỉ số ban đầu của hợp đồng hiện cùng danh sách, có nhãn "chỉ số ban đầu" (số đầu = số cuối), sửa/xoá được; không có khoá.
 - **Chốt chỉ số** mở popup có bộ lọc riêng (Toà, Phòng, Loại, Tháng chốt) không phụ thuộc bộ lọc ngoài; lưới có ô số đầu và số cuối sửa được, bật "Chỉ đồng hồ chưa chốt". Lưu: số cuối không nhỏ hơn số đầu; lỗi hiện theo từng dòng, dòng hợp lệ vẫn lưu.
 - Sửa số đầu của một tháng chưa có lần ghi thì phải nhập cùng số cuối.
 
@@ -42,7 +42,7 @@ Hợp đồng bắt đầu giữa tháng, người dùng chỉnh dòng tiền ph
 - Hoá đơn nháp: danh sách tháng hiện `Tháng MM/YYYY · số đầu – số cuối`; mở hộp thoại sửa cả số đầu lẫn số cuối của tháng đó, tiêu thụ và thành tiền tính ngay, lưu ngay không cần bấm Lưu hoá đơn. Ghi thẳng về bảng chỉ số, chỉ tính lại hoá đơn đang mở.
 - Hoá đơn mới chưa lưu: chỉ số điền xong ghi thẳng vào bảng chỉ số.
 - Duyệt chỉ kiểm (không ghi); thiếu chỉ số thì chặn và nêu đồng hồ nào. Dòng thiếu số vẫn giữ 0 đồng kèm cảnh báo để chốt ngay trong hoá đơn. Đồng hồ thay giữa kỳ thì sửa ở trang Chỉ số.
-- **Hoá đơn đầu (kỳ ký hợp đồng):** lúc tạo, số đầu và số cuối được chép từ chỉ số ban đầu của hợp đồng vào `meta.opening/closing` của dòng điện nước, tiêu thụ 0. Từ đó là số riêng của hoá đơn, có nút **Sửa** ngay trong hoá đơn; đổi hợp đồng không làm đổi hoá đơn đã tạo, tính lại không ghi đè. Xoá hoá đơn rồi tạo lại thì chép lại số hiện tại của hợp đồng.
+- **Hoá đơn đầu (kỳ ký hợp đồng):** lúc tạo, số đầu và số cuối được chép từ chỉ số ban đầu của hợp đồng vào `meta.opening/closing` của dòng điện nước, tiêu thụ 0. Từ đó là số riêng của hoá đơn, có nút **Sửa** ngay trong hoá đơn; đổi hợp đồng không làm đổi hoá đơn đã tạo, tính lại không ghi đè. Sửa số đầu ở hoá đơn đầu thì cũng ghi về chỉ số ban đầu của hợp đồng (lần chốt đầu từ ngày bắt đầu), không kéo theo lần chốt tháng hay hoá đơn nào khác. Xoá hoá đơn rồi tạo lại thì chép lại số hiện tại của hợp đồng.
 
 ### 6. Sửa phí dịch vụ trong popup sửa hợp đồng
 - Mỗi dòng phí hiện tên · đơn vị, cách tính, đơn giá (`MoneyInput`); phí theo đồng hồ hiện thêm đồng hồ đang gắn, chỉ số ban đầu và ngày chốt, sửa được (đồng hồ cùng phòng, đang rảnh). Lưu cùng nút "Lưu thay đổi", có audit. Chỉ người có quyền `meters` của toà thấy và sửa phần đồng hồ.

@@ -49,11 +49,12 @@ export function ReadingHistory({ rows, facilityName }: { rows: ReadingHistoryRow
   const save = () => {
     if (!editing) return
     if (!/^\d+$/.test(value.trim())) { setError('Nhập số cuối kỳ là số nguyên không âm'); return }
-    if (!/^\d+$/.test(openValue.trim())) { setError('Nhập số đầu kỳ là số nguyên không âm'); return }
-    if (Number(value) < Number(openValue)) { setError('Số cuối kỳ không được nhỏ hơn số đầu kỳ'); return }
+    const handover = editing.kind === 'handover'
+    if (!handover && !/^\d+$/.test(openValue.trim())) { setError('Nhập số đầu kỳ là số nguyên không âm'); return }
+    if (!handover && Number(value) < Number(openValue)) { setError('Số cuối kỳ không được nhỏ hơn số đầu kỳ'); return }
     start(async () => {
       // Số đầu là của riêng lần ghi này, lưu cùng số cuối; không đổi lần ghi nào khác
-      const r = await updateMeterReadingAction(editing.id, { value: Number(value), readOn, ...(Number(openValue) !== editing.opening ? { opening: Number(openValue) } : {}) })
+      const r = await updateMeterReadingAction(editing.id, { value: Number(value), readOn, ...(editing.kind !== 'handover' && Number(openValue) !== editing.opening ? { opening: Number(openValue) } : {}) })
       if (!r.ok) { setError(r.error); return }
       toast.success('Đã sửa chỉ số')
       setEditing(null)
@@ -72,7 +73,7 @@ export function ReadingHistory({ rows, facilityName }: { rows: ReadingHistoryRow
     })
   }
 
-  const meterCell = (r: ReadingHistoryRow) => <><div className="text-foreground">{r.meterName}</div>{r.meterCode && <div className="text-[11px] text-muted-foreground">{r.meterCode}</div>}</>
+  const meterCell = (r: ReadingHistoryRow) => <><div className="text-foreground">{r.meterName}{r.kind === 'handover' && <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">chỉ số ban đầu</span>}</div>{r.meterCode && <div className="text-[11px] text-muted-foreground">{r.meterCode}</div>}</>
   const roomCell = (r: ReadingHistoryRow) => `Phòng ${r.roomCode} · ${facilityName}`
   const actions = (r: ReadingHistoryRow) => (
     <div className="flex justify-end gap-1.5">
@@ -153,8 +154,8 @@ export function ReadingHistory({ rows, facilityName }: { rows: ReadingHistoryRow
       {editing && (
         <FormDialog open onOpenChange={(o) => { if (!o) setEditing(null) }} title={`Sửa chỉ số ${editing.meterName} phòng ${editing.roomCode}`} description={`Tháng ${monthLabel(editing.period)} · số đầu tự điền bằng số cuối tháng trước, sửa riêng ở đây không ảnh hưởng lần ghi khác`} size="sm">
           <div className="space-y-3">
-            <div className="space-y-1.5"><Label htmlFor="history-open">Số đầu kỳ</Label><Input id="history-open" inputMode="numeric" value={openValue} onChange={(e) => setOpenValue(e.target.value)} className="text-right tabular-nums" /></div>
-            <div className="space-y-1.5"><Label htmlFor="history-value">Số cuối kỳ</Label><Input id="history-value" inputMode="numeric" value={value} onChange={(e) => setValue(e.target.value)} className="text-right tabular-nums" /></div>
+            {editing.kind !== 'handover' && <div className="space-y-1.5"><Label htmlFor="history-open">Số đầu kỳ</Label><Input id="history-open" inputMode="numeric" value={openValue} onChange={(e) => setOpenValue(e.target.value)} className="text-right tabular-nums" /></div>}
+            <div className="space-y-1.5"><Label htmlFor="history-value">{editing.kind === 'handover' ? 'Chỉ số ban đầu' : 'Số cuối kỳ'}</Label><Input id="history-value" inputMode="numeric" value={value} onChange={(e) => setValue(e.target.value)} className="text-right tabular-nums" /></div>
             <DateField id="history-read-on" label="Ngày chốt" value={readOn} onValueChange={setReadOn} />
             {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
             <div className="flex justify-end gap-2">

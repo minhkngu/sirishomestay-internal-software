@@ -5,7 +5,7 @@ import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ForbiddenError, ValidationError } from '@/domain/errors'
 import { approveInvoice, createDrafts, deleteInvoice, getInvoiceDetail, savePreviewMeterReading, updateInvoiceMeterReading, updateLines } from '@/server/invoices/service'
-import { listReadingSheet } from '@/server/meters/service'
+import { listReadingHistory, listReadingSheet } from '@/server/meters/service'
 import { updateLease } from '@/server/contracts/service'
 import { createTestDb } from '../helpers/db'
 
@@ -223,6 +223,21 @@ describe('hoá đơn đầu giữ số riêng', () => {
     const [mar] = await createDrafts(db, context(['billing'], facilityId), { facilityId, period: '2026-03' })
     await updateInvoiceMeterReading(db, ctx(), mar.id, { leaseFeeId: feeId, period: '2026-02', value: 1400 })
     expect(await electric(inv.id)).toMatchObject({ quantity: 40, meta: { opening: 1300, closing: 1340 } })
+  })
+
+  it('sửa số đầu ở hoá đơn đầu ghi về chỉ số ban đầu của hợp đồng, hiện ở lịch sử Chỉ số, không đổi lần chốt tháng', async () => {
+    await db.insert(meterReadings).values({ meterId, period: '2026-02', readOn: '2026-02-28', value: 1400, opening: 1250, kind: 'monthly' })
+    const [inv] = await createDrafts(db, context(['billing'], facilityId), { facilityId, period: '2026-02' })
+    const lines = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, inv.id))
+    await updateLines(db, ctx(), inv.id, lines.map(l => (l.meta as { leaseFeeId?: string } | null)?.leaseFeeId === feeId
+      ? { ...l, meta: { ...(l.meta as Record<string, unknown>), opening: 1222, closing: 1222 } }
+      : { ...l, meta: l.meta as Record<string, unknown> | null }))
+    const handover = (await db.select().from(meterReadings).where(eq(meterReadings.meterId, meterId))).filter(r => r.kind === 'handover')
+    expect(handover.map(r => [r.readOn, r.value])).toEqual([['2026-02-15', 1222]])
+    const monthly = (await db.select().from(meterReadings).where(eq(meterReadings.meterId, meterId))).find(r => r.kind === 'monthly')
+    expect(monthly).toMatchObject({ value: 1400, opening: 1250 })
+    const history = (await listReadingHistory(db, ctx(), facilityId, '2026-02', '2026-02')).filter(r => r.meterId === meterId)
+    expect(history.map(r => [r.kind, r.opening, r.closing])).toEqual(expect.arrayContaining([['handover', 1222, 1222]]))
   })
 
   it('đổi chỉ số ban đầu ở hợp đồng không đổi hoá đơn đầu đã tạo; xoá và lập lại thì dùng số mới', async () => {

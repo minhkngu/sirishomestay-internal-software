@@ -407,10 +407,10 @@ describe('meters', () => {
       expect(cell).toMatchObject({ previous: 40, previousReadOn: '2026-09-20', previousKind: 'start', current: null, usage: null })
     })
 
-    it('lịch sử chỉ hiện lần chốt tháng; chỉ số bàn giao không hiện, số đầu tháng đầu lấy chỉ số đó', async () => {
+    it('lịch sử hiện lần chốt tháng và chỉ số ban đầu của hợp đồng (số đầu = số cuối), số đầu tháng đầu lấy chỉ số đó', async () => {
       await midMonthLease()
       const rows = (await listReadingHistory(db, hung(), fa, '2026-10', '2026-10')).filter((x) => x.meterId === m.E101)
-      expect(rows.map((x) => [x.kind, x.opening, x.closing, x.usage])).toEqual([['monthly', 1250, 1300, 50]])
+      expect(rows.map((x) => [x.kind, x.opening, x.closing, x.usage])).toEqual(expect.arrayContaining([['monthly', 1250, 1300, 50], ['handover', 1250, 1250, 0]]))
     })
 
     it('tổng quan đồng hồ trả ngày bắt đầu hợp đồng đang chạy để nhận ra dòng bàn giao đầu', async () => {
@@ -420,8 +420,8 @@ describe('meters', () => {
       expect(active.leaseStartDates).toEqual(['2026-10-15'])
       await db.update(leases).set({ status: 'ended' }).where(eq(leases.roomId, r101))
       expect((await listMeterOverview(db, hung(), fa)).find((r) => r.meterId === m.E101)!.leaseStartDate).toBeNull()
-      // Chỉ số bàn giao không phải lần chốt nên không có dòng trong lịch sử
-      expect((await listReadingHistory(db, hung(), fa, '2026-10', '2026-10')).some((x) => x.kind === 'handover')).toBe(false)
+      // Chỉ số ban đầu hiện trong lịch sử để thấy số đã sửa từ hoá đơn đầu
+      expect((await listReadingHistory(db, hung(), fa, '2026-10', '2026-10')).some((x) => x.kind === 'handover')).toBe(true)
     })
   })
 

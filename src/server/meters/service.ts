@@ -427,9 +427,9 @@ export async function listReadingHistory(db: DB, ctx: AccessContext, facilityId:
     const asc = [...m.readings].sort((a, b) => (a.readOn < b.readOn ? -1 : a.readOn > b.readOn ? 1 : 0))
     let prev = m.startReading
     for (const r of asc) {
-      // Chỉ số ban đầu (bàn giao) chỉ để tham khảo khi lập hoá đơn đầu, không phải lần chốt: không hiện trong danh sách
-      if (r.kind === 'monthly' && r.period >= from && r.period <= to) {
-        rows.push({ id: r.id, meterId: m.meterId, roomId: m.roomId, roomCode: m.roomCode, floor: m.floor, meterName: typeName(m.meterName), meterCode: m.meterCode, unit: m.unit, kind: r.kind, period: r.period, readOn: r.readOn, opening: r.opening ?? prev, closing: r.value, usage: Math.max(r.value - (r.opening ?? prev), 0) })
+      // Chỉ số ban đầu của hợp đồng hiện cùng danh sách (số đầu = số cuối), để thấy số đã sửa từ hoá đơn đầu
+      if (r.period >= from && r.period <= to) {
+        rows.push({ id: r.id, meterId: m.meterId, roomId: m.roomId, roomCode: m.roomCode, floor: m.floor, meterName: typeName(m.meterName), meterCode: m.meterCode, unit: m.unit, kind: r.kind, period: r.period, readOn: r.readOn, opening: r.kind === 'handover' ? r.value : r.opening ?? prev, closing: r.value, usage: r.kind === 'handover' ? 0 : Math.max(r.value - (r.opening ?? prev), 0) })
       }
       prev = r.value
     }
@@ -485,6 +485,28 @@ export async function deleteMeterReadings(db: DB, ctx: AccessContext, ids: strin
     }
   }
   return { deleted, skipped: unique.length - deleted }
+}
+
+/**
+ * Chỉ số ban đầu của hợp đồng được đổi từ hoá đơn đầu: ghi vào lần chốt đầu từ ngày bắt đầu hợp đồng (không có thì tạo ở ngày bắt đầu).
+ * Không đổi lần chốt tháng hay hoá đơn nào khác. Người không có quyền Chỉ số của toà thì bỏ qua, hoá đơn vẫn lưu.
+ */
+export async function setLeaseInitialReading(tx: DB, ctx: AccessContext, input: { leaseId: string; leaseFeeId: string; value: number }): Promise<void> {
+  if (!Number.isInteger(input.value) || input.value < 0) return
+  const [row] = await tx.select({ meterId: leaseFeeMeters.meterId, startDate: leases.startDate, facilityId: rooms.facilityId, roomCode: rooms.code }).from(leaseFeeMeters)
+    .innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).innerJoin(leases, eq(leases.id, leaseFeeSnapshots.leaseId)).innerJoin(meters, eq(meters.id, leaseFeeMeters.meterId)).innerJoin(rooms, eq(rooms.id, meters.roomId))
+    .where(and(eq(leaseFeeMeters.leaseFeeId, input.leaseFeeId), eq(leaseFeeSnapshots.leaseId, input.leaseId)))
+  if (!row || !can(ctx, 'meters', row.facilityId)) return
+  const handovers = await tx.select().from(meterReadings).where(and(eq(meterReadings.meterId, row.meterId), eq(meterReadings.kind, 'handover'))).orderBy(asc(meterReadings.readOn))
+  const current = handovers.find((r) => r.readOn >= row.startDate)
+  if (current) {
+    if (current.value === input.value) return
+    await tx.update(meterReadings).set({ value: input.value, updatedAt: new Date() }).where(eq(meterReadings.id, current.id))
+    await recordAudit(tx, ctx, { action: 'update', entity: 'meter_readings', entityId: current.id, facilityId: row.facilityId, summary: `Sửa chỉ số ban đầu đồng hồ phòng ${row.roomCode} từ hoá đơn đầu`, before: { value: current.value }, after: { value: input.value } })
+    return
+  }
+  const [created] = await tx.insert(meterReadings).values({ meterId: row.meterId, period: row.startDate.slice(0, 7), kind: 'handover', readOn: row.startDate, value: input.value }).returning()
+  await recordAudit(tx, ctx, { action: 'create', entity: 'meter_readings', entityId: created.id, facilityId: row.facilityId, summary: `Ghi chỉ số ban đầu đồng hồ phòng ${row.roomCode} từ hoá đơn đầu`, after: created })
 }
 
 /** Đồng hồ của các phí tính theo đồng hồ trong một hợp đồng, kèm chỉ số ban đầu: lần chốt sớm nhất từ ngày bắt đầu hợp đồng; chưa điền thì không có mục. Khoá theo id dòng phí hợp đồng. */

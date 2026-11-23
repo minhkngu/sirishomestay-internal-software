@@ -15,7 +15,7 @@ import type { Addendum, ContractFee, Invoice, MeterReading, DueRule, InvoiceLine
 import { finalizeTermination } from '@/server/addenda/finalize'
 import { recordAudit, recordAuditBatch } from '@/server/audit'
 import { registerExportOwnerResolver } from '@/server/files/owners'
-import { applyReadings, setOpeningValue } from '@/server/meters/service'
+import { applyReadings, setLeaseInitialReading, setOpeningValue } from '@/server/meters/service'
 import { getSettings } from '@/server/settings/service'
 import { registerPdfLoader } from '@/server/templates/service'
 import { resolveBankAccount } from '@/domain/vietqr'
@@ -576,6 +576,7 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
     // Phí hợp đồng theo đồng hồ hoặc theo kỳ chỉ dính số lượng, không nhân hệ số theo thời gian; mô tả luôn là tên phí
     const snapIds = [...new Set(data.flatMap(l => { const m = l.meta as { leaseFeeId?: unknown } | null | undefined; return typeof m?.leaseFeeId === 'string' ? [m.leaseFeeId] : [] }))]
     const snaps = snapIds.length ? await tx.select({ id: leaseFeeSnapshots.id, name: leaseFeeSnapshots.name, quantitySource: leaseFeeSnapshots.quantitySource }).from(leaseFeeSnapshots).where(inArray(leaseFeeSnapshots.id, snapIds)) : []
+    const initialWrites: Array<{ leaseFeeId: string; value: number }> = []
     const next = data.filter(l => l.type !== 'tax').map(l => {
       // Dòng cọc còn thiếu giữ mô tả, đơn giá, số lượng đã lưu
       const savedDeposit = l.type === 'deposit' && l.id ? old.find(previous => previous.id === l.id && previous.type === 'deposit') : undefined
@@ -589,6 +590,8 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
         if (!Number.isInteger(opening) || !Number.isInteger(closing) || opening < 0 || closing < 0) throw new ValidationError('Chỉ số không hợp lệ')
         if (closing < opening) throw new ValidationError('Số cuối không được nhỏ hơn số đầu')
         const quantity = closing - opening
+        // Số đầu của hoá đơn đầu cũng là chỉ số ban đầu của hợp đồng: ghi về bảng chỉ số để trang Chỉ số thấy
+        initialWrites.push({ leaseFeeId: meta.leaseFeeId, value: opening })
         return { invoiceId: id, type: savedLine.type, description: savedLine.description, quantity, unitPrice: savedLine.unitPrice, amount: Math.round(quantity * savedLine.unitPrice), meta: { ...((savedLine.meta ?? {}) as Record<string, unknown>), opening, closing } }
       }
       const protectedFee = inv.kind === 'monthly' && (typeof meta?.leaseFeeId === 'string' || l.type === 'rent') ? savedLine : undefined
@@ -616,6 +619,7 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
       const coefficient = addedFee && typeof meta?.coefficient === 'number' ? meta.coefficient : 1
       return { invoiceId: id, type: l.type, description: saved?.description ?? l.description, quantity: l.quantity, unitPrice: saved?.unitPrice ?? l.unitPrice, amount: Math.round(l.quantity * (saved?.unitPrice ?? l.unitPrice) * coefficient), meta: l.meta ?? null }
     })
+    for (const w of initialWrites) await setLeaseInitialReading(tx, ctx, { leaseId: inv.leaseId, ...w })
     // Thuế: tính lại ở server theo % trên tổng các dòng còn lại (làm tròn), lưu thành một dòng riêng
     if (taxRate > 0) {
       const amount = Math.round(next.reduce((n, l) => n + l.amount, 0) * taxRate / 100)
