@@ -2,7 +2,7 @@
 
 Tài liệu cho người (và agent) tiếp tục sửa repo. Đọc trước khi thêm tính năng, dời file hay đổi quy tắc import. Tóm tắt luật nằm ở mục Architecture của `CLAUDE.md`; file này giải thích chi tiết, trạng thái hiện tại và các bẫy.
 
-Cập nhật lần cuối: 22/11/2026.
+Cập nhật lần cuối: 23/11/2026.
 
 ## 1. Các module
 
@@ -16,10 +16,11 @@ Repo là **Modular monolith**: mỗi mảng nghiệp vụ là một module ở `
 | 2 | `facilities` | cơ sở, phòng, tiện ích, loại phí và giá (`use-run.tsx` ở `src/components/`; `room-occupancy.ts` ở `domain/`) | `src/modules/facilities/` |
 | 2 | `documents` | mẫu giấy tờ, mẫu hoá đơn, xem sẵn mẫu (`ui/use-lazy-preview.ts`; `pdf-inline.tsx` ở `src/components/`), dựng PDF/Word/PNG | `src/modules/documents/` |
 | 3 | `assets` | tài sản, kho, chuyển tài sản | `src/modules/assets/` |
-| 3 | `meters` | đồng hồ (mỗi phòng có sẵn điện, nước — mục 4), chỉ số theo tháng (`domain/meters-monthly.ts`), loại đồng hồ (`domain/meter-types.ts`) | `src/modules/meters/` |
-| 4 | `leasing` | cọc, hợp đồng, phụ lục, bàn giao, sổ cọc, phí phát sinh, hoá đơn, thu tiền, sự cố (`deposit.ts`, `fee-price.ts`, `sign-status.ts` ở `domain/`; trang `src/app` lấy qua `index.ts`) | `src/modules/leasing/` |
+| 3 | `meters` | đồng hồ (mỗi phòng có sẵn điện, nước — mục 4), chỉ số và lịch sử chỉ số (trang Chỉ số một danh sách, `ui/reading-history.tsx`; `domain/meters-monthly.ts`), loại đồng hồ (`server/meter-types/`, `domain/meter-types.ts`) | `src/modules/meters/` |
+| 4 | `leasing` | cọc, hợp đồng, phụ lục, bàn giao, sổ cọc, phí phát sinh, hoá đơn (hàng loạt, hoá đơn lẻ, hoá đơn đầu giữ chỉ số riêng), thu tiền, sự cố (`fee-price.ts`, `invoice-fee-line.ts`, `sign-status.ts` ở `domain/`; trang `src/app` lấy qua `index.ts`; `deposit.ts` ở lại `src/domain` vì `src/domain/cashbook.ts` dùng) | `src/modules/leasing/` |
 | 5 | `import` | nhập Excel (`targets.ts` thuần nên ở `domain/`) | `src/modules/import/` |
 | 5 | `dashboard` | nhắc việc | `src/modules/dashboard/` |
+| 5 | `cashbook` | sổ Thu chi, sở hữu bảng `expenses` (`src/domain/cashbook.ts` ở lại vì `leasing` cũng dùng; sửa khoản thu tiền thuê `updatePayment` thuộc `leasing`) | `src/modules/cashbook/` |
 
 ## 2. Luồng một yêu cầu
 
@@ -44,7 +45,7 @@ src/modules/registrations.ts   import mọi file có register* (mục 5); điể
 ```
 
 Luật:
-- **Tầng:** 1 `platform`; 2 `users`, `tenants`, `facilities`, `documents`; 3 `assets`, `meters`; 4 `leasing`; 5 `import`, `dashboard`. Module chỉ import module **tầng thấp hơn**, chỉ qua `index.ts`/`actions.ts`/`ui.ts`. Thứ tự tầng nằm ở `MODULE_TIERS`, export từ `eslint.config.mjs` (nguồn duy nhất; `tests/unit/architecture/import-graph.ts` import lại). Mảng mới: thêm vào đó.
+- **Tầng:** 1 `platform`; 2 `users`, `tenants`, `facilities`, `documents`; 3 `assets`, `meters`; 4 `leasing`; 5 `import`, `dashboard`, `cashbook`. Module chỉ import module **tầng thấp hơn**, chỉ qua `index.ts`/`actions.ts`/`ui.ts`. Thứ tự tầng nằm ở `MODULE_TIERS`, export từ `eslint.config.mjs` (nguồn duy nhất; `tests/unit/architecture/import-graph.ts` import lại). Mảng mới: thêm vào đó.
 - **Trong module:** `ui` → `domain`, cổng `actions.ts` và `server/**/actions.ts` của chính module, `src/components`, `src/domain`, `src/lib`; `import type` từ `index.ts`/`server/**` của chính module và `index.ts` của module tầng thấp hơn (giá trị thì không, để code server không lọt vào bundle trình duyệt); `ui.ts`/`actions.ts` của module tầng thấp hơn. `server` → `domain`, `server` của chính module, `src/db`, `src/domain`, `src/lib`, `index.ts` của module tầng thấp hơn. `domain` → `domain` của chính module, `src/domain`.
 - **`src/proxy.ts`** chỉ import `src/lib`, `src/domain` (và package ngoài): chạy trước mọi route nên không kéo module, `src/db`, `src/components`. ESLint kiểm (file category `proxy`) và `modules.test.ts` kiểm lại (`proxy chỉ import lib/domain`).
 - **Component client trong `src/app`** (file có `'use client'` ở câu lệnh đầu) không import **giá trị** từ `index.ts` của module (cổng server; `import type` thì được); dùng `ui.ts`/`actions.ts`. ESLint không phân biệt `'use client'` nên chỉ `modules.test.ts` kiểm (`client import cổng server`).

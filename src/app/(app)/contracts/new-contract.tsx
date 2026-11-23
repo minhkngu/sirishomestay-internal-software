@@ -12,7 +12,7 @@ import { listFeeDefaults, listFeeTypes, listFeeUnits, listFeeTypePrices } from '
 import { getSettings } from '@/modules/platform'
 import { listContractAssetOptions } from '@/modules/assets'
 import { listRoomMeterOptions } from '@/modules/meters'
-import { depositBalance } from '@/modules/leasing'
+import { depositBalance } from '@/domain/deposit'
 import type { DepositEntry } from '@/domain/types'
 import { getDepositContract } from '@/modules/leasing'
 import { NewContractForm } from './new-contract-form'
@@ -144,9 +144,11 @@ export async function NewContract({ sp, showHeading = true }: { sp: NewContractS
     defaults: {
       proration: settings.proration,
       dueRuleLabel:
-        settings.dueRule.kind === 'day_of_next_month'
-          ? `ngày ${settings.dueRule.day} của tháng sau`
-          : `${settings.dueRule.days} ngày sau khi duyệt`,
+        settings.dueRule.kind === 'day_of_invoice_month'
+          ? `ngày ${settings.dueRule.day} của chính tháng hoá đơn`
+          : settings.dueRule.kind === 'day_of_next_month'
+            ? `ngày ${settings.dueRule.day} của tháng sau`
+            : `${settings.dueRule.days} ngày sau khi duyệt`,
     },
   }
   const depositFormProps = {
