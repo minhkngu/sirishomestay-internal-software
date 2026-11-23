@@ -20,6 +20,8 @@ export type InvoicePdfData = {
   total: number
   paid: number
   bank: BankAccount | null
+  /** Ghi chú nhân viên viết cho khách, in trên hoá đơn. */
+  note?: string
 }
 export type ReceiptPdfData = {
   code: string
