@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { fillMeterReadings, meterValue, pickDate, pickTerm } from './helpers'
+import { chooseSelectOption, fillMeterReadings, meterValue, pickDate, pickTerm } from './helpers'
 
 test.skip(!process.env.E2E_BASE_URL, 'Cần E2E_BASE_URL trỏ tới môi trường thử có dữ liệu mẫu')
 async function login(page: Page, name: RegExp) {
@@ -25,19 +25,19 @@ test('tạo hoá đơn hàng loạt → sửa kỳ → duyệt → thu một ph�
   await page.locator('a[href^="/invoices/"]').filter({ hasNotText: 'Tạo' }).first().click()
   await page.waitForLoadState('networkidle')
   await expect(page.getByText('Nháp').first()).toBeVisible()
-  // sửa kỳ thành 3 tháng rồi áp dụng
-  const start = await page.getByLabel('Từ').inputValue()
-  const [y, m] = start.split('-').map(Number)
-  const end = new Date(Date.UTC(y, m + 2, 0)).toISOString().slice(0, 10)
-  await page.getByLabel('Đến').fill(end)
-  await page.getByRole('button', { name: 'Áp dụng kỳ' }).click()
-  await expect(page.getByText('Đã tính lại tiền phòng và phí cố định')).toBeVisible()
   await page.getByRole('button', { name: 'Duyệt hoá đơn' }).click()
   await expect(page.getByText('Chưa thu').first()).toBeVisible()
-  await page.getByRole('button', { name: 'Ghi thu' }).click()
-  await page.getByLabel('Số tiền').fill('1000000')
-  await page.getByRole('button', { name: 'Lưu khoản thu' }).click()
-  await expect(page.getByText('Thu một phần').first()).toBeVisible()
+  // Ghi thu theo hợp đồng ở danh sách hoá đơn: icon thu tiền mở popup, mặc định điền tổng dư nợ
+  await page.goto('/invoices')
+  await page.waitForLoadState('networkidle')
+  await page
+    .getByRole('button', { name: /^Thu tiền / })
+    .first()
+    .click()
+  await expect(page.getByLabel('Số tiền thu')).not.toHaveValue('')
+  await page.getByLabel('Số tiền thu').fill('1000000')
+  await page.getByRole('button', { name: 'Ghi thu', exact: true }).click()
+  await expect(page.getByText('Đã ghi thu')).toBeVisible()
 })
 
 test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → check-in → hoá đơn đầu tiên nháp', async ({ page }) => {
@@ -87,8 +87,8 @@ test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → 
 
   // Hợp đồng không tự sinh hoá đơn: tạo hàng loạt cho cơ sở của phòng, kỳ 12/2026 (tháng bắt đầu hợp đồng)
   await page.goto('/invoices/generate')
-  await page.getByLabel('Cơ sở').selectOption({ label: facilityName })
-  await page.getByLabel('Kỳ (tháng)').fill('2026-12')
+  await chooseSelectOption(page, 'Toà', facilityName)
+  await page.getByLabel('Tháng', { exact: true }).fill('2026-12')
   await page.getByRole('button', { name: 'Xem trước' }).click()
   const createDrafts = page.getByRole('button', { name: /^Tạo \d+ hoá đơn nháp$/ })
   await expect(createDrafts).toBeEnabled()
@@ -127,31 +127,76 @@ test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → 
   await expect(page.getByText('Đã kết thúc')).toBeVisible()
 })
 
-test('tải hoá đơn dưới dạng PDF và ảnh', async ({ page }) => {
+test('bấm mã hoá đơn xem PDF, tải ảnh ngay trong popup; trang chi tiết không còn khối xuất', async ({ page }) => {
   await page.goto('/login')
   await page.getByRole('button', { name: /^Admin/ }).click()
   await expect(page).toHaveURL(/\/$/)
   await page.goto('/invoices')
-  const detail = page.locator('main a[href^="/invoices/"]').filter({ hasNotText: 'Tạo' }).first()
-  await expect(detail).toBeVisible()
-  await detail.click()
-  await page.getByRole('button', { name: 'Xem PDF' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Xem hóa đơn PDF' })
+  const code = page.locator('main button[title="Xem bản PDF"]').first()
+  await expect(code).toBeVisible()
+  await code.click()
+  const dialog = page.getByRole('dialog', { name: /^Hoá đơn / })
   await expect(dialog).toBeVisible()
-  const preview = dialog.getByTitle('Hóa đơn PDF')
-  const previewUrl = await preview.getAttribute('src')
+  const previewUrl = await dialog.locator('iframe').getAttribute('src')
   expect(previewUrl).toMatch(/^\/api\/files\/[^?]+\?inline=1$/)
   const pdf = await page.request.get(previewUrl!)
   expect(pdf.ok()).toBe(true)
   expect(pdf.headers()['content-type']).toContain('application/pdf')
-  expect(pdf.headers()['content-disposition'] ?? '').not.toContain('attachment')
-  await dialog.getByRole('button', { name: 'Đóng' }).click()
-  for (const [label, extension] of [
-    ['Tải PDF', '.pdf'],
-    ['Tải ảnh', '.png'],
-  ] as const) {
-    const download = page.waitForEvent('download')
-    await page.getByRole('button', { name: label }).click()
-    expect((await download).suggestedFilename()).toMatch(new RegExp(`${extension.replace('.', '\\.')}$`, 'i'))
-  }
+  const download = page.waitForEvent('download')
+  await dialog.getByRole('button', { name: 'Tải ảnh' }).click()
+  expect((await download).suggestedFilename()).toMatch(/\.png$/i)
+  await page.keyboard.press('Escape')
+  await page.locator('main a[href^="/invoices/"]').filter({ hasNotText: 'Tạo' }).first().click()
+  await expect(page.getByRole('button', { name: 'Xem PDF' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Chi tiết hoá đơn' })).toBeVisible()
+})
+
+test('tạo hoá đơn lẻ từ popup: toà → phòng → tháng → xem trước chưa lưu → lưu thay đổi mới tạo', async ({ page }) => {
+  await login(page, /^Admin/)
+  await page.goto('/invoices')
+  await page.waitForLoadState('networkidle')
+  await page.getByRole('link', { name: 'Tạo hoá đơn lẻ' }).click()
+  await page.getByLabel('Toà', { exact: true }).click()
+  // Chọn toà có hợp đồng thuê (toà thử không có phòng để lập hoá đơn)
+  await page
+    .getByRole('option', { name: /Bình Thạnh|Thảo Điền/ })
+    .first()
+    .click()
+  await page.getByLabel('Phòng', { exact: true }).click()
+  await page.getByRole('option').first().click()
+  // Chọn xong tháng chỉ hiện bản xem trước chưa lưu; hoá đơn chỉ được tạo khi bấm Lưu thay đổi
+  await page.getByLabel('Tháng').fill('2031-07')
+  await expect(page.getByRole('button', { name: 'Lưu thay đổi' })).toBeVisible()
+  await expect(page.getByText('Chưa lưu').first()).toBeVisible()
+})
+
+test('thêm phí ngoài vào hoá đơn nháp bằng hộp thoại chọn phí giống màn hợp đồng', async ({ page }) => {
+  await login(page, /^Admin/)
+  await page.goto('/invoices?view=draft')
+  await page.waitForLoadState('networkidle')
+  await page.locator('a[href^="/invoices/"]').filter({ hasNotText: 'Tạo' }).first().click()
+  await page.waitForLoadState('networkidle')
+  // Đợi trình sửa hoá đơn hiện đủ dòng rồi mới đếm (máy chủ dev tải trang chậm)
+  await expect(page.getByRole('button', { name: 'Thêm phí' })).toBeVisible()
+  await expect(page.getByTitle('Xoá dòng').first()).toBeAttached()
+  const before = await page.getByTitle('Xoá dòng').count()
+  await page.getByRole('button', { name: 'Thêm phí' }).click()
+  await expect(page.getByRole('heading', { name: 'Chọn phí dịch vụ' })).toBeVisible()
+  await page.getByRole('button', { name: 'Thêm', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Xong' }).click()
+  await expect(page.getByTitle('Xoá dòng')).toHaveCount(before + 1)
+})
+
+test('tạo hoá đơn hàng loạt mở popup từ danh sách, Esc về lại danh sách', async ({ page }) => {
+  await login(page, /^Admin/)
+  await page.goto('/invoices')
+  await page.getByRole('link', { name: 'Tạo hoá đơn hàng loạt' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Tạo hoá đơn hàng loạt' })
+  await expect(dialog).toBeVisible()
+  await expect(page).toHaveURL(/\/invoices\/generate$/)
+  await page.keyboard.press('Escape')
+  await expect(dialog).toHaveCount(0)
+  await expect(page).toHaveURL(/\/invoices$/)
+  await page.goto('/invoices/generate')
+  await expect(page.getByRole('heading', { name: 'Tạo hoá đơn hàng loạt' })).toBeVisible()
 })

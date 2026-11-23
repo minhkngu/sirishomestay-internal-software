@@ -14,4 +14,13 @@ export type { DepositListItem, LeaseListItem } from './server/contracts/service'
 export { getRoomDetail, listRoomsWithStatus } from './server/contracts/room-view'
 export { getHandover, listHandovers } from './server/handovers/service'
 export { getIncident, incidentsForAsset, listAssignees, listIncidents } from './server/incidents/service'
-export { getInvoiceDetail, listInvoices, nextInvoiceCode, tenantBalance } from './server/invoices/service'
+export {
+  getInvoiceDetail,
+  listInvoices,
+  nextInvoiceCode,
+  previewNewInvoice,
+  removePayment,
+  tenantBalance,
+  updatePayment,
+} from './server/invoices/service'
+export { computeDueDate } from './domain/due-date'
