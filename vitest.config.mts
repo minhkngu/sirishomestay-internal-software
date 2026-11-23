@@ -6,6 +6,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/unit/**/*.test.ts', 'tests/integration/**/*.test.ts'],
+    setupFiles: ['tests/helpers/close-test-dbs.ts'],
     testTimeout: 120000,
     hookTimeout: 120000,
   },
