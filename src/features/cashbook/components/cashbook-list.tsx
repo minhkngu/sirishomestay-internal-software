@@ -16,9 +16,11 @@ import { summarize, type LedgerRow } from '@/domain/cashbook'
 import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { cn } from '@/lib/utils'
+import { deleteDepositEntryAction } from '@/server/charges/actions'
 import { deleteExpenseAction, deletePaymentAction } from '@/server/cashbook/actions'
 import { DepositDialog, CollectRentDialog, type LeaseTarget } from './lease-dialogs'
 import { ExpenseDialog, type ExpenseDraft, type RoomOption } from './expense-dialog'
+import { EditEntryDialog } from './edit-entry-dialog'
 
 type Facility = { id: string; name: string }
 export type ExpenseDetail = ExpenseDraft & { id: string }
@@ -52,6 +54,7 @@ export function CashbookList({ rows, depositHeld, facilities, rooms, leases, exp
   const [q, setQ] = useState('')
   const [dialog, setDialog] = useState<null | 'expense' | 'rent' | 'deposit'>(null)
   const [editing, setEditing] = useState<ExpenseDetail | null>(null)
+  const [editingEntry, setEditingEntry] = useState<LedgerRow | null>(null)
   const [removing, setRemoving] = useState<LedgerRow | null>(null)
   const names = useMemo(() => Object.fromEntries(facilities.map((f) => [f.id, f.name])), [facilities])
 
@@ -62,9 +65,9 @@ export function CashbookList({ rows, depositHeld, facilities, rooms, leases, exp
   const { pageRows, pager } = usePager(filtered, 'cashbook', `${kind}|${month}|${text}|${selected.join(',')}`)
 
   const remove = async (row: LedgerRow) => {
-    const r = row.source === 'payment' ? await deletePaymentAction(row.id) : await deleteExpenseAction(row.id)
+    const r = row.source === 'payment' ? await deletePaymentAction(row.id) : row.source === 'deposit' ? await deleteDepositEntryAction(row.id) : await deleteExpenseAction(row.id)
     if (!r.ok) { toast.error(r.error); return }
-    toast.success(row.source === 'payment' ? 'Đã xoá khoản thu' : 'Đã xoá khoản chi')
+    toast.success(row.source === 'payment' ? 'Đã xoá khoản thu' : row.source === 'deposit' ? 'Đã xoá khoản cọc' : 'Đã xoá khoản chi')
     router.refresh()
   }
 
@@ -75,9 +78,12 @@ export function CashbookList({ rows, depositHeld, facilities, rooms, leases, exp
         <Button type="button" variant="ghost" size="icon-sm" aria-label="Xoá khoản chi" title="Xoá" onClick={() => setRemoving(r)}><Trash2 className="size-4" /></Button>
       </div>
     )
-    : r.source === 'payment'
-      ? <div className="flex justify-end"><Button type="button" variant="ghost" size="icon-sm" aria-label="Xoá khoản thu" title="Xoá khoản thu" onClick={() => setRemoving(r)}><Trash2 className="size-4" /></Button></div>
-    : null
+    : (
+      <div className="flex justify-end gap-1">
+        <Button type="button" variant="ghost" size="icon-sm" aria-label={r.source === 'payment' ? 'Sửa khoản thu' : 'Sửa khoản cọc'} title="Sửa" onClick={() => setEditingEntry(r)}><Pencil className="size-4" /></Button>
+        <Button type="button" variant="ghost" size="icon-sm" aria-label={r.source === 'payment' ? 'Xoá khoản thu' : 'Xoá khoản cọc'} title="Xoá" onClick={() => setRemoving(r)}><Trash2 className="size-4" /></Button>
+      </div>
+    )
   const amountCell = (r: LedgerRow) => (
     <span className={cn('font-semibold tabular-nums', !r.counted ? 'text-muted-foreground' : r.direction === 'in' ? 'text-emerald-700' : 'text-rose-700')}>
       {r.direction === 'in' ? '+' : '−'}{formatVND(r.amount)}
@@ -160,7 +166,8 @@ export function CashbookList({ rows, depositHeld, facilities, rooms, leases, exp
       {editing && <ExpenseDialog open onOpenChange={(o) => !o && setEditing(null)} facilities={facilities} rooms={rooms} initial={editing} />}
       {dialog === 'rent' && <CollectRentDialog open onOpenChange={(o) => !o && setDialog(null)} leases={leases} />}
       {dialog === 'deposit' && <DepositDialog open onOpenChange={(o) => !o && setDialog(null)} leases={leases} />}
-      <ConfirmDialog open={!!removing} onOpenChange={(o) => !o && setRemoving(null)} title={removing?.source === 'payment' ? 'Xoá khoản thu?' : 'Xoá khoản chi?'} description={removing?.source === 'payment' ? 'Khoản thu bị gỡ, dư nợ hoá đơn tăng lại. Có ghi nhật ký.' : 'Khoản chi sẽ bị gỡ khỏi sổ quỹ, có ghi nhật ký.'} confirmLabel="Xoá" destructive onConfirm={() => removing && remove(removing)} />
+      {editingEntry && <EditEntryDialog row={editingEntry} open onOpenChange={(o) => !o && setEditingEntry(null)} />}
+      <ConfirmDialog open={!!removing} onOpenChange={(o) => !o && setRemoving(null)} title={removing?.source === 'payment' ? 'Xoá khoản thu?' : removing?.source === 'deposit' ? 'Xoá khoản cọc?' : 'Xoá khoản chi?'} description={removing?.source === 'payment' ? 'Khoản thu bị gỡ, dư nợ hoá đơn tăng lại. Có ghi nhật ký.' : removing?.source === 'deposit' ? 'Dòng sổ cọc bị gỡ, cọc đang giữ được tính lại. Có ghi nhật ký.' : 'Khoản chi sẽ bị gỡ khỏi sổ quỹ, có ghi nhật ký.'} confirmLabel="Xoá" destructive onConfirm={() => removing && remove(removing)} />
     </>
   )
 }

@@ -19,6 +19,8 @@ export type LedgerRow = {
   party: string
   method: string | null
   note: string
+  /** Ghi chú riêng của khoản thu (không kèm mã hoá đơn khi trống), để điền vào popup sửa. */
+  rawNote?: string
   status: 'done' | 'pending'
   /** Thời điểm ghi nhận khoản này (giờ Việt Nam, HH:mm); dòng cũ không rõ thì rỗng. */
   time: string

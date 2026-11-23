@@ -186,6 +186,13 @@ describe('meters', () => {
     expect(r.errors).toEqual([])
   })
 
+  it('đồng hồ lắp sau ngày ghi vẫn ghi được chỉ số, không báo lỗi chưa lắp', async () => {
+    await db.update(meters).set({ installedOn: '2026-10-20' }).where(eq(meters.id, m.E101))
+    const r = await saveReadings(db, hung(), '2026-10', [{ meterId: m.E101, value: 1100, readOn: '2026-10-15' }])
+    expect(r.saved).toBe(1)
+    expect(r.errors).toEqual([])
+  })
+
   it('ghi lại cùng kỳ thì cập nhật, không tạo dòng trùng', async () => {
     await saveReadings(db, hung(), '2026-10', [{ meterId: m.E101, value: 1100, readOn: '2026-10-31' }])
     await saveReadings(db, hung(), '2026-10', [{ meterId: m.E101, value: 1120, readOn: '2026-10-31' }])

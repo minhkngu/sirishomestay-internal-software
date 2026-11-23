@@ -4,7 +4,7 @@ import { facilities, invoiceLines, invoices, leaseFeeMeters, leaseFeeSnapshots, 
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ForbiddenError, ValidationError } from '@/domain/errors'
-import { approveInvoice, createDrafts, deleteInvoice, getInvoiceDetail, savePreviewMeterReading, updateInvoiceMeterReading } from '@/server/invoices/service'
+import { approveInvoice, createDrafts, deleteInvoice, getInvoiceDetail, savePreviewMeterReading, updateInvoiceMeterReading, updateLines } from '@/server/invoices/service'
 import { listReadingSheet } from '@/server/meters/service'
 import { updateLease } from '@/server/contracts/service'
 import { createTestDb } from '../helpers/db'
@@ -176,5 +176,61 @@ describe('sửa chỉ số đầu hợp đồng khi đã có hoá đơn', () => 
     await deleteInvoice(db, context(['billing'], facilityId), old.id)
     const [fresh] = await createDrafts(db, context(['billing'], facilityId), { facilityId, period: '2026-02' })
     expect((await electricLine(fresh.id)).quantity).toBe(20)
+  })
+})
+
+describe('hoá đơn đầu giữ số riêng', () => {
+  let db: DB, facilityId: string, leaseId: string, roomId: string, tenantId: string, meterId: string, feeId: string
+  const ctx = () => context(['billing', 'meters', 'tenants_contracts'], facilityId)
+  const electric = async (invoiceId: string) => (await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, invoiceId))).find(l => (l.meta as { leaseFeeId?: string } | null)?.leaseFeeId === feeId)!
+  beforeEach(async () => {
+    db = await createTestDb()
+    const [facility] = await db.insert(facilities).values({ code: 'TD', name: 'Thảo Điền' }).returning(); facilityId = facility.id
+    const [room] = await db.insert(rooms).values({ facilityId, code: '301' }).returning(); roomId = room.id
+    const [tenant] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: facilityId, fullName: 'Khách', phone: '+84901234567', idNumber: '012345678901' }).returning(); tenantId = tenant.id
+    const [lease] = await db.insert(leases).values({ code: 'HD2', roomId, tenantId, startDate: '2026-02-15', endDate: '2027-12-31', monthlyRent: 9000000, depositAmount: 9000000 }).returning(); leaseId = lease.id
+    const [meter] = await db.insert(meters).values({ roomId, utility: 'electric', installedOn: '2026-02-15', startReading: 0 }).returning(); meterId = meter.id
+    await db.insert(meterReadings).values({ meterId, period: '2026-02', readOn: '2026-02-15', value: 1250, kind: 'handover' })
+    const [fee] = await db.insert(leaseFeeSnapshots).values({ leaseId, name: 'Điện', unit: 'kWh', quantitySource: 'meter', billing: 'per_occurrence', unitPrice: 3500 }).returning(); feeId = fee.id
+    await db.insert(leaseFeeMeters).values({ leaseFeeId: feeId, meterId })
+  })
+
+  it('hoá đơn đầu chép số đầu, số cuối từ chỉ số ban đầu, tiêu thụ 0', async () => {
+    const [inv] = await createDrafts(db, context(['billing'], facilityId), { facilityId, period: '2026-02' })
+    const line = await electric(inv.id)
+    expect(line.quantity).toBe(0)
+    expect(line.meta).toMatchObject({ opening: 1250, closing: 1250 })
+  })
+
+  it('sửa số đầu, số cuối của hoá đơn đầu không đổi khi lưu chỉ số của tháng khác', async () => {
+    const [inv] = await createDrafts(db, context(['billing'], facilityId), { facilityId, period: '2026-02' })
+    const lines = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, inv.id))
+    await updateLines(db, ctx(), inv.id, lines.map(l => (l.meta as { leaseFeeId?: string } | null)?.leaseFeeId === feeId
+      ? { ...l, quantity: 40, amount: 40 * 3500, meta: { ...(l.meta as Record<string, unknown>), opening: 1300, closing: 1340 } }
+      : { ...l, meta: l.meta as Record<string, unknown> | null }))
+    // Hoá đơn tháng 3 sửa được chỉ số tháng 2 (chỉ số ghi thường của tháng ký hợp đồng), không đụng dòng hoá đơn đầu
+    const [mar] = await createDrafts(db, context(['billing'], facilityId), { facilityId, period: '2026-03' })
+    await updateInvoiceMeterReading(db, ctx(), mar.id, { leaseFeeId: feeId, period: '2026-02', value: 1400 })
+    expect(await electric(inv.id)).toMatchObject({ quantity: 40, meta: { opening: 1300, closing: 1340 } })
+  })
+
+  it('đổi chỉ số ban đầu ở hợp đồng không đổi hoá đơn đầu đã tạo; xoá và lập lại thì dùng số mới', async () => {
+    const [inv] = await createDrafts(db, context(['billing'], facilityId), { facilityId, period: '2026-02' })
+    await updateLease(db, ctx(), leaseId, {
+      roomId, tenantId, startDate: '2026-02-15', endDate: '2027-12-31', monthlyRent: 9000000, depositAmount: 9000000,
+      fees: [{ leaseFeeId: feeId, unitPrice: 3500, existingMeterId: meterId, initialReading: 1280 }],
+    }, false)
+    expect((await electric(inv.id)).meta).toMatchObject({ opening: 1250, closing: 1250 })
+
+    await deleteInvoice(db, context(['billing'], facilityId), inv.id)
+    const [fresh] = await createDrafts(db, context(['billing'], facilityId), { facilityId, period: '2026-02' })
+    expect((await electric(fresh.id)).meta).toMatchObject({ opening: 1280, closing: 1280 })
+  })
+
+  it('chi tiết hoá đơn của hợp đồng không có chỉ số bàn giao thì chỉ số đầu để trống, không lấy chỉ số lúc lắp', async () => {
+    await db.delete(meterReadings).where(eq(meterReadings.kind, 'handover'))
+    const [mar] = await createDrafts(db, context(['billing'], facilityId), { facilityId, period: '2026-03' })
+    const detail = await getInvoiceDetail(db, ctx(), mar.id)
+    expect(detail.meterPanels[0]).toMatchObject({ leaseFeeId: feeId, initial: null })
   })
 })
