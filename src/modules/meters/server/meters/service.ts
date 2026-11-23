@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
+import { MAX_INT4 } from '@/domain/money'
 import { facilities, leaseFeeMeters, leaseFeeSnapshots, leases, meterReadings, meters, rooms } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, can, type AccessContext } from '@/domain/access'
@@ -567,7 +568,7 @@ export async function ensureFeeMeter(
   if (!room) throw new NotFoundError()
   assertCan(ctx, 'tenants_contracts', room.facilityId)
   // Chỉ số ban đầu luôn bắt buộc: chỉ số bàn giao của đồng hồ đã chọn tại ngày bắt đầu
-  if (!Number.isSafeInteger(input.initialReading) || input.initialReading! < 0 || input.initialReading! > 2_147_483_647)
+  if (!Number.isSafeInteger(input.initialReading) || input.initialReading! < 0 || input.initialReading! > MAX_INT4)
     throw new ValidationError('Nhập chỉ số ban đầu hợp lệ', { initialReading: 'Nhập chỉ số nguyên không âm' })
   if (!input.existingMeterId)
     throw new ValidationError('Chọn đồng hồ cho phí', { existingMeterId: 'Chọn đồng hồ của phòng' })
@@ -662,7 +663,7 @@ export async function updateLeaseFeeMeter(
     .where(and(eq(leaseFeeMeters.meterId, meter.id), eq(leases.status, 'active'), ne(leases.id, input.leaseId)))
   if (busy)
     throw new ValidationError('Đồng hồ đang gắn với phí của hợp đồng khác', { existingMeterId: 'Chọn đồng hồ khác' })
-  if (!Number.isSafeInteger(input.initialReading) || input.initialReading < 0 || input.initialReading > 2_147_483_647)
+  if (!Number.isSafeInteger(input.initialReading) || input.initialReading < 0 || input.initialReading > MAX_INT4)
     throw new ValidationError('Nhập chỉ số ban đầu hợp lệ', { initialReading: 'Nhập chỉ số nguyên không âm' })
 
   const [link] = await tx.select().from(leaseFeeMeters).where(eq(leaseFeeMeters.leaseFeeId, input.leaseFeeId))

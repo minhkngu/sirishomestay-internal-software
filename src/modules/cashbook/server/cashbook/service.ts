@@ -3,6 +3,7 @@ import { depositEntries, expenses, invoiceLines, invoices, leases, payments, roo
 import type { DB } from '@/db/client'
 import { assertCan, can, type AccessContext } from '@/domain/access'
 import { depositHeld, depositMovement, expenseLabel, type LedgerRow } from '@/domain/cashbook'
+import { VN_TIME_ZONE } from '@/domain/dates'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { displayName } from '@/modules/tenants'
 import { recordAudit } from '@/modules/platform'
@@ -27,7 +28,7 @@ const inScope = (column: Parameters<typeof inArray>[0], scope: string[] | null) 
 
 const hhmm = (at: Date) =>
   new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Ho_Chi_Minh',
+    timeZone: VN_TIME_ZONE,
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,

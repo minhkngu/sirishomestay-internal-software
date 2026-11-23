@@ -1,6 +1,8 @@
 import { RequirePermission, getAccessContext } from '@/modules/platform'
+import { ASSET_CONDITION } from '@/domain/asset-labels'
 import { db } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
+import { VN_TIME_ZONE } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { orNotFound } from '@/lib/or-not-found'
 import { incidentsForAsset } from '@/modules/leasing'
@@ -55,7 +57,7 @@ async function Asset({ params }: { params: Promise<{ id: string }> }) {
             {history.handovers.map((h, i) => (
               <li key={i}>
                 {h.date} — {h.kind === 'check_in' ? 'Check-in' : 'Check-out'}:{' '}
-                {h.missing ? 'Mất' : h.damaged ? 'Hư' : h.condition}
+                {h.missing ? ASSET_CONDITION.missing : h.damaged ? ASSET_CONDITION.damaged : h.condition}
                 {h.penalty ? ` (phạt ${formatVND(h.penalty)})` : ''}
               </li>
             ))}
@@ -66,7 +68,7 @@ async function Asset({ params }: { params: Promise<{ id: string }> }) {
       <ul className="space-y-1 text-sm">
         {moves.map((m) => (
           <li key={m.id}>
-            {m.movedAt.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })} — {m.from} → {m.to}
+            {m.movedAt.toLocaleString('vi-VN', { timeZone: VN_TIME_ZONE })} — {m.from} → {m.to}
             {m.reason ? ` (${m.reason})` : ''}
           </li>
         ))}

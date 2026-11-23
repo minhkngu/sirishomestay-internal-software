@@ -1,4 +1,5 @@
 import { and, asc, eq, sql } from 'drizzle-orm'
+import { MAX_MONEY } from '@/domain/money'
 import { z } from 'zod'
 import { depositEntries, invoiceLines, invoices, leases, oneOffCharges, rooms } from '@/db'
 import type { DB } from '@/db/client'
@@ -19,7 +20,7 @@ const chargeInput = z.object({
 const depositInput = z.object({
   date,
   type: z.enum(['collect', 'topup', 'deduct', 'refund', 'forfeit']),
-  amount: z.number().int().positive().max(2147483647),
+  amount: z.number().int().positive().max(MAX_MONEY),
   status: z.enum(['pending', 'done']).default('pending'),
   method: z.enum(['cash', 'transfer', 'other']).nullable().optional(),
   note: z.string().optional(),
@@ -151,7 +152,7 @@ export async function markDepositDone(db: DB, ctx: AccessContext, id: string, in
 const EDITABLE_DEPOSIT_TYPES = ['collect', 'topup', 'refund'] as const
 const depositEditInput = z.object({
   date,
-  amount: z.number().int().positive().max(2147483647),
+  amount: z.number().int().positive().max(MAX_MONEY),
   method: z.enum(['cash', 'transfer', 'other']),
   note: z.string().trim().default(''),
 })

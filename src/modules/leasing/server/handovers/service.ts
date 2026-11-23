@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, inArray, isNotNull, ne } from 'drizzle-orm'
+import { ASSET_CONDITION } from '@/domain/asset-labels'
 import { assets, facilities, files, handoverItems, handovers, leases, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
@@ -84,11 +85,13 @@ export async function startHandoverInTransaction(
   const [h] = await tx.insert(handovers).values({ leaseId, roomId: l.roomId, kind, date: todayVN() }).returning()
   if (assetIds.length) {
     const rows = await tx.select().from(assets).where(inArray(assets.id, assetIds))
-    await tx
-      .insert(handoverItems)
-      .values(
-        rows.map((a) => ({ handoverId: h.id, assetId: a.id, condition: kind === 'check_in' ? a.condition : 'Tốt' })),
-      )
+    await tx.insert(handoverItems).values(
+      rows.map((a) => ({
+        handoverId: h.id,
+        assetId: a.id,
+        condition: kind === 'check_in' ? a.condition : ASSET_CONDITION.good,
+      })),
+    )
   }
   await recordAudit(tx, ctx, {
     action: 'create',
@@ -272,7 +275,11 @@ for (const docType of ['handover_check_in', 'handover_check_out'] as const) {
           items: h.items.map((i) => ({
             code: i.assetCode,
             name: i.assetName,
-            condition: i.missing ? 'Mất' : i.damaged ? `Hư — ${i.condition}` : i.condition,
+            condition: i.missing
+              ? ASSET_CONDITION.missing
+              : i.damaged
+                ? `${ASSET_CONDITION.damaged} — ${i.condition}`
+                : i.condition,
             penalty: i.penalty,
           })),
         },

@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { summarize, type LedgerRow } from '@/domain/cashbook'
 import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
+import { PAYMENT_METHOD_LABELS, type PaymentMethod } from '@/domain/payment-labels'
 import { cn } from '@/lib/utils'
 import { deleteDepositEntryAction } from '@/modules/leasing/actions'
 import { deleteExpenseAction, deletePaymentAction } from '../server/cashbook/actions'
@@ -34,8 +35,6 @@ const KINDS = [
   ['salary', 'Lương'],
   ['other', 'Khác'],
 ] as const
-const METHOD_LABEL: Record<string, string> = { cash: 'Tiền mặt', transfer: 'Chuyển khoản', other: 'Khác' }
-
 function Stat({ label, value, tone }: { label: string; value: number; tone?: 'in' | 'out' }) {
   return (
     <div className="p-4">
@@ -280,7 +279,9 @@ export function CashbookList({
                     {r.party || '—'}
                   </div>
                   {r.method && (
-                    <div className="text-xs text-muted-foreground">{METHOD_LABEL[r.method] ?? r.method}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {PAYMENT_METHOD_LABELS[r.method as PaymentMethod] ?? r.method}
+                    </div>
                   )}
                 </td>
                 <td className="max-w-[150px] truncate p-3 text-muted-foreground" title={r.note}>

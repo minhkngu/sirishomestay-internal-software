@@ -9,7 +9,7 @@ export const assets = pgTable('assets', {
   model: text('model').notNull().default(''),
   category: text('category').notNull().default(''),
   value: integer('value').notNull().default(0),
-  condition: text('condition').notNull().default('Tốt'),
+  condition: text('condition').notNull().default('Tốt'), // = ASSET_CONDITION.good (db chỉ import type từ domain)
   locationKind: text('location_kind').notNull(), // room | common | warehouse
   locationId: uuid('location_id').notNull(), // room: id phòng; common/warehouse: id cơ sở
   facilityId: uuid('facility_id')

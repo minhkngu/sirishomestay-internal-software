@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { signStatusLabel } from '@/modules/leasing/domain/sign-status'
+import { signStatusLabel } from '@/domain/sign-labels'
 
 describe('nhãn trạng thái ký', () => {
   it('chỉ hợp đồng đã ký mới hiện "Đã ký"', () => {

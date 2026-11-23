@@ -11,13 +11,9 @@ import { MoneyInput } from '@/components/ui/money-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { todayVN } from '@/domain/dates'
 import { EXPENSE_CATEGORIES } from '@/domain/cashbook'
+import { PAYMENT_METHOD_OPTIONS } from '@/domain/payment-labels'
 import { addExpenseAction, updateExpenseAction } from '../server/cashbook/actions'
 
-const METHODS = [
-  { value: 'cash', label: 'Tiền mặt' },
-  { value: 'transfer', label: 'Chuyển khoản' },
-  { value: 'other', label: 'Khác' },
-]
 const NO_ROOM = 'none'
 
 export type ExpenseDraft = {
@@ -173,12 +169,12 @@ export function ExpenseDialog({
           </div>
           <div className="space-y-1.5">
             <Label>Hình thức</Label>
-            <Select value={method} onValueChange={(v) => v && setMethod(String(v))} items={METHODS}>
+            <Select value={method} onValueChange={(v) => v && setMethod(String(v))} items={PAYMENT_METHOD_OPTIONS}>
               <SelectTrigger aria-label="Hình thức" className="h-9 w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {METHODS.map((m) => (
+                {PAYMENT_METHOD_OPTIONS.map((m) => (
                   <SelectItem key={m.value} value={m.value}>
                     {m.label}
                   </SelectItem>

@@ -4,6 +4,7 @@ import { ArrowLeft, Calendar, FileText } from 'lucide-react'
 import { can } from '@/domain/access'
 import {
   listOneOffs,
+  INVOICE_STATUS_LABELS,
   listHandovers,
   getDepositContract,
   getLease,
@@ -118,11 +119,11 @@ function DocRow({ d }: { d: { id: string; label: string; name: string; date: str
 }
 
 const INVOICE_STATE: Record<string, { label: string; tone: 'positive' | 'warning' | 'neutral' | 'negative' }> = {
-  paid: { label: 'Đã thu đủ', tone: 'positive' },
-  partial: { label: 'Thu một phần', tone: 'warning' },
-  unpaid: { label: 'Chưa thu', tone: 'neutral' },
-  overdue: { label: 'Quá hạn', tone: 'negative' },
-  draft: { label: 'Nháp', tone: 'neutral' },
+  paid: { label: INVOICE_STATUS_LABELS.paid, tone: 'positive' },
+  partial: { label: INVOICE_STATUS_LABELS.partial, tone: 'warning' },
+  unpaid: { label: INVOICE_STATUS_LABELS.unpaid, tone: 'neutral' },
+  overdue: { label: INVOICE_STATUS_LABELS.overdue, tone: 'negative' },
+  draft: { label: INVOICE_STATUS_LABELS.draft, tone: 'neutral' },
 }
 
 function InvoiceRows({

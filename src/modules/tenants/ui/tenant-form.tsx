@@ -7,16 +7,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { formatPhoneDisplay, normalizePhone } from '@/domain/phone'
+import { TENANT_KIND_LABELS, type TenantKind } from '@/domain/tenant-kind'
 import { createTenantAction, updateTenantAction } from '../server/tenants/actions'
 
-type Kind = 'foreign' | 'vietnamese' | 'company'
+type Kind = TenantKind
 type Field = { key: string; label: string; type?: 'date' | 'text' }
 
-const KIND_LABELS: Record<Kind, string> = {
-  foreign: 'Khách nước ngoài',
-  vietnamese: 'Khách Việt Nam',
-  company: 'Công ty',
-}
 const FIELDS: Record<Kind, Field[]> = {
   foreign: [
     { key: 'fullName', label: 'Họ tên' },
@@ -132,7 +128,7 @@ export function TenantForm({ facilities, tenant, onCreated, kinds, deferCreate, 
   return (
     <div className={bare ? 'space-y-4' : 'max-w-2xl space-y-4 rounded-lg border bg-card p-4 sm:p-6'}>
       <div className="flex flex-wrap gap-2" role="tablist">
-        {(kinds ?? (Object.keys(KIND_LABELS) as Kind[])).map((k) => (
+        {(kinds ?? (Object.keys(TENANT_KIND_LABELS) as Kind[])).map((k) => (
           <button
             key={k}
             type="button"
@@ -144,7 +140,7 @@ export function TenantForm({ facilities, tenant, onCreated, kinds, deferCreate, 
               kind === k && 'bg-[var(--primary-strong)] text-primary-foreground',
             )}
           >
-            {KIND_LABELS[k]}
+            {TENANT_KIND_LABELS[k]}
           </button>
         ))}
       </div>

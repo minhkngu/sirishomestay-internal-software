@@ -13,14 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { todayVN } from '@/domain/dates'
 import { DEPOSIT_ENTRY_LABELS } from '@/domain/deposit'
 import { formatVND } from '@/domain/money'
+import { PAYMENT_METHOD_OPTIONS } from '@/domain/payment-labels'
 import { addDepositEntryAction } from '@/modules/leasing/actions'
 
 export type LeaseTarget = { leaseId: string; facilityId: string; roomCode: string; tenantName: string; debt: number }
-const METHODS = [
-  { value: 'cash', label: 'Tiền mặt' },
-  { value: 'transfer', label: 'Chuyển khoản' },
-  { value: 'other', label: 'Khác' },
-]
 const leaseLabel = (l: LeaseTarget) => `Phòng ${l.roomCode} · ${l.tenantName}`
 
 /** Chọn hợp đồng rồi mở hộp thu tiền thuê dùng chung với danh sách hoá đơn. */
@@ -183,12 +179,12 @@ export function DepositDialog({
           </div>
           <div className="space-y-1.5">
             <Label>Hình thức</Label>
-            <Select value={method} onValueChange={(v) => v && setMethod(String(v))} items={METHODS}>
+            <Select value={method} onValueChange={(v) => v && setMethod(String(v))} items={PAYMENT_METHOD_OPTIONS}>
               <SelectTrigger aria-label="Hình thức" className="h-9 w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {METHODS.map((m) => (
+                {PAYMENT_METHOD_OPTIONS.map((m) => (
                   <SelectItem key={m.value} value={m.value}>
                     {m.label}
                   </SelectItem>

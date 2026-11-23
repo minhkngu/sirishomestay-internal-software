@@ -53,6 +53,7 @@ Luật:
 - **Ghi bảng của module khác** chỉ qua API module đó. Đọc (select/join) bảng khác thì được. Luật ghi không có công cụ kiểm, chỉ giữ bằng review.
 - **Đặt file:** file domain chỉ một module dùng → vào module đó; hai module trở lên → ở lại `src/domain`. Component đi theo module của server nó import; import hai module ngang tầng → đặt cạnh route trong `src/app`.
 - **`src/modules/registrations.ts`:** import được mọi module; chỉ điểm vào được import nó: `src/app` và `server/**/actions.ts` của module; cổng `actions.ts` chỉ re-export, không import.
+- **Hằng số và nhãn một nguồn:** mỗi khái niệm (giới hạn int4 `MAX_MONEY`/`MAX_INT4`, múi giờ `VN_TIME_ZONE`, nhãn trạng thái, phương thức thu tiền, giới hạn tải lên…) chỉ định nghĩa một lần. Một module dùng thì đặt ở `src/modules/<m>/domain/`; từ hai module (hoặc module + `src/domain`) thì đặt ở `src/domain/`. Chỗ chữ khác nhau có chủ ý (bản dài/ngắn, nhãn cố ý gộp như `signStatusLabel`) thì giữ nhiều map có tên trong cùng file nguồn. `tests/unit/architecture/constants.test.ts` chặn viết lại một số giá trị.
 - **Công cụ kiểm:** `eslint-plugin-boundaries` trong `eslint.config.mjs` kiểm mọi luật trên (`npm run lint`); luật `import/no-duplicates` gộp import giá trị trùng nguồn nhưng không bắt kiểu `{ X, type Y }` lẫn trong cùng câu import, nên gộp tay; `tests/unit/architecture/modules.test.ts` dựng đồ thị import (bỏ `import type`) và kiểm lại tầng, cổng công khai, dùng chung không import module, `src/proxy.ts`, component client trong `src/app`.
 
 ### Vì sao chia như vậy

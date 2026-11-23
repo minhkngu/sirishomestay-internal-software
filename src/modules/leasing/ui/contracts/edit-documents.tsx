@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { formatDateVN, todayVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { DEPOSIT_ENTRY_LABELS } from '@/domain/deposit'
+import { PAYMENT_METHOD_LABELS } from '@/domain/payment-labels'
 import type { DepositEntry } from '@/domain/types'
 import { BareSelect } from './contract-form-ui'
 
@@ -24,8 +25,6 @@ export type DocsDraft = {
 export const emptyDocsDraft: DocsDraft = { signedFile: null, photos: [], newEntries: [], doneEntries: {} }
 export const docsDraftChanged = (d: DocsDraft) =>
   !!d.signedFile || d.photos.length > 0 || d.newEntries.length > 0 || Object.keys(d.doneEntries).length > 0
-
-const METHOD = { cash: 'Tiền mặt', transfer: 'Chuyển khoản', other: 'Khác' } as const
 
 /** Giấy tờ, sổ cọc và bàn giao trong popup "Sửa hợp đồng": chỉ ghi nháp, mọi thứ được lưu khi bấm "Lưu thay đổi". */
 export function EditDocuments({
@@ -186,7 +185,10 @@ export function EditDocuments({
                                     },
                                   })
                                 }
-                                options={Object.entries(METHOD).map(([k, v]) => ({ value: k, label: v }))}
+                                options={Object.entries(PAYMENT_METHOD_LABELS).map(([k, v]) => ({
+                                  value: k,
+                                  label: v,
+                                }))}
                                 className="h-7 w-36 rounded-lg px-2 py-0 text-xs"
                               />
                               <Button

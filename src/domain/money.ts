@@ -64,5 +64,8 @@ export function numberToVietnameseWords(n: number): string {
   return sentence.charAt(0).toUpperCase() + sentence.slice(1)
 }
 
+/** Số nguyên 32 bit (int4) lớn nhất: giới hạn của cột số nguyên trong DB. */
+export const MAX_INT4 = 2_147_483_647
+
 /** Cột tiền trong DB là số nguyên 32 bit: lớn hơn mức này thì không lưu được. */
-export const MAX_MONEY = 2_147_483_647
+export const MAX_MONEY = MAX_INT4

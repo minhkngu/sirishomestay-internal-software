@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm'
+import { MAX_MONEY } from '@/domain/money'
 import { depositContracts, depositEntries, leases, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, facilityKey, type AccessContext } from '@/domain/access'
@@ -7,10 +8,7 @@ import type { DepositEntry } from '@/domain/types'
 
 export type Lease = typeof leases.$inferSelect
 export type DepositContract = typeof depositContracts.$inferSelect
-import type { SignStatus } from '@/domain/statuses'
 export type { SignStatus } from '@/domain/statuses'
-
-export const SIGN_RANK: Record<SignStatus, number> = { draft: 0, exported: 1, signed: 2 }
 
 // ------------------------------------------------------------------ helpers
 
@@ -39,8 +37,7 @@ export const toDomainEntry = (e: typeof depositEntries.$inferSelect): DepositEnt
 })
 
 export function checkMoney(value: number) {
-  if (!Number.isSafeInteger(value) || value < 0 || value > 2_147_483_647)
-    throw new ValidationError('Số tiền không hợp lệ')
+  if (!Number.isSafeInteger(value) || value < 0 || value > MAX_MONEY) throw new ValidationError('Số tiền không hợp lệ')
 }
 export function checkDate(value: string) {
   if (

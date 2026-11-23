@@ -1,4 +1,5 @@
 import { and, asc, eq, inArray } from 'drizzle-orm'
+import { MAX_MONEY } from '@/domain/money'
 import { z } from 'zod'
 import {
   feeTypes,
@@ -211,7 +212,7 @@ export async function restoreFeeType(db: DB, ctx: AccessContext, id: string): Pr
 
 const feePriceKey = z.object({ feeTypeId: z.uuid(), facilityId: z.uuid() })
 const feePriceInput = feePriceKey.extend({
-  price: z.number().int().min(0, 'Đơn giá không hợp lệ').max(2147483647, 'Đơn giá không hợp lệ'),
+  price: z.number().int().min(0, 'Đơn giá không hợp lệ').max(MAX_MONEY, 'Đơn giá không hợp lệ'),
 })
 
 export async function listFeeTypePrices(
@@ -285,7 +286,7 @@ const feeFacilitiesInput = z.object({
           .number()
           .int()
           .min(0, 'Đơn giá không hợp lệ')
-          .max(2147483647, 'Đơn giá không hợp lệ')
+          .max(MAX_MONEY, 'Đơn giá không hợp lệ')
           .nullable()
           .optional(),
       }),

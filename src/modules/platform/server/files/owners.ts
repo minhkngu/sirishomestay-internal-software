@@ -3,6 +3,7 @@ import { tenants } from '@/db'
 import type { DB } from '@/db/client'
 import type { Permission } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
+import { MAX_DOCUMENT_BYTES, MAX_EXPORT_BYTES, MAX_IMAGE_BYTES } from '../../domain/upload-limits'
 
 export const OWNER_TYPES = [
   'tenant_document',
@@ -81,14 +82,14 @@ const PDF = ['application/pdf']
 export const IMAGE_OWNERS: OwnerType[] = ['tenant_document', 'lease_photo', 'handover_photo', 'incident_photo']
 
 export const ALLOWED_TYPES: Record<OwnerType, { types: string[]; message: string; maxBytes: number }> = {
-  tenant_document: { types: IMAGE, message: 'Chỉ nhận ảnh (WebP, JPEG hoặc PNG)', maxBytes: 2 * 1024 * 1024 },
-  lease_photo: { types: IMAGE, message: 'Chỉ nhận ảnh (WebP, JPEG hoặc PNG)', maxBytes: 2 * 1024 * 1024 },
-  handover_photo: { types: IMAGE, message: 'Chỉ nhận ảnh (WebP, JPEG hoặc PNG)', maxBytes: 2 * 1024 * 1024 },
-  incident_photo: { types: IMAGE, message: 'Chỉ nhận ảnh (WebP, JPEG hoặc PNG)', maxBytes: 2 * 1024 * 1024 },
-  signed_contract: { types: [...PDF, ...IMAGE], message: 'Chỉ nhận PDF hoặc ảnh', maxBytes: 10 * 1024 * 1024 },
-  signed_addendum: { types: [...PDF, ...IMAGE], message: 'Chỉ nhận PDF hoặc ảnh', maxBytes: 10 * 1024 * 1024 },
-  template: { types: DOCX, message: 'Chỉ nhận file Word (.docx)', maxBytes: 10 * 1024 * 1024 },
-  export: { types: [...DOCX, ...PDF, 'image/png'], message: 'Định dạng xuất không hợp lệ', maxBytes: 20 * 1024 * 1024 },
+  tenant_document: { types: IMAGE, message: 'Chỉ nhận ảnh (WebP, JPEG hoặc PNG)', maxBytes: MAX_IMAGE_BYTES },
+  lease_photo: { types: IMAGE, message: 'Chỉ nhận ảnh (WebP, JPEG hoặc PNG)', maxBytes: MAX_IMAGE_BYTES },
+  handover_photo: { types: IMAGE, message: 'Chỉ nhận ảnh (WebP, JPEG hoặc PNG)', maxBytes: MAX_IMAGE_BYTES },
+  incident_photo: { types: IMAGE, message: 'Chỉ nhận ảnh (WebP, JPEG hoặc PNG)', maxBytes: MAX_IMAGE_BYTES },
+  signed_contract: { types: [...PDF, ...IMAGE], message: 'Chỉ nhận PDF hoặc ảnh', maxBytes: MAX_DOCUMENT_BYTES },
+  signed_addendum: { types: [...PDF, ...IMAGE], message: 'Chỉ nhận PDF hoặc ảnh', maxBytes: MAX_DOCUMENT_BYTES },
+  template: { types: DOCX, message: 'Chỉ nhận file Word (.docx)', maxBytes: MAX_DOCUMENT_BYTES },
+  export: { types: [...DOCX, ...PDF, 'image/png'], message: 'Định dạng xuất không hợp lệ', maxBytes: MAX_EXPORT_BYTES },
 }
 
 export const EXT: Record<string, string> = {

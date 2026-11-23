@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { formatVND } from '@/domain/money'
+import { ASSET_CONDITION, ASSET_STATE_OPTIONS, ASSET_STATUS_LABELS } from '@/domain/asset-labels'
 import { removeDiacritics } from '@/domain/text'
 import { LocationFilters } from './location-filters'
 import { MoveDialog } from './move-dialog'
@@ -29,25 +30,22 @@ export type AssetRow = {
   facilityId: string
 }
 
-const STATUS_LABEL: Record<string, string> = { in_use: 'Đang dùng', broken: 'Hỏng', disposed: 'Đã thanh lý' }
-
 /** Nhãn trạng thái người dùng nhìn thấy: tài sản đang dùng hiện tình trạng, còn lại hiện trạng thái. */
 export function assetState(a: AssetRow): string {
-  if (a.status === 'disposed') return 'Đã thanh lý'
-  if (a.status === 'broken') return 'Hỏng'
-  if (a.condition === 'Hư') return 'Hỏng'
-  return a.condition || STATUS_LABEL.in_use
+  if (a.status === 'disposed') return ASSET_STATUS_LABELS.disposed
+  if (a.status === 'broken') return ASSET_STATUS_LABELS.broken
+  if (a.condition === ASSET_CONDITION.damaged) return ASSET_STATUS_LABELS.broken
+  return a.condition || ASSET_STATUS_LABELS.in_use
 }
 
 function stateTone(state: string): string {
-  if (state === 'Tốt') return 'border-emerald-200/80 bg-emerald-50 text-emerald-800'
-  if (state === 'Trầy xước') return 'border-amber-200/80 bg-amber-50 text-amber-800'
-  if (state === 'Hỏng' || state === 'Hư') return 'border-rose-200/80 bg-rose-50 text-rose-700'
-  if (state === 'Đã thanh lý') return 'border-border bg-muted/70 text-muted-foreground'
+  if (state === ASSET_CONDITION.good) return 'border-emerald-200/80 bg-emerald-50 text-emerald-800'
+  if (state === ASSET_CONDITION.scratched) return 'border-amber-200/80 bg-amber-50 text-amber-800'
+  if (state === ASSET_STATUS_LABELS.broken || state === ASSET_CONDITION.damaged)
+    return 'border-rose-200/80 bg-rose-50 text-rose-700'
+  if (state === ASSET_STATUS_LABELS.disposed) return 'border-border bg-muted/70 text-muted-foreground'
   return 'border-border/80 bg-card text-foreground/80'
 }
-
-const STATE_OPTIONS = ['Tốt', 'Trầy xước', 'Hỏng', 'Đã thanh lý']
 
 export function AssetTable({
   assets,
@@ -139,14 +137,14 @@ export function AssetTable({
         <Select
           value={state || 'all'}
           onValueChange={(value) => setState(value && value !== 'all' ? value : '')}
-          items={[{ value: 'all', label: 'Tình trạng' }, ...STATE_OPTIONS.map((s) => ({ value: s, label: s }))]}
+          items={[{ value: 'all', label: 'Tình trạng' }, ...ASSET_STATE_OPTIONS.map((s) => ({ value: s, label: s }))]}
         >
           <SelectTrigger aria-label="Lọc tình trạng" className="h-9 gap-2 border-border/80 bg-card px-2.5 text-[13px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent align="start">
             <SelectItem value="all">Tình trạng</SelectItem>
-            {STATE_OPTIONS.map((s) => (
+            {ASSET_STATE_OPTIONS.map((s) => (
               <SelectItem key={s} value={s}>
                 {s}
               </SelectItem>

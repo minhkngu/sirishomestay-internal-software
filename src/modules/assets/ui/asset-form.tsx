@@ -4,14 +4,13 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ASSET_CONDITION, ASSET_CONDITIONS } from '@/domain/asset-labels'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { MoneyInput } from '@/components/ui/money-input'
 import { createAssetAction } from '../server/assets/actions'
 import type { TreeFacility } from './location-types'
-
-const CONDITIONS = ['Tốt', 'Trầy xước', 'Hư']
 
 export function AssetForm({ facilities }: { facilities: TreeFacility[] }) {
   const [open, setOpen] = useState(false)
@@ -36,7 +35,7 @@ function AssetDialogForm({ facilities, onClose }: { facilities: TreeFacility[]; 
     name: '',
     category: '',
     value: '',
-    condition: 'Tốt',
+    condition: ASSET_CONDITION.good as string,
     facilityId: facilities[0]?.id ?? '',
     where: `warehouse:${facilities[0]?.id ?? ''}`,
   })
@@ -119,7 +118,7 @@ function AssetDialogForm({ facilities, onClose }: { facilities: TreeFacility[]; 
             onChange={(e) => setV({ ...v, condition: e.target.value })}
             className="h-9 w-full rounded-xl border border-border/80 bg-card px-2.5 text-sm outline-none focus:border-primary"
           >
-            {CONDITIONS.map((c) => (
+            {ASSET_CONDITIONS.map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>

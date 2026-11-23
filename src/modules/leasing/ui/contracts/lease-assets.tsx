@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { ASSET_CONDITION } from '@/domain/asset-labels'
 import { ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -150,7 +151,7 @@ export function LeaseAssets({
   const [model, setModel] = useState('')
   const [category, setCategory] = useState('')
   const [value, setValue] = useState('0')
-  const [condition, setCondition] = useState('Tốt')
+  const [condition, setCondition] = useState<string>(ASSET_CONDITION.good)
   const targetLabel = (kind: string, id: string) => {
     if (kind === 'warehouse') {
       const f = moveTargets.facilities.find((x) => x.id === id)
@@ -464,7 +465,7 @@ export function LeaseAssets({
                       setModel('')
                       setCategory('')
                       setValue('0')
-                      setCondition('Tốt')
+                      setCondition(ASSET_CONDITION.good)
                     }}
                   >
                     Thêm tài sản mới

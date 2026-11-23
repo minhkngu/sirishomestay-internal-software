@@ -1,4 +1,4 @@
-/** Hiển thị trạng thái ký: DB giữ draft/exported/signed, giao diện chỉ phân biệt đã ký hay chưa. */
-export function signStatusLabel(status: string): 'Chưa ký' | 'Đã ký' {
-  return status === 'signed' ? 'Đã ký' : 'Chưa ký'
-}
+import type { SignStatus } from '@/domain/statuses'
+
+/** Thứ hạng trạng thái ký: chỉ được tiến, không lùi (draft → exported → signed). Nhãn ở `src/domain/sign-labels.ts`. */
+export const SIGN_RANK: Record<SignStatus, number> = { draft: 0, exported: 1, signed: 2 }

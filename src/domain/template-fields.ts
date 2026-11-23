@@ -2,7 +2,9 @@ export const PDF_DOC_TYPES = ['invoice_monthly', 'invoice_termination', 'receipt
 export type PdfDocType = (typeof PDF_DOC_TYPES)[number]
 
 import { formatDateVN } from './dates'
+import { ASSET_CONDITION } from './asset-labels'
 import { formatVND, numberToVietnameseWords } from './money'
+import { TENANT_KIND_LABELS } from './tenant-kind'
 
 export const DOC_TYPES = [
   'deposit_contract',
@@ -91,7 +93,7 @@ const HANDOVER: Field[] = [
   loop('tai_san', 'Danh sách tài sản', [
     { key: 'ma', label: 'Mã tài sản', example: 'TS-0101' },
     { key: 'ten', label: 'Tên tài sản', example: 'Máy lạnh' },
-    { key: 'tinh_trang', label: 'Tình trạng', example: 'Tốt' },
+    { key: 'tinh_trang', label: 'Tình trạng', example: ASSET_CONDITION.good },
     { key: 'phat', label: 'Tiền phạt', example: '0' },
   ]),
   loop('chi_so', 'Chỉ số điện nước', [
@@ -249,7 +251,6 @@ export type DocEntities = {
   payment?: { code: string; paidOn: string; amount: number; method: string; receivedBy: string }
 }
 
-const KIND_LABEL = { foreign: 'Khách nước ngoài', vietnamese: 'Khách Việt Nam', company: 'Công ty' } as const
 const d = (iso?: string | null) => (iso ? formatDateVN(iso) : '')
 const m = (n?: number | null) => (n == null ? '' : formatVND(n))
 const w = (n?: number | null) => (n == null ? '' : numberToVietnameseWords(n))
@@ -262,7 +263,7 @@ export function buildTemplateData(docType: DocType, e: DocEntities): Record<stri
   const penaltyTotal = e.handover?.items.reduce((s, i) => s + (i.penalty ?? 0), 0) ?? 0
   const data: Record<string, unknown> = {
     ten_khach: (t?.kind === 'company' ? t.companyName : t?.fullName) ?? '',
-    loai_khach: t ? KIND_LABEL[t.kind] : '',
+    loai_khach: t ? TENANT_KIND_LABELS[t.kind] : '',
     so_giay_to: (t?.kind === 'company' ? t.taxCode : t?.idDocument) ?? '',
     so_dien_thoai: t?.phone ?? '',
     email: t?.email ?? '',

@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, inArray, like, lt, ne, sql } from 'drizzle-orm'
+import { MAX_INT4 } from '@/domain/money'
 import { z } from 'zod'
 import {
   addenda,
@@ -54,6 +55,7 @@ import {
 } from '@/modules/documents'
 import { applyReadings, setLeaseInitialReading, setOpeningValue } from '@/modules/meters'
 import { resolveBankAccount } from '@/domain/vietqr'
+import { PAYMENT_METHOD_LABELS, type PaymentMethod } from '@/domain/payment-labels'
 
 const batchSchema = z.object({ facilityId: z.uuid(), period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) })
 const periodSchema = z
@@ -817,7 +819,7 @@ export async function saveInvoiceFeeQuantities(
 ): Promise<void> {
   const data = parse(
     z
-      .array(z.object({ leaseFeeId: z.uuid(), quantity: z.number().int().safe().nonnegative().max(2_147_483_647) }))
+      .array(z.object({ leaseFeeId: z.uuid(), quantity: z.number().int().safe().nonnegative().max(MAX_INT4) }))
       .refine((items) => new Set(items.map((i) => i.leaseFeeId)).size === items.length, 'Phí bị trùng'),
     quantities,
   )
@@ -910,8 +912,8 @@ const meterReadingEditSchema = z.object({
     .string()
     .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
     .optional(),
-  value: z.number().int().safe().nonnegative().max(2_147_483_647),
-  opening: z.number().int().safe().nonnegative().max(2_147_483_647).optional(),
+  value: z.number().int().safe().nonnegative().max(MAX_INT4),
+  opening: z.number().int().safe().nonnegative().max(MAX_INT4).optional(),
 })
 /** 3 tháng liền trước tháng hoá đơn, cũ nhất trước. */
 const recentPeriods = (invoiceMonth: string) => {
@@ -1981,7 +1983,6 @@ export async function exportReceipt(
 ) {
   return exportDocument(db, ctx, storage, { docType: 'receipt', entityId: paymentId, templateId, format })
 }
-const METHOD_LABEL = { cash: 'Tiền mặt', transfer: 'Chuyển khoản', other: 'Khác' } as const
 registerPdfLoader('receipt', async (db, ctx, id) => {
   const [p] = await db.select().from(payments).where(eq(payments.id, id))
   if (!p) throw new NotFoundError()
@@ -2002,7 +2003,7 @@ registerPdfLoader('receipt', async (db, ctx, id) => {
         invoiceCode: inv.code,
         paidOn: p.paidOn,
         amount: p.amount,
-        method: METHOD_LABEL[p.method as keyof typeof METHOD_LABEL] ?? p.method,
+        method: PAYMENT_METHOD_LABELS[p.method as PaymentMethod] ?? p.method,
         receivedBy: ctx.userId === p.receivedBy ? (ctx.fullName ?? '') : '',
         facility: { name: row.facility.name, address: row.facility.address },
         room: row.room.code,

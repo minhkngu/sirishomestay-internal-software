@@ -5,6 +5,7 @@ import { formatVND } from '@/domain/money'
 import { cn } from '@/lib/utils'
 import { AssetForm } from './asset-form'
 import { AssetTable, assetState, type AssetRow } from './asset-table'
+import { ASSET_CONDITION, ASSET_STATUS_LABELS } from '@/domain/asset-labels'
 import type { TreeFacility } from './location-types'
 import { StockTable, type StockRow } from './stock-table'
 
@@ -65,7 +66,11 @@ export function AssetsView({ tree, assets, stock }: { tree: TreeFacility[]; asse
   }, [stock, facilityId, location])
 
   const totalValue = shownAssets.reduce((sum, a) => sum + a.value, 0)
-  const attention = shownAssets.filter((a) => ['Hỏng', 'Trầy xước', 'Hư'].includes(assetState(a))).length
+  const attention = shownAssets.filter((a) =>
+    ([ASSET_STATUS_LABELS.broken, ASSET_CONDITION.scratched, ASSET_CONDITION.damaged] as string[]).includes(
+      assetState(a),
+    ),
+  ).length
   const [tab, setTab] = useState<(typeof TABS)[number]['id']>('assets')
 
   return (

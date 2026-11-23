@@ -18,7 +18,7 @@ import { assertCan, type AccessContext } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
 import { todayVN } from '@/domain/dates'
 import { depositBalance } from '@/domain/deposit'
-import { MAX_MONEY } from '@/domain/money'
+import { MAX_INT4, MAX_MONEY } from '@/domain/money'
 import { buildFirstInvoice } from '../../domain/invoice-builder'
 import type { ContractFee, LeaseTerms, Proration } from '@/domain/types'
 import { recordAudit, getSettings } from '@/modules/platform'
@@ -127,7 +127,7 @@ async function insertLeaseFees(
     if (
       !Number.isSafeInteger(fee.unitPrice) ||
       fee.unitPrice < 0 ||
-      fee.unitPrice > 2_147_483_647 ||
+      fee.unitPrice > MAX_MONEY ||
       !['occupants', 'room', 'meter', 'period_input'].includes(fee.quantitySource)
     )
       throw new ValidationError('Phí dịch vụ không hợp lệ')
@@ -156,7 +156,7 @@ async function insertLeaseFees(
     }
     if (!name || !unit) throw new ValidationError('Nhập tên và đơn vị phí')
     const quantity = source === 'legacy_fixed' ? (fee.quantity ?? 1) : 1
-    if (!Number.isSafeInteger(quantity) || quantity < 0 || quantity > 2_147_483_647)
+    if (!Number.isSafeInteger(quantity) || quantity < 0 || quantity > MAX_INT4)
       throw new ValidationError('Số lượng phí không hợp lệ')
     const [savedFee] = await tx
       .insert(leaseFeeSnapshots)
