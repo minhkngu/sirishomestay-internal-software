@@ -15,7 +15,7 @@ import type { AccessContext, Permission } from '@/domain/access'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import { auditLogs, files, invoices } from '@/db'
 import { eq } from 'drizzle-orm'
-import { addOneOff } from '@/server/charges/service'
+import { addOneOff } from '@/modules/leasing/server/charges/service'
 import {
   saveInvoiceFeeQuantities,
   exportReceipt,
@@ -30,7 +30,7 @@ import {
   setPeriod,
   tenantBalance,
   updateLines,
-} from '@/server/invoices/service'
+} from '@/modules/leasing/server/invoices/service'
 import { MemoryStorage } from '@/modules/platform/server/storage/memory'
 import { createTestDb } from '../helpers/db'
 

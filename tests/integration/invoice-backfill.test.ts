@@ -10,7 +10,7 @@ import {
   createInvoiceFromEditor,
   previewNewInvoice,
   updateLines,
-} from '@/server/invoices/service'
+} from '@/modules/leasing/server/invoices/service'
 import { createTestDb } from '../helpers/db'
 
 const context = (permissions: Permission[], facilityId: string): AccessContext => ({

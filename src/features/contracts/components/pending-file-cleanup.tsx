@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { retryContractFileCleanupAction, retryRestoredFileCleanupAction } from '@/server/contracts/actions'
+import { retryContractFileCleanupAction, retryRestoredFileCleanupAction } from '@/modules/leasing/actions'
 
 export function PendingFileCleanup({ count, restored = false }: { count: number; restored?: boolean }) {
   const [pending, start] = useTransition()

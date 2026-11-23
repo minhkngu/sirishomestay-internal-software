@@ -6,8 +6,8 @@ import { eq } from 'drizzle-orm'
 import * as schema from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
-import { createLease, updateLease } from '@/server/contracts/service'
-import { previewContractRestore, restoreContract } from '@/server/contracts/restore'
+import { createLease, updateLease } from '@/modules/leasing/server/contracts/service'
+import { previewContractRestore, restoreContract } from '@/modules/leasing/server/contracts/restore'
 import { MemoryStorage } from '@/modules/platform/server/storage/memory'
 
 it.skipIf(!process.env.TEST_POSTGRES_URL)(

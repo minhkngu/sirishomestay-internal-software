@@ -4,7 +4,7 @@ import type { AccessContext } from '@/domain/access'
 import { formatVND } from '@/domain/money'
 import { orNotFound } from '@/lib/or-not-found'
 import { getAccessContext } from '@/modules/platform'
-import { incidentsForAsset } from '@/server/incidents/service'
+import { incidentsForAsset } from '@/modules/leasing'
 import { assetHistory, assetLocationLabel, getAsset } from '@/modules/assets'
 
 export default async function AssetPage({ params }: { params: Promise<{ id: string }> }) {

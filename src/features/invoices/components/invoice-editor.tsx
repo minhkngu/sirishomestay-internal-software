@@ -15,7 +15,7 @@ import { MoneyInput } from '@/components/ui/money-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { FeePickerDialog, type FeeOption } from '@/components/fee-picker-dialog'
 import { feeLineFromType } from '@/domain/invoice-fee-line'
-import { fullMonthCoefficient, monthsCoefficient } from '@/domain/proration'
+import { fullMonthCoefficient, monthsCoefficient } from '@/modules/leasing/ui'
 import type { Proration } from '@/domain/types'
 import {
   approveInvoiceAction,
@@ -27,7 +27,7 @@ import {
   savePreviewMeterReadingAction,
   savePreviewOpeningReadingAction,
   updateLinesAction,
-} from '@/server/invoices/actions'
+} from '@/modules/leasing/actions'
 
 type Line = {
   id?: string

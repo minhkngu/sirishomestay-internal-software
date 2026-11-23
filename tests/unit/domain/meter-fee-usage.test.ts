@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { meterFeeUsage } from '@/domain/meter-fee-usage'
+import { meterFeeUsage } from '@/modules/leasing/domain/meter-fee-usage'
 import type { Addendum, Lease, Meter, MeterReading } from '@/domain/types'
 
 const lease = (over: Partial<Lease> = {}): Lease => ({

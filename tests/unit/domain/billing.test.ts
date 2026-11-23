@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { prorate, fullMonthCoefficient } from '@/domain/proration'
+import { prorate, fullMonthCoefficient } from '@/modules/leasing/domain/proration'
 import { meterUsage, suggestFinalReading } from '@/domain/meters'
-import { computeDueDate } from '@/domain/due-date'
-import { contractTermsAt } from '@/domain/contract-terms'
-import { midPeriodAdjustments } from '@/domain/adjustments'
-import { buildMonthlyInvoice, buildFirstInvoice } from '@/domain/invoice-builder'
+import { computeDueDate } from '@/modules/leasing/domain/due-date'
+import { contractTermsAt } from '@/modules/leasing/domain/contract-terms'
+import { midPeriodAdjustments } from '@/modules/leasing/domain/adjustments'
+import { buildMonthlyInvoice, buildFirstInvoice } from '@/modules/leasing/domain/invoice-builder'
 import { depositBalance, depositDiffEntry } from '@/domain/deposit'
-import { buildTerminationInvoice } from '@/domain/liquidation'
+import { buildTerminationInvoice } from '@/modules/leasing/domain/liquidation'
 import type { Addendum, ContractFee, DepositEntry, Invoice, Lease, Meter, MeterReading } from '@/domain/types'
 
 const fee = (over: Partial<ContractFee> = {}): ContractFee => ({
@@ -682,7 +682,7 @@ describe('buildTerminationInvoice', () => {
 
 describe('kỳ thanh toán và hoàn khách', () => {
   it('tính kỳ ba tháng, bỏ qua kỳ đã trả trước và giới hạn ngày kết thúc', async () => {
-    const { nextBillingPeriod } = await import('@/domain/invoice-builder')
+    const { nextBillingPeriod } = await import('@/modules/leasing/domain/invoice-builder')
     const q = { ...lease(), billingCycleMonths: 3, startDate: '2026-10-01', endDate: '2027-12-31' }
     expect(nextBillingPeriod(q, null, '2026-10')).toEqual({ start: '2026-10-01', end: '2026-12-31' })
     expect(nextBillingPeriod(q, '2026-12-31', '2026-11')).toBeNull()
@@ -695,7 +695,7 @@ describe('kỳ thanh toán và hoàn khách', () => {
     })
   })
   it('phân biệt chờ hoàn và đã hoàn', async () => {
-    const { settlementState } = await import('@/domain/invoice-builder')
+    const { settlementState } = await import('@/modules/leasing/domain/invoice-builder')
     expect(settlementState(-11_080_000, 0)).toBe('refund_pending')
     expect(settlementState(-11_080_000, -11_080_000)).toBe('refunded')
     expect(settlementState(100, 50)).toBe('partial')
@@ -704,7 +704,7 @@ describe('kỳ thanh toán và hoàn khách', () => {
 
 describe('điều khoản giữa kỳ', () => {
   it('chia tiền phòng theo ngày phụ lục có hiệu lực', async () => {
-    const { termSegments } = await import('@/domain/contract-terms')
+    const { termSegments } = await import('@/modules/leasing/domain/contract-terms')
     const changes: Addendum[] = [
       {
         id: 'A',

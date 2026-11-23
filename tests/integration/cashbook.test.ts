@@ -5,16 +5,21 @@ import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { summarize } from '@/domain/cashbook'
 import { NotFoundError, ValidationError } from '@/domain/errors'
-import { deleteDepositEntry, updateDepositEntry } from '@/server/charges/service'
+import { deleteDepositEntry, updateDepositEntry } from '@/modules/leasing/server/charges/service'
 import {
   addExpense,
   deleteExpense,
   listCashbook,
   listLeaseTargets,
-  updatePayment,
   updateExpense,
-} from '@/server/cashbook/service'
-import { approveInvoice, createDrafts, recordLeasePayment, removePayment } from '@/server/invoices/service'
+} from '@/modules/cashbook/server/cashbook/service'
+import {
+  approveInvoice,
+  createDrafts,
+  recordLeasePayment,
+  removePayment,
+  updatePayment,
+} from '@/modules/leasing/server/invoices/service'
 import { createTestDb } from '../helpers/db'
 
 const context = (permissions: Permission[], facilityIds: string[]): AccessContext => ({

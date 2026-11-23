@@ -11,7 +11,7 @@ import {
   listIncidents,
   setIncidentStatus,
   updateIncident,
-} from '@/server/incidents/service'
+} from '@/modules/leasing/server/incidents/service'
 import { createTestDb } from '../helpers/db'
 
 const context = (permissions: Permission[], facilityId: string): AccessContext => ({

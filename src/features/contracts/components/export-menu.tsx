@@ -4,7 +4,7 @@ import { useState, useTransition, type ReactNode } from 'react'
 import { FileDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { exportContractAction } from '@/server/contracts/actions'
+import { exportContractAction } from '@/modules/leasing/actions'
 
 export type TemplateOption = { id: string; name: string; isDefault: boolean }
 

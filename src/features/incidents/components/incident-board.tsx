@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { CheckCircle2, Home, User, Wrench } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { setIncidentStatusAction } from '@/server/incidents/actions'
+import { setIncidentStatusAction } from '@/modules/leasing/actions'
 
 export type BoardItem = {
   id: string

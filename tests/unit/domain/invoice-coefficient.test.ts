@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildMonthlyInvoice } from '@/domain/invoice-builder'
+import { buildMonthlyInvoice } from '@/modules/leasing/domain/invoice-builder'
 import type { Lease } from '@/domain/types'
 
 const lease = (over: Partial<Lease> = {}): Lease => ({

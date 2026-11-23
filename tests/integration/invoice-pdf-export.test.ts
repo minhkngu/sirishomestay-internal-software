@@ -9,11 +9,11 @@ import { ForbiddenError } from '@/domain/errors'
 import { getDownloadUrl } from '@/modules/platform'
 import { convertPdfToPng } from '@/modules/documents/server/convert'
 import { exportDocument } from '@/modules/documents/server/templates/service'
-import '@/server/invoices/service'
+import '@/modules/leasing/server/invoices/service'
 import { MemoryStorage } from '@/modules/platform/server/storage/memory'
 import { createTestDb } from '../helpers/db'
 import { createInvoiceTemplate } from '@/modules/documents/server/invoice-templates/service'
-import { selectInvoiceTemplate } from '@/server/invoices/template-assignment'
+import { selectInvoiceTemplate } from '@/modules/leasing/server/invoices/template-assignment'
 import { defaultInvoiceTemplate } from '@/modules/documents/domain/invoice-template'
 
 let db: DB, storage: MemoryStorage, ctx: AccessContext, facilityId: string, invoiceId: string, paymentId: string

@@ -11,12 +11,12 @@ import { getAccessContext } from '@/modules/platform'
 import { listAmenities } from '@/modules/facilities'
 import { RoomEditForm } from '@/modules/facilities/ui'
 import { RoomLifecycle } from '@/modules/facilities/ui'
-import { getRoomDetail } from '@/server/contracts/room-view'
+import { getRoomDetail } from '@/modules/leasing'
 import { listAssets } from '@/modules/assets'
 import { RoomIncidentList } from '@/modules/facilities/ui'
-import { listIncidents } from '@/server/incidents/service'
+import { listIncidents } from '@/modules/leasing'
 import { userNamesByIds } from '@/modules/users'
-import { getPendingDepositContract, listLeases } from '@/server/contracts/service'
+import { getPendingDepositContract, listLeases } from '@/modules/leasing'
 
 export default async function RoomPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

@@ -26,11 +26,15 @@ import {
   createLease,
   updateDepositContract,
   updateLease,
-} from '@/server/contracts/service'
-import { cleanupPendingRestoredFiles, previewContractRestore, restoreContract } from '@/server/contracts/restore'
+} from '@/modules/leasing/server/contracts/service'
+import {
+  cleanupPendingRestoredFiles,
+  previewContractRestore,
+  restoreContract,
+} from '@/modules/leasing/server/contracts/restore'
 import { MemoryStorage } from '@/modules/platform/server/storage/memory'
-import { createExtension, createTermination } from '@/server/addenda/service'
-import { approveInvoice } from '@/server/invoices/service'
+import { createExtension, createTermination } from '@/modules/leasing/server/addenda/service'
+import { approveInvoice } from '@/modules/leasing/server/invoices/service'
 
 describe('khôi phục hợp đồng', () => {
   let db: DB, ctx: AccessContext, roomId: string, tenantId: string, facilityId: string

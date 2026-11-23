@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { rentPeriodOf } from '@/domain/invoice-builder'
+import { rentPeriodOf } from '@/modules/leasing/domain/invoice-builder'
 
 describe('rentPeriodOf', () => {
   it('một dòng tiền phòng', () => {

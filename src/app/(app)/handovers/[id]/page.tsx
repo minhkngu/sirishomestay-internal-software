@@ -3,7 +3,7 @@ import { db } from '@/db/client'
 import { formatDateVN } from '@/domain/dates'
 import { orNotFound } from '@/lib/or-not-found'
 import { getAccessContext } from '@/modules/platform'
-import { getHandover, listHandovers } from '@/server/handovers/service'
+import { getHandover, listHandovers } from '@/modules/leasing'
 import { isUsableTemplate, listTemplates } from '@/modules/documents'
 import { HandoverForm } from '@/features/handovers/components/handover-form'
 

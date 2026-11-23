@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { monthsCoefficient } from '@/domain/proration'
+import { monthsCoefficient } from '@/modules/leasing/domain/proration'
 
 describe('hệ số theo tháng tròn tính từ ngày bắt đầu', () => {
   it('tròn tháng dương lịch là 1', () => expect(monthsCoefficient('2026-07-01', '2026-07-31', 'actual_days')).toBe(1))

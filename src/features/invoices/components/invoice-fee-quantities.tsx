@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { saveInvoiceFeeQuantitiesAction } from '@/server/invoices/actions'
+import { saveInvoiceFeeQuantitiesAction } from '@/modules/leasing/actions'
 
 type Fee = { id: string; name: string; unit: string; unitPrice: number; quantity: number | null }
 export function InvoiceFeeQuantities({ invoiceId, fees }: { invoiceId: string; fees: Fee[] }) {

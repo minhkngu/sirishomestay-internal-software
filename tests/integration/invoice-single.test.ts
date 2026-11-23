@@ -4,7 +4,12 @@ import { facilities, invoiceLines, invoices, leases, rooms, tenants } from '@/db
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ForbiddenError, ValidationError } from '@/domain/errors'
-import { createDraftForLease, createDrafts, listInvoiceableLeases, previewLease } from '@/server/invoices/service'
+import {
+  createDraftForLease,
+  createDrafts,
+  listInvoiceableLeases,
+  previewLease,
+} from '@/modules/leasing/server/invoices/service'
 import { createTestDb } from '../helpers/db'
 
 const context = (permissions: Permission[], facilityId: string): AccessContext => ({

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeDueDate } from '@/domain/due-date'
+import { computeDueDate } from '@/modules/leasing/domain/due-date'
 
 describe('hạn thanh toán', () => {
   it('ngày X của chính tháng hoá đơn', () => {

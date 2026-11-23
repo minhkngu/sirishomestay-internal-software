@@ -23,9 +23,9 @@ import {
   savePreviewMeterReading,
   updateInvoiceMeterReading,
   updateLines,
-} from '@/server/invoices/service'
+} from '@/modules/leasing/server/invoices/service'
 import { listReadingHistory, listReadingSheet } from '@/modules/meters'
-import { updateLease } from '@/server/contracts/service'
+import { updateLease } from '@/modules/leasing/server/contracts/service'
 import { createTestDb } from '../helpers/db'
 
 const context = (permissions: Permission[], facilityId: string): AccessContext => ({

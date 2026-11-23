@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
-import { startHandoverAction } from '@/server/handovers/actions'
+import { startHandoverAction } from '@/modules/leasing/actions'
 
 export function StartHandoverButtons({ leaseId }: { leaseId: string }) {
   const router = useRouter()

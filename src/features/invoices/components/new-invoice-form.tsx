@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { listInvoiceableLeasesAction } from '@/server/invoices/actions'
+import { listInvoiceableLeasesAction } from '@/modules/leasing/actions'
 
 type LeaseOption = { leaseId: string; roomCode: string; tenantName: string }
 type Initial = { facilityId: string; leaseId: string; period: string }

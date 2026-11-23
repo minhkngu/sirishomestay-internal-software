@@ -2,12 +2,12 @@ import { notFound } from 'next/navigation'
 import { db } from '@/db/client'
 import { assertCan } from '@/domain/access'
 import { todayVN } from '@/domain/dates'
-import { listCashbook, listLeaseTargets } from '@/server/cashbook/service'
+import { listCashbook, listLeaseTargets } from '@/modules/cashbook'
 import { listFacilities } from '@/modules/facilities'
 import { listRooms } from '@/modules/facilities'
 import { getAccessContext } from '@/modules/platform'
-import { CashbookList, type ExpenseDetail } from '@/features/cashbook/components/cashbook-list'
-import { listExpenseDetails } from '@/server/cashbook/service'
+import { CashbookList, type ExpenseDetail } from '@/modules/cashbook/ui'
+import { listExpenseDetails } from '@/modules/cashbook'
 
 export default async function CashbookPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
   const ctx = await getAccessContext()
