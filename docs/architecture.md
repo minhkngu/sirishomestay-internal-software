@@ -16,10 +16,10 @@ Muốn biết một mảng đang ở đâu: xem bảng dưới. **Mỗi PR chuy�
 
 | Tầng | Module | Trạng thái | Vị trí hiện tại | Task |
 |---|---|---|---|---|
-| 1 | `platform` | Đã chuyển | `src/modules/platform/` (`features/settings/components/settings-tabs.tsx` ở lại, chuyển ở Task 16; `auth-user.ts` nằm ở `src/lib/supabase/`) | 13 |
+| 1 | `platform` | Đã chuyển | `src/modules/platform/` (`settings-tabs.tsx` ghép giao diện platform và facilities nên nằm ở `src/app/(app)/settings/`; `auth-user.ts` nằm ở `src/lib/supabase/`) | 13 |
 | 2 | `users` | Đã chuyển | `src/modules/users/` | 14 |
 | 2 | `tenants` | Đã chuyển | `src/modules/tenants/` | 15 |
-| 2 | `facilities` | Chưa chuyển | `src/server/{facilities,rooms,amenities,fees,cascade-delete.ts}`, `src/features/{facilities,settings,rooms}` | 16 |
+| 2 | `facilities` | Đã chuyển | `src/modules/facilities/` (mọi component `features/rooms` đã chuyển vì không import dữ liệu hợp đồng, không còn gì chờ Task 21; `use-run.tsx` ở `src/components/`; `room-occupancy.ts` ở `modules/facilities/domain/`) | 16 |
 | 2 | `documents` | Chưa chuyển | `src/server/{templates,invoice-templates,pdf,word,convert}`, `src/features/templates` | 17 |
 | 3 | `assets` | Chưa chuyển | `src/server/{assets,stock}`, `src/features/assets` | 18 |
 | 3 | `meters` | Chưa chuyển | `src/server/meters`, `src/features/meters` | 19 |
@@ -87,13 +87,14 @@ Luật chuyển tiếp (bỏ ở Task 22): code cũ (`src/server`, `src/features
 - **Hợp đồng cọc → hợp đồng thuê:** mỗi phòng tối đa 1 hợp đồng cọc `pending` và 1 hợp đồng `active` (unique index có điều kiện trong `src/db/schema/contracts.ts`).
 - **Lịch sử/khôi phục hợp đồng:** mỗi lần sửa/xoá chụp bản ghi vào `contract_versions` (`server/contracts/history.ts`, `restore.ts`).
 - **Ghi chéo trong một transaction:** hàm hậu tố `InTransaction` (`createAssetInTransaction`, `moveAssetsInTransaction`, `setAssetStatusInTransaction`, `startHandoverInTransaction`) nhận `tx` để module khác gọi trong cùng transaction. Giữ mẫu này khi cần ghi qua module.
+- **Phòng mới có sẵn đồng hồ điện, nước:** `createRoom`/`createRoomsBulk` (facilities, tầng 2) không import meters (tầng 3); facilities mở điểm móc `registerRoomsCreatedHook(name, hook)`, chạy mọi hook trong cùng transaction tạo phòng (`hook(tx, roomIds, ngày)`), meters đăng ký `createDefaultMeters` vào đó. Hook lỗi thì phòng cũng không được tạo. Gọi service tạo phòng mà chưa nạp `src/modules/registrations.ts` (vd trong test) thì phòng không có đồng hồ; test `tests/integration/rooms-created-hook.test.ts`.
 - **Dữ liệu demo:** cột `isDemo` đánh dấu dữ liệu giả của `npm run db:seed`.
 
 ## 6. Bẫy đã biết
 
 | Bẫy | Hậu quả | Cách xử lý / trạng thái |
 |---|---|---|
-| Đăng ký kiểu side-effect: `registerOwnerResolver`, `registerExportOwnerResolver`, `registerDocLoader`, `registerPdfLoader` chỉ chạy khi file đăng ký đã được import | Route lạnh báo "Loại tệp chưa được hỗ trợ" hoặc không xuất được giấy tờ | Đã xử lý (Task 8): `src/modules/registrations.ts` (Task 12 dời từ `src/server/`) import mọi file có `register*`, và được import ở dòng đầu mọi `actions.ts`, API `route.ts` và `src/app/(app)/layout.tsx`; test `tests/unit/architecture/registrations.test.ts` kiểm. Module mới có `register*` phải thêm vào file đó |
+| Đăng ký kiểu side-effect: `registerOwnerResolver`, `registerExportOwnerResolver`, `registerDocLoader`, `registerPdfLoader`, `registerRoomsCreatedHook` chỉ chạy khi file đăng ký đã được import | Route lạnh báo "Loại tệp chưa được hỗ trợ" hoặc không xuất được giấy tờ | Đã xử lý (Task 8): `src/modules/registrations.ts` (Task 12 dời từ `src/server/`) import mọi file có `register*`, và được import ở dòng đầu mọi `actions.ts`, API `route.ts` và `src/app/(app)/layout.tsx`; test `tests/unit/architecture/registrations.test.ts` kiểm. Module mới có `register*` phải thêm vào file đó |
 | Font PDF dùng đường dẫn cứng `src/server/pdf/fonts/` ở `next.config.ts` (`outputFileTracingIncludes`) và `src/server/pdf/fonts.ts` | Dời thư mục mà quên: local, test vẫn xanh, **PDF trên Vercel hỏng** | Sửa cả hai chỗ; Task 17 thêm `tests/unit/pdf-fonts.test.ts`; luôn thử "Xem PDF" trên preview |
 | `cascade-delete.ts` (xoá cơ sở/phòng) ghi bảng của hợp đồng, hoá đơn… | Vi phạm luật "ghi bảng module khác" | Ngoại lệ có chủ ý vì DB không có `ON DELETE CASCADE`; không "sửa" bằng cách thêm cascade trong schema nếu chưa bàn |
 | Phụ thuộc hai chiều `addenda ↔ invoices`, `invoices ↔ templates` | Khó tách, dễ vòng import | Cả `addenda` và `invoices` vào `leasing`; `invoices ↔ templates` gỡ ở Task 8 |

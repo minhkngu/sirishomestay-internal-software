@@ -5,7 +5,7 @@ import {
   feeApplicationSummary,
   filterFacilitiesByName,
   isPriceInput,
-} from '@/features/settings/components/fee-options'
+} from '@/modules/facilities/ui/fee-options'
 
 it('chỉ nhận chuỗi số nguyên không âm cho ô giá', () => {
   expect(isPriceInput('3500')).toBe(true)

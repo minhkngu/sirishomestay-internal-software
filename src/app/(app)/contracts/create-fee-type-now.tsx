@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import type { FeeOption } from '@/features/contracts/components/lease-fees'
-import { FeeTypeForm, type FeeFormValues } from '@/features/settings/components/fee-type-form'
-import { createFeeTypeAction } from '@/server/fees/actions'
+import { FeeTypeForm, type FeeFormValues } from '@/modules/facilities/ui'
+import { createFeeTypeAction } from '@/modules/facilities/actions'
 
 /** Tạo loại phí mới ngay trong form tạo hợp đồng bằng đúng biểu mẫu "Thêm loại phí" của Cài đặt; loại phí được lưu vào Cài đặt rồi thêm vào hợp đồng. */
 export function CreateFeeTypeNow({

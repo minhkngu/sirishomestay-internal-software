@@ -16,7 +16,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { MoneyInput } from '@/components/ui/money-input'
 import { Label } from '@/components/ui/label'
-import { deleteRoomAction, setRoomActiveAction, updateRoomAction } from '@/server/rooms/actions'
+import { deleteRoomAction, setRoomActiveAction, updateRoomAction } from '../server/rooms/actions'
 
 export type RoomManage = {
   floor: string | null

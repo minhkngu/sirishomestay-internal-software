@@ -13,7 +13,7 @@ import { InvoiceStatus } from '@/features/invoices/components/invoice-status'
 import { getInvoiceDetail, tenantBalance } from '@/server/invoices/service'
 import { getAccessContext } from '@/modules/platform'
 import { getSettings } from '@/modules/platform'
-import { listFeeTypePrices, listFeeTypes, listFeeUnits } from '@/server/fees/service'
+import { listFeeTypePrices, listFeeTypes, listFeeUnits } from '@/modules/facilities'
 
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

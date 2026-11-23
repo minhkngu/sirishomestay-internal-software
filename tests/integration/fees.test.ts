@@ -31,7 +31,7 @@ import {
   listFeeTypes,
   ensureUtilityFeeTypes,
   saveFeeFacilities,
-} from '@/server/fees/service'
+} from '@/modules/facilities/server/fees/service'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import type { AccessContext, Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'

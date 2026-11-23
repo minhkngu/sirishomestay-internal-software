@@ -3,7 +3,7 @@ import { assertCan } from '@/domain/access'
 import { todayVN } from '@/domain/dates'
 import { GenerateWizard } from '@/features/invoices/components/generate-wizard'
 import { listLeases } from '@/server/contracts/service'
-import { listFacilities } from '@/server/facilities/service'
+import { listFacilities } from '@/modules/facilities'
 import { getAccessContext } from '@/modules/platform'
 
 /** Thân trang tạo hoá đơn hàng loạt, dùng chung cho trang đầy đủ và popup (route chặn). */

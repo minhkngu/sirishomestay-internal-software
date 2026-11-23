@@ -4,7 +4,7 @@ import type { DB } from '@/db/client'
 import { assertCan, facilityScope, NotFoundError, type AccessContext } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/modules/platform'
-import { deleteCascade } from '@/server/cascade-delete'
+import { deleteCascade } from '../cascade-delete'
 import { facilityInput, facilityUpdateInput, type FacilityInput } from './schemas'
 
 export type Facility = typeof facilities.$inferSelect

@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Button } from '@/components/ui/button'
-import { deleteRoomAction, setRoomActiveAction } from '@/server/rooms/actions'
+import { deleteRoomAction, setRoomActiveAction } from '../server/rooms/actions'
 
 /** Ngừng/dùng lại và xoá phòng. Xoá chỉ được khi phòng chưa phát sinh dữ liệu. */
 export function RoomLifecycle({ id, code, isActive }: { id: string; code: string; isActive: boolean }) {

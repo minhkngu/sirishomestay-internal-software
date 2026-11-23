@@ -6,6 +6,7 @@ import { daysInMonth } from '@/domain/dates'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { meterUsage, suggestFinalReading } from '@/domain/meters'
 import type { Meter, MeterReading, Utility } from '@/domain/types'
+import { registerRoomsCreatedHook } from '@/modules/facilities'
 import { recordAudit } from '@/modules/platform'
 
 const PERIOD_RE = /^\d{4}-(0[1-9]|1[0-2])$/
@@ -427,6 +428,9 @@ export async function createDefaultMeters(tx: DB, roomIds: string[], installedOn
     ),
   )
 }
+
+// Phòng mới (tạo ở facilities) luôn có sẵn đồng hồ điện, nước, trong cùng transaction tạo phòng.
+registerRoomsCreatedHook('default-meters', createDefaultMeters)
 
 /** Thay đồng hồ: chốt đồng hồ cũ (ngày gỡ + chỉ số cuối) và lắp đồng hồ mới với chỉ số đầu. */
 export async function replaceMeter(

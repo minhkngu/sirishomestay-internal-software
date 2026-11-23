@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { deleteFacilityAction, setFacilityActiveAction, updateFacilityAction } from '@/server/facilities/actions'
+import { deleteFacilityAction, setFacilityActiveAction, updateFacilityAction } from '../server/facilities/actions'
 
 type Facility = { id: string; code: string; name: string; address: string; isActive: boolean }
 

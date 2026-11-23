@@ -170,7 +170,7 @@ export async function quickContractDataAction(kind: 'lease' | 'deposit', id: str
   const ctx = await getAccessContext()
   return toActionResult(async () => {
     const { getLease, getDepositContract } = await import('./service')
-    const { listRooms } = await import('@/server/rooms/service')
+    const { listRooms } = await import('@/modules/facilities')
     const { searchTenants, displayName } = await import('@/modules/tenants')
     const { addendumFormData } = await import('@/server/addenda/service')
     const { listLeaseOccupants } = await import('./service')
@@ -262,7 +262,7 @@ export async function quickContractDataAction(kind: 'lease' | 'deposit', id: str
       kind === 'lease'
         ? await (async () => {
             const l = contract as Awaited<ReturnType<typeof getLease>>
-            const { listFeeTypes, listFeeTypePrices, listFeeUnits } = await import('@/server/fees/service')
+            const { listFeeTypes, listFeeTypePrices, listFeeUnits } = await import('@/modules/facilities')
             const { resolveFeePrice } = await import('@/domain/fee-price')
             const { can } = await import('@/domain/access')
             const { listLeaseMeterInitials } = await import('@/server/meters/service')
@@ -348,7 +348,7 @@ export async function quickContractDataAction(kind: 'lease' | 'deposit', id: str
             }
           })()
         : null
-    const { listFacilities } = await import('@/server/facilities/service')
+    const { listFacilities } = await import('@/modules/facilities')
     const facility = (await listFacilities(db, ctx)).find((f) => f.id === contract.facilityId)
     const assetData =
       kind === 'lease'

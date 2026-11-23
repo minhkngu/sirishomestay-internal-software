@@ -2,11 +2,11 @@ import { db } from '@/db/client'
 import { RequirePermission } from '@/modules/platform'
 import { getAccessContext } from '@/modules/platform'
 import { getSettings } from '@/modules/platform'
-import { listFacilities } from '@/server/facilities/service'
-import { listAmenities } from '@/server/amenities/service'
-import { listFeeDefaults, listFeeTypes, listFeeUnits, listFeeTypePrices } from '@/server/fees/service'
+import { listFacilities } from '@/modules/facilities'
+import { listAmenities } from '@/modules/facilities'
+import { listFeeDefaults, listFeeTypes, listFeeUnits, listFeeTypePrices } from '@/modules/facilities'
 import { listMeterTypes } from '@/server/meter-types/service'
-import { SettingsTabs } from '@/features/settings/components/settings-tabs'
+import { SettingsTabs } from './settings-tabs'
 
 export default async function SettingsPage() {
   const ctx = await getAccessContext()

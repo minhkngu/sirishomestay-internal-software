@@ -10,10 +10,10 @@ import {
   FACILITY_SEARCH_MIN,
   filterFacilitiesByName,
   type FeeFacilityDraft,
-} from '@/features/settings/components/fee-options'
-import { Msg } from '@/features/settings/components/use-run'
+} from './fee-options'
+import { Msg } from '@/components/use-run'
 import { formatVND } from '@/domain/money'
-import { saveFeeFacilitiesAction } from '@/server/fees/actions'
+import { saveFeeFacilitiesAction } from '../server/fees/actions'
 
 type Props = {
   fee: { id: string; name: string; defaultPrice: number }

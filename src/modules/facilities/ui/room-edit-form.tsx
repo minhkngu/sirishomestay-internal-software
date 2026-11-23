@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { MoneyInput } from '@/components/ui/money-input'
 import { Label } from '@/components/ui/label'
-import { updateRoomAction } from '@/server/rooms/actions'
+import { updateRoomAction } from '../server/rooms/actions'
 import { AmenityPicker } from './amenity-picker'
 
 const num = (s: string) => (s.trim() === '' ? null : Number(s.replace(',', '.')))

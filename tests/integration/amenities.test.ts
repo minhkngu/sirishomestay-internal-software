@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { createAmenity, listAmenities, updateAmenity } from '@/server/amenities/service'
+import { createAmenity, listAmenities, updateAmenity } from '@/modules/facilities/server/amenities/service'
 import { ForbiddenError, NotFoundError, type AccessContext, type Permission } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
 import { createTestDb } from '../helpers/db'

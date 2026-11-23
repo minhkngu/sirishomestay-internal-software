@@ -5,12 +5,26 @@ import { assertCan, can, facilityScope, NotFoundError, type AccessContext } from
 import { ValidationError } from '@/domain/errors'
 import { todayVN } from '@/domain/dates'
 import { recordAudit } from '@/modules/platform'
-import { deleteCascade } from '@/server/cascade-delete'
+import { deleteCascade } from '../cascade-delete'
 import { getFacility } from '../facilities/service'
-import { createDefaultMeters } from '../meters/service'
 import { bulkInput, roomInput, roomUpdateInput, type BulkInput, type RoomInput } from './schemas'
 
 export type Room = typeof rooms.$inferSelect
+
+/** Việc chạy ngay sau khi tạo phòng, trong cùng transaction (vd meters tạo sẵn đồng hồ điện, nước). */
+export type RoomsCreatedHook = (tx: DB, roomIds: string[], createdOn: string) => Promise<void>
+const roomsCreatedHooks = new Map<string, RoomsCreatedHook>()
+
+/** Module tầng trên đăng ký việc cần làm khi có phòng mới; facilities không import ngược module đó. */
+export function registerRoomsCreatedHook(name: string, hook: RoomsCreatedHook) {
+  roomsCreatedHooks.set(name, hook)
+}
+
+async function runRoomsCreatedHooks(tx: DB, roomIds: string[]) {
+  if (roomIds.length === 0) return
+  const createdOn = todayVN()
+  for (const hook of roomsCreatedHooks.values()) await hook(tx, roomIds, createdOn)
+}
 
 const DUP = 'Mã phòng đã tồn tại trong cơ sở này'
 const MAX_BULK = 500
@@ -120,7 +134,7 @@ export async function createRoom(db: DB, ctx: AccessContext, input: RoomInput): 
       .values({ ...roomData, areaM2: roomData.areaM2?.toString() ?? null })
       .returning()
     await setRoomAmenities(tx, r.id, ids)
-    await createDefaultMeters(tx, [r.id], todayVN())
+    await runRoomsCreatedHooks(tx, [r.id])
     await recordAudit(tx, ctx, {
       action: 'create',
       entity: 'room',
@@ -258,10 +272,9 @@ export async function createRoomsBulk(
           })),
         )
         .returning()
-      await createDefaultMeters(
+      await runRoomsCreatedHooks(
         tx,
         created.map((r) => r.id),
-        todayVN(),
       )
       if (ids.length)
         await tx

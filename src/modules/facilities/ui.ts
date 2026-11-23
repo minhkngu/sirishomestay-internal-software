@@ -1,0 +1,13 @@
+// Cổng component của module facilities.
+export { NewFacilityButton, FacilityBankAccount } from './ui/facility-form'
+export { FacilityList } from './ui/facility-list'
+export { FacilityLifecycle } from './ui/facility-lifecycle'
+export { RoomPanels } from './ui/room-panels'
+export { RoomMap } from './ui/room-map'
+export { RoomGrid } from './ui/room-grid'
+export { RoomEditForm } from './ui/room-edit-form'
+export { RoomLifecycle } from './ui/room-lifecycle'
+export { RoomIncidentList } from './ui/room-incident-list'
+export { FeeTypeForm, type FeeFormValues } from './ui/fee-type-form'
+export { AmenitySettings, type AmenityRow } from './ui/amenity-settings'
+export { FeeSettings } from './ui/fee-settings'

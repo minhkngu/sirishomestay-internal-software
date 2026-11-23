@@ -28,7 +28,7 @@ import {
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { resolveFeePrice } from '@/domain/fee-price'
-import { listFeeTypePrices } from '@/server/fees/service'
+import { listFeeTypePrices } from '@/modules/facilities'
 import { midPeriodAdjustments } from '@/domain/adjustments'
 import { contractTermsAt } from '@/domain/contract-terms'
 import { addDays, todayVN } from '@/domain/dates'

@@ -4,10 +4,10 @@ import { useState } from 'react'
 import { FormDialog } from '@/components/form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { FeeTypeCard } from '@/features/settings/components/fee-type-card'
-import { FeeTypeForm } from '@/features/settings/components/fee-type-form'
-import { Msg, useRun } from '@/features/settings/components/use-run'
-import { createFeeTypeAction, createFeeUnitAction, restoreFeeTypeAction } from '@/server/fees/actions'
+import { FeeTypeCard } from './fee-type-card'
+import { FeeTypeForm } from './fee-type-form'
+import { Msg, useRun } from '@/components/use-run'
+import { createFeeTypeAction, createFeeUnitAction, restoreFeeTypeAction } from '../server/fees/actions'
 
 type FacilityOption = { id: string; name: string }
 type UnitOption = { id: string; name: string }

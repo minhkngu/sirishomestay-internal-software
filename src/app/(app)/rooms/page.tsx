@@ -1,11 +1,11 @@
 import { PageHeader } from '@/components/list/page-header'
 import { db } from '@/db/client'
 import { getAccessContext } from '@/modules/platform'
-import { listAmenities } from '@/server/amenities/service'
-import { listFacilities } from '@/server/facilities/service'
+import { listAmenities } from '@/modules/facilities'
+import { listFacilities } from '@/modules/facilities'
 import { listRoomsWithStatus } from '@/server/contracts/room-view'
-import { RoomGrid } from '@/features/rooms/components/room-grid'
-import { RoomPanels } from '@/features/rooms/components/room-panels'
+import { RoomGrid } from '@/modules/facilities/ui'
+import { RoomPanels } from '@/modules/facilities/ui'
 
 export default async function RoomsPage() {
   const ctx = await getAccessContext()
