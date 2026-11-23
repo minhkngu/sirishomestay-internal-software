@@ -78,7 +78,7 @@ const INVOICE: Field[] = [
   f('tong_tien', 'Tổng tiền', '9.380.000'), f('tong_tien_bang_chu', 'Tổng tiền bằng chữ', 'Chín triệu ba trăm tám mươi nghìn đồng'),
   f('ngan_hang', 'Ngân hàng nhận tiền', 'Vietcombank'), f('so_tai_khoan', 'Số tài khoản nhận tiền', '0123456789'),
   f('chu_tai_khoan', 'Chủ tài khoản', 'CONG TY SIRIS'), f('noi_dung_ck', 'Nội dung chuyển khoản', 'TD-HD-202612-0001'),
-  f('da_thanh_toan', 'Đã thanh toán', '0'), f('con_lai', 'Còn phải trả', '9.380.000'),
+  f('ghi_chu', 'Ghi chú của hoá đơn', 'Chuyển khoản trước hạn để được giữ giá'), f('da_thanh_toan', 'Đã thanh toán', '0'), f('con_lai', 'Còn phải trả', '9.380.000'),
   INVOICE_LINES,
 ]
 
@@ -142,8 +142,9 @@ export type DocEntities = {
   deposit?: { depositAmount: number; agreedRent: number; expectedMoveIn: string }
   addendum?: { effectiveDate: string; newEndDate?: string | null; newMonthlyRent?: number | null; newDepositAmount?: number | null; newRoomCode?: string | null }
   fees?: { name: string; unit: string; quantity: number; unitPrice: number }[]
-  invoice?: { code: string; periodStart: string; periodEnd: string; dueDate?: string | null; paid?: number; bank?: { bankName: string; accountNumber: string; accountName: string } | null; lines: { description: string; quantity: number; unitPrice: number; amount: number }[] }
-  handover?: { date: string; items: { code: string; name: string; condition: string; penalty?: number }[]; readings: { kind: 'electric' | 'water' | 'fee'; label?: string; serial: string; value: number }[] }
+  invoice?: { code: string; periodStart: string; periodEnd: string; dueDate?: string | null; note?: string; paid?: number; bank?: { bankName: string; accountNumber: string; accountName: string } | null; lines: { description: string; quantity: number; unitPrice: number; amount: number }[] }
+  /** `readings` không còn dùng: biên bản bàn giao đã bỏ chỉ số; mẫu cũ vẫn nhận mảng rỗng. */
+  handover?: { date: string; items: { code: string; name: string; condition: string; penalty?: number }[]; readings?: { kind: 'electric' | 'water' | 'fee'; label?: string; serial: string; value: number }[] }
   payment?: { code: string; paidOn: string; amount: number; method: string; receivedBy: string }
 }
 
@@ -198,6 +199,7 @@ export function buildTemplateData(docType: DocType, e: DocEntities): Record<stri
     ma_hoa_don: e.invoice?.code ?? '',
     ky: e.invoice ? `${d(e.invoice.periodStart)} – ${d(e.invoice.periodEnd)}` : '',
     han_thanh_toan: d(e.invoice?.dueDate),
+    ghi_chu: e.invoice?.note ?? '',
     tong_tien: m(invoiceTotal),
     tong_tien_bang_chu: w(invoiceTotal),
     ngan_hang: e.invoice?.bank?.bankName ?? '',

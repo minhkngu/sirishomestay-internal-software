@@ -16,7 +16,7 @@ export async function renderInvoiceFromTemplate(data: InvoicePdfData, html: { bo
   const entities: DocEntities = {
     tenant: { kind: t.kind ?? 'vietnamese', fullName: t.kind === 'company' ? null : t.name, companyName: t.kind === 'company' ? t.name : null, idDocument: t.idDocument, taxCode: t.taxCode, phone: t.phone, email: t.email },
     facility: data.facility, room: { code: data.room },
-    invoice: { code: data.code, periodStart: data.periodStart, periodEnd: data.periodEnd, dueDate: data.dueDate, paid: data.paid, bank: data.bank, lines: data.lines },
+    invoice: { code: data.code, periodStart: data.periodStart, periodEnd: data.periodEnd, dueDate: data.dueDate, paid: data.paid, bank: data.bank, lines: data.lines, note: data.note },
   }
   const { doc } = renderTemplate(html.body, { ...buildTemplateData(data.kind === 'termination' ? 'invoice_termination' : 'invoice_monthly', entities), ngay_lap: formatDateVN(data.issueDate) })
   return renderTemplatePdf(doc, html.style, { qr })

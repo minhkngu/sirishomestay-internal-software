@@ -57,7 +57,7 @@ export function buildTerminationInvoice(input: TerminationInput): { lines: Invoi
   }
 
   for (const f of input.meterFees) {
-    lines.push({ type: 'fee', description: `${f.name} đến ${formatDateVN(endDate)} (${f.usage} ${f.unit})`, quantity: f.usage, unitPrice: f.unitPrice, amount: Math.round(f.usage * f.unitPrice), meta: { leaseFeeId: f.leaseFeeId, unit: f.unit } })
+    lines.push({ type: 'fee', description: f.name, quantity: f.usage, unitPrice: f.unitPrice, amount: Math.round(f.usage * f.unitPrice), meta: { leaseFeeId: f.leaseFeeId, unit: f.unit } })
   }
   for (const o of input.oneOffs.filter((x) => !x.invoicedInId)) {
     lines.push({ type: o.kind === 'penalty' ? 'penalty' : 'one_off', description: o.description, quantity: o.quantity, unitPrice: o.unitPrice, amount: Math.round(o.quantity * o.unitPrice), meta: { oneOffId: o.id } })

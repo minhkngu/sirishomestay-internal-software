@@ -124,21 +124,40 @@ export async function quickContractDataAction(kind: 'lease' | 'deposit', id: str
       const l = contract as Awaited<ReturnType<typeof getLease>>
       const { listFeeTypes, listFeeTypePrices, listFeeUnits } = await import('@/server/fees/service')
       const { resolveFeePrice } = await import('@/domain/fee-price')
+      const { can } = await import('@/domain/access')
+      const { listLeaseMeterInitials } = await import('@/server/meters/service')
       const [types, prices, units] = await Promise.all([listFeeTypes(db, ctx), listFeeTypePrices(db, ctx), listFeeUnits(db, ctx)])
       const unitName = new Map(units.map(u => [u.id, u.name]))
       const { meters, leaseFeeMeters, leaseFeeSnapshots, leases } = await import('@/db')
-      const { and, eq, isNull } = await import('drizzle-orm')
-      const meterRows = await db.select({ id: meters.id, utility: meters.utility, name: meters.name, code: meters.code, serial: meters.serial }).from(meters).where(and(eq(meters.roomId, l.roomId), isNull(meters.removedOn)))
-      const busyRows = await db.select({ meterId: leaseFeeMeters.meterId }).from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).innerJoin(leases, eq(leases.id, leaseFeeSnapshots.leaseId)).where(eq(leases.status, 'active'))
+      const { and, eq, isNull, ne } = await import('drizzle-orm')
+      const [meterRows, busyRows, links, initials] = await Promise.all([
+        db.select({ id: meters.id, utility: meters.utility, name: meters.name, code: meters.code, serial: meters.serial }).from(meters).where(and(eq(meters.roomId, l.roomId), isNull(meters.removedOn))),
+        // Đồng hồ đang gắn phí của hợp đồng đang chạy khác mới coi là bận; đồng hồ của chính hợp đồng này vẫn chọn lại được
+        db.select({ meterId: leaseFeeMeters.meterId }).from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).innerJoin(leases, eq(leases.id, leaseFeeSnapshots.leaseId)).where(and(eq(leases.status, 'active'), ne(leases.id, l.id))),
+        db.select({ leaseFeeId: leaseFeeMeters.leaseFeeId, meterId: leaseFeeMeters.meterId }).from(leaseFeeMeters).innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId)).where(eq(leaseFeeSnapshots.leaseId, l.id)),
+        listLeaseMeterInitials(db, ctx, l.id),
+      ])
       const busyIds = new Set(busyRows.map(r => r.meterId))
-      const roomMeters = meterRows.map(m => ({ id: m.id, label: `${m.name || (m.utility === 'electric' ? 'Điện' : m.utility === 'water' ? 'Nước' : 'Đồng hồ')}${m.code ? ` · ${m.code}` : ''}${m.serial ? ` · ${m.serial}` : ''}` }))
+      const linkOf = new Map(links.map(r => [r.leaseFeeId, r.meterId]))
+      const meterLabels = new Map(meterRows.map(m => [m.id, `${m.name || (m.utility === 'electric' ? 'Điện' : m.utility === 'water' ? 'Nước' : 'Đồng hồ')}${m.code ? ` · ${m.code}` : ''}${m.serial ? ` · ${m.serial}` : ''}`]))
+      const roomMeters = meterRows.map(m => ({ id: m.id, label: meterLabels.get(m.id)!, busy: busyIds.has(m.id) }))
+      const canEditMeters = can(ctx, 'meters', l.facilityId)
       return {
         editable: true,
         units: units.map(u => ({ id: u.id, name: u.name })),
-        current: l.fees.map(f => ({ leaseFeeId: f.leaseFeeId ?? null, feeTypeId: f.feeTypeId, name: f.name, unit: f.unit, unitPrice: f.unitPrice, locked: f.quantitySource === 'meter' })),
-        meterSupported: true,
-        options: types.map(t => ({ id: t.id, name: t.name, unit: unitName.get(t.unitId) ?? '', price: resolveFeePrice(t.defaultPrice, prices[t.id] ?? {}, l.facilityId), meter: t.quantityFrom === 'meter' })),
-        roomMeters: roomMeters.map(m => ({ id: m.id, label: m.label, busy: busyIds.has(m.id) })),
+        current: l.fees.map(f => {
+          const meterId = canEditMeters && f.leaseFeeId ? (linkOf.get(f.leaseFeeId) ?? null) : null
+          const opening = canEditMeters && f.leaseFeeId ? (initials[f.leaseFeeId] ?? null) : null
+          return {
+            leaseFeeId: f.leaseFeeId ?? null, feeTypeId: f.feeTypeId, name: f.name, unit: f.unit, unitPrice: f.unitPrice,
+            quantitySource: f.quantitySource ?? 'legacy_fixed', quantity: f.quantity,
+            meterId, meterLabel: meterId ? (meterLabels.get(meterId) ?? null) : null,
+            opening: opening ? { readingId: opening.readingId, value: opening.value, readOn: opening.readOn } : null,
+          }
+        }),
+        canEditMeters,
+        options: types.map(t => ({ id: t.id, name: t.name, unit: unitName.get(t.unitId) ?? '', price: resolveFeePrice(t.defaultPrice, prices[t.id] ?? {}, l.facilityId), meter: t.quantityFrom === 'meter', source: (t.quantityFrom === 'manual' ? 'legacy_fixed' : t.quantityFrom) as 'occupants' | 'room' | 'meter' | 'period_input' | 'legacy_fixed' })),
+        roomMeters,
       }
     })() : null
     const { listFacilities } = await import('@/server/facilities/service')

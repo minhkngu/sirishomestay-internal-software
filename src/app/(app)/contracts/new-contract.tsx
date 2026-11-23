@@ -67,7 +67,7 @@ export async function NewContract({ sp, showHeading = true }: { sp: NewContractS
     tenants: tenantOptions,
     initial,
     feeTypes: feeTypes.map((f) => ({ id: f.id, name: f.name, unit: unitName.get(f.unitId) ?? '', defaultPrice: f.defaultPrice, prices: prices[f.id] ?? {}, billing: f.billing, quantityFrom: f.quantityFrom })),
-    defaults: { proration: settings.proration, dueRuleLabel: settings.dueRule.kind === 'day_of_next_month' ? `ngày ${settings.dueRule.day} của tháng sau` : `${settings.dueRule.days} ngày sau khi duyệt` },
+    defaults: { proration: settings.proration, dueRuleLabel: settings.dueRule.kind === 'day_of_invoice_month' ? `ngày ${settings.dueRule.day} của chính tháng hoá đơn` : settings.dueRule.kind === 'day_of_next_month' ? `ngày ${settings.dueRule.day} của tháng sau` : `${settings.dueRule.days} ngày sau khi duyệt` },
   }
   const depositFormProps = {
     rooms: roomOptions((s) => s === 'vacant' || s === 'occupied' || s === 'ending_soon'),
