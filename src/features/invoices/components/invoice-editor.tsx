@@ -230,26 +230,21 @@ function MeterReadingsPanel({ panel, editable, consumption, snapshot, onSnapshot
           const v = panel.initial.value.toLocaleString('vi-VN')
           return <p className="mt-1.5 tabular-nums">Số đầu kỳ <span className="font-medium text-foreground">{v}</span> · Số cuối kỳ <span className="font-medium text-foreground">{v}</span> <span className="text-muted-foreground/80">(chỉ số ban đầu {formatDateVN(panel.initial.readOn)}, chưa phát sinh)</span></p>
         }
-        const o = openingOf(last)
-        const c = staged[last.period] !== undefined ? Number(staged[last.period]) : last.value
-        return <p className="mt-1.5 tabular-nums">Số đầu kỳ <span className="font-medium text-foreground">{o == null ? '—' : o.toLocaleString('vi-VN')}</span> · Số cuối kỳ <span className="font-medium text-foreground">{c == null ? '—' : c.toLocaleString('vi-VN')}</span></p>
+        return null
       })()}
       <p className="mt-0.5">Tiêu thụ: <span className="font-medium tabular-nums text-foreground">{consumption.toLocaleString('vi-VN')} {panel.unit}</span></p>
       {panel.history && panel.history.length > 0 && (
-        <div className="mt-1.5 rounded-lg border border-border/60 px-2 py-1.5">
-          <p className="mb-1 text-muted-foreground/80">Các lần chốt các tháng trước</p>
-          <ul className="space-y-0.5">
-            {panel.history.map((r, i) => (
-              <li key={r.id} className="flex items-center justify-between gap-2 tabular-nums">
-                <span>{formatDateVN(r.readOn)}{r.kind === 'handover' ? ' · chỉ số ban đầu' : ''}</span>
-                <span className="flex items-center gap-1.5">
-                  <span className="font-medium text-foreground">{r.value.toLocaleString('vi-VN')} {panel.unit}</span>
-                  {i === panel.history!.length - 1 && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">Mới nhất</span>}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <ul className="mt-1 space-y-0.5 tabular-nums">
+          {panel.history.map((r, i) => (
+            <li key={r.id} className="flex items-center justify-between gap-2">
+              <span>{formatDateVN(r.readOn)}{r.kind === 'handover' ? ' · chỉ số ban đầu' : ''}</span>
+              <span className="flex items-center gap-1.5">
+                <span className="font-medium text-foreground">{r.value.toLocaleString('vi-VN')} {panel.unit}</span>
+                {i === panel.history!.length - 1 && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">Mới nhất</span>}
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
       {row && (
         <FormDialog open onOpenChange={(o) => { if (!o) setPeriod(null) }} title={`Chốt chỉ số ${panel.name}`} description={`Tháng ${periodLabel(row.period)}${row.value == null ? ' · chưa chốt' : ` · đang là ${row.value.toLocaleString('vi-VN')}`}. Bấm Lưu để lưu luôn số này (cùng các thay đổi khác của hoá đơn), ghi về tab Chỉ số và tính lại tiền.`} size="sm">
