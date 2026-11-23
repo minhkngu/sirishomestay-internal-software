@@ -9,8 +9,8 @@ import { Input } from '@/components/ui/input'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { formatDateVN } from '@/domain/dates'
 import { cn } from '@/lib/utils'
-import { saveOpeningsAction, saveReadingsAction } from '@/server/meters/actions'
-import { meterTypeName } from '../meter-types'
+import { saveOpeningsAction, saveReadingsAction } from '../server/meters/actions'
+import { meterTypeName } from '../domain/meter-types'
 import { ReplaceMeterDialog } from './replace-meter-dialog'
 
 export type GridCell = {

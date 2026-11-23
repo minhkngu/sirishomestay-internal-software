@@ -2,7 +2,7 @@ import '@/modules/registrations'
 import { describe, it, expect, beforeEach } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { facilities, rooms, roomAmenities, meters } from '@/db'
-import { saveReadings } from '@/server/meters/service'
+import { saveReadings } from '@/modules/meters/server/meters/service'
 import {
   listFacilities,
   getFacility,

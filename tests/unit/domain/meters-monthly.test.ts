@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildMonthlyCells } from '@/domain/meters-monthly'
+import { buildMonthlyCells } from '@/modules/meters/domain/meters-monthly'
 import type { Meter, MeterReading } from '@/domain/types'
 
 const m1: Meter = { id: 'm1', roomId: 'R1', utility: 'electric', installedOn: '2025-01-01', startReading: 0 }

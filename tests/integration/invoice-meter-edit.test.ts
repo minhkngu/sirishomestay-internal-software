@@ -24,7 +24,7 @@ import {
   updateInvoiceMeterReading,
   updateLines,
 } from '@/server/invoices/service'
-import { listReadingHistory, listReadingSheet } from '@/server/meters/service'
+import { listReadingHistory, listReadingSheet } from '@/modules/meters'
 import { updateLease } from '@/server/contracts/service'
 import { createTestDb } from '../helpers/db'
 

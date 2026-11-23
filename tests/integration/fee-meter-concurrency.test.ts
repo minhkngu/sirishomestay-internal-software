@@ -5,7 +5,7 @@ import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import { eq } from 'drizzle-orm'
 import * as schema from '@/db'
 import type { DB } from '@/db/client'
-import { ensureFeeMeter } from '@/server/meters/service'
+import { ensureFeeMeter } from '@/modules/meters'
 import { createTenant } from '@/modules/tenants/server/tenants/service'
 import type { AccessContext } from '@/domain/access'
 

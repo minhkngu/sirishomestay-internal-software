@@ -12,8 +12,8 @@ import { Label } from '@/components/ui/label'
 import { Pager } from '@/components/list/pager'
 import { usePager } from '@/components/list/use-list-params'
 import { formatDateVN } from '@/domain/dates'
-import { deleteMeterReadingAction, deleteMeterReadingsAction, updateMeterReadingAction } from '@/server/meters/actions'
-import type { ReadingHistoryRow } from '@/server/meters/service'
+import { deleteMeterReadingAction, deleteMeterReadingsAction, updateMeterReadingAction } from '../server/meters/actions'
+import type { ReadingHistoryRow } from '../server/meters/service'
 
 const fmt = (value: number) => value.toLocaleString('vi-VN')
 const monthLabel = (period: string) => `${Number(period.slice(5))}/${period.slice(0, 4)}`

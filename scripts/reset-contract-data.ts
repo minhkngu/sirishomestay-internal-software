@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm'
 import { rooms } from '@/db'
 import type { DB } from '@/db/client'
 import { todayVN } from '@/domain/dates'
-import { createDefaultMeters } from '@/server/meters/service'
+import { createDefaultMeters } from '@/modules/meters'
 
 /** Mọi bảng dữ liệu hợp đồng và đồng hồ; TRUNCATE ... CASCADE xoá thêm các bảng phụ thuộc vào chúng. */
 const TABLES = [

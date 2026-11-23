@@ -45,7 +45,7 @@ import type {
 import { finalizeTermination } from '@/server/addenda/finalize'
 import { recordAudit, recordAuditBatch } from '@/modules/platform'
 import { registerExportOwnerResolver } from '@/modules/platform'
-import { applyReadings, setLeaseInitialReading, setOpeningValue } from '@/server/meters/service'
+import { applyReadings, setLeaseInitialReading, setOpeningValue } from '@/modules/meters'
 import { getSettings } from '@/modules/platform'
 import { exportDocument, registerPdfLoader } from '@/modules/documents'
 import { resolveBankAccount } from '@/domain/vietqr'

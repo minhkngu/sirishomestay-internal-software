@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Msg, useRun } from '@/components/use-run'
-import { createMeterTypeAction, deleteMeterTypeAction, updateMeterTypeAction } from '@/server/meter-types/actions'
+import { createMeterTypeAction, deleteMeterTypeAction, updateMeterTypeAction } from '../server/meter-types/actions'
 
 export type MeterTypeRow = { id: string; name: string; unit: string; isSystem: boolean }
 

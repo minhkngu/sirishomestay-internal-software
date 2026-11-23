@@ -5,7 +5,7 @@ import { getSettings } from '@/modules/platform'
 import { listFacilities } from '@/modules/facilities'
 import { listAmenities } from '@/modules/facilities'
 import { listFeeDefaults, listFeeTypes, listFeeUnits, listFeeTypePrices } from '@/modules/facilities'
-import { listMeterTypes } from '@/server/meter-types/service'
+import { listMeterTypes } from '@/modules/meters'
 import { SettingsTabs } from './settings-tabs'
 
 export default async function SettingsPage() {

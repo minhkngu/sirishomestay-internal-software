@@ -1,7 +1,7 @@
-import { daysInMonth } from './dates'
-import { ValidationError } from './errors'
-import { meterUsage } from './meters'
-import type { Meter, MeterReading } from './types'
+import { daysInMonth } from '@/domain/dates'
+import { ValidationError } from '@/domain/errors'
+import { meterUsage } from '@/domain/meters'
+import type { Meter, MeterReading } from '@/domain/types'
 
 /** Một ô của bảng chỉ số theo tháng (một loại công tơ của một phòng trong một tháng). */
 export type MonthlyCell = {

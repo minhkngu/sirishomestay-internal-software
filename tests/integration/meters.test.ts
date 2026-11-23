@@ -14,7 +14,7 @@ import {
   saveOpenings,
   updateMeterReading,
   deleteMeterReading,
-} from '@/server/meters/service'
+} from '@/modules/meters/server/meters/service'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import type { AccessContext, Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'

@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { todayVN } from '@/domain/dates'
-import { addRoomMeterAction } from '@/server/meters/actions'
+import { addRoomMeterAction } from '../server/meters/actions'
 
 /** Thêm một đồng hồ (loại khác) cho phòng. Đồng hồ điện, nước mặc định đã có sẵn; không có thao tác xoá đồng hồ. */
 export function AddMeterButton({

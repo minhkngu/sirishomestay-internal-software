@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { daysInMonth } from '@/domain/dates'
-import { loadReadingSheetAction } from '@/server/meters/actions'
+import { loadReadingSheetAction } from '../server/meters/actions'
 import { ReadingGrid, type GridRow } from './reading-grid'
 
 /** Nút "Chốt chỉ số": chọn tháng chốt, hiện các đồng hồ chưa chốt trong tháng đó để điền số cuối kỳ; lưu xong danh sách phía sau tự cập nhật. */

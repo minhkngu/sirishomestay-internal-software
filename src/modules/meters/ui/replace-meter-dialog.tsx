@@ -5,7 +5,7 @@ import { DateField } from '@/components/date-field'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { replaceMeterAction, suggestFinalReadingAction } from '@/server/meters/actions'
+import { replaceMeterAction, suggestFinalReadingAction } from '../server/meters/actions'
 
 export function ReplaceMeterDialog({
   roomId,

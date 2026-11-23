@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { meterTypeName, readingMeterTypes, sortMeterTypes } from '@/features/meters/meter-types'
+import { meterTypeName, readingMeterTypes, sortMeterTypes } from '@/modules/meters/domain/meter-types'
 
 describe('meter types', () => {
   it('bỏ mã đồng hồ trong ngoặc ở cuối tên', () => {

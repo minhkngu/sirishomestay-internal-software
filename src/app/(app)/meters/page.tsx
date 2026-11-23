@@ -4,13 +4,14 @@ import { db } from '@/db/client'
 import { todayVN } from '@/domain/dates'
 import { getAccessContext } from '@/modules/platform'
 import { listFacilities } from '@/modules/facilities'
-import { listReadingHistory, listReadingSheet } from '@/server/meters/service'
-import { listMeterTypes } from '@/server/meter-types/service'
-import { ReadingHistory } from '@/features/meters/components/reading-history'
-import { AddMeterButton } from '@/features/meters/components/add-meter-dialog'
-import { CloseReadingsButton } from '@/features/meters/components/close-readings-button'
-import { MeterFilters } from '@/features/meters/components/meter-filters'
-import { readingMeterTypes, sortMeterTypes } from '@/features/meters/meter-types'
+import {
+  listMeterTypes,
+  listReadingHistory,
+  listReadingSheet,
+  readingMeterTypes,
+  sortMeterTypes,
+} from '@/modules/meters'
+import { AddMeterButton, CloseReadingsButton, MeterFilters, ReadingHistory } from '@/modules/meters/ui'
 
 /** Kỳ ghi gần đây: 3 tháng tới và 24 tháng trước, mới nhất trước. */
 function periodChoices(today: string): Array<{ value: string; label: string }> {
