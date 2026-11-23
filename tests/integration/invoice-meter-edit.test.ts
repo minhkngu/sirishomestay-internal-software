@@ -43,10 +43,10 @@ describe('sửa chỉ số điện trong hoá đơn', () => {
     await expect(updateLines(db, ctx(), invoiceId, sent)).resolves.toBeDefined()
     expect((await electricLine()).quantity).toBe(100)
   })
-  it('chi tiết hoá đơn liệt kê mọi lần chốt trong tháng liền trước, cũ đến mới', async () => {
+  it('chi tiết hoá đơn liệt kê mọi lần chốt của 3 tháng liền trước, cũ đến mới', async () => {
     await db.insert(meterReadings).values({ meterId, period: '2026-11', readOn: '2026-11-10', value: 150, kind: 'handover' })
     const detail = await getInvoiceDetail(db, ctx(), invoiceId)
-    expect(detail.meterPanels?.[0].inMonth?.map(r => [r.readOn, r.value, r.kind])).toEqual([['2026-11-10', 150, 'handover'], ['2026-11-30', 200, 'monthly']])
+    expect(detail.meterPanels?.[0].history?.map(r => [r.readOn, r.value, r.kind])).toEqual([['2026-10-31', 100, 'monthly'], ['2026-11-10', 150, 'handover'], ['2026-11-30', 200, 'monthly']])
   })
   it('thấp hơn chỉ số tháng trước thì từ chối, chỉ số không đổi', async () => {
     await expect(updateInvoiceMeterReading(db, ctx(), invoiceId, { leaseFeeId: feeId, value: 90 })).rejects.toThrow(ValidationError)

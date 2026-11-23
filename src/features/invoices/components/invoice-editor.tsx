@@ -127,12 +127,12 @@ function LineTime({ line, defaultFrom, defaultTo, fullMonth, proration, editable
     </div>
   )
 }
-type MeterPanel = { leaseFeeId: string; name: string; unit: string; /** Chỉ số ban đầu ghi ở hợp đồng (bàn giao hoặc lúc lắp đồng hồ). */ initial?: { value: number; readOn: string } | null; /** Mọi lần chốt trong tháng liền trước tháng hoá đơn, cũ đến mới. */ inMonth?: Array<{ id: string; readOn: string; value: number; kind: 'monthly' | 'handover' }>; rows: Array<{ period: string; readOn: string | null; value: number | null; /** Số đầu kỳ: chỉ số gần nhất trước tháng này; null khi chưa có. */ opening: number | null; /** Số đầu đã lưu riêng cho lần ghi (tự điền lúc ghi hoặc sửa). */ openingStored: boolean; /** Số đầu đến từ chốt tháng trước, chỉ số bàn giao, hay chỉ số ban đầu của đồng hồ. */ openingSource: 'monthly' | 'handover' | 'start' }> }
+type MeterPanel = { leaseFeeId: string; name: string; unit: string; /** Chỉ số ban đầu ghi ở hợp đồng (bàn giao hoặc lúc lắp đồng hồ). */ initial?: { value: number; readOn: string } | null; /** Mọi lần chốt trong 3 tháng liền trước tháng hoá đơn, cũ đến mới. */ history?: Array<{ id: string; readOn: string; value: number; kind: 'monthly' | 'handover' }>; rows: Array<{ period: string; readOn: string | null; value: number | null; /** Số đầu kỳ: chỉ số gần nhất trước tháng này; null khi chưa có. */ opening: number | null; /** Số đầu đã lưu riêng cho lần ghi (tự điền lúc ghi hoặc sửa). */ openingStored: boolean; /** Số đầu đến từ chốt tháng trước, chỉ số bàn giao, hay chỉ số ban đầu của đồng hồ. */ openingSource: 'monthly' | 'handover' | 'start' }> }
 const periodLabel = (period: string) => `${period.slice(5)}/${period.slice(0, 4)}`
 const NEW_READING = '__new'
 /** Chỉ số đã chốt của đồng hồ: danh sách các tháng, thêm dòng "Chốt chỉ số" cuối danh sách; chọn một dòng mở popup điền số (ghi ngược về tab Chỉ số). */
 /** Hoá đơn kỳ ký hợp đồng: số đầu, số cuối của riêng hoá đơn (chép từ chỉ số ban đầu lúc tạo), sửa được, không liên quan hợp đồng hay hoá đơn khác. */
-function FirstInvoiceReadings({ snap, unit, editable, consumption, onSave, readOn }: { snap: { opening: number; closing: number }; unit: string; editable: boolean; consumption: number; onSave: (opening: number, closing: number) => void; readOn?: string }) {
+function FirstInvoiceReadings({ snap, unit, editable, consumption, onSave, initial }: { snap: { opening: number; closing: number }; unit: string; editable: boolean; consumption: number; onSave: (opening: number, closing: number) => void; initial?: { value: number; readOn: string } | null }) {
   const [open, setOpen] = useState(false)
   const [o, setO] = useState(''), [c, setC] = useState('')
   const num = (t: string) => (/^\d+$/.test(t.trim()) ? Number(t.trim()) : null)
@@ -142,7 +142,8 @@ function FirstInvoiceReadings({ snap, unit, editable, consumption, onSave, readO
   return (
     <div className="text-[11px] text-muted-foreground">
       <p className="tabular-nums">Số đầu kỳ <span className="font-medium text-foreground">{fmtN(snap.opening)}</span> · Số cuối kỳ <span className="font-medium text-foreground">{fmtN(snap.closing)}</span></p>
-      <p className="mt-0.5">{readOn ? `Chỉ số ban đầu ${formatDateVN(readOn)} · ` : ''}Tiêu thụ: <span className="font-medium tabular-nums text-foreground">{fmtN(consumption)} {unit}</span>
+      {initial && <p className="mt-0.5 tabular-nums">Chốt lúc ký hợp đồng {formatDateVN(initial.readOn)}: <span className="font-medium text-foreground">{fmtN(initial.value)} {unit}</span> <span className="text-muted-foreground/80">(số hiện tại của hợp đồng)</span></p>}
+      <p className="mt-0.5">Tiêu thụ: <span className="font-medium tabular-nums text-foreground">{fmtN(consumption)} {unit}</span>
         {editable && <button type="button" className="ml-2 text-primary hover:underline" onClick={() => { setO(String(snap.opening)); setC(String(snap.closing)); setOpen(true) }}>Sửa</button>}
       </p>
       {open && (
@@ -214,7 +215,7 @@ function MeterReadingsPanel({ panel, editable, consumption, snapshot, onSnapshot
   if (panel.rows.length === 0) {
     const snap = snapshot ?? (panel.initial ? { opening: panel.initial.value, closing: panel.initial.value } : null)
     if (!snap) return <span className="text-muted-foreground/60">—</span>
-    return <FirstInvoiceReadings snap={snap} unit={panel.unit} editable={editable && !!onSnapshot} consumption={consumption} onSave={(o, c) => onSnapshot?.(o, c)} readOn={panel.initial?.readOn} />
+    return <FirstInvoiceReadings snap={snap} unit={panel.unit} editable={editable && !!onSnapshot} consumption={consumption} onSave={(o, c) => onSnapshot?.(o, c)} initial={panel.initial} />
   }
   return (
     <div className="text-[11px] text-muted-foreground">
@@ -234,16 +235,16 @@ function MeterReadingsPanel({ panel, editable, consumption, snapshot, onSnapshot
         return <p className="mt-1.5 tabular-nums">Số đầu kỳ <span className="font-medium text-foreground">{o == null ? '—' : o.toLocaleString('vi-VN')}</span> · Số cuối kỳ <span className="font-medium text-foreground">{c == null ? '—' : c.toLocaleString('vi-VN')}</span></p>
       })()}
       <p className="mt-0.5">Tiêu thụ: <span className="font-medium tabular-nums text-foreground">{consumption.toLocaleString('vi-VN')} {panel.unit}</span></p>
-      {panel.inMonth && panel.inMonth.length > 0 && (
+      {panel.history && panel.history.length > 0 && (
         <div className="mt-1.5 rounded-lg border border-border/60 px-2 py-1.5">
-          <p className="mb-1 text-muted-foreground/80">Các lần chốt tháng {periodLabel(last.period)}</p>
+          <p className="mb-1 text-muted-foreground/80">Các lần chốt các tháng trước</p>
           <ul className="space-y-0.5">
-            {panel.inMonth.map((r, i) => (
+            {panel.history.map((r, i) => (
               <li key={r.id} className="flex items-center justify-between gap-2 tabular-nums">
                 <span>{formatDateVN(r.readOn)}{r.kind === 'handover' ? ' · chỉ số ban đầu' : ''}</span>
                 <span className="flex items-center gap-1.5">
                   <span className="font-medium text-foreground">{r.value.toLocaleString('vi-VN')} {panel.unit}</span>
-                  {i === panel.inMonth!.length - 1 && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">Mới nhất</span>}
+                  {i === panel.history!.length - 1 && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">Mới nhất</span>}
                 </span>
               </li>
             ))}
