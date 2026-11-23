@@ -37,6 +37,12 @@ describe('sửa chỉ số điện trong hoá đơn', () => {
     const sheet = await listReadingSheet(db, ctx(), facilityId, '2026-11')
     expect(sheet.rows[0].electric?.current).toBe(260)
   })
+  it('lưu hoá đơn khi giao diện đã cộng sẵn chỉ số chưa lưu vào số lượng dòng điện: không báo lỗi dòng hợp đồng', async () => {
+    const lines = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, invoiceId))
+    const sent = lines.map(l => ({ id: l.id, type: l.type, description: l.description, quantity: (l.meta as { leaseFeeId?: string } | null)?.leaseFeeId === feeId ? 160 : l.quantity, unitPrice: l.unitPrice, meta: l.meta as Record<string, unknown> | null }))
+    await expect(updateLines(db, ctx(), invoiceId, sent)).resolves.toBeDefined()
+    expect((await electricLine()).quantity).toBe(100)
+  })
   it('thấp hơn chỉ số tháng trước thì từ chối, chỉ số không đổi', async () => {
     await expect(updateInvoiceMeterReading(db, ctx(), invoiceId, { leaseFeeId: feeId, value: 90 })).rejects.toThrow(ValidationError)
     expect((await db.select().from(meterReadings).where(and(eq(meterReadings.meterId, meterId), eq(meterReadings.period, '2026-11'))))[0].value).toBe(200)

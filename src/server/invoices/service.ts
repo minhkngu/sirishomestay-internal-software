@@ -559,11 +559,14 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
   return db.transaction(async tx0 => {
     const tx = tx0 as unknown as DB; const inv = await getInvoice(tx, ctx, id)
     const old = await tx.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, id))
+    // Hoá đơn nháp cũ chưa có số đầu, số cuối riêng: dòng vừa được sửa số riêng vẫn là dòng đó, không tính là đổi dòng hợp đồng
+    const legacyOwn = (l: (typeof data)[number]) => { const o = l.id ? old.find(x => x.id === l.id) : undefined; const om = (o?.meta ?? {}) as { leaseFeeId?: unknown; segments?: unknown; period?: unknown }; return !!o && ownReadings(l) && !ownReadings(o) && o.type === 'fee' && typeof om.leaseFeeId === 'string' && !Array.isArray(om.segments) && typeof om.period !== 'string' ? o : undefined }
+
     if (inv.kind === 'monthly') {
-      // Dòng tiền phòng và dòng phí hợp đồng lấy từ hợp đồng: không đổi mô tả, số lượng, đơn giá hay xoá ở đây (hệ số sửa qua setLineTime, chỉ số qua bảng chỉ số)
-      const protectedLine = (l: { id?: string; type: string; description: string; quantity: number; unitPrice: number; meta?: unknown }) => { const meta = l.meta as { leaseFeeId?: unknown } | null; if (ownReadings(l)) return typeof meta?.leaseFeeId === 'string' ? JSON.stringify([l.id, meta.leaseFeeId, 'own']) : null; return typeof meta?.leaseFeeId === 'string' || l.type === 'rent' ? JSON.stringify([l.id, meta?.leaseFeeId ?? null, l.type, l.description, isTimeBasedLine(l.type, l.meta) ? null : l.quantity, l.unitPrice]) : null }
+      // Dòng tiền phòng và dòng phí hợp đồng lấy từ hợp đồng: không đổi mô tả, đơn giá hay xoá ở đây. Số lượng không so: máy chủ giữ số đã lưu hoặc tính lại từ hệ số, chỉ số (phía giao diện đã cộng sẵn số vừa điền chưa lưu)
+      const protectedLine = (l: { id?: string; type: string; description: string; quantity: number; unitPrice: number; meta?: unknown }) => { const meta = l.meta as { leaseFeeId?: unknown } | null; if (ownReadings(l)) return typeof meta?.leaseFeeId === 'string' ? JSON.stringify([l.id, meta.leaseFeeId, 'own']) : null; return typeof meta?.leaseFeeId === 'string' || l.type === 'rent' ? JSON.stringify([l.id, meta?.leaseFeeId ?? null, l.type, l.description, l.unitPrice]) : null }
       const beforeFees = old.map(protectedLine).filter(Boolean).sort()
-      const afterFees = data.map(protectedLine).filter(Boolean).sort()
+      const afterFees = data.map(l => { const o = legacyOwn(l); return o ? protectedLine(o) : protectedLine(l) }).filter(Boolean).sort()
       // Hoá đơn thêm cho kỳ đã có hoá đơn (không có dòng tiền phòng): được bỏ bớt phí hợp đồng không tính lại, không được sửa
       const supplementary = !old.some(l => l.type === 'rent')
       const sameOrSubset = supplementary ? afterFees.every(f => beforeFees.includes(f)) : JSON.stringify(beforeFees) === JSON.stringify(afterFees)
@@ -579,7 +582,7 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
       if (savedDeposit) return { invoiceId: id, type: savedDeposit.type, description: savedDeposit.description, quantity: savedDeposit.quantity, unitPrice: savedDeposit.unitPrice, amount: savedDeposit.amount, meta: savedDeposit.meta }
       const meta = l.meta as { feeTypeId?: unknown; leaseFeeId?: unknown; coefficient?: unknown; from?: unknown; to?: unknown; coefficientOverride?: unknown } | null
       const savedLine = old.find(previous => previous.id === l.id)
-      if (inv.kind === 'monthly' && savedLine && ownReadings(savedLine) && typeof meta?.leaseFeeId === 'string') {
+      if (inv.kind === 'monthly' && savedLine && (ownReadings(savedLine) || legacyOwn(l)) && ownReadings(l) && typeof meta?.leaseFeeId === 'string') {
         // Số đầu, số cuối riêng của hoá đơn đầu: số lượng là hiệu số, số cuối không nhỏ hơn số đầu; đơn giá và mô tả giữ đã lưu
         const m = (l.meta ?? {}) as { opening?: unknown; closing?: unknown }
         const opening = Number(m.opening), closing = Number(m.closing)
