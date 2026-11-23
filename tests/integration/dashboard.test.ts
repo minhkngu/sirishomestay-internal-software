@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { facilities } from '@/db'
 import { createTenant } from '@/modules/tenants/server/tenants/service'
 import { updateSettings } from '@/modules/platform/server/settings/service'
-import { getExpiringVisas } from '@/server/dashboard/service'
+import { getExpiringVisas } from '@/modules/dashboard/server/dashboard/service'
 import type { AccessContext, Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'
 import type { DB } from '@/db/client'
@@ -102,7 +102,7 @@ describe('getExpiringVisas', () => {
 describe('getDashboard', () => {
   it('gom nhắc việc theo quyền và cơ sở; số liệu phòng và công nợ quá hạn', async () => {
     const { rooms, tenants, leases, invoices, invoiceLines, payments, incidents } = await import('@/db')
-    const { getDashboard } = await import('@/server/dashboard/service')
+    const { getDashboard } = await import('@/modules/dashboard/server/dashboard/service')
     const db = await createTestDb()
     const [fa, fb] = await db
       .insert(facilities)

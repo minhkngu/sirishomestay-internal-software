@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import type { FeeOption } from '@/features/contracts/components/lease-fees'
+import type { FeeOption } from '@/modules/leasing/ui'
 import { FeeTypeForm, type FeeFormValues } from '@/modules/facilities/ui'
 import { createFeeTypeAction } from '@/modules/facilities/actions'
 

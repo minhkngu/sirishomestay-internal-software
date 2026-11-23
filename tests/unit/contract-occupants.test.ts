@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { replaceSigner } from '@/features/contracts/contract-occupants'
+import { replaceSigner } from '@/modules/leasing/ui/contracts/contract-occupants'
 
 describe('replaceSigner', () => {
   it('thay người ký nhưng giữ những người thêm chủ động', () => {

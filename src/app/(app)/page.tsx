@@ -13,9 +13,8 @@ import {
 } from 'lucide-react'
 import { db } from '@/db/client'
 import { can } from '@/domain/access'
-import { ReminderCard } from '@/features/dashboard/components/reminder-card'
-import { StatStrip } from '@/features/dashboard/components/stat-strip'
-import { getDashboard } from '@/server/dashboard/service'
+import { ReminderCard, StatStrip } from '@/modules/dashboard/ui'
+import { getDashboard } from '@/modules/dashboard'
 import { getAccessContext } from '@/modules/platform'
 
 const SEVERITY_CONFIG = {

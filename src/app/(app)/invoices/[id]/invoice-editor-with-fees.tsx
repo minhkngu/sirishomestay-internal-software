@@ -1,7 +1,7 @@
 'use client'
 
 import type { ComponentProps } from 'react'
-import { InvoiceEditor } from '@/features/invoices/components/invoice-editor'
+import { InvoiceEditor } from '@/modules/leasing/ui'
 import { CreateFeeTypeNow } from '../../contracts/create-fee-type-now'
 
 type Props = Omit<ComponentProps<typeof InvoiceEditor>, 'addFee'> & {

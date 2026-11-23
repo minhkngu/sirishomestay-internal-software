@@ -23,9 +23,9 @@ Muốn biết một mảng đang ở đâu: xem bảng dưới. **Mỗi PR chuy�
 | 2 | `documents` | Đã chuyển | `src/modules/documents/` | 17 |
 | 3 | `assets` | Đã chuyển | `src/modules/assets/` | 18 |
 | 3 | `meters` | Đã chuyển | `src/modules/meters/` | 19 |
-| 4 | `leasing` | Server đã chuyển (Task 20); UI còn ở `src/features` tới Task 21 | `src/modules/leasing/` (server, domain; `ui/invoices/collect-payment-dialog.tsx` vì `cashbook` dùng chung); `src/features/{contracts,deposits,handovers,charges,invoices,incidents}` | 20–21 |
-| 5 | `import` | Chưa chuyển | `src/server/import`, `src/features/import` | 21 |
-| 5 | `dashboard` | Chưa chuyển | `src/server/dashboard`, `src/features/dashboard` | 21 |
+| 4 | `leasing` | Đã chuyển | `src/modules/leasing/` (`server/`, `domain/`, `ui/` theo thư mục cũ: contracts, deposits, handovers, charges, invoices, incidents) | 20–21 |
+| 5 | `import` | Đã chuyển | `src/modules/import/` (`server/import/`, `ui/`; `targets.ts` thuần nên ở `domain/` để `ui` dùng được) | 21 |
+| 5 | `dashboard` | Đã chuyển | `src/modules/dashboard/` (`server/dashboard/`, `ui/`, `domain/reminders.ts`) | 21 |
 | 5 | `cashbook` | Đã chuyển | `src/modules/cashbook/` (sổ Thu chi, sở hữu bảng `expenses`; `src/domain/cashbook.ts` ở lại vì `leasing` cũng dùng; sửa khoản thu tiền thuê `updatePayment` thuộc `leasing`) | 20 |
 
 Việc nền trước khi chuyển (Prettier, CI, gỡ ghép ngược…) là Task 1–12 của plan; xem checkbox trong plan để biết task nào xong.
@@ -76,14 +76,14 @@ Luật chuyển tiếp (bỏ ở Task 22): code cũ (`src/server`, `src/features
 ### Vì sao chia như vậy
 
 - **`leasing` gom hợp đồng, phụ lục, bàn giao, sổ cọc, phí phát sinh, hoá đơn, sự cố.** `contracts`/`addenda` ghi khoảng 20 bảng (hoá đơn đầu tiên khi tạo hợp đồng, hoá đơn thanh lý, chỉ số khi bàn giao, xoá dây chuyền khi xoá hợp đồng); duyệt hoá đơn thanh lý lại chốt hợp đồng. Tách thành hai module sẽ phụ thuộc vòng.
-- **Trạng thái phòng** (`listRoomsWithStatus`, `getRoomDetail`) cần dữ liệu hợp đồng nên thuộc `leasing`; `facilities` chỉ CRUD cơ sở, phòng, tiện ích, phí (đã làm ở Task 9: `src/server/contracts/room-view.ts`).
-- **Gán mẫu hoá đơn** cho hợp đồng/hoá đơn ghi bảng của `leasing` nên thuộc `leasing`, không thuộc `documents` (đã làm ở Task 9: `src/server/invoices/template-assignment.ts`).
+- **Trạng thái phòng** (`listRoomsWithStatus`, `getRoomDetail`) cần dữ liệu hợp đồng nên thuộc `leasing`; `facilities` chỉ CRUD cơ sở, phòng, tiện ích, phí (đã làm ở Task 9: `src/modules/leasing/server/contracts/room-view.ts`).
+- **Gán mẫu hoá đơn** cho hợp đồng/hoá đơn ghi bảng của `leasing` nên thuộc `leasing`, không thuộc `documents` (đã làm ở Task 9: `src/modules/leasing/server/invoices/template-assignment.ts`).
 - **`documents`** không biết hợp đồng hay hoá đơn: module tầng trên đăng ký loader cho nó (mục 6).
 
 ## 5. Quy tắc nghiệp vụ cần biết trước khi sửa
 
 - **Quyền:** 7 nhóm (`src/domain/access.ts`). Có `settings` là admin, thấy mọi cơ sở. Người khác chỉ thấy cơ sở được cấp. `assertCan` ném `NotFoundError` khi ngoài phạm vi cơ sở (không lộ sự tồn tại), `ForbiddenError` khi thiếu nhóm quyền. Khách mất cơ sở dùng `NO_FACILITY` (chỉ admin thấy). Số passport/CCCD bị che (`maskId`) với người không có `tenants_contracts`.
-- **Hoá đơn tháng N** (`src/domain/invoice-builder.ts`): tiền phòng + phí cố định của kỳ N (trả trước); điện, nước, phí theo lần của tháng N−1 (trả sau). Có chia ngày lẻ (`proration.ts`) và hệ số kỳ.
+- **Hoá đơn tháng N** (`src/modules/leasing/domain/invoice-builder.ts`): tiền phòng + phí cố định của kỳ N (trả trước); điện, nước, phí theo lần của tháng N−1 (trả sau). Có chia ngày lẻ (`proration.ts`) và hệ số kỳ.
 - **Phí hợp đồng:** lưu ở `lease_fee_snapshots` (chụp giá lúc ký). Điện, nước là dòng phí gắn đúng một đồng hồ của phòng, đơn giá lấy từ hợp đồng; không còn kiểu cũ (`lease_fees`, `feeModel`, bảng giá cơ sở `utility_rates`).
 - **Hợp đồng cọc → hợp đồng thuê:** mỗi phòng tối đa 1 hợp đồng cọc `pending` và 1 hợp đồng `active` (unique index có điều kiện trong `src/db/schema/contracts.ts`).
 - **Lịch sử/khôi phục hợp đồng:** mỗi lần sửa/xoá chụp bản ghi vào `contract_versions` (`server/contracts/history.ts`, `restore.ts`).

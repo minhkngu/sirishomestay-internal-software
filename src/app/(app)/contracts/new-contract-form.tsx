@@ -2,9 +2,8 @@
 
 import { useRef, useState, type ComponentProps } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { LeaseWizard } from '@/features/contracts/components/lease-wizard'
+import { DepositForm, LeaseWizard, type TenantOption } from '@/modules/leasing/ui'
 import { CreateFeeTypeNow } from './create-fee-type-now'
-import { DepositForm, type TenantOption } from '@/features/contracts/components/deposit-form'
 import { TenantForm, type CreatedTenant } from '@/modules/tenants/ui'
 
 type LeaseProps = Omit<ComponentProps<typeof LeaseWizard>, 'onCreatePerson'>

@@ -5,7 +5,7 @@ import { orNotFound } from '@/lib/or-not-found'
 import { getAccessContext } from '@/modules/platform'
 import { getHandover, listHandovers } from '@/modules/leasing'
 import { isUsableTemplate, listTemplates } from '@/modules/documents'
-import { HandoverForm } from '@/features/handovers/components/handover-form'
+import { HandoverForm } from '@/modules/leasing/ui'
 
 export default async function HandoverPage({ params }: { params: Promise<{ id: string }> }) {
   return (

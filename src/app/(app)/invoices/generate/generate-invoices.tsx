@@ -1,7 +1,7 @@
 import { db } from '@/db/client'
 import { assertCan } from '@/domain/access'
 import { todayVN } from '@/domain/dates'
-import { GenerateWizard } from '@/features/invoices/components/generate-wizard'
+import { GenerateWizard } from '@/modules/leasing/ui'
 import { listLeases } from '@/modules/leasing'
 import { listFacilities } from '@/modules/facilities'
 import { getAccessContext } from '@/modules/platform'

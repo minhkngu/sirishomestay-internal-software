@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { db } from '@/db/client'
 import { assertCan } from '@/domain/access'
-import { IncidentForm } from '@/features/incidents/components/incident-form'
+import { IncidentForm } from '@/modules/leasing/ui'
 import { listAssignees } from '@/modules/leasing'
 import { getRoomDetail } from '@/modules/leasing'
 import { getAccessContext } from '@/modules/platform'

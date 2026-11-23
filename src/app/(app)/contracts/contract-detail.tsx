@@ -3,8 +3,14 @@ import { notFound } from 'next/navigation'
 import { ArrowLeft, Calendar, FileText } from 'lucide-react'
 import { can } from '@/domain/access'
 import { listOneOffs } from '@/modules/leasing'
-import { OneOffDialog } from '@/features/charges/components/one-off-dialog'
-import { DepositLedger } from '@/features/deposits/components/deposit-ledger'
+import {
+  OneOffDialog,
+  DepositLedger,
+  ExportMenu,
+  SignStatus,
+  AddendaList,
+  StartHandoverButtons,
+} from '@/modules/leasing/ui'
 import { buttonVariants } from '@/components/ui/button'
 import { db } from '@/db/client'
 import { NotFoundError } from '@/domain/errors'
@@ -18,13 +24,9 @@ import { listHandovers } from '@/modules/leasing'
 import { getDepositContract, getLease, listLeaseOccupants } from '@/modules/leasing'
 import { formatPhoneDisplay } from '@/domain/phone'
 import { PdfViewButton } from '@/components/pdf-view-button'
-import { ExportMenu } from '@/features/contracts/components/export-menu'
 import { listInvoices } from '@/modules/leasing'
 import { listLeaseMeterInitials } from '@/modules/meters'
-import { SignStatus } from '@/features/contracts/components/sign-status'
-import { AddendaList } from '@/features/contracts/components/addenda-list'
 import { ContractActions } from './contract-actions'
-import { StartHandoverButtons } from '@/features/handovers/components/start-handover-buttons'
 import { listAddenda } from '@/modules/leasing'
 import { cn } from '@/lib/utils'
 import { SignChip, Stat, StatusChip, TermBar, termProgress } from '@/components/contract-ui'
