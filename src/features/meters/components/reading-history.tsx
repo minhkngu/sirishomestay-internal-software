@@ -9,6 +9,8 @@ import { FormDialog } from '@/components/form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Pager } from '@/components/list/pager'
+import { usePager } from '@/components/list/use-list-params'
 import { formatDateVN } from '@/domain/dates'
 import { deleteMeterReadingAction, deleteMeterReadingsAction, updateMeterReadingAction } from '@/server/meters/actions'
 import type { ReadingHistoryRow } from '@/server/meters/service'
@@ -17,8 +19,10 @@ const fmt = (value: number) => value.toLocaleString('vi-VN')
 const monthLabel = (period: string) => `${Number(period.slice(5))}/${period.slice(0, 4)}`
 
 /** Các đồng hồ đã chốt trong tháng đang lọc: mỗi dòng một lần chốt (đồng hồ, phòng · toà, số đầu, số cuối, ngày chốt). Chỉ số tháng đã dùng trong hoá đơn đã duyệt thì khoá; chỉ số bàn giao chỉ để tham khảo nên không khoá. */
-export function ReadingHistory({ rows, facilityName }: { rows: ReadingHistoryRow[]; facilityName: string }) {
+export function ReadingHistory({ rows: allRows, facilityName, paged, total }: { rows: ReadingHistoryRow[]; facilityName: string; /** Có phân trang (đã chọn năm hoặc Tất cả); không thì chỉ hiện các lần chốt mới nhất. */ paged: boolean; total: number }) {
   const router = useRouter()
+  const { pageRows, pager } = usePager(allRows, 'meter-history', `${allRows.length}|${allRows[0]?.id ?? ''}`)
+  const rows = paged ? pageRows : allRows
   const [pending, start] = useTransition()
   const [editing, setEditing] = useState<ReadingHistoryRow | null>(null)
   const [value, setValue] = useState('')
@@ -83,11 +87,11 @@ export function ReadingHistory({ rows, facilityName }: { rows: ReadingHistoryRow
   )
 
   if (rows.length === 0) {
-    return <div className="rounded-2xl border border-dashed border-border/80 bg-card/60 p-8 text-center text-xs text-muted-foreground">Tháng này chưa có đồng hồ nào được chốt.</div>
+    return <div className="rounded-2xl border border-dashed border-border/80 bg-card/60 p-8 text-center text-xs text-muted-foreground">Chưa có lần chốt nào theo bộ lọc này.</div>
   }
   return (
     <div className="rounded-2xl border border-border/80 bg-card">
-      <div className="border-b border-border/70 px-4 py-3 text-xs text-muted-foreground">{rows.length} lần chốt · số đầu là lần chốt liền trước của đồng hồ</div>
+      <div className="border-b border-border/70 px-4 py-3 text-xs text-muted-foreground">{paged ? `${total} lần chốt` : total > rows.length ? `${rows.length} lần chốt mới nhất (còn ${total - rows.length} lần nữa, chọn Năm hoặc Tất cả để xem)` : `${rows.length} lần chốt`} · số đầu là lần chốt liền trước của đồng hồ</div>
       <div className="hidden overflow-x-auto lg:block">
         <table className="w-full text-[13px]">
           <thead>
@@ -134,6 +138,8 @@ export function ReadingHistory({ rows, facilityName }: { rows: ReadingHistoryRow
           </li>
         ))}
       </ul>
+
+      {paged && <div className="px-4 pb-3"><Pager {...pager} /></div>}
 
       {chosen.length > 0 && (
         <div className="fixed inset-x-0 bottom-4 z-30 mx-auto flex w-fit max-w-[calc(100vw-2rem)] items-center gap-3 rounded-2xl border border-border/80 bg-card px-4 py-2.5 shadow-lg">

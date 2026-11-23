@@ -270,7 +270,7 @@ function MeterReadingsPanel({ panel, editable, consumption, snapshot, onSnapshot
                 <Label>Tháng chốt</Label>
                 <Select value={row.period} onValueChange={(v) => { if (v) open(String(v)) }} items={panel.rows.map((r) => ({ value: r.period, label: rowLabel(r) }))}>
                   <SelectTrigger aria-label="Tháng chốt" className="h-9 w-full"><SelectValue /></SelectTrigger>
-                  <SelectContent>{panel.rows.map((r) => <SelectItem key={r.period} value={r.period}>{rowLabel(r)}</SelectItem>)}</SelectContent>
+                  <SelectContent className="w-max min-w-(--anchor-width) max-w-[min(32rem,92vw)]">{panel.rows.map((r) => <SelectItem key={r.period} value={r.period}><span className="whitespace-nowrap">{rowLabel(r)}</span></SelectItem>)}</SelectContent>
                 </Select>
               </div>
             )}

@@ -10,6 +10,8 @@ import { cn } from '@/lib/utils'
 
 type Option = { value: string; label: string }
 
+const MONTH_OPTIONS: Option[] = [{ value: '', label: 'Cả năm' }, ...Array.from({ length: 12 }, (_, i) => ({ value: String(i + 1).padStart(2, '0'), label: `Tháng ${i + 1}` }))]
+
 function FilterField({ label, className, children }: { label: string; className?: string; children: React.ReactNode }) {
   return (
     <div className={cn('min-w-0 space-y-1', className)}>
@@ -19,9 +21,9 @@ function FilterField({ label, className, children }: { label: string; className?
   )
 }
 
-function FilterSelect({ label, value, options, onChange }: { label: string; value: string; options: Option[]; onChange: (value: string) => void }) {
+function FilterSelect({ label, value, options, onChange, disabled }: { label: string; value: string; options: Option[]; onChange: (value: string) => void; disabled?: boolean }) {
   return (
-    <Select value={value} onValueChange={(next) => onChange(String(next ?? ''))} items={options}>
+    <Select value={value} onValueChange={(next) => onChange(String(next ?? ''))} items={options} disabled={disabled}>
       <SelectTrigger aria-label={label} className="h-9 w-full justify-between bg-card text-[13px] font-normal">
         <SelectValue />
       </SelectTrigger>
@@ -79,6 +81,9 @@ export function MeterFilters({
   period,
   showPeriod,
   range,
+  yearOptions,
+  year,
+  month,
 }: {
   facilities: Option[]
   facilityId: string
@@ -91,6 +96,10 @@ export function MeterFilters({
   showPeriod: boolean
   /** Chế độ lịch sử: lọc từ tháng – đến tháng thay cho ô Kỳ ghi. */
   range?: { from: string; to: string }
+  /** Lọc Năm → Tháng (thay ô Kỳ ghi): '' là 15 lần chốt mới nhất, 'all' là tất cả. */
+  yearOptions?: Option[]
+  year?: string
+  month?: string
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -126,6 +135,16 @@ export function MeterFilters({
           </FilterField>
           <FilterField label="Đến tháng" className="sm:w-40">
             <input type="month" aria-label="Đến tháng" value={range.to} min={range.from} onChange={(e) => e.target.value && update({ to: e.target.value })} className="h-9 w-full rounded-xl border border-input bg-card px-3 text-[13px]" />
+          </FilterField>
+        </>
+      )}
+      {yearOptions && (
+        <>
+          <FilterField label="Năm" className="sm:w-40">
+            <FilterSelect label="Năm" value={year ?? ''} options={yearOptions} onChange={(value) => update({ year: value || null, month: null })} />
+          </FilterField>
+          <FilterField label="Tháng" className="sm:w-36">
+            <FilterSelect label="Tháng" value={month ?? ''} options={MONTH_OPTIONS} disabled={!/^\d{4}$/.test(year ?? '')} onChange={(value) => update({ month: value || null })} />
           </FilterField>
         </>
       )}
