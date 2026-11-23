@@ -5,7 +5,7 @@ import { FormDialog } from '@/components/form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatVND } from '@/domain/money'
-import { resolveFeePrice } from '@/domain/fee-price'
+import { resolveFeePrice } from '../../domain/fee-price'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export type FeeOption = {

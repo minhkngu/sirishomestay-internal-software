@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { feeLineFromType } from '@/domain/invoice-fee-line'
+import { feeLineFromType } from '@/modules/leasing/domain/invoice-fee-line'
 
 const fee = { id: 'f1', name: 'Giặt ủi', unit: 'kg', defaultPrice: 25000, prices: { T1: 30000 } }
 

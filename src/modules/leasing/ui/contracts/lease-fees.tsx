@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { MoneyInput } from '@/components/ui/money-input'
 import { availableMeters, resolveMeterIds } from './lease-fee-meters'
 import { BareSelect } from './contract-form-ui'
-import { FeePickerDialog, type FeeOption } from '@/components/fee-picker-dialog'
+import { FeePickerDialog, type FeeOption } from './fee-picker-dialog'
 import { FEE_SOURCE_LABEL } from './fee-source-label'
 
 export type { FeeOption }

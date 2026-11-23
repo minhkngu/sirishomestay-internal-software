@@ -1,4 +1,5 @@
 // Cổng phía server của module leasing: chỉ những gì nơi ngoài module đang dùng.
+export { signStatusLabel } from './domain/sign-status'
 export { listAddenda } from './server/addenda/service'
 export { listOneOffs } from './server/charges/service'
 export {
