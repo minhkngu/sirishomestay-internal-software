@@ -65,7 +65,7 @@ export type LeaseEditInput = Pick<
     leaseFeeId?: string
     feeTypeId?: string | null
     unitPrice: number
-    /** Phí theo đồng hồ thêm mới: chỉ số ban đầu và đồng hồ có sẵn (bỏ trống thì tạo đồng hồ mới). */ initialReading?: number
+    /** Phí theo đồng hồ: chỉ số ban đầu và đồng hồ có sẵn (bỏ trống thì tạo đồng hồ mới khi thêm phí). Dòng phí cũ gửi kèm hai trường này để sửa đồng hồ/chỉ số đầu. */ initialReading?: number
     existingMeterId?: string
   }[]
 }

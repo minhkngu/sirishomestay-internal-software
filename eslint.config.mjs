@@ -16,6 +16,7 @@ export const MODULE_TIERS = Object.freeze({
   leasing: 4,
   import: 5,
   dashboard: 5,
+  cashbook: 5,
 })
 
 const moduleNames = Object.keys(MODULE_TIERS)

@@ -1,6 +1,6 @@
 // Cổng component của module meters.
-export { MeterList } from './ui/meter-list'
-export { ReadingGrid } from './ui/reading-grid'
-export { MonthlyTable } from './ui/monthly-table'
+export { ReadingHistory } from './ui/reading-history'
+export { CloseReadingsButton } from './ui/close-readings-button'
 export { AddMeterButton } from './ui/add-meter-dialog'
 export { MeterFilters } from './ui/meter-filters'
+export { MeterTypeSettings, type MeterTypeRow } from './ui/meter-type-settings'

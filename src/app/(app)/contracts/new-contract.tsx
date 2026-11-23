@@ -6,10 +6,11 @@ import { assertCan, can } from '@/domain/access'
 import { ROOM_STATUS_LABELS } from '@/domain/room-status'
 import { getAccessContext, getSettings } from '@/modules/platform'
 import { listFacilities, listFeeDefaults, listFeeTypes, listFeeUnits, listFeeTypePrices } from '@/modules/facilities'
-import { listRoomsWithStatus, depositBalance, getDepositContract } from '@/modules/leasing'
+import { listRoomsWithStatus, getDepositContract } from '@/modules/leasing'
 import { searchTenants, displayName } from '@/modules/tenants'
 import { listContractAssetOptions } from '@/modules/assets'
 import { listRoomMeterOptions } from '@/modules/meters'
+import { depositBalance } from '@/domain/deposit'
 import type { DepositEntry } from '@/domain/types'
 import { NewContractForm } from './new-contract-form'
 import { isUsableTemplate, listTemplates, listInvoiceTemplates } from '@/modules/documents'
@@ -139,9 +140,11 @@ export async function NewContract({ sp, showHeading = true }: { sp: NewContractS
     defaults: {
       proration: settings.proration,
       dueRuleLabel:
-        settings.dueRule.kind === 'day_of_next_month'
-          ? `ngày ${settings.dueRule.day} của tháng sau`
-          : `${settings.dueRule.days} ngày sau khi duyệt`,
+        settings.dueRule.kind === 'day_of_invoice_month'
+          ? `ngày ${settings.dueRule.day} của chính tháng hoá đơn`
+          : settings.dueRule.kind === 'day_of_next_month'
+            ? `ngày ${settings.dueRule.day} của tháng sau`
+            : `${settings.dueRule.days} ngày sau khi duyệt`,
     },
   }
   const depositFormProps = {

@@ -45,7 +45,7 @@ import { MemoryStorage } from '@/modules/platform/server/storage/memory'
 import { FORMAT_EXT } from '@/modules/documents/server/convert'
 import PizZip from 'pizzip'
 import { removeTemplate } from '@/modules/documents/server/templates/service'
-import { depositBalance } from '@/modules/leasing/domain/deposit'
+import { depositBalance } from '@/domain/deposit'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import type { AccessContext, Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'
@@ -613,7 +613,11 @@ describe('contracts', () => {
   })
 
   it('phí chung cũ nhập tay giữ số lượng cố định trong snapshot', async () => {
-    await updateFeeType(db, admin, feePerson, { quantityFrom: 'manual', billing: 'monthly_fixed' })
+    // Dữ liệu cũ: loại phí còn đặt 'manual' trong DB (giao diện và service không cho đặt nữa)
+    await db
+      .update(feeTypes)
+      .set({ quantityFrom: 'manual', billing: 'monthly_fixed' })
+      .where(eq(feeTypes.id, feePerson))
     const { lease } = await createLease(db, lan(), {
       ...leaseInput(),
       fees: [{ feeTypeId: feePerson, name: '', unit: '', quantitySource: 'period_input', unitPrice: 20, quantity: 3 }],
@@ -664,7 +668,7 @@ describe('contracts', () => {
     expect(firstInvoiceLines.find((l) => l.description.startsWith('ABC'))).toMatchObject({
       quantity: 0,
       amount: 0,
-      description: 'ABC (chỉ số 123 → 123)',
+      description: 'ABC',
     })
   })
 

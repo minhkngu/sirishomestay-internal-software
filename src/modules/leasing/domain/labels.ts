@@ -1,11 +1,3 @@
-/** Phương thức thu tiền (thu hoá đơn, sổ cọc). */
-export const PAYMENT_METHOD_LABELS = {
-  cash: 'Tiền mặt',
-  transfer: 'Chuyển khoản',
-  other: 'Khác',
-} as const
-export type PaymentMethod = keyof typeof PAYMENT_METHOD_LABELS
-
 /** Trạng thái thu tiền của hoá đơn (suy ra từ hoá đơn và các khoản đã thu). */
 export const INVOICE_STATUS_LABELS = {
   draft: 'Nháp',

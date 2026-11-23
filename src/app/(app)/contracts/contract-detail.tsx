@@ -4,7 +4,6 @@ import { ArrowLeft, Calendar, FileText } from 'lucide-react'
 import { can } from '@/domain/access'
 import {
   listOneOffs,
-  depositBalance,
   INVOICE_STATUS_LABELS,
   listHandovers,
   getDepositContract,
@@ -24,12 +23,14 @@ import {
 import { buttonVariants } from '@/components/ui/button'
 import { db } from '@/db/client'
 import { NotFoundError } from '@/domain/errors'
+import { depositBalance } from '@/domain/deposit'
 import { formatDateVN, todayVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { getAccessContext, listFiles } from '@/modules/platform'
 import { isUsableTemplate, listTemplates } from '@/modules/documents'
 import { formatPhoneDisplay } from '@/domain/phone'
 import { PdfViewButton } from '@/components/pdf-view-button'
+import { listLeaseMeterInitials } from '@/modules/meters'
 import { ContractActions } from './contract-actions'
 import { cn } from '@/lib/utils'
 import { SignChip, Stat, StatusChip, TermBar, termProgress } from '@/components/contract-ui'
@@ -354,10 +355,11 @@ export default async function ContractDetail({ id }: { id: string }) {
   const charges = billing ? await listOneOffs(db, ctx, lease.id) : []
   const handoverList = await listHandovers(db, ctx, lease.id)
   const addendaList = await listAddenda(db, ctx, lease.id)
-  const [templates, exports, photos] = await Promise.all([
+  const [templates, exports, photos, meterInitials] = await Promise.all([
     listTemplates(db, ctx, 'lease').then((t) => t.filter(isUsableTemplate)),
     listFiles(db, ctx, 'export', lease.id),
     listFiles(db, ctx, 'lease_photo', lease.id),
+    listLeaseMeterInitials(db, ctx, lease.id),
   ])
 
   const isActive = lease.status === 'active'
@@ -560,7 +562,19 @@ export default async function ContractDetail({ id }: { id: string }) {
                     key={idx}
                     className="flex items-center justify-between gap-3 py-2.5 text-[13px] first:pt-0 last:pb-0"
                   >
-                    <span className="text-foreground">{f.name}</span>
+                    <span className="min-w-0 text-foreground">
+                      {f.name}
+                      {f.leaseFeeId && meterInitials[f.leaseFeeId] && (
+                        <span className="mt-0.5 block text-xs tabular-nums text-muted-foreground">
+                          Chỉ số đầu{' '}
+                          <span className="font-medium text-foreground">
+                            {meterInitials[f.leaseFeeId].value.toLocaleString('vi-VN')}
+                          </span>{' '}
+                          · {formatDateVN(meterInitials[f.leaseFeeId].readOn)}
+                          {meterInitials[f.leaseFeeId].meterCode ? ` · ${meterInitials[f.leaseFeeId].meterCode}` : ''}
+                        </span>
+                      )}
+                    </span>
                     <span className="font-medium tabular-nums text-foreground">{formatVND(f.unitPrice)}</span>
                   </li>
                 ))}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEPOSIT_ENTRY_LABELS, depositBalance, runningDepositBalances } from '@/modules/leasing/domain/deposit'
+import { DEPOSIT_ENTRY_LABELS, depositBalance, runningDepositBalances } from '@/domain/deposit'
 
 const entries = [
   { type: 'collect', amount: 10_000_000, status: 'done' },

@@ -1,19 +1,6 @@
-import { and, asc, desc, eq, inArray, isNotNull, ne, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNotNull, ne } from 'drizzle-orm'
 import { ASSET_CONDITION } from '@/domain/asset-labels'
-import {
-  assets,
-  facilities,
-  files,
-  handoverItems,
-  handovers,
-  leaseFeeMeters,
-  leaseFeeSnapshots,
-  leases,
-  meterReadings,
-  meters,
-  rooms,
-  tenants,
-} from '@/db'
+import { assets, facilities, files, handoverItems, handovers, leases, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
@@ -140,33 +127,6 @@ export async function getHandover(db: DB, ctx: AccessContext, id: string) {
           ),
         )
     : []
-  const roomMeters = await db.select().from(meters).where(eq(meters.roomId, h.roomId))
-  const feeMeters = await db
-    .select({ meterId: leaseFeeMeters.meterId, name: leaseFeeSnapshots.name })
-    .from(leaseFeeMeters)
-    .innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId))
-    .where(eq(leaseFeeSnapshots.leaseId, h.leaseId))
-  const labelFor = (m: typeof meters.$inferSelect) =>
-    m.utility === 'electric'
-      ? 'Điện'
-      : m.utility === 'water'
-        ? 'Nước'
-        : (feeMeters.find((f) => f.meterId === m.id)?.name ?? 'Đồng hồ')
-  const relevantMeters = roomMeters.filter((m) => m.utility !== 'fee' || feeMeters.some((f) => f.meterId === m.id))
-  const reads = roomMeters.length
-    ? await db
-        .select()
-        .from(meterReadings)
-        .where(
-          and(
-            inArray(
-              meterReadings.meterId,
-              roomMeters.map((m) => m.id),
-            ),
-            eq(meterReadings.readOn, h.date),
-          ),
-        )
-    : []
   const view = items.map(({ i, assetCode, assetName, assetValue }) => ({
     ...i,
     assetCode,
@@ -180,21 +140,11 @@ export async function getHandover(db: DB, ctx: AccessContext, id: string) {
     roomCode,
     items: view,
     penaltyTotal: view.reduce((s, i) => s + i.penalty, 0),
-    meters: relevantMeters
-      .filter((m) => !m.removedOn)
-      .map((m) => ({ meterId: m.id, utility: m.utility, serial: m.serial, label: labelFor(m) })),
-    readings: reads
-      .filter((r) => relevantMeters.some((m) => m.id === r.meterId))
-      .map((r) => {
-        const m = relevantMeters.find((x) => x.id === r.meterId)!
-        return { meterId: r.meterId, value: r.value, serial: m.serial, utility: m.utility, label: labelFor(m) }
-      }),
   }
 }
 
 export type HandoverSave = {
   items: { id: string; condition?: string; note?: string; damaged?: boolean; missing?: boolean; penalty?: number }[]
-  meterReadings: { meterId: string; value: number }[]
 }
 
 export async function saveHandover(db: DB, ctx: AccessContext, id: string, input: HandoverSave): Promise<void> {
@@ -218,26 +168,6 @@ export async function saveHandover(db: DB, ctx: AccessContext, id: string, input
         .set({ condition: it.condition ?? cur.i.condition, note: it.note ?? cur.i.note, damaged, missing, penalty })
         .where(eq(handoverItems.id, it.id))
     }
-    const period = h.date.slice(0, 7)
-    for (const r of input.meterReadings) {
-      const [m] = await tx
-        .select()
-        .from(meters)
-        .where(and(eq(meters.id, r.meterId), eq(meters.roomId, h.roomId)))
-      if (!m) throw new ValidationError('Đồng hồ không thuộc phòng này')
-      const others = await tx.select().from(meterReadings).where(eq(meterReadings.meterId, m.id))
-      const prev = others.filter((x) => x.readOn < h.date).sort((a, b) => (a.readOn < b.readOn ? 1 : -1))[0]
-      if (!Number.isInteger(r.value) || r.value < (prev?.value ?? m.startReading))
-        throw new ValidationError('Chỉ số mới nhỏ hơn chỉ số cũ', { value: 'Chỉ số mới nhỏ hơn chỉ số cũ' })
-      await tx
-        .insert(meterReadings)
-        .values({ meterId: m.id, period, readOn: h.date, value: r.value, kind: 'handover' })
-        .onConflictDoUpdate({
-          target: [meterReadings.meterId, meterReadings.readOn],
-          targetWhere: sql`${meterReadings.kind} = 'handover'`,
-          set: { value: r.value, readOn: h.date, updatedAt: new Date() },
-        })
-    }
     await tx.update(handovers).set({ updatedAt: new Date() }).where(eq(handovers.id, id))
     await recordAudit(tx, ctx, {
       action: 'update',
@@ -245,7 +175,7 @@ export async function saveHandover(db: DB, ctx: AccessContext, id: string, input
       entityId: id,
       facilityId,
       summary: `Cập nhật biên bản ${h.kind === 'check_in' ? 'check-in' : 'check-out'}`,
-      after: { items: input.items.length, readings: input.meterReadings.length },
+      after: { items: input.items.length },
     })
   })
 }
@@ -351,12 +281,6 @@ for (const docType of ['handover_check_in', 'handover_check_out'] as const) {
                 ? `${ASSET_CONDITION.damaged} — ${i.condition}`
                 : i.condition,
             penalty: i.penalty,
-          })),
-          readings: h.readings.map((r) => ({
-            kind: r.utility as 'electric' | 'water' | 'fee',
-            label: r.label,
-            serial: r.serial ?? '',
-            value: r.value,
           })),
         },
       },
