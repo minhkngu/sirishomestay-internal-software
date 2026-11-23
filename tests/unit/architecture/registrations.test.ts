@@ -82,4 +82,28 @@ describe('đăng ký resolver và loader', () => {
   it('templates/service.ts không nạp invoices bằng import động', () => {
     expect(read(join(ROOT, 'src/server/templates/service.ts'))).not.toContain("import('@/server/invoices")
   })
+
+  describe('ranh giới tầng giữa các module', () => {
+    const filesIn = (dir: string) => walk(join(ROOT, dir)).filter((f) => /\.tsx?$/.test(f))
+    const offenders = (dir: string, pattern: RegExp) =>
+      filesIn(dir)
+        .filter((f) => pattern.test(read(f)))
+        .map(rel)
+
+    it('src/server/rooms không import @/server/invoices', () => {
+      expect(offenders('src/server/rooms', /@\/server\/invoices/)).toEqual([])
+    })
+
+    it('src/server/assets không import @/server/incidents', () => {
+      expect(offenders('src/server/assets', /@\/server\/incidents/)).toEqual([])
+    })
+
+    it('src/server/invoice-templates không ghi bảng invoices, leases', () => {
+      expect(offenders('src/server/invoice-templates', /\.update\((invoices|leases)\b/)).toEqual([])
+    })
+
+    it('src/server/invoice-templates không import @/server/invoices', () => {
+      expect(offenders('src/server/invoice-templates', /@\/server\/invoices/)).toEqual([])
+    })
+  })
 })

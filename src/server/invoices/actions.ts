@@ -34,6 +34,7 @@ import {
   updateInvoiceOpeningReading,
   updateLines,
 } from './service'
+import { selectInvoiceTemplate, selectLeaseInvoiceTemplate } from './template-assignment'
 
 const refresh = () => {
   revalidatePath('/invoices', 'layout')
@@ -268,6 +269,24 @@ export async function savePreviewOpeningReadingAction(input: {
   return toActionResult(async () => {
     await savePreviewOpeningReading(db, ctx, input)
     revalidatePath('/meters')
+    return {}
+  })
+}
+export async function selectInvoiceTemplateAction(id: string, templateId: string | null) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => {
+    await selectInvoiceTemplate(db, ctx, id, templateId)
+    revalidatePath('/templates')
+    refresh()
+    return {}
+  })
+}
+export async function selectLeaseInvoiceTemplateAction(id: string, templateId: string | null) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => {
+    await selectLeaseInvoiceTemplate(db, ctx, id, templateId)
+    revalidatePath('/templates')
+    refresh()
     return {}
   })
 }

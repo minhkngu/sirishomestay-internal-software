@@ -5,7 +5,13 @@ import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ForbiddenError, NotFoundError } from '@/domain/errors'
 import { assetHistory } from '@/server/assets/service'
-import { createIncident, listIncidents, setIncidentStatus, updateIncident } from '@/server/incidents/service'
+import {
+  createIncident,
+  incidentsForAsset,
+  listIncidents,
+  setIncidentStatus,
+  updateIncident,
+} from '@/server/incidents/service'
 import { createTestDb } from '../helpers/db'
 
 const context = (permissions: Permission[], facilityId: string): AccessContext => ({
@@ -79,11 +85,12 @@ describe('sự cố và sửa chữa', () => {
     await setIncidentStatus(db, ctx, inc.id, 'done')
     expect(await db.select().from(oneOffCharges)).toHaveLength(0)
   })
-  it('assetHistory của tài sản gắn sự cố có sự cố này', async () => {
+  it('incidentsForAsset của tài sản gắn sự cố có sự cố này, assetHistory không còn trả sự cố', async () => {
     const ctx = context(['incidents', 'assets'], facilityId)
     const inc = await createIncident(db, ctx, { assetId, title: 'Máy lạnh không mát' })
     expect(inc.roomId).toBe(roomId)
-    expect((await assetHistory(db, ctx, assetId)).incidents).toEqual([expect.objectContaining({ id: inc.id })])
+    expect(await incidentsForAsset(db, assetId)).toEqual([expect.objectContaining({ id: inc.id })])
+    expect(Object.keys(await assetHistory(db, ctx, assetId)).sort()).toEqual(['handovers', 'moves'])
   })
   it('cơ sở khác → NotFoundError; thiếu quyền incidents → ForbiddenError', async () => {
     const inc = await createIncident(db, context(['incidents'], facilityId), { roomId, title: 'x' })

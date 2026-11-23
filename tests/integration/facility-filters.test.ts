@@ -7,7 +7,7 @@ import { listLeases } from '@/server/contracts/service'
 import { listInvoices } from '@/server/invoices/service'
 import { listAssets } from '@/server/assets/service'
 import { listIncidents } from '@/server/incidents/service'
-import { listRoomsWithStatus } from '@/server/rooms/service'
+import { listRoomsWithStatus } from '@/server/contracts/room-view'
 import { createTestDb } from '../helpers/db'
 let db: DB, ids: string[], ctx: AccessContext, admin: AccessContext
 beforeEach(async () => {
