@@ -261,9 +261,7 @@ async function applyAdjustments(
 }
 
 async function activeMeters(tx: DB, roomId: string, date: string) {
-  return (await tx.select().from(meters).where(eq(meters.roomId, roomId))).filter(
-    (m) => !m.removedOn && m.installedOn <= date,
-  )
+  return (await tx.select().from(meters).where(eq(meters.roomId, roomId))).filter((m) => !m.removedOn)
 }
 /** Chốt chỉ số tại ngày thay đổi: mọi đồng hồ đang chạy của các phòng liên quan phải có chỉ số, không được giảm. Không tính tiền từ chỉ số thiếu. */
 async function recordReadings(tx: DB, roomIds: string[], date: string, input: { meterId: string; value: number }[]) {

@@ -27,7 +27,10 @@ export function RouteModal({
       description={description}
       size={size}
       onOpenChange={(open) => {
-        if (!open) closeHref ? router.replace(closeHref) : router.back()
+        if (!open) {
+          if (closeHref) router.replace(closeHref)
+          else router.back()
+        }
       }}
     >
       <RouteModalContext.Provider value>{children}</RouteModalContext.Provider>

@@ -1,6 +1,20 @@
+import { readdirSync, readFileSync } from 'node:fs'
+import path from 'node:path'
 import { eq, sql } from 'drizzle-orm'
 import { describe, it, expect, beforeEach } from 'vitest'
-import { facilities, feeTypes, feeTypePrices, feeUnits } from '@/db'
+import {
+  auditLogs,
+  facilities,
+  feeTypes,
+  feeTypePrices,
+  feeUnits,
+  leaseFeeSnapshots,
+  leases,
+  meters,
+  oneOffCharges,
+  rooms,
+  tenants,
+} from '@/db'
 import {
   setFeeDefault,
   listFeeDefaults,
@@ -12,6 +26,7 @@ import {
   createFeeType,
   updateFeeType,
   archiveFeeType,
+  deleteFeeType,
   restoreFeeType,
   listFeeTypes,
   ensureUtilityFeeTypes,
@@ -95,7 +110,7 @@ describe('fees & rates', () => {
       unitId: unit.id,
       defaultPrice: 200000,
       billing: 'monthly_fixed',
-      quantityFrom: 'manual',
+      quantityFrom: 'period_input',
     })
     const input = { feeTypeId: fee.id, facilityId: fa, price: 250000 }
     await setFeeTypePrice(db, admin, input)
@@ -117,7 +132,7 @@ describe('fees & rates', () => {
       unitId: unit.id,
       defaultPrice: 1,
       billing: 'monthly_fixed',
-      quantityFrom: 'manual',
+      quantityFrom: 'period_input',
     })
     await setFeeTypePrice(db, admin, { feeTypeId: fee.id, facilityId: fa, price: 2 })
     await db.delete(facilities).where(eq(facilities.id, fa))
@@ -170,9 +185,48 @@ describe('fees & rates', () => {
     expect(await db.select().from(feeUnits)).toHaveLength(1)
   })
 
+  it('không cho đặt cách tính "manual" (Nhập tay) nữa', async () => {
+    const unit = await createFeeUnit(db, admin, { name: 'lần' })
+    await expect(
+      createFeeType(db, admin, {
+        name: 'X',
+        unitId: unit.id,
+        defaultPrice: 1,
+        billing: 'monthly_fixed',
+        quantityFrom: 'manual' as never,
+      }),
+    ).rejects.toThrow(ValidationError)
+    const ok = await createFeeType(db, admin, {
+      name: 'Y',
+      unitId: unit.id,
+      defaultPrice: 1,
+      billing: 'monthly_fixed',
+      quantityFrom: 'period_input',
+    })
+    await expect(updateFeeType(db, admin, ok.id, { quantityFrom: 'manual' as never })).rejects.toThrow(ValidationError)
+  })
+
+  it('migration gộp "manual" vào "period_input", giữ nguyên cách tính khác', async () => {
+    const unit = await createFeeUnit(db, admin, { name: 'xe' })
+    const [old] = await db.insert(feeTypes).values({ name: 'Cũ', unitId: unit.id, quantityFrom: 'manual' }).returning()
+    const [keep] = await db
+      .insert(feeTypes)
+      .values({ name: 'Giữ', unitId: unit.id, quantityFrom: 'occupants' })
+      .returning()
+    const file = readdirSync(path.resolve(process.cwd(), 'drizzle')).find((f) => f.includes('gop_nhap_tay'))
+    expect(file).toBeDefined()
+    await db.execute(
+      sql.raw(
+        readFileSync(path.resolve(process.cwd(), 'drizzle', file!), 'utf8').replaceAll('--> statement-breakpoint', ''),
+      ),
+    )
+    expect((await db.select().from(feeTypes).where(eq(feeTypes.id, old.id)))[0].quantityFrom).toBe('period_input')
+    expect((await db.select().from(feeTypes).where(eq(feeTypes.id, keep.id)))[0].quantityFrom).toBe('occupants')
+  })
+
   it('từ chối khi vừa chọn đơn vị vừa nhập đơn vị mới, hoặc thiếu cả hai', async () => {
     const unit = await createFeeUnit(db, admin, { name: 'lần' })
-    const base = { name: 'X', defaultPrice: 1, billing: 'monthly_fixed', quantityFrom: 'manual' } as const
+    const base = { name: 'X', defaultPrice: 1, billing: 'monthly_fixed', quantityFrom: 'period_input' } as const
     await expect(createFeeType(db, admin, { ...base, unitId: unit.id, newUnitName: 'Y' })).rejects.toThrow(
       'Chọn đơn vị hoặc nhập đơn vị mới',
     )
@@ -205,7 +259,7 @@ describe('fees & rates', () => {
       unitId: unit.id,
       defaultPrice: 0,
       billing: 'per_occurrence',
-      quantityFrom: 'manual',
+      quantityFrom: 'period_input',
     })
     await archiveFeeType(db, admin, fee.id)
     await expect(restoreFeeType(db, ctxOf(['billing'], [fa]), fee.id)).rejects.toThrow(ForbiddenError)
@@ -323,6 +377,97 @@ describe('fees & rates', () => {
       await expect(
         saveFeeFacilities(db, admin, { feeTypeId: fee.id, items: [{ facilityId: fa, enabled: true }] }),
       ).rejects.toThrow(ValidationError)
+    })
+  })
+
+  describe('xoá loại phí', () => {
+    const newFee = async () => {
+      const unit = await createFeeUnit(db, admin, { name: `đv${Math.random()}` })
+      return createFeeType(db, admin, {
+        name: 'Phí xoá',
+        unitId: unit.id,
+        defaultPrice: 5,
+        billing: 'monthly_fixed',
+        quantityFrom: 'period_input',
+      })
+    }
+    const leaseOn = async () => {
+      const [room] = await db.insert(rooms).values({ facilityId: fa, code: '101' }).returning()
+      const [tenant] = await db
+        .insert(tenants)
+        .values({
+          kind: 'vietnamese',
+          homeFacilityId: fa,
+          fullName: 'Khách',
+          phone: '+84901234567',
+          idNumber: '012345678901',
+        })
+        .returning()
+      const [lease] = await db
+        .insert(leases)
+        .values({
+          code: 'HD1',
+          roomId: room.id,
+          tenantId: tenant.id,
+          startDate: '2026-01-01',
+          endDate: '2026-12-31',
+          monthlyRent: 1,
+          depositAmount: 1,
+        })
+        .returning()
+      return { room, lease }
+    }
+
+    it('xoá hẳn phí chưa dùng, kèm giá theo toà, và ghi audit', async () => {
+      const fee = await newFee()
+      await setFeeTypePrice(db, admin, { feeTypeId: fee.id, facilityId: fa, price: 7 })
+      await deleteFeeType(db, admin, fee.id)
+      expect(await listFeeTypes(db, admin, { includeArchived: true })).toHaveLength(0)
+      expect(await db.select().from(feeTypePrices)).toHaveLength(0)
+      expect((await db.select().from(auditLogs)).some((a) => a.entity === 'fee_type' && a.action === 'delete')).toBe(
+        true,
+      )
+    })
+    it('từ chối khi phí đã gắn vào hợp đồng', async () => {
+      const fee = await newFee()
+      const { lease } = await leaseOn()
+      await db.insert(leaseFeeSnapshots).values({
+        leaseId: lease.id,
+        feeTypeId: fee.id,
+        name: 'Phí',
+        unit: 'lần',
+        quantitySource: 'period_input',
+        unitPrice: 1,
+      })
+      await expect(deleteFeeType(db, admin, fee.id)).rejects.toThrow(ValidationError)
+      expect(await listFeeTypes(db, admin, { includeArchived: true })).toHaveLength(1)
+    })
+    it('từ chối khi phí đã dùng cho phí phát sinh', async () => {
+      const fee = await newFee()
+      const { lease } = await leaseOn()
+      await db.insert(oneOffCharges).values({
+        leaseId: lease.id,
+        feeTypeId: fee.id,
+        kind: 'service',
+        description: 'x',
+        date: '2026-02-01',
+        quantity: 1,
+        unitPrice: 1,
+      })
+      await expect(deleteFeeType(db, admin, fee.id)).rejects.toThrow(ValidationError)
+      expect(await listFeeTypes(db, admin, { includeArchived: true })).toHaveLength(1)
+    })
+    it('từ chối khi phí đã gắn vào đồng hồ', async () => {
+      const fee = await newFee()
+      const { room } = await leaseOn()
+      await db.insert(meters).values({ roomId: room.id, utility: 'fee', feeTypeId: fee.id, installedOn: '2026-01-01' })
+      await expect(deleteFeeType(db, admin, fee.id)).rejects.toThrow(ValidationError)
+      expect(await listFeeTypes(db, admin, { includeArchived: true })).toHaveLength(1)
+    })
+    it('từ chối khi không có quyền settings, báo lỗi khi không tồn tại', async () => {
+      const fee = await newFee()
+      await expect(deleteFeeType(db, ctxOf(['billing']), fee.id)).rejects.toThrow(ForbiddenError)
+      await expect(deleteFeeType(db, admin, crypto.randomUUID())).rejects.toThrow(NotFoundError)
     })
   })
 })

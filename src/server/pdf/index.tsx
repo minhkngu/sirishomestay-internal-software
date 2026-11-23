@@ -37,6 +37,7 @@ export async function renderInvoiceFromTemplate(
       paid: data.paid,
       bank: data.bank,
       lines: data.lines,
+      note: data.note,
     },
   }
   const { doc } = renderTemplate(html.body, {

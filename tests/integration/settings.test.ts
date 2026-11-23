@@ -45,7 +45,7 @@ describe('settings', () => {
 
   it('mặc định có quy tắc hạn thanh toán và số ngày giữ ảnh', async () => {
     const s = await getSettings(db)
-    expect(s.dueRule).toEqual({ kind: 'days_after_approval', days: 5 })
+    expect(s.dueRule).toEqual({ kind: 'day_of_invoice_month', day: 5 })
     expect(s.photoRetentionDays).toBe(30)
   })
 
@@ -60,6 +60,12 @@ describe('settings', () => {
     await expect(
       updateSettings(db, ctxOf(['settings']), { dueRule: { kind: 'day_of_next_month', day: 0 } }),
     ).rejects.toThrow()
+    await expect(
+      updateSettings(db, ctxOf(['settings']), { dueRule: { kind: 'day_of_invoice_month', day: 32 } }),
+    ).rejects.toThrow()
+    expect(
+      (await updateSettings(db, ctxOf(['settings']), { dueRule: { kind: 'day_of_invoice_month', day: 10 } })).dueRule,
+    ).toEqual({ kind: 'day_of_invoice_month', day: 10 })
     await expect(
       updateSettings(db, ctxOf(['settings']), { dueRule: { kind: 'days_after_approval', days: 400 } }),
     ).rejects.toThrow()

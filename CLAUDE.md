@@ -38,3 +38,9 @@ Web nội bộ cho nhân viên Siris quản lý cơ sở, phòng, khách thuê, 
 - Thiết kế ở `docs/superpowers/specs/`, kế hoạch ở `docs/superpowers/plans/`.
 - Thao tác "thêm mới" luôn hiện popup, không điều hướng sang trang mới. Form cần dữ liệu từ server: làm trang `src/app/(app)/<mục>/new/page.tsx` với thân trang tách thành component dùng chung (`new-<mục>.tsx`), rồi thêm route chặn `src/app/(app)/@modal/(.)<mục>/new/page.tsx` bọc thân đó bằng `RouteModal` (`src/components/route-modal.tsx`). Form tự chứa: bọc bằng `FormDialog` (`src/components/form-dialog.tsx`). Liên kết "thêm" dùng `Link`, không dùng `<a>` (trừ khi cố ý tải trang đầy đủ). Sau khi tạo: `router.refresh()` để danh sách phía sau cập nhật. Phải kiểm tra: bấm từ danh sách ra popup, F5 hoặc mở thẳng ra trang đầy đủ, Esc quay về đúng URL cũ.
 - Giao diện: theo [docs/front-end-design.md](docs/front-end-design.md) (bố cục danh sách, bộ lọc, bảng, hộp thoại, màu, ô tiền, điện thoại).
+
+## Quy trình làm việc với Claude
+- Chỉ chạy test (unit, integration, e2e, lint) khi chuẩn bị mở PR.
+- Ngoài ra chỉ test khi web báo lỗi; không tự chạy test sau mỗi lần sửa.
+- Khi người dùng yêu cầu thêm hoặc sửa chức năng trong phiên: vẫn cập nhật các test liên quan trong `tests/` (không chạy), để kiểm sau lúc chuẩn bị PR.
+- Không hỏi có nên push, commit hay tạo PR. Người dùng cần thì tự bảo.

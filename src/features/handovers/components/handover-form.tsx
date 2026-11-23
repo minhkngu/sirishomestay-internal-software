@@ -13,18 +13,14 @@ type Props = {
   readOnly: boolean
   items: (Omit<ItemState, 'penalty'> & { penalty: number })[]
   checkInConditions?: Record<string, string>
-  meters: { meterId: string; utility: string; label: string; serial: string | null; value: number | null }[]
   hasTemplate: boolean
 }
 
-export function HandoverForm({ id, kind, readOnly, items: initial, checkInConditions, meters, hasTemplate }: Props) {
+export function HandoverForm({ id, kind, readOnly, items: initial, checkInConditions, hasTemplate }: Props) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [items, setItems] = useState<ItemState[]>(
     initial.map((i) => ({ ...i, penalty: i.penalty ? String(i.penalty) : '' })),
-  )
-  const [readings, setReadings] = useState<Record<string, string>>(
-    Object.fromEntries(meters.map((m) => [m.meterId, m.value != null ? String(m.value) : ''])),
   )
   const [msg, setMsg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -41,9 +37,6 @@ export function HandoverForm({ id, kind, readOnly, items: initial, checkInCondit
       missing: i.missing,
       penalty: i.penalty === '' ? undefined : Number(i.penalty),
     })),
-    meterReadings: Object.entries(readings)
-      .filter(([, v]) => v.trim() !== '')
-      .map(([meterId, v]) => ({ meterId, value: Number(v) })),
   })
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>, ok: string, refresh = true) =>
     start(async () => {
@@ -59,24 +52,6 @@ export function HandoverForm({ id, kind, readOnly, items: initial, checkInCondit
 
   return (
     <div className="space-y-4">
-      {meters.length > 0 && (
-        <section className="space-y-2 rounded-lg border bg-card p-3">
-          <h2 className="font-medium">Chỉ số đồng hồ</h2>
-          {meters.map((m) => (
-            <label key={m.meterId} className="flex items-center justify-between gap-2 text-sm">
-              {m.label} {m.serial ?? ''}
-              <input
-                aria-label={`Chỉ số ${m.label}`}
-                disabled={readOnly}
-                inputMode="numeric"
-                value={readings[m.meterId]}
-                onChange={(e) => setReadings({ ...readings, [m.meterId]: e.target.value })}
-                className="h-10 w-32 rounded-lg border px-2 text-right"
-              />
-            </label>
-          ))}
-        </section>
-      )}
       <ul className="space-y-3">
         {items.map((i) => (
           <AssetConditionRow

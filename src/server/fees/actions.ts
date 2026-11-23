@@ -9,6 +9,7 @@ import {
   setFeeTypePrice,
   removeFeeTypePrice,
   archiveFeeType,
+  deleteFeeType,
   restoreFeeType,
   createFeeType,
   createFeeUnit,
@@ -44,6 +45,14 @@ export async function archiveFeeTypeAction(id: string) {
   const ctx = await getAccessContext()
   return toActionResult(async () => {
     await archiveFeeType(db, ctx, id)
+    revalidatePath('/settings')
+    return {}
+  })
+}
+export async function deleteFeeTypeAction(id: string) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => {
+    await deleteFeeType(db, ctx, id)
     revalidatePath('/settings')
     return {}
   })
