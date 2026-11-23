@@ -1,6 +1,15 @@
 import { and, asc, eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
-import { feeTypes, feeTypePrices, feeUnits, feeDefaults, facilities } from '@/db'
+import {
+  feeTypes,
+  feeTypePrices,
+  feeUnits,
+  feeDefaults,
+  facilities,
+  leaseFeeSnapshots,
+  meters,
+  oneOffCharges,
+} from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
@@ -14,7 +23,7 @@ const feeTypeFields = {
   name: z.string().trim().min(1, 'Nhập tên loại phí'),
   defaultPrice: z.number().int().min(0, 'Đơn giá không hợp lệ'),
   billing: z.enum(['monthly_fixed', 'per_occurrence']),
-  quantityFrom: z.enum(['manual', 'occupants', 'room', 'meter', 'period_input']),
+  quantityFrom: z.enum(['occupants', 'room', 'meter', 'period_input']),
 }
 const feeTypeInput = z
   .object({
@@ -148,6 +157,36 @@ export async function archiveFeeType(db: DB, ctx: AccessContext, id: string): Pr
       summary: `Lưu trữ loại phí ${before.name}`,
       before: { isActive: true },
       after: { isActive: false },
+    })
+  })
+}
+
+/** Xoá hẳn loại phí chưa từng dùng; phí đã gắn hợp đồng, phí phát sinh hoặc đồng hồ thì phải lưu trữ thay vì xoá. */
+export async function deleteFeeType(db: DB, ctx: AccessContext, id: string): Promise<void> {
+  assertCan(ctx, 'settings')
+  await db.transaction(async (tx) => {
+    const [before] = await tx.select().from(feeTypes).where(eq(feeTypes.id, id))
+    if (!before) throw new NotFoundError()
+    const [lease, charge, meter] = await Promise.all([
+      tx
+        .select({ id: leaseFeeSnapshots.id })
+        .from(leaseFeeSnapshots)
+        .where(eq(leaseFeeSnapshots.feeTypeId, id))
+        .limit(1),
+      tx.select({ id: oneOffCharges.id }).from(oneOffCharges).where(eq(oneOffCharges.feeTypeId, id)).limit(1),
+      tx.select({ id: meters.id }).from(meters).where(eq(meters.feeTypeId, id)).limit(1),
+    ])
+    if (lease.length || charge.length || meter.length)
+      throw new ValidationError(
+        'Loại phí đã được dùng trong hợp đồng, phí phát sinh hoặc đồng hồ, hãy lưu trữ thay vì xoá',
+      )
+    await tx.delete(feeTypes).where(eq(feeTypes.id, id))
+    await recordAudit(tx, ctx, {
+      action: 'delete',
+      entity: 'fee_type',
+      entityId: id,
+      summary: `Xoá loại phí ${before.name}`,
+      before,
     })
   })
 }
