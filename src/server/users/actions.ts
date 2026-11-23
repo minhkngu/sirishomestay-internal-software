@@ -1,6 +1,6 @@
 'use server'
 
-import '@/server/registrations'
+import '@/modules/registrations'
 
 import { randomBytes } from 'node:crypto'
 import { revalidatePath } from 'next/cache'

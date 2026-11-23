@@ -1,6 +1,6 @@
 'use server'
 
-import '@/server/registrations'
+import '@/modules/registrations'
 
 import { revalidatePath } from 'next/cache'
 import { ZodError } from 'zod'

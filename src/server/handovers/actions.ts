@@ -1,6 +1,6 @@
 'use server'
 
-import '@/server/registrations'
+import '@/modules/registrations'
 
 import { eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
