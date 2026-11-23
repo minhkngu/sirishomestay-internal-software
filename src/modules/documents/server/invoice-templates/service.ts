@@ -4,13 +4,13 @@ import { invoiceTemplates, invoices, leases } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
-import type { TemplateStyle } from '@/domain/doc-template'
+import type { TemplateStyle } from '../../domain/doc-template'
 import {
   defaultInvoiceTemplate,
   invoiceTemplateSchema,
   resolveInvoiceTemplateId,
   type InvoiceTemplateConfig,
-} from '@/domain/invoice-template'
+} from '../../domain/invoice-template'
 import { recordAudit } from '@/modules/platform'
 
 type TemplateInput = { name: string; config?: unknown; body?: string; style?: TemplateStyle }
@@ -44,7 +44,7 @@ function checked(input: TemplateInput) {
 export async function previewInvoiceTemplate(ctx: AccessContext, config: unknown): Promise<Uint8Array> {
   assertCan(ctx, 'settings')
   const validated = checked({ name: 'Xem trước', config }).config
-  const { renderInvoicePdf } = await import('@/server/pdf')
+  const { renderInvoicePdf } = await import('../pdf')
   return renderInvoicePdf(
     {
       kind: 'monthly',
@@ -96,7 +96,7 @@ export async function previewInvoiceTemplateHtml(
   assertCan(ctx, 'settings')
   if (!input.body.trim()) throw new ValidationError('Nhập nội dung mẫu')
   if (input.body.length > 200_000) throw new ValidationError('Nội dung mẫu quá dài')
-  const { renderInvoiceFromTemplate } = await import('@/server/pdf')
+  const { renderInvoiceFromTemplate } = await import('../pdf')
   return renderInvoiceFromTemplate(SAMPLE_INVOICE, input, { sample: true })
 }
 /** Phiên bản bộ dựng bản xem; đổi số này khi cách dựng PDF thay đổi để bản xem đã lưu được dựng lại. */
@@ -104,7 +104,7 @@ export const INVOICE_PREVIEW_VERSION = 1
 
 type TemplateRow = typeof invoiceTemplates.$inferSelect
 async function renderPreview(t: Pick<TemplateRow, 'body' | 'style' | 'config'>): Promise<Uint8Array> {
-  const pdf = await import('@/server/pdf')
+  const pdf = await import('../pdf')
   return t.body
     ? pdf.renderInvoiceFromTemplate(SAMPLE_INVOICE, { body: t.body, style: t.style as TemplateStyle }, { sample: true })
     : pdf.renderInvoicePdf(SAMPLE_INVOICE, invoiceTemplateSchema.parse(t.config), { sample: true })

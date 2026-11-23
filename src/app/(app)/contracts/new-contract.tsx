@@ -16,8 +16,8 @@ import { depositBalance } from '@/domain/deposit'
 import type { DepositEntry } from '@/domain/types'
 import { getDepositContract } from '@/server/contracts/service'
 import { NewContractForm } from './new-contract-form'
-import { isUsableTemplate, listTemplates } from '@/server/templates/service'
-import { listInvoiceTemplates } from '@/server/invoice-templates/service'
+import { isUsableTemplate, listTemplates } from '@/modules/documents'
+import { listInvoiceTemplates } from '@/modules/documents'
 
 export type NewContractSP = { kind?: string; room?: string; tenant?: string; deposit?: string }
 

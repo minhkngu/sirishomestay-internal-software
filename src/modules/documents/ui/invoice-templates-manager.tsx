@@ -5,8 +5,8 @@ import { useState, useTransition } from 'react'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { PdfInline } from '@/components/pdf-inline'
 import { Button } from '@/components/ui/button'
-import { DEFAULT_INVOICE_HTML } from '@/domain/invoice-template-html'
-import type { TemplateStyle } from '@/domain/doc-template'
+import { DEFAULT_INVOICE_HTML } from '../domain/invoice-template-html'
+import type { TemplateStyle } from '../domain/doc-template'
 import {
   deleteInvoiceTemplateAction,
   getInvoiceTemplatePreviewAction,
@@ -14,7 +14,7 @@ import {
   restoreDefaultInvoiceTemplatesAction,
   saveInvoiceTemplateAction,
   setDefaultInvoiceTemplateAction,
-} from '@/server/invoice-templates/actions'
+} from '../server/invoice-templates/actions'
 import { STYLE_LABEL, TemplateDialog, type TemplateOps } from './template-dialog'
 import { useLazyPreview } from './use-lazy-preview'
 

@@ -4,7 +4,7 @@ import { formatDateVN } from '@/domain/dates'
 import { orNotFound } from '@/lib/or-not-found'
 import { getAccessContext } from '@/modules/platform'
 import { getHandover, listHandovers } from '@/server/handovers/service'
-import { isUsableTemplate, listTemplates } from '@/server/templates/service'
+import { isUsableTemplate, listTemplates } from '@/modules/documents'
 import { HandoverForm } from '@/features/handovers/components/handover-form'
 
 export default async function HandoverPage({ params }: { params: Promise<{ id: string }> }) {

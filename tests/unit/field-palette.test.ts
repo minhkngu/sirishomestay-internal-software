@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { TEMPLATE_FIELDS } from '@/domain/template-fields'
-import { fieldGroups, fieldPlacement } from '@/features/templates/components/field-palette'
+import { fieldGroups, fieldPlacement } from '@/modules/documents/ui/field-palette'
 
 describe('fieldGroups', () => {
   const g = fieldGroups('lease')

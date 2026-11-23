@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import PizZip from 'pizzip'
-import { buildDocx } from '@/server/word/build-docx'
-import type { DocBlock } from '@/domain/doc-template'
+import { buildDocx } from '@/modules/documents/server/word/build-docx'
+import type { DocBlock } from '@/modules/documents/domain/doc-template'
 
 const doc: DocBlock[] = [
   { type: 'heading', level: 1, align: 'center', inlines: [{ text: 'Đặng Thị Ỷ — HỢP ĐỒNG' }] },

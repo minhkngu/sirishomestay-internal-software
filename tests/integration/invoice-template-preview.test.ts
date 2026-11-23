@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { invoiceTemplates } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
-import { DEFAULT_INVOICE_TEMPLATES } from '@/domain/invoice-template-html'
-import { restoreDefaultInvoiceTemplates } from '@/server/invoice-templates/defaults'
+import { DEFAULT_INVOICE_TEMPLATES } from '@/modules/documents/domain/invoice-template-html'
+import { restoreDefaultInvoiceTemplates } from '@/modules/documents/server/invoice-templates/defaults'
 import {
   INVOICE_PREVIEW_VERSION,
   createInvoiceTemplate,
@@ -12,7 +12,7 @@ import {
   listInvoiceTemplatePreviews,
   listInvoiceTemplates,
   updateInvoiceTemplate,
-} from '@/server/invoice-templates/service'
+} from '@/modules/documents/server/invoice-templates/service'
 import { createTestDb } from '../helpers/db'
 
 const admin: AccessContext = {

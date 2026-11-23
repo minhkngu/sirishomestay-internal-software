@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm'
 import { docTemplates } from '@/db'
 import { db } from '@/db/client'
 import { toActionResult } from '@/lib/action-result'
-import { renderTemplate, type TemplateStyle } from '@/domain/doc-template'
+import { renderTemplate, type TemplateStyle } from '../../domain/doc-template'
 import { sampleDataFor, type DocType } from '@/domain/template-fields'
 import { assertCan } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
@@ -114,8 +114,8 @@ export async function previewTemplateAction(input: {
     const { doc, warnings } = renderTemplate(input.body, sampleDataFor(input.docType))
     const bytes =
       input.format === 'docx'
-        ? await (await import('@/server/word/build-docx')).buildDocx(doc, input.style)
-        : await (await import('@/server/pdf/template-pdf')).renderTemplatePdf(doc, input.style)
+        ? await (await import('../word/build-docx')).buildDocx(doc, input.style)
+        : await (await import('../pdf/template-pdf')).renderTemplatePdf(doc, input.style)
     return { base64: toBase64(bytes), name: `thu-${input.docType}.${input.format}`, mime: MIME[input.format], warnings }
   })
 }
@@ -128,7 +128,7 @@ export async function previewTemplateByIdAction(templateId: string) {
     const [t] = await db.select().from(docTemplates).where(eq(docTemplates.id, templateId))
     if (!t?.body) throw new ValidationError('Mẫu này chưa có nội dung để xem')
     const { doc } = renderTemplate(t.body, sampleDataFor(t.docType as DocType))
-    const bytes = await (await import('@/server/pdf/template-pdf')).renderTemplatePdf(doc, t.style as TemplateStyle)
+    const bytes = await (await import('../pdf/template-pdf')).renderTemplatePdf(doc, t.style as TemplateStyle)
     return { base64: toBase64(bytes), name: `${t.name}.pdf`, mime: MIME.pdf, warnings: [] as string[] }
   })
 }

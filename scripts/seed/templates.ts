@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { docTemplates } from '@/db'
 import { TEMPLATE_DOC_TYPES } from '@/domain/template-fields'
-import { DEFAULT_TEMPLATES } from '@/server/templates/defaults'
+import { DEFAULT_TEMPLATES } from '@/modules/documents/server/templates/defaults'
 import type { SeedModule } from './types'
 
 /** Mười sáu mẫu giấy tờ mặc định (tám loại × hai kiểu); kiểu Trang trọng là mẫu mặc định của từng loại. */

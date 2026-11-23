@@ -20,7 +20,7 @@ Muốn biết một mảng đang ở đâu: xem bảng dưới. **Mỗi PR chuy�
 | 2 | `users` | Đã chuyển | `src/modules/users/` | 14 |
 | 2 | `tenants` | Đã chuyển | `src/modules/tenants/` | 15 |
 | 2 | `facilities` | Đã chuyển | `src/modules/facilities/` (mọi component `features/rooms` đã chuyển vì không import dữ liệu hợp đồng, không còn gì chờ Task 21; `use-run.tsx` ở `src/components/`; `room-occupancy.ts` ở `modules/facilities/domain/`) | 16 |
-| 2 | `documents` | Chưa chuyển | `src/server/{templates,invoice-templates,pdf,word,convert}`, `src/features/templates` | 17 |
+| 2 | `documents` | Đã chuyển | `src/modules/documents/` | 17 |
 | 3 | `assets` | Chưa chuyển | `src/server/{assets,stock}`, `src/features/assets` | 18 |
 | 3 | `meters` | Chưa chuyển | `src/server/meters`, `src/features/meters` | 19 |
 | 4 | `leasing` | Chưa chuyển | `src/server/{contracts,addenda,handovers,charges,invoices,incidents}`, `src/features/{contracts,deposits,handovers,charges,invoices,incidents}` | 20–21 |
@@ -95,7 +95,7 @@ Luật chuyển tiếp (bỏ ở Task 22): code cũ (`src/server`, `src/features
 | Bẫy | Hậu quả | Cách xử lý / trạng thái |
 |---|---|---|
 | Đăng ký kiểu side-effect: `registerOwnerResolver`, `registerExportOwnerResolver`, `registerDocLoader`, `registerPdfLoader`, `registerRoomsCreatedHook` chỉ chạy khi file đăng ký đã được import | Route lạnh báo "Loại tệp chưa được hỗ trợ" hoặc không xuất được giấy tờ | Đã xử lý (Task 8): `src/modules/registrations.ts` (Task 12 dời từ `src/server/`) import mọi file có `register*`, và được import ở dòng đầu mọi `actions.ts`, API `route.ts` và `src/app/(app)/layout.tsx`; test `tests/unit/architecture/registrations.test.ts` kiểm. Module mới có `register*` phải thêm vào file đó |
-| Font PDF dùng đường dẫn cứng `src/server/pdf/fonts/` ở `next.config.ts` (`outputFileTracingIncludes`) và `src/server/pdf/fonts.ts` | Dời thư mục mà quên: local, test vẫn xanh, **PDF trên Vercel hỏng** | Sửa cả hai chỗ; Task 17 thêm `tests/unit/pdf-fonts.test.ts`; luôn thử "Xem PDF" trên preview |
+| Font PDF dùng đường dẫn cứng `src/modules/documents/server/pdf/fonts/` ở `next.config.ts` (`outputFileTracingIncludes`) và `src/modules/documents/server/pdf/fonts.ts` | Dời thư mục mà quên: local, test vẫn xanh, **PDF trên Vercel hỏng** | Sửa cả hai chỗ; test: `tests/unit/pdf-fonts.test.ts` (bắt lệch đường dẫn hoặc glob); luôn thử "Xem PDF" trên preview |
 | `cascade-delete.ts` (xoá cơ sở/phòng) ghi bảng của hợp đồng, hoá đơn… | Vi phạm luật "ghi bảng module khác" | Ngoại lệ có chủ ý vì DB không có `ON DELETE CASCADE`; không "sửa" bằng cách thêm cascade trong schema nếu chưa bàn |
 | Phụ thuộc hai chiều `addenda ↔ invoices`, `invoices ↔ templates` | Khó tách, dễ vòng import | Cả `addenda` và `invoices` vào `leasing`; `invoices ↔ templates` gỡ ở Task 8 |
 | 8 trang trong `src/app` tự viết truy vấn Drizzle | Bỏ qua kiểm quyền của service | Đã xử lý ở Task 7: truy vấn chuyển vào service, ESLint chặn `@/db` schema và `drizzle-orm` trong `src/app` |

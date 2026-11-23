@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import QRCode from 'qrcode'
 import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.mjs'
-import { renderInvoicePdf, renderReceiptPdf } from '@/server/pdf'
-import type { InvoicePdfData } from '@/server/pdf/types'
-import { convertPdfToPng } from '@/server/convert'
-import { defaultInvoiceTemplate } from '@/domain/invoice-template'
+import { renderInvoicePdf, renderReceiptPdf } from '@/modules/documents/server/pdf'
+import type { InvoicePdfData } from '@/modules/documents/server/pdf/types'
+import { convertPdfToPng } from '@/modules/documents/server/convert'
+import { defaultInvoiceTemplate } from '@/modules/documents/domain/invoice-template'
 import { createCanvas } from '@napi-rs/canvas'
 
 const invoice: InvoicePdfData = {

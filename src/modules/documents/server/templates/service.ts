@@ -11,10 +11,10 @@ import {
   type DocEntities,
   type DocType,
 } from '@/domain/template-fields'
-import { renderTemplate, type TemplateStyle } from '@/domain/doc-template'
+import { renderTemplate, type TemplateStyle } from '../../domain/doc-template'
 import { recordAudit } from '@/modules/platform'
 import { fileAccessPermission } from '@/modules/platform'
-import { assertFormatAllowed, convertPdfToPng, FORMAT_EXT, type ExportFormat } from '@/server/convert'
+import { assertFormatAllowed, convertPdfToPng, FORMAT_EXT, type ExportFormat } from '../convert'
 import type { StorageAdapter } from '@/modules/platform'
 
 export type DocTemplate = Omit<typeof docTemplates.$inferSelect, 'style' | 'previewPdf' | 'previewVersion'> & {
@@ -56,7 +56,7 @@ export async function storeTemplatePreview(
     const [t] = await db.select().from(docTemplates).where(eq(docTemplates.id, templateId))
     if (!t?.body) return null
     const { doc } = renderTemplate(t.body, sampleDataFor(t.docType as DocType))
-    const bytes = await (await import('@/server/pdf/template-pdf')).renderTemplatePdf(doc, t.style as TemplateStyle)
+    const bytes = await (await import('../pdf/template-pdf')).renderTemplatePdf(doc, t.style as TemplateStyle)
     const base64 = Buffer.from(bytes).toString('base64')
     await db
       .update(docTemplates)
@@ -381,8 +381,8 @@ async function produceDocument(
   const { doc, warnings } = renderTemplate(template.body!, buildTemplateData(input.docType, loaded.entities))
   const bytes =
     format === 'docx'
-      ? await (await import('@/server/word/build-docx')).buildDocx(doc, template.style)
-      : await (await import('@/server/pdf/template-pdf')).renderTemplatePdf(doc, template.style)
+      ? await (await import('../word/build-docx')).buildDocx(doc, template.style)
+      : await (await import('../pdf/template-pdf')).renderTemplatePdf(doc, template.style)
   return { bytes, facilityId: loaded.facilityId, baseName: loaded.baseName, warnings, format }
 }
 

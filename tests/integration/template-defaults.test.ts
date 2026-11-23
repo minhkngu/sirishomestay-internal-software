@@ -3,11 +3,15 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { docTemplates, facilities, files } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
-import { renderTemplate } from '@/domain/doc-template'
+import { renderTemplate } from '@/modules/documents/domain/doc-template'
 import { sampleDataFor, TEMPLATE_DOC_TYPES, type TemplateDocType } from '@/domain/template-fields'
 import { MemoryStorage } from '@/modules/platform/server/storage/memory'
-import { DEFAULT_TEMPLATES, ensureDefaultTemplate, restoreDefaultTemplates } from '@/server/templates/defaults'
-import { exportDocument, registerDocLoader } from '@/server/templates/service'
+import {
+  DEFAULT_TEMPLATES,
+  ensureDefaultTemplate,
+  restoreDefaultTemplates,
+} from '@/modules/documents/server/templates/defaults'
+import { exportDocument, registerDocLoader } from '@/modules/documents/server/templates/service'
 import { createTestDb } from '../helpers/db'
 import { addHtmlTemplate } from '../helpers/templates'
 

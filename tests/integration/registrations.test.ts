@@ -16,7 +16,7 @@ import {
 import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
 import { resolveOwner } from '@/modules/platform/server/files/owners'
-import { exportDocument } from '@/server/templates/service'
+import { exportDocument } from '@/modules/documents/server/templates/service'
 import { MemoryStorage } from '@/modules/platform/server/storage/memory'
 import { createTestDb } from '../helpers/db'
 

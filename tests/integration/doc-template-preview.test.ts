@@ -10,7 +10,7 @@ import {
   listTemplatePreviews,
   listTemplates,
   updateTemplate,
-} from '@/server/templates/service'
+} from '@/modules/documents/server/templates/service'
 import { createTestDb } from '../helpers/db'
 
 const admin: AccessContext = {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { renderTemplate, sampleTemplateHtml } from '@/domain/doc-template'
+import { renderTemplate, sampleTemplateHtml } from '@/modules/documents/domain/doc-template'
 import { DOC_TYPES, sampleDataFor } from '@/domain/template-fields'
 
 describe('renderTemplate', () => {

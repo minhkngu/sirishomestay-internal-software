@@ -1,5 +1,5 @@
 import type { TemplateStyle } from './doc-template'
-import { TEMPLATE_FIELDS } from './template-fields'
+import { TEMPLATE_FIELDS } from '@/domain/template-fields'
 
 const LABEL = new Map(TEMPLATE_FIELDS.invoice_termination.map((f) => [f.key, f.label]))
 const LINE_LABEL = new Map(

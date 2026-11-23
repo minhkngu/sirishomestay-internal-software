@@ -42,9 +42,9 @@ import {
   exportContract,
 } from '@/server/contracts/service'
 import { MemoryStorage } from '@/modules/platform/server/storage/memory'
-import { FORMAT_EXT } from '@/server/convert'
+import { FORMAT_EXT } from '@/modules/documents/server/convert'
 import PizZip from 'pizzip'
-import { removeTemplate } from '@/server/templates/service'
+import { removeTemplate } from '@/modules/documents/server/templates/service'
 import { depositBalance } from '@/domain/deposit'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import type { AccessContext, Permission } from '@/domain/access'

@@ -3,7 +3,7 @@ import QRCode from 'qrcode'
 import { facilities, rooms, tenants, leases, invoices } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
-import { defaultInvoiceTemplate } from '@/domain/invoice-template'
+import { defaultInvoiceTemplate } from '@/modules/documents/domain/invoice-template'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { createTestDb } from '../helpers/db'
 import {
@@ -14,7 +14,7 @@ import {
   setDefaultInvoiceTemplate,
   resolveInvoiceTemplate,
   previewInvoiceTemplate,
-} from '@/server/invoice-templates/service'
+} from '@/modules/documents/server/invoice-templates/service'
 import { selectInvoiceTemplate, selectLeaseInvoiceTemplate } from '@/server/invoices/template-assignment'
 
 describe('quản lý và chọn mẫu hóa đơn', () => {

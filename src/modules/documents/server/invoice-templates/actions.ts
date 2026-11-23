@@ -7,7 +7,7 @@ import { db } from '@/db/client'
 import { toActionResult } from '@/lib/action-result'
 import { assertCan } from '@/domain/access'
 import { getAccessContext } from '@/modules/platform'
-import type { TemplateStyle } from '@/domain/doc-template'
+import type { TemplateStyle } from '../../domain/doc-template'
 import { restoreDefaultInvoiceTemplates } from './defaults'
 import {
   createInvoiceTemplate,

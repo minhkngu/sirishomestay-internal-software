@@ -5,10 +5,10 @@ import { InvoiceDocument } from './invoice-pdf'
 import { ReceiptDocument } from './receipt-pdf'
 import type { InvoicePdfData, ReceiptPdfData } from './types'
 import { formatDateVN } from '@/domain/dates'
-import { renderTemplate, type TemplateStyle } from '@/domain/doc-template'
+import { renderTemplate, type TemplateStyle } from '../../domain/doc-template'
 import { buildTemplateData, type DocEntities } from '@/domain/template-fields'
 import { renderTemplatePdf } from './template-pdf'
-import { defaultInvoiceTemplate, type InvoiceTemplateConfig } from '@/domain/invoice-template'
+import { defaultInvoiceTemplate, type InvoiceTemplateConfig } from '../../domain/invoice-template'
 /** Hoá đơn dựng từ mẫu HTML soạn trong app (cùng bộ dựng với hợp đồng), có mã QR thanh toán nếu còn tiền phải trả. */
 export async function renderInvoiceFromTemplate(
   data: InvoicePdfData,

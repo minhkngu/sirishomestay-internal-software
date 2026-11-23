@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { defaultInvoiceTemplate, invoiceTemplateSchema, resolveInvoiceTemplateId } from '@/domain/invoice-template'
+import {
+  defaultInvoiceTemplate,
+  invoiceTemplateSchema,
+  resolveInvoiceTemplateId,
+} from '@/modules/documents/domain/invoice-template'
 
 describe('mẫu hóa đơn', () => {
   it('ưu tiên mẫu của kỳ, rồi mẫu hợp đồng, rồi mẫu mặc định', () => {

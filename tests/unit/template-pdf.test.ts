@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { renderTemplatePdf } from '@/server/pdf/template-pdf'
-import type { DocBlock } from '@/domain/doc-template'
+import { renderTemplatePdf } from '@/modules/documents/server/pdf/template-pdf'
+import type { DocBlock } from '@/modules/documents/domain/doc-template'
 
 async function pdfText(bytes: Uint8Array): Promise<{ pages: number; text: string }> {
   const g = globalThis as { pdfjsWorker?: unknown }

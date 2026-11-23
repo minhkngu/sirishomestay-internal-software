@@ -5,7 +5,7 @@ import type { AccessContext } from '@/domain/access'
 import { NotFoundError } from '@/domain/errors'
 import { deleteFile } from '@/modules/platform'
 import type { StorageAdapter } from '@/modules/platform'
-import { exportDocument } from '@/server/templates/service'
+import { exportDocument } from '@/modules/documents'
 
 type Job = {
   label: string

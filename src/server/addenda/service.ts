@@ -59,7 +59,7 @@ import { registerExportOwnerResolver, registerOwnerResolver } from '@/modules/pl
 import { leaseData, loadAddenda, nextInvoiceCode } from '@/server/invoices/service'
 import { getSettings } from '@/modules/platform'
 import type { StorageAdapter } from '@/modules/platform'
-import { exportDocument, registerDocLoader } from '@/server/templates/service'
+import { exportDocument, registerDocLoader } from '@/modules/documents'
 
 type AddendumRow = typeof addenda.$inferSelect
 export type AdjustmentPreview = {

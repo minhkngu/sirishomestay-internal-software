@@ -14,7 +14,7 @@ import {
   PageBreak,
   type ParagraphChild,
 } from 'docx'
-import type { Align, DocBlock, Inline, TemplateStyle } from '@/domain/doc-template'
+import type { Align, DocBlock, Inline, TemplateStyle } from '../../domain/doc-template'
 
 const FONT = 'Be Vietnam Pro'
 const BRAND = '0F6B4F'

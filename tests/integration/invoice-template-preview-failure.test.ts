@@ -2,11 +2,11 @@ import { eq } from 'drizzle-orm'
 import { describe, expect, it, vi } from 'vitest'
 import { invoiceTemplates } from '@/db'
 import type { AccessContext } from '@/domain/access'
-import { DEFAULT_INVOICE_TEMPLATES } from '@/domain/invoice-template-html'
-import { createInvoiceTemplate, updateInvoiceTemplate } from '@/server/invoice-templates/service'
+import { DEFAULT_INVOICE_TEMPLATES } from '@/modules/documents/domain/invoice-template-html'
+import { createInvoiceTemplate, updateInvoiceTemplate } from '@/modules/documents/server/invoice-templates/service'
 import { createTestDb } from '../helpers/db'
 
-vi.mock('@/server/pdf', () => ({
+vi.mock('@/modules/documents/server/pdf', () => ({
   renderInvoiceFromTemplate: async () => {
     throw new Error('không dựng được PDF')
   },

@@ -4,17 +4,17 @@ import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { invoiceTemplates } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
-import { renderTemplate } from '@/domain/doc-template'
-import { DEFAULT_INVOICE_TEMPLATES } from '@/domain/invoice-template-html'
+import { renderTemplate } from '@/modules/documents/domain/doc-template'
+import { DEFAULT_INVOICE_TEMPLATES } from '@/modules/documents/domain/invoice-template-html'
 import { sampleDataFor } from '@/domain/template-fields'
-import { restoreDefaultInvoiceTemplates } from '@/server/invoice-templates/defaults'
+import { restoreDefaultInvoiceTemplates } from '@/modules/documents/server/invoice-templates/defaults'
 import {
   createInvoiceTemplate,
   previewInvoiceTemplateById,
   previewInvoiceTemplateHtml,
   setDefaultInvoiceTemplate,
   updateInvoiceTemplate,
-} from '@/server/invoice-templates/service'
+} from '@/modules/documents/server/invoice-templates/service'
 import { createTestDb } from '../helpers/db'
 
 const admin: AccessContext = {
@@ -101,7 +101,7 @@ describe('mẫu hoá đơn HTML', () => {
   })
 
   it('hoá đơn thật dựng từ mẫu HTML: điền mã, khách, dòng khoản thu và ngân hàng', async () => {
-    const { renderInvoiceFromTemplate } = await import('@/server/pdf')
+    const { renderInvoiceFromTemplate } = await import('@/modules/documents/server/pdf')
     const text = await textOf(
       await renderInvoiceFromTemplate(
         {
