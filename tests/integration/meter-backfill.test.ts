@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { and, eq } from 'drizzle-orm'
-import { sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import fs from 'node:fs'
 import path from 'node:path'
 import { facilities, meters, rooms } from '@/db'

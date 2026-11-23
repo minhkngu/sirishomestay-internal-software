@@ -282,7 +282,7 @@ export async function assetLocationLabel(
   kind: 'room' | 'facility',
   id: string,
 ): Promise<string> {
-  // Cố ý không lọc theo phạm vi cơ sở: trang gọi đã kiểm quyền trước, giữ nguyên như khi truy vấn còn nằm trong trang.
+  // Cố ý không lọc theo phạm vi cơ sở: trang gọi đã kiểm quyền trước.
   void ctx
   if (kind === 'room') {
     const [r] = await db.select().from(rooms).where(eq(rooms.id, id))

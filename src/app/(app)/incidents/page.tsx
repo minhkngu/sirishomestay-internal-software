@@ -7,8 +7,7 @@ import { assertCan } from '@/domain/access'
 import { IncidentList } from '@/modules/leasing/ui'
 import { listIncidents } from '@/modules/leasing'
 import { getAccessContext } from '@/modules/platform'
-import { listFacilities } from '@/modules/facilities'
-import { roomCodesByIds } from '@/modules/facilities'
+import { listFacilities, roomCodesByIds } from '@/modules/facilities'
 import { userNamesByIds } from '@/modules/users'
 
 export default async function IncidentsPage() {

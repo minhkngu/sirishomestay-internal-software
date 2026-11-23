@@ -1,5 +1,4 @@
-import { asc, eq } from 'drizzle-orm'
-import { getTableColumns } from 'drizzle-orm'
+import { asc, eq, getTableColumns } from 'drizzle-orm'
 import { invoiceTemplates, invoices, leases } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'

@@ -8,5 +8,8 @@ export type DepositEntryStatus = 'pending' | 'done'
 export type AssetStatus = 'in_use' | 'broken' | 'disposed'
 export type IncidentStatus = 'new' | 'in_progress' | 'done' | 'cancelled'
 export type HandoverKind = 'check_in' | 'check_out'
+export type HandoverStatus = 'draft' | 'done'
 // Cột `invoices.status` chỉ ghi draft/approved; unpaid/partial/overdue/paid là trạng thái suy ra khi đọc.
 export type InvoiceStatus = 'draft' | 'approved'
+// Loại hoá đơn: monthly (tháng), first (kỳ đầu), termination (thanh lý), manual (nhập từ Excel). Hiện chỉ monthly, termination, manual được ghi; first vẫn được đọc ở domain/types.ts.
+export type InvoiceKind = 'monthly' | 'first' | 'termination' | 'manual'

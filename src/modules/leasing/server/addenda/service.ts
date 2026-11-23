@@ -49,11 +49,9 @@ import type {
   PendingAdjustment,
   Proration,
 } from '@/domain/types'
-import { recordAudit } from '@/modules/platform'
+import { recordAudit, registerExportOwnerResolver, registerOwnerResolver, getSettings } from '@/modules/platform'
 import { captureContractVersion, recordTerminationHandover, recordTerminationReadings } from '../contracts/history'
-import { registerExportOwnerResolver, registerOwnerResolver } from '@/modules/platform'
 import { leaseData, loadAddenda, nextInvoiceCode } from '../invoices/service'
-import { getSettings } from '@/modules/platform'
 import type { StorageAdapter } from '@/modules/platform'
 import { exportDocument, registerDocLoader } from '@/modules/documents'
 

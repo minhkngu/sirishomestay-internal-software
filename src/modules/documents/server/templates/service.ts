@@ -12,8 +12,8 @@ import {
   type DocType,
 } from '@/domain/template-fields'
 import { renderTemplate, type TemplateStyle } from '../../domain/doc-template'
-import { recordAudit } from '@/modules/platform'
-import { fileAccessPermission } from '@/modules/platform'
+import { recordAudit, fileAccessPermission } from '@/modules/platform'
+
 import { assertFormatAllowed, convertPdfToPng, FORMAT_EXT, type ExportFormat } from '../convert'
 import type { StorageAdapter } from '@/modules/platform'
 

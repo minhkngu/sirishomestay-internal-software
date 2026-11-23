@@ -1,10 +1,13 @@
 import { db } from '@/db/client'
-import { RequirePermission } from '@/modules/platform'
-import { getAccessContext } from '@/modules/platform'
-import { getSettings } from '@/modules/platform'
-import { listFacilities } from '@/modules/facilities'
-import { listAmenities } from '@/modules/facilities'
-import { listFeeDefaults, listFeeTypes, listFeeUnits, listFeeTypePrices } from '@/modules/facilities'
+import { RequirePermission, getAccessContext, getSettings } from '@/modules/platform'
+import {
+  listFacilities,
+  listAmenities,
+  listFeeDefaults,
+  listFeeTypes,
+  listFeeUnits,
+  listFeeTypePrices,
+} from '@/modules/facilities'
 import { listMeterTypes } from '@/modules/meters'
 import { SettingsTabs } from './settings-tabs'
 

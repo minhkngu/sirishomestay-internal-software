@@ -1,4 +1,4 @@
-import type { InvoiceStatus } from '@/domain/statuses'
+import type { InvoiceKind, InvoiceStatus } from '@/domain/statuses'
 import {
   bigint,
   boolean,
@@ -28,7 +28,7 @@ export const invoices = pgTable(
     facilityId: uuid('facility_id')
       .notNull()
       .references(() => facilities.id),
-    kind: text('kind').notNull(),
+    kind: text('kind').$type<InvoiceKind>().notNull(),
     periodStart: date('period_start', { mode: 'string' }).notNull(),
     periodEnd: date('period_end', { mode: 'string' }).notNull(),
     coefficient: numeric('coefficient', { mode: 'number' }),

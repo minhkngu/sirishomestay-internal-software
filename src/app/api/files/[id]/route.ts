@@ -3,9 +3,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/db/client'
 import { ForbiddenError, NotFoundError } from '@/domain/errors'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getDownloadUrl } from '@/modules/platform'
-import { loadAccessContext } from '@/modules/platform'
-import { getStorage } from '@/modules/platform'
+import { getDownloadUrl, loadAccessContext, getStorage } from '@/modules/platform'
 
 /** Kiểm quyền theo chủ sở hữu + cơ sở rồi chuyển hướng 302 sang URL ký 5 phút. `?thumb=1` lấy thumbnail. */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {

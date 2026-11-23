@@ -11,8 +11,7 @@ import { renderTemplate, type TemplateStyle } from '../../domain/doc-template'
 import { sampleDataFor, type DocType } from '@/domain/template-fields'
 import { assertCan } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
-import { getAccessContext } from '@/modules/platform'
-import { getStorage } from '@/modules/platform'
+import { getAccessContext, getStorage } from '@/modules/platform'
 import { restoreDefaultTemplates } from './defaults'
 import {
   attachTemplateFile,

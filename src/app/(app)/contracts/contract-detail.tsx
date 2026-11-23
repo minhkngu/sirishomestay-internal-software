@@ -2,7 +2,15 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, Calendar, FileText } from 'lucide-react'
 import { can } from '@/domain/access'
-import { listOneOffs } from '@/modules/leasing'
+import {
+  listOneOffs,
+  listHandovers,
+  getDepositContract,
+  getLease,
+  listLeaseOccupants,
+  listInvoices,
+  listAddenda,
+} from '@/modules/leasing'
 import {
   OneOffDialog,
   DepositLedger,
@@ -17,17 +25,12 @@ import { NotFoundError } from '@/domain/errors'
 import { depositBalance } from '@/domain/deposit'
 import { formatDateVN, todayVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
-import { getAccessContext } from '@/modules/platform'
-import { listFiles } from '@/modules/platform'
+import { getAccessContext, listFiles } from '@/modules/platform'
 import { isUsableTemplate, listTemplates } from '@/modules/documents'
-import { listHandovers } from '@/modules/leasing'
-import { getDepositContract, getLease, listLeaseOccupants } from '@/modules/leasing'
 import { formatPhoneDisplay } from '@/domain/phone'
 import { PdfViewButton } from '@/components/pdf-view-button'
-import { listInvoices } from '@/modules/leasing'
 import { listLeaseMeterInitials } from '@/modules/meters'
 import { ContractActions } from './contract-actions'
-import { listAddenda } from '@/modules/leasing'
 import { cn } from '@/lib/utils'
 import { SignChip, Stat, StatusChip, TermBar, termProgress } from '@/components/contract-ui'
 

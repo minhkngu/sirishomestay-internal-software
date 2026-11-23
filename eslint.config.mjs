@@ -186,11 +186,18 @@ const appNoDbConfig = {
   },
 }
 
+// Một specifier chỉ nên có một câu import giá trị (plugin `import` đã có qua eslint-config-next).
+const noDuplicateImportsConfig = {
+  files: ['**/*.{ts,tsx,mjs}'],
+  rules: { 'import/no-duplicates': 'error' },
+}
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   boundariesConfig,
   appNoDbConfig,
+  noDuplicateImportsConfig,
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
