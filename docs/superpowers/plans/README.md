@@ -12,8 +12,8 @@ Plan làm xong thì xoá khỏi thư mục này (lần gần nhất: 23/11/2026:
 
 ## Việc còn lại trước khi người dùng duyệt
 
-- [ ] Hoá đơn, chỉ số, Thu chi: xem trên giao diện trang Chỉ số (lọc Năm → Tháng, popup Chốt chỉ số), menu chỉ số và hoá đơn đầu trong hoá đơn, popup sửa hợp đồng, sửa và xoá khoản thu, cọc ở Thu chi.
-- [ ] E2E còn đỏ trên cổng thử (`invoices` dòng 11 và 40, `contract-quick-actions`, `contract-create-one-page`, `addenda`, `template-editor`): đối chiếu với `main` để biết lỗi do nhánh hay do dữ liệu thử; thêm e2e cho sửa, xoá khoản thu ở Thu chi và sửa số đầu ở hoá đơn đầu.
+- [ ] Hoá đơn, chỉ số: xem trên giao diện trang Chỉ số (lọc Năm → Tháng, popup Chốt chỉ số), menu chỉ số trong hoá đơn, popup sửa hợp đồng. (Sửa, xoá khoản thu ở Thu chi và sửa số đầu ở hoá đơn đầu: người dùng đã tự kiểm.)
+- [ ] E2E còn đỏ trên cổng thử (`invoices` dòng 11 và 40, `contract-quick-actions`, `contract-create-one-page`, `addenda`, `template-editor`): đối chiếu với `main` để biết lỗi do nhánh hay do dữ liệu thử.
 - [ ] Xác nhận xuất PDF và ảnh hoá đơn, phiếu thu trên bản preview mới nhất (sau commit `391ec48` đóng gói `pdfkit` và `@napi-rs/canvas`).
 - [ ] Chạy lại toàn bộ e2e (`node scripts/e2e-preflight.mjs` trước), xác nhận tất cả đạt.
 - [ ] Đo tốc độ chuyển trang trên bản production (`npm run test:perf`). Ghi kết quả vào `docs/operations/toc-do.md`.
