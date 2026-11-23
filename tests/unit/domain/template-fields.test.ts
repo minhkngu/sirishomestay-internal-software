@@ -73,6 +73,10 @@ describe('buildTemplateData', () => {
   it('thiếu dữ liệu → chuỗi rỗng, không ném lỗi', () => {
     expect(buildTemplateData('lease', { now: '2026-10-14' }).ten_khach).toBe('')
   })
+  it('biên bản bàn giao không còn chỉ số: mẫu cũ dùng bảng chỉ số in bảng rỗng', () => {
+    const d = buildTemplateData('handover_check_in', { now: '2026-10-14', handover: { date: '2026-10-15', items: [], readings: undefined } })
+    expect(d.chi_so).toEqual([])
+  })
   it('sampleDataFor dựng dữ liệu từ ví dụ của từng trường', () => {
     const d = sampleDataFor('lease')
     expect(d.ten_khach).toBeTruthy()

@@ -25,13 +25,13 @@ function rentAndFixedLines(terms: LeaseTerms, from: ISODate, to: ISODate, sum: n
   const label = rangeLabel(from, to)
   const lines: InvoiceLineInput[] = [{
     type: 'rent', description: `Tiền phòng ${label}`, quantity: round4(sum), unitPrice: terms.monthlyRent, amount: Math.round(terms.monthlyRent * sum),
-    meta: { from, to },
+    meta: { from, to, coefficient: round4(sum) },
   }]
   for (const f of terms.fees.filter((x) => (x.billing === 'monthly_fixed' || x.quantitySource === 'occupants' || x.quantitySource === 'room') && x.quantitySource !== 'meter' && x.quantitySource !== 'period_input')) {
     const qty = f.quantitySource === 'room' ? 1 : f.quantitySource === 'occupants' || (!f.quantitySource && f.quantityFrom === 'occupants') ? occupantsCount : f.quantity
     lines.push({
-      type: 'fee', description: `${f.name} (${qty} ${f.unit}) ${label}`, quantity: qty, unitPrice: f.unitPrice,
-      amount: Math.round(qty * f.unitPrice * sum), meta: { feeTypeId: f.feeTypeId, leaseFeeId: f.leaseFeeId, unit: f.unit, from, to },
+      type: 'fee', description: f.name, quantity: qty, unitPrice: f.unitPrice,
+      amount: Math.round(qty * f.unitPrice * sum), meta: { feeTypeId: f.feeTypeId, leaseFeeId: f.leaseFeeId, unit: f.unit, from, to, coefficient: round4(sum) },
     })
   }
   return lines
@@ -50,6 +50,10 @@ export type MonthlyInvoiceInput = {
   oneOffs: OneOffCharge[]
   pending: PendingAdjustment[]
   overridePeriod?: { start: ISODate; end: ISODate; coefficient?: number }
+  /** Hoá đơn thứ hai trùng kỳ: không cộng tiền phòng (đã tính ở hoá đơn trước), vẫn tính các phí, phát sinh khác. */
+  skipRent?: boolean
+  /** Kèm dòng tiền cọc còn thiếu = tiền cọc theo hợp đồng trừ phần đã có (đã thu hoặc đã lập ở hoá đơn khác). */
+  deposit?: { collected: number }
   fullMonth?: boolean
 }
 
@@ -64,6 +68,10 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): { lines: Invoic
   const monthEnd = lastDayOf(period)
   const warnings: string[] = []
   const lines: InvoiceLineInput[] = []
+  if (input.deposit && !input.skipRent) {
+    const missing = terms.depositAmount - input.deposit.collected
+    if (missing > 0) lines.push({ type: 'deposit', description: 'Tiền cọc còn thiếu', quantity: 1, unitPrice: missing, amount: missing, meta: { deposit: true } })
+  }
 
   // --- kỳ N: tiền phòng + phí cố định
   let from: ISODate
@@ -87,8 +95,7 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): { lines: Invoic
         const fraction = prorateFraction(segment.from, segment.to, input.proration)
         const coefficient = input.overridePeriod?.coefficient != null || input.fullMonth ? sum * fraction / totalFraction : fraction
         const segmentLines = rentAndFixedLines(segment.terms, segment.from, segment.to, coefficient, segment.terms.occupantIds.length)
-        segmentLines.forEach(line => { line.description += ` — phòng ${segment.terms.roomId}` })
-        lines.push(...segmentLines)
+        lines.push(...(input.skipRent ? segmentLines.filter((l) => l.type !== 'rent') : segmentLines))
       }
     }
   } else warnings.push('Hợp đồng không có hiệu lực trong kỳ này')
@@ -102,13 +109,14 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): { lines: Invoic
     if (f.quantitySource === 'period_input') {
       const item = input.periodQuantities?.find(x => x.leaseFeeId === f.leaseFeeId && x.period === period)
       if (!item) { warnings.push(`Chưa nhập số lượng ${f.name} kỳ ${period}`); continue }
-      lines.push({ type: 'fee', description: `${f.name} kỳ ${period}`, quantity: item.quantity, unitPrice: f.unitPrice, amount: item.quantity * f.unitPrice, meta: { leaseFeeId: f.leaseFeeId, period, unit: f.unit } })
+      lines.push({ type: 'fee', description: f.name, quantity: item.quantity, unitPrice: f.unitPrice, amount: item.quantity * f.unitPrice, meta: { leaseFeeId: f.leaseFeeId, period, unit: f.unit } })
     }
     if (f.quantitySource === 'meter' && terms.startDate >= monthStart && terms.startDate <= monthEnd) {
       // Kỳ ký hợp đồng: chưa dùng, chỉ số đầu và cuối đều là chỉ số ghi lúc ký
       const link = input.feeMeterLinks?.find(x => x.leaseFeeId === f.leaseFeeId)
       const start = input.readings.find(r => r.meterId === link?.meterId && r.kind === 'handover' && r.readOn === terms.startDate)
-      if (start) lines.push({ type: 'fee', description: `${f.name} (chỉ số ${start.value} → ${start.value})`, quantity: 0, unitPrice: f.unitPrice, amount: 0, meta: { leaseFeeId: f.leaseFeeId, unit: f.unit } })
+      // Số đầu, số cuối chép từ chỉ số ban đầu của hợp đồng vào dòng; từ đó là số riêng của hoá đơn, hợp đồng đổi không kéo theo
+      if (start) lines.push({ type: 'fee', description: f.name, quantity: 0, unitPrice: f.unitPrice, amount: 0, meta: { leaseFeeId: f.leaseFeeId, unit: f.unit, opening: start.value, closing: start.value } })
       continue
     }
     if (f.quantitySource === 'meter' && terms.startDate <= prevEnd && terms.endDate >= prevStart) {
@@ -117,14 +125,21 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): { lines: Invoic
       if (!linked) { warnings.push(`Chưa có đồng hồ ${f.name}`); continue }
       try {
         const total = meterFeeUsage({ lease: input.lease, addenda: input.addenda, linked, meters: input.meters, readings: input.readings, from: prevStart, to: prevEnd, startDate: terms.startDate })
-        if (total.missing.length) { warnings.push(`Chưa ghi chỉ số ${f.name} tháng ${mmYYYY(prev)}`); continue }
+        if (total.missing.length) {
+          // Vẫn giữ dòng (0 đồng) để có chỗ chốt chỉ số ngay trong hoá đơn; điền chỉ số xong thì dòng được tính lại
+          warnings.push(`Chưa ghi chỉ số ${f.name} tháng ${mmYYYY(prev)}`)
+          lines.push({ type: 'fee', description: f.name, quantity: 0, unitPrice: f.unitPrice, amount: 0, meta: { leaseFeeId: f.leaseFeeId, unit: f.unit } })
+          continue
+        }
         lines.push({
-          type: 'fee', description: `${f.name} tháng ${mmYYYY(prev)} (${total.usage} ${f.unit})${total.segments.some((x) => x.estimated) ? ' (ước tính)' : ''}`,
+          type: 'fee', description: f.name,
           quantity: total.usage, unitPrice: f.unitPrice, amount: Math.round(total.usage * f.unitPrice), meta: { leaseFeeId: f.leaseFeeId, unit: f.unit, segments: total.segments },
         })
       } catch (e) {
         if (!(e instanceof ValidationError)) throw e
+        // Số sai thì vẫn giữ dòng (0 đồng) để sửa ngay trong hoá đơn, không để dòng biến mất
         warnings.push(`${f.name}: ${e.message}`)
+        lines.push({ type: 'fee', description: f.name, quantity: 0, unitPrice: f.unitPrice, amount: 0, meta: { leaseFeeId: f.leaseFeeId, unit: f.unit } })
       }
     }
   }
@@ -158,7 +173,7 @@ export function buildFirstInvoice(terms: LeaseTerms, startDate: ISODate, prorati
   for (const f of terms.fees.filter((x) => x.quantitySource === 'meter' && x.leaseFeeId)) {
     const start = meterStarts.find((x) => x.leaseFeeId === f.leaseFeeId)
     if (!start) continue
-    lines.push({ type: 'fee', description: `${f.name} (chỉ số ${start.reading} → ${start.reading})`, quantity: 0, unitPrice: f.unitPrice, amount: 0, meta: { leaseFeeId: f.leaseFeeId, unit: f.unit } })
+    lines.push({ type: 'fee', description: f.name, quantity: 0, unitPrice: f.unitPrice, amount: 0, meta: { leaseFeeId: f.leaseFeeId, unit: f.unit } })
   }
   return lines
 }
@@ -182,4 +197,18 @@ export function settlementState(total: number, paid: number): 'unpaid' | 'partia
   if (total < 0) return paid <= total ? 'refunded' : 'refund_pending'
   if (paid >= total) return 'paid'
   return paid > 0 ? 'partial' : 'unpaid'
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+/** Kỳ hoá đơn suy từ các dòng tiền phòng: ngày đầu sớm nhất, ngày cuối muộn nhất; không có dòng hợp lệ thì null. */
+export function rentPeriodOf(lines: Array<{ type: string; meta?: unknown }>): { start: string; end: string } | null {
+  let start: string | null = null, end: string | null = null
+  for (const l of lines) {
+    if (l.type !== 'rent') continue
+    const m = (l.meta ?? {}) as { from?: unknown; to?: unknown }
+    if (typeof m.from !== 'string' || typeof m.to !== 'string' || !ISO_DATE.test(m.from) || !ISO_DATE.test(m.to)) continue
+    if (start === null || m.from < start) start = m.from
+    if (end === null || m.to > end) end = m.to
+  }
+  return start !== null && end !== null ? { start, end } : null
 }

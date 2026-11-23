@@ -187,7 +187,7 @@ describe('buildMonthlyInvoice', () => {
   const base = {
     facilityId: 'TD', period: '2026-11', proration: 'days_30' as const, meters: [meterE], readings, feeMeterLinks: [{ leaseFeeId: 'e1', meterId: 'me' }], oneOffs: [], pending: [], addenda: [],
   }
-  it('dòng điện có đoạn ước tính có hậu tố nhãn, dòng thường giữ nguyên mô tả', () => {
+  it('dòng điện luôn mang tên phí, kể cả khi có đoạn ước tính', () => {
     const l = lease({ ...terms() })
     const normal = buildMonthlyInvoice({ ...base, lease: l, meters: [{ ...meterE, id: 'me' }], readings: [{ meterId: 'me', period: '2026-10', readOn: '2026-10-31', value: 1100 }, { meterId: 'me', period: '2026-09', readOn: '2026-09-30', value: 1000 }] })
     const oldE: Meter = { id: 'old', roomId: 'R1', utility: 'electric', installedOn: '2025-01-01', startReading: 0, removedOn: '2026-10-20', finalReading: 1060, finalReadingEstimated: true }
@@ -195,7 +195,7 @@ describe('buildMonthlyInvoice', () => {
     const est = buildMonthlyInvoice({ ...base, lease: l, feeMeterLinks: [{ leaseFeeId: 'e1', meterId: 'new' }], meters: [oldE, newE], readings: [{ meterId: 'old', period: '2026-09', readOn: '2026-09-30', value: 1000 }, { meterId: 'new', period: '2026-10', readOn: '2026-10-31', value: 40 }] })
     const desc = (r: typeof normal) => r.lines.find((x) => x.meta?.leaseFeeId === 'e1')!.description
     expect(desc(normal)).not.toContain('ước tính')
-    expect(desc(est).endsWith(' (ước tính)')).toBe(true)
+    expect(desc(est)).toBe(desc(normal))
   })
   it('tiền phòng + phí cố định kỳ N, điện tháng N−1, phí lẻ và điều chỉnh đang chờ', () => {
     const r = buildMonthlyInvoice({
@@ -229,7 +229,7 @@ describe('buildMonthlyInvoice', () => {
     const r = buildMonthlyInvoice({ ...base, lease: lease({ ...t, occupantIds: ['t1', 't2'] }), readings: [{ meterId: 'me', period: '2026-11', kind: 'handover', readOn: '2026-11-15', value: 120 }] })
     const electric = r.lines.find((l) => l.meta?.leaseFeeId === 'e1')
     expect(electric).toMatchObject({ quantity: 0, unitPrice: 3500, amount: 0 })
-    expect(electric!.description).toContain('120 → 120')
+    expect(electric!.description).toBe('Điện')
     expect(r.warnings).toEqual([])
   })
   it('hoá đơn sau kỳ ký: đồng hồ cũ đã gỡ trước ngày bắt đầu không chặn hoá đơn', () => {
@@ -262,8 +262,15 @@ describe('buildMonthlyInvoice', () => {
   it('thiếu chỉ số hoặc chưa gắn đồng hồ → cảnh báo, không ném lỗi', () => {
     const noReading = buildMonthlyInvoice({ ...base, lease: lease({ ...terms(), occupantIds: ['t1', 't2'] }), readings: readings.slice(0, 1) })
     expect(noReading.warnings.join(' ')).toContain('Chưa ghi chỉ số Điện')
+    expect(noReading.lines.find(l => l.meta?.leaseFeeId === 'e1')).toMatchObject({ quantity: 0, amount: 0 })
     const noMeter = buildMonthlyInvoice({ ...base, lease: lease({ ...terms(), occupantIds: ['t1', 't2'] }), feeMeterLinks: [] })
     expect(noMeter.warnings.join(' ')).toContain('Chưa có đồng hồ Điện')
+  })
+  it('số cuối nhỏ hơn số đầu: vẫn giữ dòng điện 0 đồng kèm cảnh báo, không mất dòng', () => {
+    const r = buildMonthlyInvoice({ ...base, lease: lease({ ...terms(), occupantIds: ['t1', 't2'] }), readings: [{ meterId: 'me', period: '2026-09', readOn: '2026-09-30', value: 1000 }, { meterId: 'me', period: '2026-10', readOn: '2026-10-31', value: 900 }] })
+    expect(r.warnings.join(' ')).toContain('Điện')
+    expect(r.warnings.join(' ')).toContain('nhỏ hơn')
+    expect(r.lines.find((l) => l.meta?.leaseFeeId === 'e1')).toMatchObject({ quantity: 0, amount: 0 })
   })
   it('hợp đồng kết thúc giữa kỳ: tiền phòng lẻ đến ngày kết thúc', () => {
     const t = { ...terms(), endDate: '2026-11-20' }
@@ -276,7 +283,7 @@ describe('buildFirstInvoice: phí theo đồng hồ', () => {
     const t = contractTermsAt(lease({ fees: [fee({ feeTypeId: null, leaseFeeId: 'e1', name: 'Điện', unit: 'kWh', quantitySource: 'meter', billing: 'per_occurrence', quantityFrom: 'manual', unitPrice: 3500 })] }), [], '2026-11-15')
     const lines = buildFirstInvoice(t, '2026-11-15', 'days_30', 9_000_000, [{ leaseFeeId: 'e1', reading: 120 }])
     expect(lines.find((l) => l.meta?.leaseFeeId === 'e1')).toMatchObject({ quantity: 0, unitPrice: 3500, amount: 0 })
-    expect(lines.find((l) => l.meta?.leaseFeeId === 'e1')!.description).toContain('120 → 120')
+    expect(lines.find((l) => l.meta?.leaseFeeId === 'e1')!.description).toBe('Điện')
     expect(buildFirstInvoice(t, '2026-11-15', 'days_30', 9_000_000).some((l) => l.meta?.leaseFeeId === 'e1')).toBe(false)
   })
 })
@@ -409,7 +416,7 @@ it('cảnh báo khi thiếu chỉ số chốt phòng cũ lúc chuyển phòng', 
   const meters: Meter[] = ['R1', 'R2'].map((roomId, i) => ({ id: `m${i}`, roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 }))
   const readings: MeterReading[] = [{ meterId: 'm0', period: '2026-10', readOn: '2026-10-31', value: 100 }, { meterId: 'm0', period: '2026-11', readOn: '2026-11-10', value: 110 }, { meterId: 'm1', period: '2026-11', readOn: '2026-11-15', value: 200 }, { meterId: 'm1', period: '2026-11', readOn: '2026-11-30', value: 240 }]
   const result = buildMonthlyInvoice({ lease: electricLease(), addenda: [change], facilityId: 'TD', period: '2026-12', proration: 'days_30', meters, readings, feeMeterLinks: [{ leaseFeeId: 'e1', meterId: 'm0' }], oneOffs: [], pending: [] })
-  expect(result.lines.find(line => line.meta?.leaseFeeId === 'e1')).toBeUndefined()
+  expect(result.lines.find(line => line.meta?.leaseFeeId === 'e1')).toMatchObject({ quantity: 0, amount: 0 })
   expect(result.warnings.join(' ')).toContain('Chưa ghi chỉ số Điện')
 })
 
@@ -442,7 +449,9 @@ describe('phí snapshot trong hóa đơn', () => {
   })
   it('thiếu lượng đo hoặc nhập tay cảnh báo và không tự tính 0', () => {
     const result = buildMonthlyInvoice({ ...input, readings: [], periodQuantities: [] })
-    expect(result.lines.some(l => l.description.startsWith('C') || l.description.startsWith('D'))).toBe(false)
+    expect(result.lines.some(l => l.description.startsWith('D'))).toBe(false)
+    // Phí theo đồng hồ giữ dòng 0 đồng để chốt chỉ số trong hoá đơn
+    expect(result.lines.filter(l => l.description.startsWith('C')).every(l => l.amount === 0)).toBe(true)
     expect(result.warnings.join(' ')).toContain('C')
     expect(result.warnings.join(' ')).toContain('D')
   })
@@ -456,7 +465,7 @@ describe('phí snapshot trong hóa đơn', () => {
     const newLease = { ...input.lease, startDate: '2026-10-15', fees: input.lease.fees.filter(f => f.leaseFeeId === 'c') }
     const readings = [{ meterId: 'mc', period: '2026-09', readOn: '2026-09-30', value: 110 }, { meterId: 'mc', period: '2026-10', readOn: '2026-10-31', value: 140 }]
     const missing = buildMonthlyInvoice({ ...input, lease: newLease, readings })
-    expect(missing.lines.some(l => l.meta?.leaseFeeId === 'c')).toBe(false)
+    expect(missing.lines.find(l => l.meta?.leaseFeeId === 'c')).toMatchObject({ quantity: 0, amount: 0 })
     expect(missing.warnings.join(' ')).toContain('C')
     const withBoundary = buildMonthlyInvoice({ ...input, lease: newLease, readings: [...readings, { meterId: 'mc', period: '2026-10', readOn: '2026-10-15', value: 120 }] })
     expect(withBoundary.lines.find(l => l.meta?.leaseFeeId === 'c')?.amount).toBe(100_000)

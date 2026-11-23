@@ -20,6 +20,7 @@ export default async function InvoicesPage() {
         title="Hoá đơn"
         action={
           <>
+            <Link href="/invoices/new" className={buttonVariants({ variant: 'outline' })}>Tạo hoá đơn lẻ</Link>
             <Link href="/invoices/generate" className={buttonVariants({ variant: 'default' })}>
               Tạo hoá đơn hàng loạt
             </Link>

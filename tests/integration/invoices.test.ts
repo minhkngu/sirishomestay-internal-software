@@ -58,6 +58,21 @@ describe('hoá đơn và thu tiền', () => {
     await expect(updateLines(db, ctx, inv.id, lines.filter(l => l.meta?.leaseFeeId !== fee.id))).rejects.toThrow(ValidationError)
   })
 
+  it('khoá mô tả, giá của dòng tiền phòng và dòng phí hợp đồng; dòng khác vẫn sửa được', async () => {
+    const ctx = context(['billing'], facilityId)
+    await db.insert(leaseFeeSnapshots).values({ leaseId, name: 'Phòng', unit: 'phòng', quantitySource: 'room', unitPrice: 300000 })
+    const [inv] = await createDrafts(db, ctx, { facilityId, period: '2026-12' })
+    const old = (await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, inv.id))).map(l => ({ ...l, meta: l.meta as Record<string, unknown> | null }))
+    const edit = (type: string, patch: Record<string, unknown>) => old.map(l => l.type === type ? { ...l, ...patch } : l)
+    await expect(updateLines(db, ctx, inv.id, edit('rent', { unitPrice: 1 }))).rejects.toThrow(ValidationError)
+    await expect(updateLines(db, ctx, inv.id, edit('rent', { description: 'Tiền phòng khác' }))).rejects.toThrow(ValidationError)
+    await expect(updateLines(db, ctx, inv.id, edit('fee', { description: 'Phí khác' }))).rejects.toThrow(ValidationError)
+    await expect(updateLines(db, ctx, inv.id, old.filter(l => l.type !== 'rent'))).rejects.toThrow(ValidationError)
+    const ok = await updateLines(db, ctx, inv.id, [...old, { type: 'adjustment', description: 'Giảm giá', quantity: 1, unitPrice: -100000, meta: null }])
+    expect(ok.find(l => l.type === 'adjustment')?.amount).toBe(-100000)
+    expect(ok.find(l => l.type === 'rent')?.amount).toBe(9000000)
+  })
+
   it('giữ thành tiền phí theo kỳ lẻ khi sửa mô tả hóa đơn', async () => {
     const ctx = context(['billing'], facilityId)
     await db.update(leases).set({ startDate: '2026-12-16' }).where(eq(leases.id, leaseId))
@@ -67,7 +82,7 @@ describe('hoá đơn và thu tiền', () => {
     const old = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, inv.id))
     const feeLine = old.find(l => (l.meta as Record<string, unknown> | null)?.leaseFeeId === fee.id)!
     expect(feeLine.amount).not.toBe(feeLine.quantity * feeLine.unitPrice)
-    const updated = await updateLines(db, ctx, inv.id, old.map(l => ({ ...l, description: l.description + ' sửa', meta: l.id === feeLine.id ? { ...l.meta as Record<string, unknown>, from: '2020-01-01' } : l.meta as Record<string, unknown> | null })))
+    const updated = await updateLines(db, ctx, inv.id, old.map(l => ({ ...l, meta: l.meta as Record<string, unknown> | null })))
     const updatedFee = updated.find(l => (l.meta as Record<string, unknown> | null)?.leaseFeeId === fee.id)
     expect(updatedFee?.amount).toBe(feeLine.amount)
     expect(updatedFee?.meta).toEqual(feeLine.meta)
@@ -122,7 +137,8 @@ describe('hoá đơn và thu tiền', () => {
   it('sửa dòng, gỡ thu, liệt kê, công nợ và chặn sai cơ sở', async () => {
     const ctx = context(['billing'], facilityId)
     const [row] = await createDrafts(db, ctx, { facilityId, period: '2026-12' })
-    await updateLines(db, ctx, row.id, [{ type: 'rent', description: 'Tiền phòng', quantity: 1, unitPrice: 9000000 }, { type: 'adjustment', description: 'Giảm giá', quantity: 1, unitPrice: -500000 }])
+    const rentLine = (await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, row.id))).find(l => l.type === 'rent')!
+    await updateLines(db, ctx, row.id, [{ ...rentLine, meta: rentLine.meta as Record<string, unknown> | null }, { type: 'adjustment', description: 'Giảm giá', quantity: 1, unitPrice: -500000 }])
     expect((await db.select().from(invoiceLines)).reduce((n, l) => n + l.amount, 0)).toBe(8500000)
     expect((await listInvoices(db, ctx, { status: 'draft' }))).toHaveLength(1)
     await approveInvoice(db, ctx, row.id, { dueDate: '2027-01-05' })
@@ -165,7 +181,8 @@ describe('hoá đơn và thu tiền', () => {
     const ctx = context(['billing'], facilityId)
     const [row] = await createDrafts(db, ctx, { facilityId, period: '2026-12' })
     await approveInvoice(db, ctx, row.id, { dueDate: '2027-01-05' })
-    await updateLines(db, ctx, row.id, [{ type: 'rent', description: 'Tiền phòng', quantity: 1, unitPrice: 8000000 }])
+    const rentRow = (await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, row.id))).find(l => l.type === 'rent')!
+    await updateLines(db, ctx, row.id, [{ ...rentRow, meta: rentRow.meta as Record<string, unknown> | null }, { type: 'adjustment', description: 'Giảm giá sau duyệt', quantity: 1, unitPrice: -1000000 }])
     const log = (await db.select().from(auditLogs)).find(x => x.summary === 'Sửa dòng hoá đơn đã duyệt')
     expect(log?.before).toBeTruthy(); expect(log?.after).toBeTruthy()
   })
