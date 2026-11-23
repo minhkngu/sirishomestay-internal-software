@@ -4,18 +4,17 @@ import { toast } from 'sonner'
 import { formatDateVN, todayVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { DEPOSIT_ENTRY_LABELS, runningDepositBalances } from '@/domain/deposit'
-import type { DepositEntry } from '@/domain/types'
+import type { DepositEntryStatus, DepositEntryType } from '@/domain/statuses'
 import { MoneyInput } from '@/components/ui/money-input'
 import { StatusChip } from '@/components/contract-ui'
 import { addDepositEntryAction, markDepositDoneAction } from '@/server/charges/actions'
 
-// Dòng từ DB có `type`/`status` kiểu chuỗi; giá trị hợp lệ do cột DB bảo đảm.
-type Entry = { id: string; date: string; type: string; amount: number; status: string }
+type Entry = { id: string; date: string; type: DepositEntryType; amount: number; status: DepositEntryStatus }
 
 export function DepositLedger({ entries, canEdit, leaseId }: { entries: Entry[]; canEdit: boolean; leaseId: string }) {
   const [pending, startTransition] = useTransition()
   const [amount, setAmount] = useState('')
-  const balances = runningDepositBalances(entries as Pick<DepositEntry, 'type' | 'amount' | 'status'>[])
+  const balances = runningDepositBalances(entries)
   const current = balances.at(-1) ?? 0
 
   return (
@@ -40,9 +39,7 @@ export function DepositLedger({ entries, canEdit, leaseId }: { entries: Entry[];
             {entries.map((entry, index) => (
               <tr key={entry.id}>
                 <td className="py-3 pr-4 tabular-nums text-foreground">{formatDateVN(entry.date)}</td>
-                <td className="py-3 pr-4 text-foreground">
-                  {DEPOSIT_ENTRY_LABELS[entry.type as DepositEntry['type']] ?? entry.type}
-                </td>
+                <td className="py-3 pr-4 text-foreground">{DEPOSIT_ENTRY_LABELS[entry.type] ?? entry.type}</td>
                 <td className="py-3 pr-4 text-right font-medium tabular-nums text-foreground">
                   {formatVND(entry.amount)}
                 </td>
@@ -117,9 +114,7 @@ export function DepositLedger({ entries, canEdit, leaseId }: { entries: Entry[];
           <li key={entry.id} className="space-y-1.5 py-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-medium text-foreground">
-                  {DEPOSIT_ENTRY_LABELS[entry.type as DepositEntry['type']] ?? entry.type}
-                </p>
+                <p className="font-medium text-foreground">{DEPOSIT_ENTRY_LABELS[entry.type] ?? entry.type}</p>
                 <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">{formatDateVN(entry.date)}</p>
               </div>
               <p className="font-medium tabular-nums text-foreground">{formatVND(entry.amount)}</p>

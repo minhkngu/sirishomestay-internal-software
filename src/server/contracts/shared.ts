@@ -7,7 +7,8 @@ import type { DepositEntry } from '@/domain/types'
 
 export type Lease = typeof leases.$inferSelect
 export type DepositContract = typeof depositContracts.$inferSelect
-export type SignStatus = 'draft' | 'exported' | 'signed'
+import type { SignStatus } from '@/domain/statuses'
+export type { SignStatus } from '@/domain/statuses'
 
 export const SIGN_RANK: Record<SignStatus, number> = { draft: 0, exported: 1, signed: 2 }
 

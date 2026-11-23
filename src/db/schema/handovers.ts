@@ -1,3 +1,4 @@
+import type { HandoverKind } from '@/domain/statuses'
 import { boolean, date, integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 import { assets } from './assets'
 import { leases } from './contracts'
@@ -11,7 +12,7 @@ export const handovers = pgTable('handovers', {
   roomId: uuid('room_id')
     .notNull()
     .references(() => rooms.id),
-  kind: text('kind').notNull(), // check_in | check_out
+  kind: text('kind').$type<HandoverKind>().notNull(),
   date: date('date', { mode: 'string' }).notNull(),
   status: text('status').notNull().default('draft'), // draft | done
   isDemo: boolean('is_demo').notNull().default(false),

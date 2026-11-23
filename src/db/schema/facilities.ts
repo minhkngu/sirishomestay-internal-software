@@ -1,5 +1,4 @@
 // Kiểu dữ liệu dùng chung, không tạo phụ thuộc lúc chạy.
-// eslint-disable-next-line boundaries/dependencies
 import type { BankAccount } from '@/domain/types'
 import { boolean, integer, jsonb, numeric, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core'
 

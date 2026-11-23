@@ -24,6 +24,11 @@ const boundariesConfig = {
         policies: [
           { from: { element: { type: 'domain' } }, allow: { to: { element: { type: 'domain' } } } },
           { from: { element: { type: 'db' } }, allow: { to: { element: { type: 'db' } } } },
+          // db chỉ được import kiểu từ domain (không phụ thuộc lúc chạy).
+          {
+            from: { element: { type: 'db' } },
+            allow: { to: { element: { type: 'domain' } }, dependency: { kind: 'type' } },
+          },
           { from: { element: { type: 'lib' } }, allow: { to: { element: { types: { anyOf: ['lib', 'domain'] } } } } },
           {
             from: { element: { type: 'server' } },
