@@ -2,53 +2,36 @@
 
 Tài liệu cho người (và agent) tiếp tục sửa repo. Đọc trước khi thêm tính năng, dời file hay đổi quy tắc import. Tóm tắt luật nằm ở mục Architecture của `CLAUDE.md`; file này giải thích chi tiết, trạng thái hiện tại và các bẫy.
 
-Cập nhật lần cuối: 20/11/2026.
+Cập nhật lần cuối: 23/11/2026.
 
-## 1. Đang ở đâu
+## 1. Các module
 
-Repo **đang chuyển** từ N-Layer sang **Modular monolith** (người dùng chọn ngày 20/11/2026). Lộ trình và từng bước: [docs/superpowers/plans/2026-11-19-chuan-hoa-repo.md](superpowers/plans/2026-11-19-chuan-hoa-repo.md).
+Repo là **Modular monolith**: mỗi mảng nghiệp vụ là một module ở `src/modules/<tên>/`, chia lớp `domain/`, `server/`, `ui/` bên trong. Dùng chung: `src/domain`, `src/components`, `src/lib`, `src/db`; route ở `src/app`.
 
-Trong lúc chuyển, hai cấu trúc cùng tồn tại:
-- Mảng **chưa chuyển**: code ở `src/server/<tên>/` và `src/features/<tên>/`, theo luật N-Layer (mục 3).
-- Mảng **đã chuyển**: code ở `src/modules/<mảng>/`, theo luật module (mục 4).
-
-Muốn biết một mảng đang ở đâu: xem bảng dưới. **Mỗi PR chuyển module phải cập nhật bảng này.**
-
-| Tầng | Module | Trạng thái | Vị trí hiện tại | Task |
-|---|---|---|---|---|
-| 1 | `platform` | Đã chuyển | `src/modules/platform/` (`settings-tabs.tsx` ghép giao diện platform và facilities nên nằm ở `src/app/(app)/settings/`; `auth-user.ts` nằm ở `src/lib/supabase/`) | 13 |
-| 2 | `users` | Đã chuyển | `src/modules/users/` | 14 |
-| 2 | `tenants` | Đã chuyển | `src/modules/tenants/` | 15 |
-| 2 | `facilities` | Đã chuyển | `src/modules/facilities/` (mọi component `features/rooms` đã chuyển vì không import dữ liệu hợp đồng, không còn gì chờ Task 21; `use-run.tsx` ở `src/components/`; `room-occupancy.ts` ở `modules/facilities/domain/`) | 16 |
-| 2 | `documents` | Đã chuyển | `src/modules/documents/` | 17 |
-| 3 | `assets` | Đã chuyển | `src/modules/assets/` | 18 |
-| 3 | `meters` | Đã chuyển | `src/modules/meters/` | 19 |
-| 4 | `leasing` | Đã chuyển | `src/modules/leasing/` (`server/`, `domain/`, `ui/` theo thư mục cũ: contracts, deposits, handovers, charges, invoices, incidents) | 20–21 |
-| 5 | `import` | Đã chuyển | `src/modules/import/` (`server/import/`, `ui/`; `targets.ts` thuần nên ở `domain/` để `ui` dùng được) | 21 |
-| 5 | `dashboard` | Đã chuyển | `src/modules/dashboard/` (`server/dashboard/`, `ui/`, `domain/reminders.ts`) | 21 |
-| 5 | `cashbook` | Đã chuyển | `src/modules/cashbook/` (sổ Thu chi, sở hữu bảng `expenses`; `src/domain/cashbook.ts` ở lại vì `leasing` cũng dùng; sửa khoản thu tiền thuê `updatePayment` thuộc `leasing`) | 20 |
-
-Việc nền trước khi chuyển (Prettier, CI, gỡ ghép ngược…) là Task 1–12 của plan; xem checkbox trong plan để biết task nào xong.
+| Tầng | Module | Phụ trách | Vị trí |
+|---|---|---|---|
+| 1 | `platform` | phiên đăng nhập, nhật ký, tệp và lưu trữ, cài đặt chung (`settings-tabs.tsx` ghép giao diện platform và facilities nên nằm ở `src/app/(app)/settings/`; `auth-user.ts` ở `src/lib/supabase/`) | `src/modules/platform/` |
+| 2 | `users` | người dùng, nhóm quyền, cơ sở được cấp | `src/modules/users/` |
+| 2 | `tenants` | khách thuê, giấy tờ tuỳ thân | `src/modules/tenants/` |
+| 2 | `facilities` | cơ sở, phòng, tiện ích, loại phí và giá (`use-run.tsx` ở `src/components/`; `room-occupancy.ts` ở `domain/`) | `src/modules/facilities/` |
+| 2 | `documents` | mẫu giấy tờ, mẫu hoá đơn, xem sẵn mẫu (`ui/use-lazy-preview.ts`; `pdf-inline.tsx` ở `src/components/`), dựng PDF/Word/PNG | `src/modules/documents/` |
+| 3 | `assets` | tài sản, kho, chuyển tài sản | `src/modules/assets/` |
+| 3 | `meters` | đồng hồ (mỗi phòng có sẵn điện, nước — mục 4), chỉ số và lịch sử chỉ số (trang Chỉ số một danh sách, `ui/reading-history.tsx`; `domain/meters-monthly.ts`), loại đồng hồ (`server/meter-types/`, `domain/meter-types.ts`) | `src/modules/meters/` |
+| 4 | `leasing` | cọc, hợp đồng, phụ lục, bàn giao, sổ cọc, phí phát sinh, hoá đơn (hàng loạt, hoá đơn lẻ, hoá đơn đầu giữ chỉ số riêng), thu tiền, sự cố | `src/modules/leasing/` |
+| 5 | `import` | nhập Excel (`targets.ts` thuần nên ở `domain/`) | `src/modules/import/` |
+| 5 | `dashboard` | nhắc việc | `src/modules/dashboard/` |
+| 5 | `cashbook` | sổ Thu chi, sở hữu bảng `expenses` (`src/domain/cashbook.ts` ở lại vì `leasing` cũng dùng; sửa khoản thu tiền thuê `updatePayment` thuộc `leasing`) | `src/modules/cashbook/` |
 
 ## 2. Luồng một yêu cầu
 
-- **Trang (server component)** trong `src/app/(app)/<mục>/page.tsx`: gọi `getAccessContext()` (`src/server/session.ts`, chuyển về `/login` nếu chưa đăng nhập hoặc bị khoá), rồi gọi service với `db` từ `@/db/client`. Trang không tự viết truy vấn (đang dọn ở Task 7).
-- **Thao tác của người dùng (client component)** gọi server action `src/server/<tên>/actions.ts`: `getAccessContext()` → `toActionResult(() => service(db, ctx, input))` (`src/lib/action-result.ts`, đổi lỗi đã biết thành `{ ok: false, error, fieldErrors }`, kể cả lỗi trùng khoá 23505) → `revalidatePath`.
+- **Trang (server component)** trong `src/app/(app)/<mục>/page.tsx`: gọi `getAccessContext()` (`src/modules/platform/server/session.ts`, chuyển về `/login` nếu chưa đăng nhập hoặc bị khoá), rồi gọi service với `db` từ `@/db/client`. Trang không tự viết truy vấn (ESLint chặn).
+- **Thao tác của người dùng (client component)** gọi server action qua cổng `actions.ts` của module (file `src/modules/<mảng>/server/<tên>/actions.ts`): `getAccessContext()` → `toActionResult(() => service(db, ctx, input))` (`src/lib/action-result.ts`, đổi lỗi đã biết thành `{ ok: false, error, fieldErrors }`, kể cả lỗi trùng khoá 23505) → `revalidatePath`.
 - **Service** `(db, ctx, input)`: `input` là `unknown`, parse bằng zod trong `schemas.ts`; kiểm quyền bằng `assertCan`/`can` (`src/domain/access.ts`); ghi nhật ký `recordAudit(tx, ctx, …)` trong cùng transaction.
 - **API route** chỉ có hai: `src/app/api/files/[id]` (tải/xem tệp qua URL ký) và `src/app/api/documents/preview` (xem trước giấy tờ). Hai route dùng `loadAccessContext` thay vì `getAccessContext`.
 - **Đăng nhập:** `src/proxy.ts` (Next 16 dùng `proxy.ts`, không phải `middleware.ts`) làm mới phiên Supabase và chuyển người chưa đăng nhập về `/login`.
 - **Popup thêm mới:** route chặn `src/app/(app)/@modal/(.)<mục>/new/page.tsx` bọc thân trang `new-<mục>.tsx` bằng `RouteModal`; F5 hoặc mở thẳng URL ra trang đầy đủ. Form tự chứa dùng `FormDialog`.
 
-## 3. Luật N-Layer (cho code chưa chuyển)
-
-- `src/app/` route mỏng; là nơi duy nhất được ghép nhiều feature (ví dụ `contracts/contract-detail.tsx` ghép charges, deposits, contracts, handovers).
-- `src/features/<tên>/components/` giao diện; không import `db`, không import feature khác.
-- `src/server/<tên>/` `service.ts`, `actions.ts`, `schemas.ts`; import `db`, `domain`, `lib`.
-- `src/domain/` quy tắc thuần, không import gì ngoài `src/domain`.
-- `src/db/` chỉ import `db`, trừ `import type` từ `src/domain` (kiểu trạng thái, `BankAccount`); ESLint chỉ cho dependency kind `type`.
-- `eslint-plugin-boundaries` trong `eslint.config.mjs` kiểm các luật này khi `npm run lint`.
-
-## 4. Kiến trúc đích: Modular monolith
+## 3. Cấu trúc và luật import
 
 ```
 src/modules/<mảng>/
@@ -58,7 +41,7 @@ src/modules/<mảng>/
   index.ts     cổng công khai phía server (service, kiểu)
   actions.ts   cổng server action cho giao diện (re-export, không có 'use server' ở file cổng)
   ui.ts        cổng component
-src/modules/registrations.ts   import mọi file có register* (mục 6); điểm ghép, không phải module
+src/modules/registrations.ts   import mọi file có register* (mục 5); điểm ghép, không phải module
 ```
 
 Luật:
@@ -66,55 +49,48 @@ Luật:
 - **Trong module:** `ui` → `domain`, cổng `actions.ts` và `server/**/actions.ts` của chính module, `src/components`, `src/domain`, `src/lib`; `import type` từ `index.ts`/`server/**` của chính module và `index.ts` của module tầng thấp hơn (giá trị thì không, để code server không lọt vào bundle trình duyệt); `ui.ts`/`actions.ts` của module tầng thấp hơn. `server` → `domain`, `server` của chính module, `src/db`, `src/domain`, `src/lib`, `index.ts` của module tầng thấp hơn. `domain` → `domain` của chính module, `src/domain`.
 - **Dùng chung** (`src/domain`, `src/components`, `src/lib`, `src/db`) không import module. `src/db` được `import type` từ `src/domain` (không import giá trị).
 - **Ghi bảng của module khác** chỉ qua API module đó. Đọc (select/join) bảng khác thì được. Luật ghi không có công cụ kiểm, chỉ giữ bằng review.
-- **Chia khi chuyển:** file domain chỉ một module dùng → vào module đó; hai module trở lên → ở lại `src/domain`. Component đi theo module của server nó import; import hai module ngang tầng → đặt cạnh route trong `src/app`.
+- **Đặt file:** file domain chỉ một module dùng → vào module đó; hai module trở lên → ở lại `src/domain`. Component đi theo module của server nó import; import hai module ngang tầng → đặt cạnh route trong `src/app`.
 
-- **`src/modules/registrations.ts`:** import được mọi module và `src/server`; chỉ điểm vào được import nó: `src/app`, `src/server/**/actions.ts`, cổng `actions.ts` và `server/**/actions.ts` của module.
+- **`src/modules/registrations.ts`:** import được mọi module; chỉ điểm vào được import nó: `src/app` và `server/**/actions.ts` của module; cổng `actions.ts` chỉ re-export, không import.
 - **Công cụ kiểm:** `eslint-plugin-boundaries` trong `eslint.config.mjs` kiểm mọi luật trên (`npm run lint`); `tests/unit/architecture/modules.test.ts` dựng đồ thị import (bỏ `import type`) và kiểm lại tầng, cổng công khai, dùng chung không import module.
-
-Luật chuyển tiếp (bỏ ở Task 22): code cũ (`src/server`, `src/features`, `src/app`) được import module qua cổng công khai; module **không** import `src/server`/`src/features`. Chuyển từ tầng thấp lên nên module đã chuyển chỉ cần module đã chuyển.
 
 ### Vì sao chia như vậy
 
 - **`leasing` gom hợp đồng, phụ lục, bàn giao, sổ cọc, phí phát sinh, hoá đơn, sự cố.** `contracts`/`addenda` ghi khoảng 20 bảng (hoá đơn đầu tiên khi tạo hợp đồng, hoá đơn thanh lý, chỉ số khi bàn giao, xoá dây chuyền khi xoá hợp đồng); duyệt hoá đơn thanh lý lại chốt hợp đồng. Tách thành hai module sẽ phụ thuộc vòng.
-- **Trạng thái phòng** (`listRoomsWithStatus`, `getRoomDetail`) cần dữ liệu hợp đồng nên thuộc `leasing`; `facilities` chỉ CRUD cơ sở, phòng, tiện ích, phí (đã làm ở Task 9: `src/modules/leasing/server/contracts/room-view.ts`).
-- **Gán mẫu hoá đơn** cho hợp đồng/hoá đơn ghi bảng của `leasing` nên thuộc `leasing`, không thuộc `documents` (đã làm ở Task 9: `src/modules/leasing/server/invoices/template-assignment.ts`).
-- **`documents`** không biết hợp đồng hay hoá đơn: module tầng trên đăng ký loader cho nó (mục 6).
+- **Trạng thái phòng** (`listRoomsWithStatus`, `getRoomDetail`) cần dữ liệu hợp đồng nên thuộc `leasing`; `facilities` chỉ CRUD cơ sở, phòng, tiện ích, phí (`src/modules/leasing/server/contracts/room-view.ts`).
+- **Gán mẫu hoá đơn** cho hợp đồng/hoá đơn ghi bảng của `leasing` nên thuộc `leasing`, không thuộc `documents` (`src/modules/leasing/server/invoices/template-assignment.ts`).
+- **`documents`** không biết hợp đồng hay hoá đơn: module tầng trên đăng ký loader cho nó (mục 5).
 
-## 5. Quy tắc nghiệp vụ cần biết trước khi sửa
+## 4. Quy tắc nghiệp vụ cần biết trước khi sửa
 
 - **Quyền:** 7 nhóm (`src/domain/access.ts`). Có `settings` là admin, thấy mọi cơ sở. Người khác chỉ thấy cơ sở được cấp. `assertCan` ném `NotFoundError` khi ngoài phạm vi cơ sở (không lộ sự tồn tại), `ForbiddenError` khi thiếu nhóm quyền. Khách mất cơ sở dùng `NO_FACILITY` (chỉ admin thấy). Số passport/CCCD bị che (`maskId`) với người không có `tenants_contracts`.
 - **Hoá đơn tháng N** (`src/modules/leasing/domain/invoice-builder.ts`): tiền phòng + phí cố định của kỳ N (trả trước); điện, nước, phí theo lần của tháng N−1 (trả sau). Có chia ngày lẻ (`proration.ts`) và hệ số kỳ.
-- **Phí hợp đồng:** lưu ở `lease_fee_snapshots` (chụp giá lúc ký). Điện, nước là dòng phí gắn đúng một đồng hồ của phòng, đơn giá lấy từ hợp đồng; không còn kiểu cũ (`lease_fees`, `feeModel`, bảng giá cơ sở `utility_rates`).
+- **Phí hợp đồng:** lưu ở `lease_fee_snapshots` (chụp giá lúc ký). Điện, nước là dòng phí gắn đúng một đồng hồ của phòng (bảng `lease_fee_meters`; mức dùng tính ở `src/modules/leasing/domain/meter-fee-usage.ts`), đơn giá lấy từ hợp đồng; không còn kiểu cũ (`lease_fees`, `feeModel`, bảng giá cơ sở `utility_rates`).
 - **Hợp đồng cọc → hợp đồng thuê:** mỗi phòng tối đa 1 hợp đồng cọc `pending` và 1 hợp đồng `active` (unique index có điều kiện trong `src/db/schema/contracts.ts`).
 - **Lịch sử/khôi phục hợp đồng:** mỗi lần sửa/xoá chụp bản ghi vào `contract_versions` (`server/contracts/history.ts`, `restore.ts`).
 - **Ghi chéo trong một transaction:** hàm hậu tố `InTransaction` (`createAssetInTransaction`, `moveAssetsInTransaction`, `setAssetStatusInTransaction`, `startHandoverInTransaction`) nhận `tx` để module khác gọi trong cùng transaction. Giữ mẫu này khi cần ghi qua module.
 - **Phòng mới có sẵn đồng hồ điện, nước:** `createRoom`/`createRoomsBulk` (facilities, tầng 2) không import meters (tầng 3); facilities mở điểm móc `registerRoomsCreatedHook(name, hook)`, chạy mọi hook trong cùng transaction tạo phòng (`hook(tx, roomIds, ngày)`), meters đăng ký `createDefaultMeters` vào đó. Hook lỗi thì phòng cũng không được tạo. Gọi service tạo phòng mà chưa nạp `src/modules/registrations.ts` (vd trong test) thì phòng không có đồng hồ; test `tests/integration/rooms-created-hook.test.ts`.
 - **Dữ liệu demo:** cột `isDemo` đánh dấu dữ liệu giả của `npm run db:seed`.
 
-## 6. Bẫy đã biết
+## 5. Bẫy đã biết
 
 | Bẫy | Hậu quả | Cách xử lý / trạng thái |
 |---|---|---|
-| Đăng ký kiểu side-effect: `registerOwnerResolver`, `registerExportOwnerResolver`, `registerDocLoader`, `registerPdfLoader`, `registerRoomsCreatedHook` chỉ chạy khi file đăng ký đã được import | Route lạnh báo "Loại tệp chưa được hỗ trợ" hoặc không xuất được giấy tờ | Đã xử lý (Task 8): `src/modules/registrations.ts` (Task 12 dời từ `src/server/`) import mọi file có `register*`, và được import ở dòng đầu mọi `actions.ts`, API `route.ts` và `src/app/(app)/layout.tsx`; test `tests/unit/architecture/registrations.test.ts` kiểm. Module mới có `register*` phải thêm vào file đó |
+| Đăng ký kiểu side-effect: `registerOwnerResolver`, `registerExportOwnerResolver`, `registerDocLoader`, `registerPdfLoader`, `registerRoomsCreatedHook` chỉ chạy khi file đăng ký đã được import | Route lạnh báo "Loại tệp chưa được hỗ trợ", không xuất được giấy tờ, hoặc phòng mới không có đồng hồ điện nước | Module có `register*` phải được import trong `src/modules/registrations.ts` — `tests/unit/architecture/registrations.test.ts` kiểm |
 | Font PDF dùng đường dẫn cứng `src/modules/documents/server/pdf/fonts/` ở `next.config.ts` (`outputFileTracingIncludes`) và `src/modules/documents/server/pdf/fonts.ts` | Dời thư mục mà quên: local, test vẫn xanh, **PDF trên Vercel hỏng** | Sửa cả hai chỗ; test: `tests/unit/pdf-fonts.test.ts` (bắt lệch đường dẫn hoặc glob); luôn thử "Xem PDF" trên preview |
 | `cascade-delete.ts` (xoá cơ sở/phòng) ghi bảng của hợp đồng, hoá đơn… | Vi phạm luật "ghi bảng module khác" | Ngoại lệ có chủ ý vì DB không có `ON DELETE CASCADE`; không "sửa" bằng cách thêm cascade trong schema nếu chưa bàn |
-| Phụ thuộc hai chiều `addenda ↔ invoices`, `invoices ↔ templates` | Khó tách, dễ vòng import | Cả `addenda` và `invoices` vào `leasing`; `invoices ↔ templates` gỡ ở Task 8 |
-| 8 trang trong `src/app` tự viết truy vấn Drizzle | Bỏ qua kiểm quyền của service | Đã xử lý ở Task 7: truy vấn chuyển vào service, ESLint chặn `@/db` schema và `drizzle-orm` trong `src/app` |
-| `NEXT_PUBLIC_*` đọc kiểu `process.env[name]` | Không được nhúng vào bundle trình duyệt, đăng nhập hỏng | Luôn viết literal `process.env.NEXT_PUBLIC_X` (Task 5 gom vào `src/lib/env.ts`) |
+| `NEXT_PUBLIC_*` đọc kiểu `process.env[name]` | Không được nhúng vào bundle trình duyệt, đăng nhập hỏng | Luôn viết literal `process.env.NEXT_PUBLIC_X` (gom ở `src/lib/env.ts`) |
 | Lưu trữ: `STORAGE_DRIVER` mặc định `supabase`; thiếu biến Supabase thì rơi về **bộ nhớ trong** (tệp mất khi khởi động lại) | Tưởng đã lưu ảnh nhưng không | Kiểm biến khi chạy thật; `r2` thiếu biến thì báo lỗi |
 | Next.js 16 khác bản quen thuộc | Viết theo trí nhớ dễ sai API | Đọc `node_modules/next/dist/docs/` trước (xem `AGENTS.md`) |
 | `@napi-rs/canvas`, `pdfkit` cần đóng gói đặc biệt trên Vercel | Xuất PNG/PDF hỏng trên production | Giữ `serverExternalPackages` và `outputFileTracingIncludes` trong `next.config.ts` |
 
-## 7. Kiểm thử
+## 6. Kiểm thử
 
-- `npm test`: unit (`tests/unit`, gồm test kiến trúc từ Task 8/12) và integration (`tests/integration`) chạy với PGlite qua `createTestDb()` ở `tests/helpers/db.ts`. Không cần Docker hay Supabase. Integration gọi thẳng service với `ctx` giả.
+- `npm test`: unit (`tests/unit`, gồm test kiến trúc) và integration (`tests/integration`) chạy với PGlite qua `createTestDb()` ở `tests/helpers/db.ts`. Không cần Docker hay Supabase. Integration gọi thẳng service với `ctx` giả.
 - `npm run test:e2e`: Playwright trên môi trường có `NEXT_PUBLIC_DEMO_MODE=1`; chạy `node scripts/e2e-preflight.mjs` trước, đặt `E2E_BASE_URL`.
-- Mọi PR (sau Task 4) chạy CI: định dạng, lint, typecheck, test, kiểm không sinh migration, build.
-- Không có migration nào trong lộ trình chuyển kiến trúc: revert code bất kỳ PR nào không cần đụng DB.
+- Mọi PR chạy CI: định dạng, lint, typecheck, test, kiểm không sinh migration, build.
 
-## 8. Giữ tài liệu này đúng
+## 7. Giữ tài liệu này đúng
 
-- PR chuyển một module: cập nhật bảng mục 1 (trạng thái, vị trí hiện tại).
-- PR đổi luật import, thêm module, đổi tầng: cập nhật mục 4, `CLAUDE.md` (Architecture) và `MODULE_TIERS`.
-- Phát hiện bẫy mới: thêm một dòng vào mục 6.
-- Khi xong Task 22: bỏ mục 3, luật chuyển tiếp ở mục 4 và các dòng bẫy đã xử lý; mục 1 chỉ còn bảng module.
+- PR đổi luật import, thêm module, đổi tầng: cập nhật bảng mục 1, mục 3, `CLAUDE.md` (Architecture) và `MODULE_TIERS` trong `eslint.config.mjs`.
+- Phát hiện bẫy mới: thêm một dòng vào mục 5.

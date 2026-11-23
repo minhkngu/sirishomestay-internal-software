@@ -83,12 +83,11 @@ function place(file: string): Place {
   return { kind: 'other' }
 }
 
-/** Điểm vào được import registrations: route/layout, actions.ts cũ, cổng actions.ts và server/**\/actions.ts của module. */
+/** Điểm vào được import registrations: route/layout, actions.ts cũ và server/**\/actions.ts của module (cổng actions.ts không import). */
 function isEntryPoint(file: string): boolean {
   return (
     file.startsWith('src/app/') ||
     /^src\/server\/.+\/actions\.ts$/.test(file) ||
-    /^src\/modules\/[^/]+\/actions\.ts$/.test(file) ||
     /^src\/modules\/[^/]+\/server\/(.+\/)?actions\.ts$/.test(file)
   )
 }
