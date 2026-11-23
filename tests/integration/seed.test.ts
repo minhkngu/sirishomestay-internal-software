@@ -39,7 +39,7 @@ function fakeAuth(): AuthAdmin {
 // Các test chỉ đọc dùng chung một DB đã seed; test nào ghi dữ liệu thì tự tạo DB riêng.
 let seeded: ReturnType<typeof createTestDb> | undefined
 function seededDb() {
-  seeded ??= createTestDb().then(async (db) => {
+  seeded ??= createTestDb({ keepUntilFileEnd: true }).then(async (db) => {
     await runSeed(db, fakeAuth(), { today: '2026-11-16', password: 'x' })
     return db
   })
