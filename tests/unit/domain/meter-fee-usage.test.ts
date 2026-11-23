@@ -36,7 +36,6 @@ describe('meterFeeUsage', () => {
     const r = meterFeeUsage({ ...base, lease: lease({ startDate: '2026-11-15' }), startDate: '2026-11-15', linked: m, meters: [m], readings: [reading('m', '2026-11-30', 150)] })
     expect(r.missing).toEqual(['m'])
   })
-
   it('cắt đầu kỳ theo ngày bắt đầu hợp đồng: không tính phần của khách trước', () => {
     const m = electric('m', 'R1')
     // khách mới vào 15/11, chỉ số bàn giao 120; tính từ 15/11 chứ không từ 01/11

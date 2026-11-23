@@ -365,12 +365,10 @@ describe('meters', () => {
       })
     })
 
-    it('không có lần chốt sau ngày bắt đầu thì dùng chỉ số lúc lắp đồng hồ', async () => {
+    it('không có lần chốt từ ngày bắt đầu thì chưa có chỉ số ban đầu, không lấy chỉ số lúc lắp', async () => {
       const { fee } = await feeLease('2026-10-15')
       await db.insert(meterReadings).values({ meterId: m.E101, period: '2025-01', readOn: '2025-01-01', value: 500, kind: 'handover' })
-      expect(await listLeaseMeterInitials(db, hung(), fee.leaseId)).toEqual({
-        [fee.id]: { meterId: m.E101, meterCode: null, value: 0, readOn: '2025-01-01', readingId: null },
-      })
+      expect(await listLeaseMeterInitials(db, hung(), fee.leaseId)).toEqual({})
     })
 
     it('người không có quyền meters nhận rỗng', async () => {

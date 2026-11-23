@@ -131,7 +131,39 @@ type MeterPanel = { leaseFeeId: string; name: string; unit: string; /** Chỉ s�
 const periodLabel = (period: string) => `${period.slice(5)}/${period.slice(0, 4)}`
 const NEW_READING = '__new'
 /** Chỉ số đã chốt của đồng hồ: danh sách các tháng, thêm dòng "Chốt chỉ số" cuối danh sách; chọn một dòng mở popup điền số (ghi ngược về tab Chỉ số). */
-function MeterReadingsPanel({ panel, editable, consumption, staged, onStage, stagedOpening, onStageOpening, onApply }: { panel: MeterPanel; editable: boolean; consumption: number; /** Chỉ số đã điền nhưng chưa lưu, theo tháng. */ staged: Record<string, string>; onStage: (period: string, value: string) => void; /** Số đầu (bàn giao, ban đầu) đã sửa nhưng chưa lưu, theo tháng của hoá đơn. */ stagedOpening: Record<string, string>; onStageOpening: (period: string, value: string) => void; /** Lưu ngay số vừa điền (cùng các chỉ số chưa lưu) vào hoá đơn. */ onApply: (readings: Record<string, string>, openings: Record<string, string>) => void }) {
+/** Hoá đơn kỳ ký hợp đồng: số đầu, số cuối của riêng hoá đơn (chép từ chỉ số ban đầu lúc tạo), sửa được, không liên quan hợp đồng hay hoá đơn khác. */
+function FirstInvoiceReadings({ snap, unit, editable, consumption, onSave, readOn }: { snap: { opening: number; closing: number }; unit: string; editable: boolean; consumption: number; onSave: (opening: number, closing: number) => void; readOn?: string }) {
+  const [open, setOpen] = useState(false)
+  const [o, setO] = useState(''), [c, setC] = useState('')
+  const num = (t: string) => (/^\d+$/.test(t.trim()) ? Number(t.trim()) : null)
+  const op = num(o), cl = num(c)
+  const tooLow = op !== null && cl !== null && cl < op
+  const fmtN = (n: number) => n.toLocaleString('vi-VN')
+  return (
+    <div className="text-[11px] text-muted-foreground">
+      <p className="tabular-nums">Số đầu kỳ <span className="font-medium text-foreground">{fmtN(snap.opening)}</span> · Số cuối kỳ <span className="font-medium text-foreground">{fmtN(snap.closing)}</span></p>
+      <p className="mt-0.5">{readOn ? `Chỉ số ban đầu ${formatDateVN(readOn)} · ` : ''}Tiêu thụ: <span className="font-medium tabular-nums text-foreground">{fmtN(consumption)} {unit}</span>
+        {editable && <button type="button" className="ml-2 text-primary hover:underline" onClick={() => { setO(String(snap.opening)); setC(String(snap.closing)); setOpen(true) }}>Sửa</button>}
+      </p>
+      {open && (
+        <FormDialog open onOpenChange={(v) => { if (!v) setOpen(false) }} title="Sửa số đầu, số cuối kỳ" description="Số riêng của hoá đơn này, không đổi hợp đồng hay chỉ số của hoá đơn khác." size="sm">
+          <div className="space-y-4 pb-1">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5"><Label htmlFor="first-open">Số đầu kỳ ({unit})</Label><Input id="first-open" inputMode="numeric" value={o} onChange={(e) => setO(e.target.value)} className="h-9 text-right tabular-nums" /></div>
+              <div className="space-y-1.5"><Label htmlFor="first-close">Số cuối kỳ ({unit})</Label><Input id="first-close" inputMode="numeric" value={c} onChange={(e) => setC(e.target.value)} className="h-9 text-right tabular-nums" /></div>
+            </div>
+            <p className={tooLow ? 'text-sm text-destructive' : 'text-sm text-muted-foreground'}>{tooLow ? 'Số cuối kỳ không được nhỏ hơn số đầu kỳ.' : <>Tiêu thụ: <span className="font-medium tabular-nums text-foreground">{op !== null && cl !== null ? fmtN(cl - op) : '—'} {unit}</span></>}</p>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Huỷ</Button>
+              <Button type="button" disabled={op === null || cl === null || tooLow} onClick={() => { if (op !== null && cl !== null) { onSave(op, cl); setOpen(false) } }}>Lưu chỉ số</Button>
+            </div>
+          </div>
+        </FormDialog>
+      )}
+    </div>
+  )
+}
+function MeterReadingsPanel({ panel, editable, consumption, snapshot, onSnapshot, staged, onStage, stagedOpening, onStageOpening, onApply }: { panel: MeterPanel; editable: boolean; consumption: number; /** Số đầu, số cuối riêng của hoá đơn kỳ ký hợp đồng (chép từ chỉ số ban đầu lúc tạo). */ snapshot?: { opening: number; closing: number } | null; onSnapshot?: (opening: number, closing: number) => void; /** Chỉ số đã điền nhưng chưa lưu, theo tháng. */ staged: Record<string, string>; onStage: (period: string, value: string) => void; /** Số đầu (bàn giao, ban đầu) đã sửa nhưng chưa lưu, theo tháng của hoá đơn. */ stagedOpening: Record<string, string>; onStageOpening: (period: string, value: string) => void; /** Lưu ngay số vừa điền (cùng các chỉ số chưa lưu) vào hoá đơn. */ onApply: (readings: Record<string, string>, openings: Record<string, string>) => void }) {
   const [period, setPeriod] = useState<string | null>(null)
   const [text, setText] = useState('')
   const [openText, setOpenText] = useState('')
@@ -180,14 +212,9 @@ function MeterReadingsPanel({ panel, editable, consumption, staged, onStage, sta
   }
   // Hợp đồng mới bắt đầu, chưa có tháng nào để chốt: chỉ hiện chỉ số ban đầu ghi ở hợp đồng làm số đầu và số cuối kỳ
   if (panel.rows.length === 0) {
-    if (!panel.initial) return <span className="text-muted-foreground/60">—</span>
-    const v = panel.initial.value.toLocaleString('vi-VN')
-    return (
-      <div className="text-[11px] text-muted-foreground">
-        <p className="tabular-nums">Số đầu kỳ <span className="font-medium text-foreground">{v}</span> · Số cuối kỳ <span className="font-medium text-foreground">{v}</span></p>
-        <p className="mt-0.5">Chỉ số ban đầu {formatDateVN(panel.initial.readOn)}, chưa phát sinh · Tiêu thụ: <span className="font-medium tabular-nums text-foreground">{consumption.toLocaleString('vi-VN')} {panel.unit}</span></p>
-      </div>
-    )
+    const snap = snapshot ?? (panel.initial ? { opening: panel.initial.value, closing: panel.initial.value } : null)
+    if (!snap) return <span className="text-muted-foreground/60">—</span>
+    return <FirstInvoiceReadings snap={snap} unit={panel.unit} editable={editable && !!onSnapshot} consumption={consumption} onSave={(o, c) => onSnapshot?.(o, c)} readOn={panel.initial?.readOn} />
   }
   return (
     <div className="text-[11px] text-muted-foreground">
@@ -448,7 +475,7 @@ export function InvoiceEditor(p: Props) {
                     {isTimeBased(l) && !isMeterLine(l) ? <LineTime line={l} defaultFrom={p.start} defaultTo={p.end} fullMonth={p.fullMonth} proration={p.proration} editable={p.status === 'draft'} onChange={(meta) => set(i, timePatch(l, meta))} /> : <span className="text-muted-foreground/60">—</span>}
                   </td>
                   <td className="p-2.5 align-top">
-                    {(() => { const panel = p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId); return panel ? <MeterReadingsPanel panel={panel} editable={p.status === 'draft'} consumption={l.quantity} staged={stagedFor(panel.leaseFeeId)} onStage={(period, value) => setStaged((cur) => ({ ...cur, [`${panel.leaseFeeId}|${period}`]: value }))} onApply={(readings, openings) => { if (!p.id) savePreviewReadings(panel.leaseFeeId, readings, openings); else saveAll({ staged: Object.fromEntries(Object.entries(readings).map(([k, v]) => [`${panel.leaseFeeId}|${k}`, v])), opening: Object.fromEntries(Object.entries(openings).map(([k, v]) => [`${panel.leaseFeeId}|${k}`, v])) }) }} stagedOpening={stagedOpeningFor(panel.leaseFeeId)} onStageOpening={(period, value) => setStagedOpening((cur) => ({ ...cur, [`${panel.leaseFeeId}|${period}`]: value }))} /> : <span className="text-muted-foreground/60">—</span> })()}
+                    {(() => { const panel = p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId); return panel ? <MeterReadingsPanel panel={panel} editable={p.status === 'draft'} consumption={l.quantity} snapshot={typeof l.meta?.opening === 'number' && typeof l.meta?.closing === 'number' ? { opening: l.meta.opening, closing: l.meta.closing } : null} onSnapshot={(opening, closing) => set(i, { meta: { ...l.meta, opening, closing }, quantity: closing - opening, amount: Math.round((closing - opening) * l.unitPrice) })} staged={stagedFor(panel.leaseFeeId)} onStage={(period, value) => setStaged((cur) => ({ ...cur, [`${panel.leaseFeeId}|${period}`]: value }))} onApply={(readings, openings) => { if (!p.id) savePreviewReadings(panel.leaseFeeId, readings, openings); else saveAll({ staged: Object.fromEntries(Object.entries(readings).map(([k, v]) => [`${panel.leaseFeeId}|${k}`, v])), opening: Object.fromEntries(Object.entries(openings).map(([k, v]) => [`${panel.leaseFeeId}|${k}`, v])) }) }} stagedOpening={stagedOpeningFor(panel.leaseFeeId)} onStageOpening={(period, value) => setStagedOpening((cur) => ({ ...cur, [`${panel.leaseFeeId}|${period}`]: value }))} /> : <span className="text-muted-foreground/60">—</span> })()}
                   </td>
                   <td className="p-2.5 align-top">
                     {isMeterLine(l)

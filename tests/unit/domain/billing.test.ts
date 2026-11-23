@@ -266,6 +266,12 @@ describe('buildMonthlyInvoice', () => {
     const noMeter = buildMonthlyInvoice({ ...base, lease: lease({ ...terms(), occupantIds: ['t1', 't2'] }), feeMeterLinks: [] })
     expect(noMeter.warnings.join(' ')).toContain('Chưa có đồng hồ Điện')
   })
+  it('số cuối nhỏ hơn số đầu: vẫn giữ dòng điện 0 đồng kèm cảnh báo, không mất dòng', () => {
+    const r = buildMonthlyInvoice({ ...base, lease: lease({ ...terms(), occupantIds: ['t1', 't2'] }), readings: [{ meterId: 'me', period: '2026-09', readOn: '2026-09-30', value: 1000 }, { meterId: 'me', period: '2026-10', readOn: '2026-10-31', value: 900 }] })
+    expect(r.warnings.join(' ')).toContain('Điện')
+    expect(r.warnings.join(' ')).toContain('nhỏ hơn')
+    expect(r.lines.find((l) => l.meta?.leaseFeeId === 'e1')).toMatchObject({ quantity: 0, amount: 0 })
+  })
   it('hợp đồng kết thúc giữa kỳ: tiền phòng lẻ đến ngày kết thúc', () => {
     const t = { ...terms(), endDate: '2026-11-20' }
     expect(buildMonthlyInvoice({ ...base, lease: lease({ ...t, occupantIds: ['t1', 't2'] }) }).lines.find((l) => l.type === 'rent')?.amount).toBe(6_000_000)
