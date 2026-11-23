@@ -3,30 +3,19 @@ import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { formatDateVN, todayVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
+import { DEPOSIT_ENTRY_LABELS, runningDepositBalances } from '@/domain/deposit'
+import type { DepositEntry } from '@/domain/types'
 import { MoneyInput } from '@/components/ui/money-input'
 import { StatusChip } from '@/components/contract-ui'
 import { addDepositEntryAction, markDepositDoneAction } from '@/server/charges/actions'
 
+// Dòng từ DB có `type`/`status` kiểu chuỗi; giá trị hợp lệ do cột DB bảo đảm.
 type Entry = { id: string; date: string; type: string; amount: number; status: string }
-const labels: Record<string, string> = {
-  collect: 'Thu cọc',
-  topup: 'Thu bổ sung',
-  deduct: 'Khấu trừ',
-  refund: 'Hoàn cọc',
-  forfeit: 'Mất cọc',
-}
 
 export function DepositLedger({ entries, canEdit, leaseId }: { entries: Entry[]; canEdit: boolean; leaseId: string }) {
   const [pending, startTransition] = useTransition()
   const [amount, setAmount] = useState('')
-  const balances = entries.reduce<number[]>((result, entry) => {
-    const previous = result.at(-1) ?? 0
-    return [
-      ...result,
-      previous +
-        (entry.status === 'done' ? (['collect', 'topup'].includes(entry.type) ? entry.amount : -entry.amount) : 0),
-    ]
-  }, [])
+  const balances = runningDepositBalances(entries as Pick<DepositEntry, 'type' | 'amount' | 'status'>[])
   const current = balances.at(-1) ?? 0
 
   return (
@@ -51,7 +40,9 @@ export function DepositLedger({ entries, canEdit, leaseId }: { entries: Entry[];
             {entries.map((entry, index) => (
               <tr key={entry.id}>
                 <td className="py-3 pr-4 tabular-nums text-foreground">{formatDateVN(entry.date)}</td>
-                <td className="py-3 pr-4 text-foreground">{labels[entry.type] ?? entry.type}</td>
+                <td className="py-3 pr-4 text-foreground">
+                  {DEPOSIT_ENTRY_LABELS[entry.type as DepositEntry['type']] ?? entry.type}
+                </td>
                 <td className="py-3 pr-4 text-right font-medium tabular-nums text-foreground">
                   {formatVND(entry.amount)}
                 </td>
@@ -126,7 +117,9 @@ export function DepositLedger({ entries, canEdit, leaseId }: { entries: Entry[];
           <li key={entry.id} className="space-y-1.5 py-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-medium text-foreground">{labels[entry.type] ?? entry.type}</p>
+                <p className="font-medium text-foreground">
+                  {DEPOSIT_ENTRY_LABELS[entry.type as DepositEntry['type']] ?? entry.type}
+                </p>
                 <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">{formatDateVN(entry.date)}</p>
               </div>
               <p className="font-medium tabular-nums text-foreground">{formatVND(entry.amount)}</p>
@@ -189,11 +182,11 @@ export function DepositLedger({ entries, canEdit, leaseId }: { entries: Entry[];
               name="type"
               className="h-9 rounded-lg border border-border/80 bg-card px-2 text-[13px] text-foreground"
             >
-              <option value="topup">Thu bổ sung</option>
-              <option value="collect">Thu cọc</option>
-              <option value="deduct">Khấu trừ</option>
-              <option value="refund">Hoàn cọc</option>
-              <option value="forfeit">Mất cọc</option>
+              {(['topup', 'collect', 'deduct', 'refund', 'forfeit'] as const).map((type) => (
+                <option key={type} value={type}>
+                  {DEPOSIT_ENTRY_LABELS[type]}
+                </option>
+              ))}
             </select>
           </label>
           <label className="grid gap-1 text-xs text-muted-foreground">

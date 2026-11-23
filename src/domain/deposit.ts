@@ -1,10 +1,28 @@
 import type { DepositEntry, ISODate } from './types'
 
-/** Số dư cọc: chỉ dòng `done`; collect/topup cộng, deduct/refund/forfeit trừ. */
-export function depositBalance(entries: DepositEntry[]): number {
-  return entries
-    .filter((e) => e.status === 'done')
-    .reduce((sum, e) => sum + (e.type === 'collect' || e.type === 'topup' ? e.amount : -e.amount), 0)
+type BalanceEntry = Pick<DepositEntry, 'type' | 'amount' | 'status'>
+
+/** Nhãn hiển thị của từng loại dòng sổ cọc. */
+export const DEPOSIT_ENTRY_LABELS: Record<DepositEntry['type'], string> = {
+  collect: 'Thu cọc',
+  topup: 'Thu cọc bổ sung',
+  deduct: 'Khấu trừ',
+  refund: 'Hoàn cọc',
+  forfeit: 'Mất cọc',
+}
+
+/** Số dư sau từng dòng: chỉ dòng `done` làm đổi; collect/topup cộng, deduct/refund/forfeit trừ. */
+export function runningDepositBalances(entries: BalanceEntry[]): number[] {
+  let running = 0
+  return entries.map((e) => {
+    if (e.status === 'done') running += e.type === 'collect' || e.type === 'topup' ? e.amount : -e.amount
+    return running
+  })
+}
+
+/** Số dư cọc hiện tại: số dư sau dòng cuối, 0 nếu chưa có dòng. */
+export function depositBalance(entries: BalanceEntry[]): number {
+  return runningDepositBalances(entries).at(-1) ?? 0
 }
 
 /** Tiền cọc đổi theo phụ lục: dòng thu bổ sung hoặc hoàn chênh lệch (chờ thu/chi), hoặc null nếu không đổi. */

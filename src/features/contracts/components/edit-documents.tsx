@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatDateVN, todayVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
+import { DEPOSIT_ENTRY_LABELS } from '@/domain/deposit'
+import type { DepositEntry } from '@/domain/types'
 import { BareSelect } from './contract-form-ui'
 
 export type DepositRow = { id: string; date: string; type: string; amount: number; status: string }
@@ -23,13 +25,6 @@ export const emptyDocsDraft: DocsDraft = { signedFile: null, photos: [], newEntr
 export const docsDraftChanged = (d: DocsDraft) =>
   !!d.signedFile || d.photos.length > 0 || d.newEntries.length > 0 || Object.keys(d.doneEntries).length > 0
 
-const TYPE: Record<string, string> = {
-  collect: 'Thu cọc',
-  topup: 'Thu bổ sung',
-  deduct: 'Khấu trừ',
-  refund: 'Hoàn cọc',
-  forfeit: 'Mất cọc',
-}
 const METHOD = { cash: 'Tiền mặt', transfer: 'Chuyển khoản', other: 'Khác' } as const
 
 /** Giấy tờ, sổ cọc và bàn giao trong popup "Sửa hợp đồng": chỉ ghi nháp, mọi thứ được lưu khi bấm "Lưu thay đổi". */
@@ -160,7 +155,7 @@ export function EditDocuments({
                   return (
                     <tr key={e.id}>
                       <td className="py-1.5 pr-3">{formatDateVN(e.date)}</td>
-                      <td className="py-1.5 pr-3">{TYPE[e.type] ?? e.type}</td>
+                      <td className="py-1.5 pr-3">{DEPOSIT_ENTRY_LABELS[e.type as DepositEntry['type']] ?? e.type}</td>
                       <td className="py-1.5 pr-3">{formatVND(e.amount)}</td>
                       <td className="py-1.5 pr-3">{done ? 'Sẽ hoàn tất' : e.status === 'done' ? 'Đã xong' : 'Chờ'}</td>
                       <td className="py-1.5 pr-3">{formatVND(balances[i])}</td>
@@ -228,7 +223,7 @@ export function EditDocuments({
                 {draft.newEntries.map((n) => (
                   <tr key={n.key} className="bg-muted/40">
                     <td className="py-1.5 pr-3">{formatDateVN(n.date)}</td>
-                    <td className="py-1.5 pr-3">{TYPE[n.type]}</td>
+                    <td className="py-1.5 pr-3">{DEPOSIT_ENTRY_LABELS[n.type]}</td>
                     <td className="py-1.5 pr-3">{formatVND(n.amount)}</td>
                     <td className="py-1.5 pr-3">Dòng mới (chờ)</td>
                     <td />
@@ -277,7 +272,10 @@ function NewEntry({ onAdd }: { onAdd: (entry: DocsDraft['newEntries'][number]) =
           ariaLabel="Loại"
           value={type}
           onValueChange={(value) => setType(value as 'topup' | 'collect' | 'deduct' | 'refund' | 'forfeit')}
-          options={['topup', 'collect', 'deduct', 'refund', 'forfeit'].map((k) => ({ value: k, label: TYPE[k] }))}
+          options={(['topup', 'collect', 'deduct', 'refund', 'forfeit'] as const).map((k) => ({
+            value: k,
+            label: DEPOSIT_ENTRY_LABELS[k],
+          }))}
           className="h-8 w-28 rounded-lg px-2 py-0 text-xs"
         />
       </div>
