@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
+import { updateMeterReadingAction } from '@/server/meters/actions'
 import { MoneyInput } from '@/components/ui/money-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { FeePickerDialog, type FeeOption } from '@/components/fee-picker-dialog'
@@ -179,7 +180,15 @@ function MeterReadingsPanel({ panel, editable, consumption, snapshot, onSnapshot
   }
   const fmt = (n: number | null | undefined) => n == null ? '—' : n.toLocaleString('vi-VN')
   const rowLabel = (r: MeterPanel['rows'][number]) => staged[r.period] !== undefined ? `Tháng ${periodLabel(r.period)} · ${fmt(openingOf(r))} – ${fmt(Number(staged[r.period]))} ` : r.value == null ? `Tháng ${periodLabel(r.period)} · chưa chốt` : `Tháng ${periodLabel(r.period)} · ${fmt(openingOf(r))} – ${fmt(r.value)}`
-  const items = [...panel.rows.map((r) => ({ value: r.period, label: rowLabel(r) })), ...(editable ? [{ value: NEW_READING, label: '＋ Chốt chỉ số' }] : [])]
+  // Mọi lần chốt trong một menu, cũ đến mới: chỉ số ban đầu của hợp đồng (theo ngày) và các tháng (cuối tháng); dòng cuối là mới nhất
+  const entries = [
+    ...panel.rows.map((r) => ({ key: `${r.period}-99`, value: r.period, label: rowLabel(r) })),
+    ...(panel.history ?? []).filter((h) => h.kind === 'handover').map((h) => ({ key: h.readOn, value: `h:${h.id}`, label: `${formatDateVN(h.readOn)} · chỉ số ban đầu · ${h.value.toLocaleString('vi-VN')} ${panel.unit}` })),
+  ].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)).map((e, i, all) => ({ value: e.value, label: i === all.length - 1 ? `${e.label} · mới nhất` : e.label }))
+  const items = [...entries, ...(editable ? [{ value: NEW_READING, label: '＋ Chốt chỉ số' }] : [])]
+  const router = useRouter()
+  const [saving, startSaving] = useTransition()
+  const [initialEdit, setInitialEdit] = useState<{ id: string; readOn: string; text: string } | null>(null)
   const row = panel.rows.find((r) => r.period === period)
   // Số đầu kỳ: nếu tháng liền trước đang được điền (chưa lưu) thì lấy số đó
   const prevRow = row ? panel.rows[panel.rows.indexOf(row) - 1] : undefined
@@ -190,6 +199,11 @@ function MeterReadingsPanel({ panel, editable, consumption, snapshot, onSnapshot
   const closing = /^\d+$/.test(text.trim()) ? Number(text.trim()) : null
   const tooLow = closing !== null && opening !== null && closing < opening
   const open = (value: string) => {
+    if (value.startsWith('h:')) {
+      const h = panel.history?.find((x) => x.id === value.slice(2))
+      if (h) setInitialEdit({ id: h.id, readOn: h.readOn, text: String(h.value) })
+      return
+    }
     // Chưa có chỉ số thì mặc định chốt tháng liền trước tháng lập hoá đơn (dòng cuối của danh sách)
     const target = value === NEW_READING ? (last.value == null ? last : (panel.rows.find((r) => r.value == null) ?? last)).period : value
     const found = panel.rows.find((r) => r.period === target) ?? last
@@ -233,18 +247,20 @@ function MeterReadingsPanel({ panel, editable, consumption, snapshot, onSnapshot
         return null
       })()}
       <p className="mt-0.5">Tiêu thụ: <span className="font-medium tabular-nums text-foreground">{consumption.toLocaleString('vi-VN')} {panel.unit}</span></p>
-      {panel.history && panel.history.length > 0 && (
-        <ul className="mt-1 space-y-0.5 tabular-nums">
-          {panel.history.map((r, i) => (
-            <li key={r.id} className="flex items-center justify-between gap-2">
-              <span>{formatDateVN(r.readOn)}{r.kind === 'handover' ? ' · chỉ số ban đầu' : ''}</span>
-              <span className="flex items-center gap-1.5">
-                <span className="font-medium text-foreground">{r.value.toLocaleString('vi-VN')} {panel.unit}</span>
-                {i === panel.history!.length - 1 && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">Mới nhất</span>}
-              </span>
-            </li>
-          ))}
-        </ul>
+      {initialEdit && (
+        <FormDialog open onOpenChange={(o) => { if (!o) setInitialEdit(null) }} title={`Chỉ số ban đầu ${panel.name}`} description={`Chốt ngày ${formatDateVN(initialEdit.readOn)} lúc ký hợp đồng. Sửa ở đây cũng là sửa ở hợp đồng và trang Chỉ số, không đổi hoá đơn hay lần chốt nào khác.`} size="sm">
+          <div className="space-y-4 pb-1">
+            <div className="space-y-1.5"><Label htmlFor="initial-edit">Chỉ số ban đầu ({panel.unit})</Label><Input id="initial-edit" inputMode="numeric" value={initialEdit.text} onChange={(e) => setInitialEdit({ ...initialEdit, text: e.target.value })} className="h-9 text-right tabular-nums" /></div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="ghost" onClick={() => setInitialEdit(null)}>Huỷ</Button>
+              <Button type="button" disabled={saving || !/^\d+$/.test(initialEdit.text.trim())} onClick={() => startSaving(async () => {
+                const r = await updateMeterReadingAction(initialEdit.id, { value: Number(initialEdit.text.trim()), readOn: initialEdit.readOn })
+                if (!r.ok) { toast.error(r.error ?? 'Không lưu được chỉ số'); return }
+                toast.success('Đã lưu chỉ số ban đầu'); setInitialEdit(null); router.refresh()
+              })}>Lưu chỉ số</Button>
+            </div>
+          </div>
+        </FormDialog>
       )}
       {row && (
         <FormDialog open onOpenChange={(o) => { if (!o) setPeriod(null) }} title={`Chốt chỉ số ${panel.name}`} description={`Tháng ${periodLabel(row.period)}${row.value == null ? ' · chưa chốt' : ` · đang là ${row.value.toLocaleString('vi-VN')}`}. Bấm Lưu để lưu luôn số này (cùng các thay đổi khác của hoá đơn), ghi về tab Chỉ số và tính lại tiền.`} size="sm">
