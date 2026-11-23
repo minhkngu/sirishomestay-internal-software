@@ -2,7 +2,7 @@
 
 Spec: [Thiết kế tổng](../specs/2026-11-16-quan-ly-khach-thue-design.md) (spec duy nhất của dự án).
 
-Plan làm xong thì xoá khỏi thư mục này (lần gần nhất: 19/11/2026); xem lại trong lịch sử git. Ghi chú môi trường ở [docs/operations/supabase.md](../../operations/supabase.md).
+Plan làm xong thì xoá khỏi thư mục này (lần gần nhất: 23/11/2026: plan và spec hoá đơn, chỉ số, thu chi đã xong, nội dung ở mục Tính năng của [README](../../../README.md)); xem lại trong lịch sử git. Ghi chú môi trường ở [docs/operations/supabase.md](../../operations/supabase.md).
 
 ## Plan đang mở
 
@@ -12,6 +12,8 @@ Plan làm xong thì xoá khỏi thư mục này (lần gần nhất: 19/11/2026)
 
 ## Việc còn lại trước khi người dùng duyệt
 
+- [ ] Hoá đơn, chỉ số: xem trên giao diện trang Chỉ số (lọc Năm → Tháng, popup Chốt chỉ số), menu chỉ số trong hoá đơn, popup sửa hợp đồng. (Sửa, xoá khoản thu ở Thu chi và sửa số đầu ở hoá đơn đầu: người dùng đã tự kiểm.)
+- [ ] E2E còn đỏ trên cổng thử (`invoices` dòng 11 và 40, `contract-quick-actions`, `contract-create-one-page`, `addenda`, `template-editor`): đối chiếu với `main` để biết lỗi do nhánh hay do dữ liệu thử.
 - [ ] Xác nhận xuất PDF và ảnh hoá đơn, phiếu thu trên bản preview mới nhất (sau commit `391ec48` đóng gói `pdfkit` và `@napi-rs/canvas`).
 - [ ] Chạy lại toàn bộ e2e (`node scripts/e2e-preflight.mjs` trước), xác nhận tất cả đạt.
 - [ ] Đo tốc độ chuyển trang trên bản production (`npm run test:perf`). Ghi kết quả vào `docs/operations/toc-do.md`.
