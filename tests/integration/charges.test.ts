@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { depositEntries, facilities, invoiceLines, invoices, leases, oneOffCharges, rooms, tenants } from '@/db'
 import { eq } from 'drizzle-orm'
-import { depositBalance } from '@/modules/leasing/domain/deposit'
+import { depositBalance } from '@/domain/deposit'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ForbiddenError, NotFoundError } from '@/domain/errors'
 import {

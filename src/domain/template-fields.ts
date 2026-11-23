@@ -114,6 +114,7 @@ const INVOICE: Field[] = [
   f('so_tai_khoan', 'Số tài khoản nhận tiền', '0123456789'),
   f('chu_tai_khoan', 'Chủ tài khoản', 'CONG TY SIRIS'),
   f('noi_dung_ck', 'Nội dung chuyển khoản', 'TD-HD-202612-0001'),
+  f('ghi_chu', 'Ghi chú của hoá đơn', 'Chuyển khoản trước hạn để được giữ giá'),
   f('da_thanh_toan', 'Đã thanh toán', '0'),
   f('con_lai', 'Còn phải trả', '9.380.000'),
   INVOICE_LINES,
@@ -236,14 +237,16 @@ export type DocEntities = {
     periodStart: string
     periodEnd: string
     dueDate?: string | null
+    note?: string
     paid?: number
     bank?: { bankName: string; accountNumber: string; accountName: string } | null
     lines: { description: string; quantity: number; unitPrice: number; amount: number }[]
   }
+  /** `readings` không còn dùng: biên bản bàn giao đã bỏ chỉ số; mẫu cũ vẫn nhận mảng rỗng. */
   handover?: {
     date: string
     items: { code: string; name: string; condition: string; penalty?: number }[]
-    readings: { kind: 'electric' | 'water' | 'fee'; label?: string; serial: string; value: number }[]
+    readings?: { kind: 'electric' | 'water' | 'fee'; label?: string; serial: string; value: number }[]
   }
   payment?: { code: string; paidOn: string; amount: number; method: string; receivedBy: string }
 }
@@ -303,6 +306,7 @@ export function buildTemplateData(docType: DocType, e: DocEntities): Record<stri
     ma_hoa_don: e.invoice?.code ?? '',
     ky: e.invoice ? `${d(e.invoice.periodStart)} – ${d(e.invoice.periodEnd)}` : '',
     han_thanh_toan: d(e.invoice?.dueDate),
+    ghi_chu: e.invoice?.note ?? '',
     tong_tien: m(invoiceTotal),
     tong_tien_bang_chu: w(invoiceTotal),
     ngan_hang: e.invoice?.bank?.bankName ?? '',

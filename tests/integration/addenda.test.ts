@@ -450,7 +450,7 @@ describe('phụ lục hợp đồng', () => {
         .values({ code: 'TV1', name: 'TV', value: 500000, locationKind: 'room', locationId: roomId, facilityId })
       const h = await startHandover(db, ctx(), leaseId, 'check_out')
       const d = await (await import('@/modules/leasing/server/handovers/service')).getHandover(db, ctx(), h.id)
-      await saveHandover(db, ctx(), h.id, { items: [{ id: d.items[0].id, penalty: 500000 }], meterReadings: [] })
+      await saveHandover(db, ctx(), h.id, { items: [{ id: d.items[0].id, penalty: 500000 }] })
       return createTermination(db, ctx(), leaseId, {
         endDate: '2026-11-20',
         forfeit,
