@@ -58,11 +58,11 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
   const meterOptions = [{ value: '', label: 'Tất cả loại đồng hồ' }, ...typeNames.map((type) => ({ value: type, label: type }))]
   const unitByType = Object.fromEntries(meterTypes.map((t) => [t.name, t.unit]))
 
-  // Năm → Tháng: mặc định ('') hiện 15 lần chốt mới nhất; 'all' hiện hết; chọn năm thì chọn thêm tháng. Có phân trang khi không phải mặc định
+  // Năm → Tháng: chưa chọn gì (mặc định) hiện 15 lần chốt mới nhất; 'all' hiện hết; chọn năm thì chọn thêm tháng. Có phân trang khi không phải mặc định
   const year = sp.year === 'all' || /^\d{4}$/.test(sp.year ?? '') ? sp.year! : ''
   const month = /^\d{4}$/.test(year) && /^(0[1-9]|1[0-2])$/.test(sp.month ?? '') ? sp.month! : ''
   const years = [...new Set(historyAll.map((row) => row.period.slice(0, 4)))].sort().reverse()
-  const yearOptions = [{ value: '', label: '15 lần chốt mới nhất' }, { value: 'all', label: 'Tất cả' }, ...years.map((y) => ({ value: y, label: `Năm ${y}` }))]
+  const yearOptions = [{ value: 'all', label: 'Tất cả' }, ...years.map((y) => ({ value: y, label: `Năm ${y}` }))]
   const filtered = historyAll.filter((row) => (!roomId || row.roomId === roomId) && (!meter || row.meterName === meter)
     && (!/^\d{4}$/.test(year) || row.period.startsWith(year)) && (!month || row.period.slice(5) === month))
   const shown = year === '' ? filtered.slice(0, 15) : filtered
