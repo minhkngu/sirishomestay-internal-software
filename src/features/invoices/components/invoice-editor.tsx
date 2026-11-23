@@ -127,7 +127,7 @@ function LineTime({ line, defaultFrom, defaultTo, fullMonth, proration, editable
     </div>
   )
 }
-type MeterPanel = { leaseFeeId: string; name: string; unit: string; /** Chỉ số ban đầu ghi ở hợp đồng (bàn giao hoặc lúc lắp đồng hồ). */ initial?: { value: number; readOn: string } | null; rows: Array<{ period: string; readOn: string | null; value: number | null; /** Số đầu kỳ: chỉ số gần nhất trước tháng này; null khi chưa có. */ opening: number | null; /** Số đầu đã lưu riêng cho lần ghi (tự điền lúc ghi hoặc sửa). */ openingStored: boolean; /** Số đầu đến từ chốt tháng trước, chỉ số bàn giao, hay chỉ số ban đầu của đồng hồ. */ openingSource: 'monthly' | 'handover' | 'start' }> }
+type MeterPanel = { leaseFeeId: string; name: string; unit: string; /** Chỉ số ban đầu ghi ở hợp đồng (bàn giao hoặc lúc lắp đồng hồ). */ initial?: { value: number; readOn: string } | null; /** Mọi lần chốt trong tháng liền trước tháng hoá đơn, cũ đến mới. */ inMonth?: Array<{ id: string; readOn: string; value: number; kind: 'monthly' | 'handover' }>; rows: Array<{ period: string; readOn: string | null; value: number | null; /** Số đầu kỳ: chỉ số gần nhất trước tháng này; null khi chưa có. */ opening: number | null; /** Số đầu đã lưu riêng cho lần ghi (tự điền lúc ghi hoặc sửa). */ openingStored: boolean; /** Số đầu đến từ chốt tháng trước, chỉ số bàn giao, hay chỉ số ban đầu của đồng hồ. */ openingSource: 'monthly' | 'handover' | 'start' }> }
 const periodLabel = (period: string) => `${period.slice(5)}/${period.slice(0, 4)}`
 const NEW_READING = '__new'
 /** Chỉ số đã chốt của đồng hồ: danh sách các tháng, thêm dòng "Chốt chỉ số" cuối danh sách; chọn một dòng mở popup điền số (ghi ngược về tab Chỉ số). */
@@ -234,6 +234,22 @@ function MeterReadingsPanel({ panel, editable, consumption, snapshot, onSnapshot
         return <p className="mt-1.5 tabular-nums">Số đầu kỳ <span className="font-medium text-foreground">{o == null ? '—' : o.toLocaleString('vi-VN')}</span> · Số cuối kỳ <span className="font-medium text-foreground">{c == null ? '—' : c.toLocaleString('vi-VN')}</span></p>
       })()}
       <p className="mt-0.5">Tiêu thụ: <span className="font-medium tabular-nums text-foreground">{consumption.toLocaleString('vi-VN')} {panel.unit}</span></p>
+      {panel.inMonth && panel.inMonth.length > 0 && (
+        <div className="mt-1.5 rounded-lg border border-border/60 px-2 py-1.5">
+          <p className="mb-1 text-muted-foreground/80">Các lần chốt tháng {periodLabel(last.period)}</p>
+          <ul className="space-y-0.5">
+            {panel.inMonth.map((r, i) => (
+              <li key={r.id} className="flex items-center justify-between gap-2 tabular-nums">
+                <span>{formatDateVN(r.readOn)}{r.kind === 'handover' ? ' · chỉ số ban đầu' : ''}</span>
+                <span className="flex items-center gap-1.5">
+                  <span className="font-medium text-foreground">{r.value.toLocaleString('vi-VN')} {panel.unit}</span>
+                  {i === panel.inMonth!.length - 1 && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">Mới nhất</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {row && (
         <FormDialog open onOpenChange={(o) => { if (!o) setPeriod(null) }} title={`Chốt chỉ số ${panel.name}`} description={`Tháng ${periodLabel(row.period)}${row.value == null ? ' · chưa chốt' : ` · đang là ${row.value.toLocaleString('vi-VN')}`}. Bấm Lưu để lưu luôn số này (cùng các thay đổi khác của hoá đơn), ghi về tab Chỉ số và tính lại tiền.`} size="sm">
           <div className="space-y-4 pb-1">
