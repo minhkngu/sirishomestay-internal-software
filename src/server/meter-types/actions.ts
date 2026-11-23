@@ -1,5 +1,7 @@
 'use server'
 
+import '@/server/registrations'
+
 import { revalidatePath } from 'next/cache'
 import { ZodError } from 'zod'
 import { db } from '@/db/client'
