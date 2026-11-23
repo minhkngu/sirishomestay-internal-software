@@ -355,7 +355,7 @@ export async function quickContractDataAction(kind: 'lease' | 'deposit', id: str
         ? await (async () => {
             const { can } = await import('@/domain/access')
             if (!can(ctx, 'assets', contract.facilityId)) return null
-            const { listAssets } = await import('@/server/assets/service')
+            const { listAssets } = await import('@/modules/assets')
             const all = await listAssets(db, ctx, { facilityId: contract.facilityId })
             const room = (contract as Awaited<ReturnType<typeof getLease>>).roomId
             const pick = (a: (typeof all)[number]) => ({

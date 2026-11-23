@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { moveAssetsAction } from '@/server/assets/actions'
+import { moveAssetsAction } from '../server/assets/actions'
 import type { TreeFacility } from './location-types'
 
 /** Chọn nơi đến (cùng cơ sở với các món đang chọn) + lý do → chuyển. */

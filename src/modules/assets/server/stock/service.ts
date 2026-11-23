@@ -5,7 +5,7 @@ import type { DB } from '@/db/client'
 import { assertCan, facilityScope, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/modules/platform'
-import type { Location } from '@/server/assets/service'
+import type { Location } from '../assets/service'
 
 const itemInput = z.object({
   facilityId: z.string().uuid(),

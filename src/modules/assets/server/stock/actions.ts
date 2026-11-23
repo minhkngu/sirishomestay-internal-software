@@ -6,7 +6,7 @@ import { db } from '@/db/client'
 import { toActionResult } from '@/lib/action-result'
 import { getAccessContext } from '@/modules/platform'
 import { createStockItem, receiveStock, moveStock, consumeStock } from './service'
-import type { Location } from '@/server/assets/service'
+import type { Location } from '../assets/service'
 export async function createStockAction(input: unknown) {
   const ctx = await getAccessContext()
   return toActionResult(async () => {

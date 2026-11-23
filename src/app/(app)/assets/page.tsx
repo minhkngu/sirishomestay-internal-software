@@ -3,9 +3,9 @@ import { RequirePermission } from '@/modules/platform'
 import { getAccessContext } from '@/modules/platform'
 import { listFacilities } from '@/modules/facilities'
 import { listRooms } from '@/modules/facilities'
-import { listAssets } from '@/server/assets/service'
-import { listStock } from '@/server/stock/service'
-import { AssetsView } from '@/features/assets/components/assets-view'
+import { listAssets } from '@/modules/assets'
+import { listStock } from '@/modules/assets'
+import { AssetsView } from '@/modules/assets/ui'
 
 export default async function AssetsPage() {
   return (

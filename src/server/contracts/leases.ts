@@ -27,7 +27,7 @@ import type { ContractFee, InvoiceLineInput, LeaseTerms, Proration } from '@/dom
 import { recordAudit } from '@/modules/platform'
 import { captureContractVersion } from './history'
 import { ensureFeeMeter, updateLeaseFeeMeter } from '@/server/meters/service'
-import { createAssetInTransaction, moveAssetsInTransaction, setAssetStatusInTransaction } from '@/server/assets/service'
+import { createAssetInTransaction, moveAssetsInTransaction, setAssetStatusInTransaction } from '@/modules/assets'
 import { startHandoverInTransaction } from '@/server/handovers/service'
 import { leaseData, loadAddenda } from '@/server/invoices/service'
 import { getSettings } from '@/modules/platform'

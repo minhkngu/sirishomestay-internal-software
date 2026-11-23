@@ -4,7 +4,7 @@ import { assets, facilities, leases, oneOffCharges, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ForbiddenError, NotFoundError } from '@/domain/errors'
-import { assetHistory } from '@/server/assets/service'
+import { assetHistory } from '@/modules/assets/server/assets/service'
 import {
   createIncident,
   incidentsForAsset,
