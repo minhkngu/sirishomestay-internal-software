@@ -1,5 +1,5 @@
 import { normHeader, type ImportTarget } from './targets'
-import { tenantInput, type TenantInput } from '../tenants/schemas'
+import { tenantInput, type TenantInput } from '@/modules/tenants'
 import { roomInput } from '../rooms/schemas'
 import { parseFlexibleDate } from '@/domain/dates'
 import { removeDiacritics } from '@/domain/text'

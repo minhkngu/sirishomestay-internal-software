@@ -3,7 +3,7 @@ import { db } from '@/db/client'
 import { assertCan } from '@/domain/access'
 import { getAccessContext } from '@/modules/platform'
 import { listFacilities } from '@/server/facilities/service'
-import { TenantForm } from '@/features/tenants/components/tenant-form'
+import { TenantForm } from '@/modules/tenants/ui'
 
 /** Nội dung trang thêm khách; dùng cho cả trang đầy đủ lẫn popup. */
 export async function NewTenant({ showHeading = true }: { showHeading?: boolean }) {

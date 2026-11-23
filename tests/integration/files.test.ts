@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { facilities, files, rooms, leases } from '@/db'
 import '@/server/contracts/service'
-import { createTenant } from '@/server/tenants/service'
+import { createTenant } from '@/modules/tenants/server/tenants/service'
 import {
   requestUpload,
   confirmUpload,

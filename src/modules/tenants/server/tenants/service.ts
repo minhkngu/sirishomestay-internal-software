@@ -12,7 +12,7 @@ import { tenantInput, type TenantInput } from './schemas'
 export type Tenant = typeof tenants.$inferSelect
 export { maskTenant } from './mask'
 
-export { displayName } from '@/domain/tenant-name'
+export { displayName } from '../../domain/tenant-name'
 
 export function parseTenantInput(input: unknown): TenantInput {
   const r = tenantInput.safeParse(input)

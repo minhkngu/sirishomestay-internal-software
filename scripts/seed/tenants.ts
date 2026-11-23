@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { tenants } from '@/db'
 import { addDays } from '@/domain/dates'
-import { parseTenantInput, toTenantRow } from '@/server/tenants/service'
+import { parseTenantInput, toTenantRow } from '@/modules/tenants/server/tenants/service'
 import type { SeedModule } from './types'
 
 const VISA_OFFSETS = [-5, 0, 3, 9, 16, 24, 29, 30, 45, 70, 120, 200, 260, 330]

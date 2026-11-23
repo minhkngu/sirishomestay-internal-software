@@ -4,7 +4,7 @@ import type { DB } from '@/db/client'
 import { assertCan, can, type AccessContext } from '@/domain/access'
 import { depositHeld, depositMovement, expenseLabel, type LedgerRow } from '@/domain/cashbook'
 import { NotFoundError, ValidationError } from '@/domain/errors'
-import { displayName } from '@/domain/tenant-name'
+import { displayName } from '@/modules/tenants'
 import { recordAudit } from '@/modules/platform'
 import { expenseInput, paymentEditInput } from './schemas'
 

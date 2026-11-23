@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm'
 import * as schema from '@/db'
 import type { DB } from '@/db/client'
 import { ensureFeeMeter } from '@/server/meters/service'
-import { createTenant } from '@/server/tenants/service'
+import { createTenant } from '@/modules/tenants/server/tenants/service'
 import type { AccessContext } from '@/domain/access'
 
 it.skipIf(!process.env.TEST_POSTGRES_URL)(
