@@ -4,7 +4,7 @@ import { auditLogs, depositEntries, facilities, invoiceLines, leases, rooms, ten
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { summarize } from '@/domain/cashbook'
-import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
+import { NotFoundError, ValidationError } from '@/domain/errors'
 import { deleteDepositEntry, updateDepositEntry } from '@/server/charges/service'
 import { addExpense, deleteExpense, listCashbook, listLeaseTargets, updatePayment, updateExpense } from '@/server/cashbook/service'
 import { approveInvoice, createDrafts, recordLeasePayment, removePayment } from '@/server/invoices/service'
@@ -132,8 +132,9 @@ describe('sửa, xoá khoản thu và cọc ở sổ quỹ', () => {
   it('người ngoài cơ sở không sửa, xoá được khoản của cơ sở đó; thao tác nào cũng có nhật ký', async () => {
     const collect = await depositRow({ type: 'collect', amount: 5000000 })
     const outsider = context(['billing'], [otherId])
-    await expect(updateDepositEntry(db, outsider, collect.id, { date: '2026-08-01', amount: 4000000, method: 'cash', note: '' })).rejects.toThrow(ForbiddenError)
-    await expect(deleteDepositEntry(db, outsider, collect.id)).rejects.toThrow(ForbiddenError)
+    // Cơ sở ngoài phạm vi trả NotFound (như các service khác, không lộ sự tồn tại của khoản)
+    await expect(updateDepositEntry(db, outsider, collect.id, { date: '2026-08-01', amount: 4000000, method: 'cash', note: '' })).rejects.toThrow(NotFoundError)
+    await expect(deleteDepositEntry(db, outsider, collect.id)).rejects.toThrow(NotFoundError)
     await deleteDepositEntry(db, ctx(), collect.id)
     expect((await db.select().from(auditLogs).where(eq(auditLogs.entityId, collect.id))).length).toBeGreaterThan(0)
   })

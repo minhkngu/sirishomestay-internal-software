@@ -208,8 +208,9 @@ describe('hoá đơn đầu giữ số riêng', () => {
     await updateLines(db, ctx(), inv.id, lines.map(l => (l.meta as { leaseFeeId?: string } | null)?.leaseFeeId === feeId
       ? { ...l, quantity: 40, amount: 40 * 3500, meta: { ...(l.meta as Record<string, unknown>), opening: 1300, closing: 1340 } }
       : { ...l, meta: l.meta as Record<string, unknown> | null }))
+    // Hoá đơn tháng 3 sửa được chỉ số tháng 2 (chỉ số ghi thường của tháng ký hợp đồng), không đụng dòng hoá đơn đầu
     const [mar] = await createDrafts(db, context(['billing'], facilityId), { facilityId, period: '2026-03' })
-    await updateInvoiceMeterReading(db, ctx(), mar.id, { leaseFeeId: feeId, period: '2026-03', value: 1400 })
+    await updateInvoiceMeterReading(db, ctx(), mar.id, { leaseFeeId: feeId, period: '2026-02', value: 1400 })
     expect(await electric(inv.id)).toMatchObject({ quantity: 40, meta: { opening: 1300, closing: 1340 } })
   })
 

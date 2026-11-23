@@ -232,9 +232,9 @@ describe('sửa và xoá hợp đồng', () => {
       await db.insert(meterReadings).values({ meterId: meter.id, period: '2025-12', readOn: '2025-12-31', value: 500, kind: 'handover' })
       const edit = (initialReading: number) => editFees(lease.id, [{ leaseFeeId: fee.id, unitPrice: 3500, existingMeterId: meter.id, initialReading }])
       await expect(edit(-1)).rejects.toThrow('chỉ số')
-      await expect(edit(400)).resolves.toBeDefined() // chỉ số ban đầu độc lập, không bị chặn bởi lần chốt trước
+      await expect(edit(400)).resolves.toBeUndefined() // chỉ số ban đầu độc lập, không bị chặn bởi lần chốt trước
       await db.insert(meterReadings).values({ meterId: meter.id, period: '2026-02', readOn: '2026-02-28', value: 1400, kind: 'monthly' })
-      await expect(edit(1500)).resolves.toBeDefined() // cũng không bị chặn bởi lần chốt sau
+      await expect(edit(1500)).resolves.toBeUndefined() // cũng không bị chặn bởi lần chốt sau
 
     })
 
