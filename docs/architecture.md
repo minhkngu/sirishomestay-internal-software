@@ -26,6 +26,7 @@ Muốn biết một mảng đang ở đâu: xem bảng dưới. **Mỗi PR chuy�
 | 4 | `leasing` | Đã chuyển | `src/modules/leasing/` (`server/`, `domain/`, `ui/` theo thư mục cũ: contracts, deposits, handovers, charges, invoices, incidents) | 20–21 |
 | 5 | `import` | Đã chuyển | `src/modules/import/` (`server/import/`, `ui/`; `targets.ts` thuần nên ở `domain/` để `ui` dùng được) | 21 |
 | 5 | `dashboard` | Đã chuyển | `src/modules/dashboard/` (`server/dashboard/`, `ui/`, `domain/reminders.ts`) | 21 |
+| 5 | `cashbook` | Đã chuyển | `src/modules/cashbook/` (sổ Thu chi, sở hữu bảng `expenses`; `src/domain/cashbook.ts` ở lại vì `leasing` cũng dùng; sửa khoản thu tiền thuê `updatePayment` thuộc `leasing`) | 20 |
 
 Việc nền trước khi chuyển (Prettier, CI, gỡ ghép ngược…) là Task 1–12 của plan; xem checkbox trong plan để biết task nào xong.
 
@@ -61,7 +62,7 @@ src/modules/registrations.ts   import mọi file có register* (mục 6); điể
 ```
 
 Luật:
-- **Tầng:** 1 `platform`; 2 `users`, `tenants`, `facilities`, `documents`; 3 `assets`, `meters`; 4 `leasing`; 5 `import`, `dashboard`. Module chỉ import module **tầng thấp hơn**, chỉ qua `index.ts`/`actions.ts`/`ui.ts`. Thứ tự tầng nằm ở `MODULE_TIERS`, export từ `eslint.config.mjs` (nguồn duy nhất; `tests/unit/architecture/import-graph.ts` import lại). Mảng mới: thêm vào đó.
+- **Tầng:** 1 `platform`; 2 `users`, `tenants`, `facilities`, `documents`; 3 `assets`, `meters`; 4 `leasing`; 5 `import`, `dashboard`, `cashbook`. Module chỉ import module **tầng thấp hơn**, chỉ qua `index.ts`/`actions.ts`/`ui.ts`. Thứ tự tầng nằm ở `MODULE_TIERS`, export từ `eslint.config.mjs` (nguồn duy nhất; `tests/unit/architecture/import-graph.ts` import lại). Mảng mới: thêm vào đó.
 - **Trong module:** `ui` → `domain`, cổng `actions.ts` và `server/**/actions.ts` của chính module, `src/components`, `src/domain`, `src/lib`; `import type` từ `index.ts`/`server/**` của chính module và `index.ts` của module tầng thấp hơn (giá trị thì không, để code server không lọt vào bundle trình duyệt); `ui.ts`/`actions.ts` của module tầng thấp hơn. `server` → `domain`, `server` của chính module, `src/db`, `src/domain`, `src/lib`, `index.ts` của module tầng thấp hơn. `domain` → `domain` của chính module, `src/domain`.
 - **Dùng chung** (`src/domain`, `src/components`, `src/lib`, `src/db`) không import module. `src/db` được `import type` từ `src/domain` (không import giá trị).
 - **Ghi bảng của module khác** chỉ qua API module đó. Đọc (select/join) bảng khác thì được. Luật ghi không có công cụ kiểm, chỉ giữ bằng review.

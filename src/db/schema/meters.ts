@@ -40,6 +40,8 @@ export const meterReadings = pgTable(
     kind: text('kind').notNull().default('monthly'),
     readOn: date('read_on', { mode: 'string' }).notNull(),
     value: integer('value').notNull(),
+    // Số đầu kỳ của lần ghi: tự điền bằng số cuối lần ghi trước lúc ghi, sửa riêng được; null = lấy theo lần ghi liền trước
+    opening: integer('opening'),
     isDemo: boolean('is_demo').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -62,3 +64,17 @@ export const leaseFeeMeters = pgTable('lease_fee_meters', {
     .notNull()
     .references(() => meters.id),
 }).enableRLS()
+
+/** Loại đồng hồ quản lý trong Cài đặt (Điện, Nước, Máy giặt...): tên và đơn vị; dùng để thêm đồng hồ và lọc chỉ số. */
+export const meterTypes = pgTable(
+  'meter_types',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: text('name').notNull(),
+    unit: text('unit').notNull().default(''),
+    /** Điện, Nước có sẵn: không đổi tên, không xoá. */
+    isSystem: boolean('is_system').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('meter_types_name_unique').on(sql`lower(${t.name})`)],
+)

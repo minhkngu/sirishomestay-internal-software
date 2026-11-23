@@ -1,4 +1,4 @@
-import { addDays, daysInMonth, diffDays } from '@/domain/dates'
+import { addDays, addMonths, daysInMonth, diffDays } from '@/domain/dates'
 import type { ISODate, Proration } from '@/domain/types'
 
 const round4 = (n: number) => Math.round(n * 10000) / 10000
@@ -47,3 +47,18 @@ export function fullMonthCoefficient(from: ISODate, to: ISODate): number {
 }
 
 export { addDays }
+
+/**
+ * Hệ số theo "tháng tròn tính từ ngày bắt đầu": mỗi khoảng từ ngày X đến ngày X của tháng sau trừ 1 ngày là 1 tháng (hệ số 1),
+ * kể cả khi bắt đầu giữa tháng (15/7 → 14/8 = 1). Phần ngày lẻ còn lại tính theo số ngày / 30 hoặc / số ngày của tháng đó.
+ */
+export function monthsCoefficient(from: ISODate, to: ISODate, mode: Proration): number {
+  if (to < from) return 0
+  let months = 0
+  while (months < 1200 && addDays(addMonths(from, months + 1), -1) <= to) months++
+  const restStart = addMonths(from, months)
+  if (restStart > to) return months
+  const days = diffDays(restStart, to) + 1
+  const length = diffDays(restStart, addMonths(from, months + 1))
+  return months + days / (mode === 'days_30' ? 30 : length)
+}
