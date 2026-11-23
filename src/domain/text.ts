@@ -1,9 +1,5 @@
 export function removeDiacritics(s: string): string {
-  return s
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/đ/g, 'd')
-    .replace(/Đ/g, 'D')
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D')
 }
 
 /** Chuỗi tìm kiếm: bỏ dấu, chữ thường, gộp khoảng trắng; số +84… thêm dạng 0…. */

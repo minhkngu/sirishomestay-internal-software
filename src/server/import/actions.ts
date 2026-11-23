@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/db/client'
 import { assertCan } from '@/domain/access'
 import { getAccessContext } from '@/server/session'
-import { toActionResult,  } from '@/lib/action-result'
+import { toActionResult } from '@/lib/action-result'
 import { ValidationError } from '@/domain/errors'
 import { buildTemplateWorkbook, parseWorkbook, type ParsedSheet } from '@/lib/excel'
 import { findImportConflicts, findMissingFacilities, runImport } from './run'
@@ -29,7 +29,8 @@ export async function parseWorkbookAction(formData: FormData) {
     } catch {
       throw new ValidationError('Không đọc được file Excel')
     }
-    for (const s of parsed.sheets) if (s.rows.length > MAX_ROWS) throw new ValidationError(`Sheet "${s.name}" có quá ${MAX_ROWS} dòng`)
+    for (const s of parsed.sheets)
+      if (s.rows.length > MAX_ROWS) throw new ValidationError(`Sheet "${s.name}" có quá ${MAX_ROWS} dòng`)
     return parsed
   })
 }

@@ -42,28 +42,47 @@ export function NewContractForm({
       kind: tenant.isCompany ? 'company' : 'vietnamese',
       phone: tenant.phone ?? null,
     }
-    setCreatedPeople((previous) => previous.some((item) => item.id === person.id) ? previous : [...previous, person])
+    setCreatedPeople((previous) => (previous.some((item) => item.id === person.id) ? previous : [...previous, person]))
     createdCallback.current?.(person)
     createdCallback.current = null
     setCreateOpen(false)
   }
 
   const orderedFacilities = createFacilityId
-    ? [...facilities].sort((a, b) => a.id === createFacilityId ? -1 : b.id === createFacilityId ? 1 : 0)
+    ? [...facilities].sort((a, b) => (a.id === createFacilityId ? -1 : b.id === createFacilityId ? 1 : 0))
     : facilities
 
   return (
     <>
-      {kind === 'lease' && leaseProps
-        ? <LeaseWizard {...leaseProps} renderCreateFee={({ onCreated }) => <CreateFeeTypeNow units={leaseProps.feeUnits} onCreated={onCreated} />} embedded={embedded} tenants={[...leaseProps.tenants, ...createdPeople]} onCreatePerson={openCreatePerson} />
-        : depositProps
-          ? <DepositForm {...depositProps} embedded={embedded} tenants={[...depositProps.tenants, ...createdPeople]} onCreatePerson={openCreatePerson} />
-          : null}
-      <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) createdCallback.current = null }}>
+      {kind === 'lease' && leaseProps ? (
+        <LeaseWizard
+          {...leaseProps}
+          renderCreateFee={({ onCreated }) => <CreateFeeTypeNow units={leaseProps.feeUnits} onCreated={onCreated} />}
+          embedded={embedded}
+          tenants={[...leaseProps.tenants, ...createdPeople]}
+          onCreatePerson={openCreatePerson}
+        />
+      ) : depositProps ? (
+        <DepositForm
+          {...depositProps}
+          embedded={embedded}
+          tenants={[...depositProps.tenants, ...createdPeople]}
+          onCreatePerson={openCreatePerson}
+        />
+      ) : null}
+      <Dialog
+        open={createOpen}
+        onOpenChange={(open) => {
+          setCreateOpen(open)
+          if (!open) createdCallback.current = null
+        }}
+      >
         <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Thêm người mới</DialogTitle>
-            <DialogDescription>Người mới được lưu vào danh sách khách thuê và chọn luôn cho hợp đồng này.</DialogDescription>
+            <DialogDescription>
+              Người mới được lưu vào danh sách khách thuê và chọn luôn cho hợp đồng này.
+            </DialogDescription>
           </DialogHeader>
           {createOpen && <TenantForm bare facilities={orderedFacilities} onCreated={personCreated} />}
         </DialogContent>

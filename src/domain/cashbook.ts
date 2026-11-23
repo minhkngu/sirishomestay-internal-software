@@ -39,18 +39,30 @@ export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number]['value']
 export const expenseLabel = (category: string) => EXPENSE_CATEGORIES.find((c) => c.value === category)?.label ?? 'Khác'
 
 /** Hướng và có tính vào Thu/Chi hay không của một dòng sổ cọc. */
-export function depositMovement(type: string, status: string): { direction: 'in' | 'out'; counted: boolean; label: string } {
+export function depositMovement(
+  type: string,
+  status: string,
+): { direction: 'in' | 'out'; counted: boolean; label: string } {
   const counted = status === 'done' && (type === 'collect' || type === 'topup' || type === 'refund')
   switch (type) {
-    case 'collect': return { direction: 'in', counted, label: 'Thu cọc' }
-    case 'topup': return { direction: 'in', counted, label: 'Thu cọc bổ sung' }
-    case 'refund': return { direction: 'out', counted, label: 'Hoàn cọc' }
-    case 'deduct': return { direction: 'out', counted: false, label: 'Trừ cọc' }
-    default: return { direction: 'out', counted: false, label: 'Mất cọc' }
+    case 'collect':
+      return { direction: 'in', counted, label: 'Thu cọc' }
+    case 'topup':
+      return { direction: 'in', counted, label: 'Thu cọc bổ sung' }
+    case 'refund':
+      return { direction: 'out', counted, label: 'Hoàn cọc' }
+    case 'deduct':
+      return { direction: 'out', counted: false, label: 'Trừ cọc' }
+    default:
+      return { direction: 'out', counted: false, label: 'Mất cọc' }
   }
 }
 
-export function summarize(rows: Pick<LedgerRow, 'direction' | 'amount' | 'counted'>[]): { income: number; expense: number; net: number } {
+export function summarize(rows: Pick<LedgerRow, 'direction' | 'amount' | 'counted'>[]): {
+  income: number
+  expense: number
+  net: number
+} {
   let income = 0
   let expense = 0
   for (const r of rows) {
@@ -62,4 +74,5 @@ export function summarize(rows: Pick<LedgerRow, 'direction' | 'amount' | 'counte
 }
 
 /** Cọc đang giữ: cùng cách tính với sổ cọc hợp đồng (chỉ dòng đã hoàn tất). */
-export const depositHeld = (entries: { type: string; status: string; amount: number }[]): number => depositBalance(entries as DepositEntry[])
+export const depositHeld = (entries: { type: string; status: string; amount: number }[]): number =>
+  depositBalance(entries as DepositEntry[])

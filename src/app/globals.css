@@ -1,13 +1,14 @@
-@import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans), beVietnam, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-sans:
+    var(--font-sans), beVietnam, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -49,28 +50,73 @@
 }
 
 :root {
-  --background: #F6F8F7; --foreground: #111A16;
-  --card: #FFFFFF; --card-foreground: #111A16;
-  --popover: #FFFFFF; --popover-foreground: #111A16;
-  --primary: #0F7652; --primary-strong: #0A5339; --primary-foreground: #FFFFFF;
-  --secondary: #E8F2ED; --secondary-foreground: #111A16;
-  --muted: #EBF0EC; --muted-foreground: #405247;
-  --accent: #E1EFE7; --accent-foreground: #0A4F36;
-  --destructive: #DC2626; --border: #D6DFDA; --input: #C8D4CE; --ring: #0F7652;
-  --chart-1: #0F7652; --chart-2: #F59E0B; --chart-3: #0EA5E9; --chart-4: #8B5CF6; --chart-5: #64748B;
+  --background: #f6f8f7;
+  --foreground: #111a16;
+  --card: #ffffff;
+  --card-foreground: #111a16;
+  --popover: #ffffff;
+  --popover-foreground: #111a16;
+  --primary: #0f7652;
+  --primary-strong: #0a5339;
+  --primary-foreground: #ffffff;
+  --secondary: #e8f2ed;
+  --secondary-foreground: #111a16;
+  --muted: #ebf0ec;
+  --muted-foreground: #405247;
+  --accent: #e1efe7;
+  --accent-foreground: #0a4f36;
+  --destructive: #dc2626;
+  --border: #d6dfda;
+  --input: #c8d4ce;
+  --ring: #0f7652;
+  --chart-1: #0f7652;
+  --chart-2: #f59e0b;
+  --chart-3: #0ea5e9;
+  --chart-4: #8b5cf6;
+  --chart-5: #64748b;
   --radius: 0.75rem;
-  --sidebar: #FFFFFF; --sidebar-foreground: #111A16; --sidebar-primary: #0F7652; --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #EBF2EE; --sidebar-accent-foreground: #0A5339; --sidebar-border: #D8E2DC; --sidebar-ring: #0F7652;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #111a16;
+  --sidebar-primary: #0f7652;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #ebf2ee;
+  --sidebar-accent-foreground: #0a5339;
+  --sidebar-border: #d8e2dc;
+  --sidebar-ring: #0f7652;
 }
 .dark {
-  --background: #111815; --foreground: #EDF5F0;
-  --card: #18221D; --card-foreground: #EDF5F0; --popover: #18221D; --popover-foreground: #EDF5F0;
-  --primary: #22C58B; --primary-strong: #15805D; --primary-foreground: #0B2018; --secondary: #213028; --secondary-foreground: #EDF5F0;
-  --muted: #213028; --muted-foreground: #9DB4A7; --accent: #223A2F; --accent-foreground: #EDF5F0;
-  --destructive: #F87171; --border: #2C3E34; --input: #364C40; --ring: #22C58B;
-  --chart-1: #22C58B; --chart-2: #F59E0B; --chart-3: #38BDF8; --chart-4: #A78BFA; --chart-5: #9DB4A7;
-  --sidebar: #141E19; --sidebar-foreground: #EDF5F0; --sidebar-primary: #22C58B; --sidebar-primary-foreground: #0B2018;
-  --sidebar-accent: #213028; --sidebar-accent-foreground: #EDF5F0; --sidebar-border: #27382F; --sidebar-ring: #22C58B;
+  --background: #111815;
+  --foreground: #edf5f0;
+  --card: #18221d;
+  --card-foreground: #edf5f0;
+  --popover: #18221d;
+  --popover-foreground: #edf5f0;
+  --primary: #22c58b;
+  --primary-strong: #15805d;
+  --primary-foreground: #0b2018;
+  --secondary: #213028;
+  --secondary-foreground: #edf5f0;
+  --muted: #213028;
+  --muted-foreground: #9db4a7;
+  --accent: #223a2f;
+  --accent-foreground: #edf5f0;
+  --destructive: #f87171;
+  --border: #2c3e34;
+  --input: #364c40;
+  --ring: #22c58b;
+  --chart-1: #22c58b;
+  --chart-2: #f59e0b;
+  --chart-3: #38bdf8;
+  --chart-4: #a78bfa;
+  --chart-5: #9db4a7;
+  --sidebar: #141e19;
+  --sidebar-foreground: #edf5f0;
+  --sidebar-primary: #22c58b;
+  --sidebar-primary-foreground: #0b2018;
+  --sidebar-accent: #213028;
+  --sidebar-accent-foreground: #edf5f0;
+  --sidebar-border: #27382f;
+  --sidebar-ring: #22c58b;
 }
 
 @layer base {
@@ -104,9 +150,20 @@
   }
   body {
     @apply bg-background text-foreground font-sans;
-    font-family: var(--font-sans), beVietnam, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family:
+      var(--font-sans),
+      beVietnam,
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      Roboto,
+      sans-serif;
   }
-  button, input, optgroup, select, textarea {
+  button,
+  input,
+  optgroup,
+  select,
+  textarea {
     font-family: inherit;
     font-feature-settings: inherit;
     font-variation-settings: inherit;
@@ -129,7 +186,9 @@
     color: var(--foreground);
     height: 2.25rem;
     font-size: 0.8125rem;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
   }
   select:hover {
     border-color: var(--input);
@@ -139,7 +198,12 @@
     border-color: var(--ring);
     box-shadow: 0 0 0 3px rgba(21, 128, 93, 0.15);
   }
-  a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible {
+  a:focus-visible,
+  button:focus-visible,
+  select:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  summary:focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
@@ -147,38 +211,140 @@
 
 /* Taste Skill Micro-interactions & Craft Details */
 .card-taste {
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.02), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+  box-shadow:
+    0 1px 3px 0 rgba(0, 0, 0, 0.02),
+    0 2px 6px -1px rgba(0, 0, 0, 0.03);
+  transition:
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
 }
 .card-taste:hover {
   transform: translateY(-1.5px);
-  box-shadow: 0 6px 16px -3px rgba(0, 0, 0, 0.06), 0 2px 6px -2px rgba(0, 0, 0, 0.03);
+  box-shadow:
+    0 6px 16px -3px rgba(0, 0, 0, 0.06),
+    0 2px 6px -2px rgba(0, 0, 0, 0.03);
 }
 
 .btn-tactile {
-  transition: transform 0.12s ease, background-color 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.12s ease,
+    background-color 0.15s ease,
+    opacity 0.15s ease,
+    box-shadow 0.15s ease;
 }
 .btn-tactile:active:not(:disabled) {
   transform: scale(0.985);
 }
 /* Hộp soạn mẫu giấy tờ: chip chỗ điền, khối tóm tắt, ngắt trang */
-.template-editor { font-size: 0.9rem; line-height: 1.55; }
-.template-editor h1 { font-size: 1.4rem; font-weight: 700; margin: 0.5rem 0; }
-.template-editor h2 { font-size: 1.15rem; font-weight: 600; margin: 0.5rem 0; }
-.template-editor h3 { font-size: 1rem; font-weight: 600; margin: 0.4rem 0; }
-.template-editor p { margin: 0.3rem 0; }
-.template-editor ul { list-style: disc; padding-left: 1.4rem; }
-.template-editor ol { list-style: decimal; padding-left: 1.4rem; }
-.template-editor table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; }
-.template-editor td, .template-editor th { border: 1px solid var(--border); padding: 0.25rem 0.5rem; vertical-align: top; }
-.template-editor th { background: var(--muted); font-weight: 600; text-align: left; }
-.template-editor tr[data-loop] td { background: color-mix(in oklab, var(--primary) 6%, transparent); }
-.template-editor tr[data-loop] td:first-child { box-shadow: inset 3px 0 0 var(--primary); }
-.template-editor .field-chip { display: inline-block; border: 1px solid var(--border); border-radius: 999px; background: var(--muted); padding: 0 0.5rem; font-size: 0.8rem; cursor: grab; }
-.template-editor .field-chip.ProseMirror-selectednode { outline: 2px solid var(--primary); }
-.template-editor .summary-block { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; border-block: 1px solid var(--border); padding: 0.5rem 0; margin: 0.5rem 0; }
-.template-editor .summary-item::before { content: attr(data-label); display: block; font-size: 0.7rem; color: var(--muted-foreground); }
-.template-editor hr.page-break { border: 0; border-top: 2px dashed var(--border); margin: 1rem 0; position: relative; }
-.template-editor hr.page-break::after { content: 'Ngắt trang'; position: absolute; top: -0.65rem; left: 50%; transform: translateX(-50%); background: var(--card); padding: 0 0.5rem; font-size: 0.7rem; color: var(--muted-foreground); }
-.template-editor .qr-block { width: 6rem; height: 6rem; display: flex; align-items: center; justify-content: center; text-align: center; border: 1px dashed var(--border); border-radius: 0.5rem; font-size: 0.7rem; color: var(--muted-foreground); margin: 0.5rem 0; }
-.template-editor .qr-block.ProseMirror-selectednode { outline: 2px solid var(--primary); }
+.template-editor {
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+.template-editor h1 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0.5rem 0;
+}
+.template-editor h2 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 0.5rem 0;
+}
+.template-editor h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0.4rem 0;
+}
+.template-editor p {
+  margin: 0.3rem 0;
+}
+.template-editor ul {
+  list-style: disc;
+  padding-left: 1.4rem;
+}
+.template-editor ol {
+  list-style: decimal;
+  padding-left: 1.4rem;
+}
+.template-editor table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5rem 0;
+}
+.template-editor td,
+.template-editor th {
+  border: 1px solid var(--border);
+  padding: 0.25rem 0.5rem;
+  vertical-align: top;
+}
+.template-editor th {
+  background: var(--muted);
+  font-weight: 600;
+  text-align: left;
+}
+.template-editor tr[data-loop] td {
+  background: color-mix(in oklab, var(--primary) 6%, transparent);
+}
+.template-editor tr[data-loop] td:first-child {
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+.template-editor .field-chip {
+  display: inline-block;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--muted);
+  padding: 0 0.5rem;
+  font-size: 0.8rem;
+  cursor: grab;
+}
+.template-editor .field-chip.ProseMirror-selectednode {
+  outline: 2px solid var(--primary);
+}
+.template-editor .summary-block {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  border-block: 1px solid var(--border);
+  padding: 0.5rem 0;
+  margin: 0.5rem 0;
+}
+.template-editor .summary-item::before {
+  content: attr(data-label);
+  display: block;
+  font-size: 0.7rem;
+  color: var(--muted-foreground);
+}
+.template-editor hr.page-break {
+  border: 0;
+  border-top: 2px dashed var(--border);
+  margin: 1rem 0;
+  position: relative;
+}
+.template-editor hr.page-break::after {
+  content: 'Ngắt trang';
+  position: absolute;
+  top: -0.65rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--card);
+  padding: 0 0.5rem;
+  font-size: 0.7rem;
+  color: var(--muted-foreground);
+}
+.template-editor .qr-block {
+  width: 6rem;
+  height: 6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border: 1px dashed var(--border);
+  border-radius: 0.5rem;
+  font-size: 0.7rem;
+  color: var(--muted-foreground);
+  margin: 0.5rem 0;
+}
+.template-editor .qr-block.ProseMirror-selectednode {
+  outline: 2px solid var(--primary);
+}

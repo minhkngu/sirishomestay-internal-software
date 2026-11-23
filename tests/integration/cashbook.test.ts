@@ -6,27 +6,75 @@ import type { AccessContext, Permission } from '@/domain/access'
 import { summarize } from '@/domain/cashbook'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { deleteDepositEntry, updateDepositEntry } from '@/server/charges/service'
-import { addExpense, deleteExpense, listCashbook, listLeaseTargets, updatePayment, updateExpense } from '@/server/cashbook/service'
+import {
+  addExpense,
+  deleteExpense,
+  listCashbook,
+  listLeaseTargets,
+  updatePayment,
+  updateExpense,
+} from '@/server/cashbook/service'
 import { approveInvoice, createDrafts, recordLeasePayment, removePayment } from '@/server/invoices/service'
 import { createTestDb } from '../helpers/db'
 
-const context = (permissions: Permission[], facilityIds: string[]): AccessContext => ({ userId: crypto.randomUUID(), email: 'test@example.com', fullName: 'Test', permissions: new Set(permissions), facilityIds: new Set(facilityIds), isAdmin: false })
+const context = (permissions: Permission[], facilityIds: string[]): AccessContext => ({
+  userId: crypto.randomUUID(),
+  email: 'test@example.com',
+  fullName: 'Test',
+  permissions: new Set(permissions),
+  facilityIds: new Set(facilityIds),
+  isAdmin: false,
+})
 
 describe('sổ quỹ thu chi', () => {
   let db: DB, facilityId: string, otherId: string, roomId: string, leaseId: string
   const ctx = () => context(['billing'], [facilityId])
-  const expense = (over: Record<string, unknown> = {}) => ({ facilityId, category: 'repair', date: '2026-08-12', amount: 500000, method: 'cash', payee: 'Thợ điện', note: '', ...over })
+  const expense = (over: Record<string, unknown> = {}) => ({
+    facilityId,
+    category: 'repair',
+    date: '2026-08-12',
+    amount: 500000,
+    method: 'cash',
+    payee: 'Thợ điện',
+    note: '',
+    ...over,
+  })
   beforeEach(async () => {
     db = await createTestDb()
-    const [a] = await db.insert(facilities).values({ code: 'TD', name: 'Thảo Điền' }).returning(); facilityId = a.id
-    const [b] = await db.insert(facilities).values({ code: 'BT', name: 'Bình Thạnh' }).returning(); otherId = b.id
-    const [room] = await db.insert(rooms).values({ facilityId, code: '301' }).returning(); roomId = room.id
-    const [tenant] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: facilityId, fullName: 'Khách', phone: '+84901234567', idNumber: '012345678901' }).returning()
-    const [lease] = await db.insert(leases).values({ code: 'HD1', roomId, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-12-31', monthlyRent: 9000000, depositAmount: 9000000 }).returning(); leaseId = lease.id
+    const [a] = await db.insert(facilities).values({ code: 'TD', name: 'Thảo Điền' }).returning()
+    facilityId = a.id
+    const [b] = await db.insert(facilities).values({ code: 'BT', name: 'Bình Thạnh' }).returning()
+    otherId = b.id
+    const [room] = await db.insert(rooms).values({ facilityId, code: '301' }).returning()
+    roomId = room.id
+    const [tenant] = await db
+      .insert(tenants)
+      .values({
+        kind: 'vietnamese',
+        homeFacilityId: facilityId,
+        fullName: 'Khách',
+        phone: '+84901234567',
+        idNumber: '012345678901',
+      })
+      .returning()
+    const [lease] = await db
+      .insert(leases)
+      .values({
+        code: 'HD1',
+        roomId,
+        tenantId: tenant.id,
+        startDate: '2026-01-01',
+        endDate: '2027-12-31',
+        monthlyRent: 9000000,
+        depositAmount: 9000000,
+      })
+      .returning()
+    leaseId = lease.id
   })
 
   it('gộp thu tiền thuê, cọc và chi; chờ thu, trừ cọc, mất cọc không hiện và không cộng vào Thu/Chi', async () => {
-    const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-08' }); await approveInvoice(db, ctx(), inv.id, {})
+    const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-08' })
+    await approveInvoice(db, ctx(), inv.id, {})
     await recordLeasePayment(db, ctx(), leaseId, { paidOn: '2026-08-10', amount: 4000000, method: 'cash' })
     await db.insert(depositEntries).values([
       { leaseId, date: '2026-08-01', type: 'collect', amount: 9000000, status: 'done' },
@@ -37,7 +85,7 @@ describe('sổ quỹ thu chi', () => {
     await addExpense(db, ctx(), expense())
     const { rows, depositHeld } = await listCashbook(db, ctx(), { month: '2026-08' })
     // Chỉ khoản tiền đã thực nhận/chi mới hiện: cọc đã thu, chi, thu tiền thuê; cọc chờ thu, trừ cọc, mất cọc không hiện
-    expect(rows.map(r => r.source).sort()).toEqual(['deposit', 'expense', 'payment'])
+    expect(rows.map((r) => r.source).sort()).toEqual(['deposit', 'expense', 'payment'])
     expect(summarize(rows)).toEqual({ income: 13000000, expense: 500000, net: 12500000 })
     expect(depositHeld).toBe(8700000)
   })
@@ -50,7 +98,9 @@ describe('sổ quỹ thu chi', () => {
     await expect(addExpense(db, ctx(), expense({ amount: 0 }))).rejects.toThrow(ValidationError)
     await expect(addExpense(db, ctx(), expense({ category: 'khac-la' }))).rejects.toThrow(ValidationError)
     await expect(addExpense(db, ctx(), expense({ facilityId: otherId }))).rejects.toThrow(NotFoundError)
-    await expect(addExpense(db, context(['billing'], [facilityId, otherId]), expense({ facilityId: otherId, roomId }))).rejects.toThrow(ValidationError)
+    await expect(
+      addExpense(db, context(['billing'], [facilityId, otherId]), expense({ facilityId: otherId, roomId })),
+    ).rejects.toThrow(ValidationError)
   })
   it('sửa và xoá khoản chi đều ghi nhật ký', async () => {
     const row = await addExpense(db, ctx(), expense())
@@ -59,20 +109,24 @@ describe('sổ quỹ thu chi', () => {
     await deleteExpense(db, ctx(), row.id)
     expect((await listCashbook(db, ctx(), {})).rows).toHaveLength(0)
     const logs = await db.select().from(auditLogs).where(eq(auditLogs.entity, 'expense'))
-    expect(logs.map(l => l.action).sort()).toEqual(['create', 'delete', 'update'])
+    expect(logs.map((l) => l.action).sort()).toEqual(['create', 'delete', 'update'])
   })
   it('xoá khoản thu khỏi sổ quỹ làm dư nợ tăng lại; thiếu quyền cơ sở thì từ chối', async () => {
-    const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-08' }); await approveInvoice(db, ctx(), inv.id, {})
+    const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-08' })
+    await approveInvoice(db, ctx(), inv.id, {})
     await recordLeasePayment(db, ctx(), leaseId, { paidOn: '2026-08-10', amount: 4000000, method: 'cash' })
-    const [pay] = (await listCashbook(db, ctx(), {})).rows.filter(r => r.source === 'payment')
+    const [pay] = (await listCashbook(db, ctx(), {})).rows.filter((r) => r.source === 'payment')
     await expect(removePayment(db, context(['billing'], [otherId]), pay.id)).rejects.toThrow(NotFoundError)
     await removePayment(db, ctx(), pay.id)
-    expect((await listCashbook(db, ctx(), {})).rows.filter(r => r.source === 'payment')).toHaveLength(0)
+    expect((await listCashbook(db, ctx(), {})).rows.filter((r) => r.source === 'payment')).toHaveLength(0)
     expect((await listLeaseTargets(db, ctx()))[0].debt).toBe(18000000)
   })
   it('liệt kê hợp đồng đang thuê kèm dư nợ', async () => {
-    const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-08' }); await approveInvoice(db, ctx(), inv.id, {})
-    expect(await listLeaseTargets(db, ctx())).toEqual([expect.objectContaining({ leaseId, roomCode: '301', debt: 18000000 })])
+    const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-08' })
+    await approveInvoice(db, ctx(), inv.id, {})
+    expect(await listLeaseTargets(db, ctx())).toEqual([
+      expect.objectContaining({ leaseId, roomCode: '301', debt: 18000000 }),
+    ])
   })
 })
 
@@ -81,21 +135,55 @@ describe('sửa, xoá khoản thu và cọc ở sổ quỹ', () => {
   const ctx = () => context(['billing'], [facilityId])
   beforeEach(async () => {
     db = await createTestDb()
-    const [a] = await db.insert(facilities).values({ code: 'TD', name: 'Thảo Điền' }).returning(); facilityId = a.id
-    const [b] = await db.insert(facilities).values({ code: 'BT', name: 'Bình Thạnh' }).returning(); otherId = b.id
+    const [a] = await db.insert(facilities).values({ code: 'TD', name: 'Thảo Điền' }).returning()
+    facilityId = a.id
+    const [b] = await db.insert(facilities).values({ code: 'BT', name: 'Bình Thạnh' }).returning()
+    otherId = b.id
     const [room] = await db.insert(rooms).values({ facilityId, code: '301' }).returning()
-    const [tenant] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: facilityId, fullName: 'Khách', phone: '+84901234567', idNumber: '012345678901' }).returning()
-    const [lease] = await db.insert(leases).values({ code: 'HD1', roomId: room.id, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-12-31', monthlyRent: 9000000, depositAmount: 9000000 }).returning(); leaseId = lease.id
-    const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-08' }); await approveInvoice(db, ctx(), inv.id, {})
+    const [tenant] = await db
+      .insert(tenants)
+      .values({
+        kind: 'vietnamese',
+        homeFacilityId: facilityId,
+        fullName: 'Khách',
+        phone: '+84901234567',
+        idNumber: '012345678901',
+      })
+      .returning()
+    const [lease] = await db
+      .insert(leases)
+      .values({
+        code: 'HD1',
+        roomId: room.id,
+        tenantId: tenant.id,
+        startDate: '2026-01-01',
+        endDate: '2027-12-31',
+        monthlyRent: 9000000,
+        depositAmount: 9000000,
+      })
+      .returning()
+    leaseId = lease.id
+    const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-08' })
+    await approveInvoice(db, ctx(), inv.id, {})
     const lines = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, inv.id))
     invoiceTotal = lines.reduce((n, l) => n + l.amount, 0)
   })
-  const debtOf = async () => (await listLeaseTargets(db, ctx())).find(l => l.leaseId === leaseId)!.debt
+  const debtOf = async () => (await listLeaseTargets(db, ctx())).find((l) => l.leaseId === leaseId)!.debt
   const heldOf = async () => (await listCashbook(db, ctx())).depositHeld
-  const depositRow = async (over: Partial<typeof depositEntries.$inferInsert>) => (await db.insert(depositEntries).values({ leaseId, date: '2026-08-01', type: 'collect', amount: 5000000, status: 'done', ...over }).returning())[0]
+  const depositRow = async (over: Partial<typeof depositEntries.$inferInsert>) =>
+    (
+      await db
+        .insert(depositEntries)
+        .values({ leaseId, date: '2026-08-01', type: 'collect', amount: 5000000, status: 'done', ...over })
+        .returning()
+    )[0]
 
   it('sửa số tiền thu hợp lệ thì dư nợ đổi đúng, có nhật ký', async () => {
-    const [pay] = await recordLeasePayment(db, ctx(), leaseId, { paidOn: '2026-08-10', amount: 4000000, method: 'cash' })
+    const [pay] = await recordLeasePayment(db, ctx(), leaseId, {
+      paidOn: '2026-08-10',
+      amount: 4000000,
+      method: 'cash',
+    })
     const before = await debtOf()
     await updatePayment(db, ctx(), pay.id, { paidOn: '2026-08-11', amount: 3000000, method: 'transfer', note: 'sửa' })
     expect(await debtOf()).toBe(before + 1000000)
@@ -103,12 +191,22 @@ describe('sửa, xoá khoản thu và cọc ở sổ quỹ', () => {
   })
 
   it('sửa số tiền thu vượt phần còn nợ thì từ chối', async () => {
-    const [pay] = await recordLeasePayment(db, ctx(), leaseId, { paidOn: '2026-08-10', amount: 4000000, method: 'cash' })
-    await expect(updatePayment(db, ctx(), pay.id, { paidOn: '2026-08-10', amount: invoiceTotal + 1, method: 'cash' })).rejects.toThrow(ValidationError)
+    const [pay] = await recordLeasePayment(db, ctx(), leaseId, {
+      paidOn: '2026-08-10',
+      amount: 4000000,
+      method: 'cash',
+    })
+    await expect(
+      updatePayment(db, ctx(), pay.id, { paidOn: '2026-08-10', amount: invoiceTotal + 1, method: 'cash' }),
+    ).rejects.toThrow(ValidationError)
   })
 
   it('xoá khoản thu thì dư nợ tăng lại', async () => {
-    const [pay] = await recordLeasePayment(db, ctx(), leaseId, { paidOn: '2026-08-10', amount: 4000000, method: 'cash' })
+    const [pay] = await recordLeasePayment(db, ctx(), leaseId, {
+      paidOn: '2026-08-10',
+      amount: 4000000,
+      method: 'cash',
+    })
     await removePayment(db, ctx(), pay.id)
     expect(await debtOf()).toBe(invoiceTotal)
   })
@@ -125,7 +223,9 @@ describe('sửa, xoá khoản thu và cọc ở sổ quỹ', () => {
 
   it('khoản trừ cọc, mất cọc không sửa và xoá được', async () => {
     const deduct = await depositRow({ type: 'deduct', amount: 200000 })
-    await expect(updateDepositEntry(db, ctx(), deduct.id, { date: '2026-08-01', amount: 100000, method: 'cash', note: '' })).rejects.toThrow(ValidationError)
+    await expect(
+      updateDepositEntry(db, ctx(), deduct.id, { date: '2026-08-01', amount: 100000, method: 'cash', note: '' }),
+    ).rejects.toThrow(ValidationError)
     await expect(deleteDepositEntry(db, ctx(), deduct.id)).rejects.toThrow(ValidationError)
   })
 
@@ -133,7 +233,9 @@ describe('sửa, xoá khoản thu và cọc ở sổ quỹ', () => {
     const collect = await depositRow({ type: 'collect', amount: 5000000 })
     const outsider = context(['billing'], [otherId])
     // Cơ sở ngoài phạm vi trả NotFound (như các service khác, không lộ sự tồn tại của khoản)
-    await expect(updateDepositEntry(db, outsider, collect.id, { date: '2026-08-01', amount: 4000000, method: 'cash', note: '' })).rejects.toThrow(NotFoundError)
+    await expect(
+      updateDepositEntry(db, outsider, collect.id, { date: '2026-08-01', amount: 4000000, method: 'cash', note: '' }),
+    ).rejects.toThrow(NotFoundError)
     await expect(deleteDepositEntry(db, outsider, collect.id)).rejects.toThrow(NotFoundError)
     await deleteDepositEntry(db, ctx(), collect.id)
     expect((await db.select().from(auditLogs).where(eq(auditLogs.entityId, collect.id))).length).toBeGreaterThan(0)

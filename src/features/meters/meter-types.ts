@@ -4,7 +4,9 @@ export function meterTypeName(name: string): string {
 }
 
 /** Các loại đồng hồ có trong bảng ghi chỉ số, xếp Điện, Nước trước rồi tên khác theo ABC. */
-export function readingMeterTypes(rows: Array<{ electric: unknown; water: unknown; feeMeters?: Array<{ name: string }> }>): string[] {
+export function readingMeterTypes(
+  rows: Array<{ electric: unknown; water: unknown; feeMeters?: Array<{ name: string }> }>,
+): string[] {
   const types = new Set<string>()
   if (rows.some((row) => row.electric)) types.add('Điện')
   if (rows.some((row) => row.water)) types.add('Nước')

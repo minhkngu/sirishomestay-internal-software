@@ -20,10 +20,22 @@ export async function GET(req: Request) {
   const docType = q.get('docType') as (typeof ALLOWED)[number] | null
   const id = q.get('id') ?? ''
   const templateId = q.get('templateId') ?? undefined
-  if (!docType || !ALLOWED.includes(docType) || !/^[0-9a-f-]{36}$/.test(id) || (templateId && !/^[0-9a-f-]{36}$/.test(templateId))) return new NextResponse('Not found', { status: 404 })
+  if (
+    !docType ||
+    !ALLOWED.includes(docType) ||
+    !/^[0-9a-f-]{36}$/.test(id) ||
+    (templateId && !/^[0-9a-f-]{36}$/.test(templateId))
+  )
+    return new NextResponse('Not found', { status: 404 })
   try {
     const r = await previewDocument(db, ctx, { docType, entityId: id, templateId })
-    return new NextResponse(new Uint8Array(r.bytes), { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${encodeURIComponent(r.name)}"`, 'Cache-Control': 'private, no-store' } })
+    return new NextResponse(new Uint8Array(r.bytes), {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="${encodeURIComponent(r.name)}"`,
+        'Cache-Control': 'private, no-store',
+      },
+    })
   } catch (e) {
     if (e instanceof NotFoundError || e instanceof ForbiddenError) return new NextResponse('Not found', { status: 404 })
     if (e instanceof ValidationError) return new NextResponse(e.message, { status: 422 })

@@ -17,7 +17,10 @@ export function TenantSearch() {
   const first = useRef(true)
 
   useEffect(() => {
-    if (first.current) { first.current = false; return }
+    if (first.current) {
+      first.current = false
+      return
+    }
     const t = setTimeout(() => setListParams({ q }), 300)
     return () => clearTimeout(t)
   }, [q])

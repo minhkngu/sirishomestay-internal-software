@@ -32,5 +32,7 @@ export function formatPhoneDisplay(e164: string | null | undefined): string {
   const m = /^\+84(\d{9,10})$/.exec(e164)
   if (!m) return e164
   const n = m[1]
-  return n.length === 9 ? `+84 ${n.slice(0, 2)} ${n.slice(2, 5)} ${n.slice(5)}` : `+84 ${n.slice(0, 2)} ${n.slice(2, 6)} ${n.slice(6)}`
+  return n.length === 9
+    ? `+84 ${n.slice(0, 2)} ${n.slice(2, 5)} ${n.slice(5)}`
+    : `+84 ${n.slice(0, 2)} ${n.slice(2, 6)} ${n.slice(6)}`
 }

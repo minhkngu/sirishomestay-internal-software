@@ -1,6 +1,14 @@
 'use client'
 
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import type { TreeFacility } from './location-types'
 
 export function LocationFilters({
@@ -34,12 +42,19 @@ export function LocationFilters({
         onValueChange={(value) => onFacilityChange(!value || value === 'all' ? '' : value)}
         items={[{ value: 'all', label: 'Tất cả toà' }, ...facilities.map((f) => ({ value: f.id, label: f.name }))]}
       >
-        <SelectTrigger aria-label="Lọc toà" className="h-9 w-32 gap-2 border-border/80 bg-card px-2.5 text-[13px] sm:w-40">
+        <SelectTrigger
+          aria-label="Lọc toà"
+          className="h-9 w-32 gap-2 border-border/80 bg-card px-2.5 text-[13px] sm:w-40"
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent align="start">
           <SelectItem value="all">Tất cả toà</SelectItem>
-          {facilities.map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
+          {facilities.map((f) => (
+            <SelectItem key={f.id} value={f.id}>
+              {f.name}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
 
@@ -48,9 +63,28 @@ export function LocationFilters({
         onValueChange={(value) => onLocationChange(!value || value === 'all' ? '' : value)}
         items={locationItems}
       >
-        <SelectTrigger aria-label="Lọc vị trí" className="h-9 w-36 gap-2 border-border/80 bg-card px-2.5 text-[13px] sm:w-40">
+        <SelectTrigger
+          aria-label="Lọc vị trí"
+          className="h-9 w-36 gap-2 border-border/80 bg-card px-2.5 text-[13px] sm:w-40"
+        >
           <span className="truncate">
-            {!location ? 'Tất cả vị trí' : room ? `Phòng ${room.code}` : location === 'warehouse' ? (facilityId ? 'Kho' : 'Kho (tất cả toà)') : location === 'common' ? (facilityId ? 'Khu chung' : 'Khu chung (tất cả toà)') : location === 'unassigned' ? (facilityId ? 'Chưa xếp' : 'Chưa xếp (tất cả toà)') : 'Tất cả vị trí'}
+            {!location
+              ? 'Tất cả vị trí'
+              : room
+                ? `Phòng ${room.code}`
+                : location === 'warehouse'
+                  ? facilityId
+                    ? 'Kho'
+                    : 'Kho (tất cả toà)'
+                  : location === 'common'
+                    ? facilityId
+                      ? 'Khu chung'
+                      : 'Khu chung (tất cả toà)'
+                    : location === 'unassigned'
+                      ? facilityId
+                        ? 'Chưa xếp'
+                        : 'Chưa xếp (tất cả toà)'
+                      : 'Tất cả vị trí'}
           </span>
         </SelectTrigger>
         <SelectContent align="start" className="w-48">
@@ -64,7 +98,11 @@ export function LocationFilters({
           {facilityId && (
             <SelectGroup>
               <SelectLabel>Phòng</SelectLabel>
-              {rooms.map((r) => <SelectItem key={r.id} value={r.id}>Phòng {r.code}</SelectItem>)}
+              {rooms.map((r) => (
+                <SelectItem key={r.id} value={r.id}>
+                  Phòng {r.code}
+                </SelectItem>
+              ))}
             </SelectGroup>
           )}
         </SelectContent>

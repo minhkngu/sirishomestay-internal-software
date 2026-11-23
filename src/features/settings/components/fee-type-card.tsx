@@ -28,9 +28,7 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
     Object.fromEntries(facilities.map((f) => [f.id, defaultFacilityIds.includes(f.id)])),
   )
   const appliedFacilities = facilities.filter((f) => selected[f.id])
-  const priceEntries = appliedFacilities
-    .filter((f) => prices[f.id] != null)
-    .map((f) => [f.name, prices[f.id]] as const)
+  const priceEntries = appliedFacilities.filter((f) => prices[f.id] != null).map((f) => [f.name, prices[f.id]] as const)
 
   function archive() {
     if (!window.confirm(`Lưu trữ phí ${fee.name}?`)) return
@@ -38,7 +36,10 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
   }
 
   function remove() {
-    if (!window.confirm(`Xoá hẳn phí ${fee.name}? Không thể hoàn tác. Phí đã dùng trong hợp đồng thì chỉ có thể lưu trữ.`)) return
+    if (
+      !window.confirm(`Xoá hẳn phí ${fee.name}? Không thể hoàn tác. Phí đã dùng trong hợp đồng thì chỉ có thể lưu trữ.`)
+    )
+      return
     run(() => deleteFeeTypeAction(fee.id), 'Đã xoá')
   }
 
@@ -52,11 +53,19 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
             {` · ${quantityLabel(fee.quantityFrom)}`}
           </p>
           <p className="text-xs text-muted-foreground">
-            {appliedFacilities.length === 0 ? feeApplicationSummary(0, 0) : (
+            {appliedFacilities.length === 0 ? (
+              feeApplicationSummary(0, 0)
+            ) : (
               <Popover>
                 <PopoverTrigger
-                  openOnHover delay={100}
-                  render={<button type="button" className="cursor-help underline decoration-dotted underline-offset-2 hover:text-foreground" />}
+                  openOnHover
+                  delay={100}
+                  render={
+                    <button
+                      type="button"
+                      className="cursor-help underline decoration-dotted underline-offset-2 hover:text-foreground"
+                    />
+                  }
                 >
                   {feeApplicationSummary(appliedFacilities.length, priceEntries.length)}
                 </PopoverTrigger>
@@ -64,7 +73,9 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
                   {appliedFacilities.map((f) => (
                     <p key={f.id} className="flex justify-between gap-4">
                       <span>{f.name}</span>
-                      <span className="text-muted-foreground">{prices[f.id] != null ? `${formatVND(prices[f.id])} đ` : 'giá chung'}</span>
+                      <span className="text-muted-foreground">
+                        {prices[f.id] != null ? `${formatVND(prices[f.id])} đ` : 'giá chung'}
+                      </span>
                     </p>
                   ))}
                 </PopoverContent>
@@ -73,12 +84,30 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
-          <FeeFacilitiesDialog fee={fee} facilities={facilities} selected={selected} prices={prices} onSelectedChange={setSelected} />
+          <FeeFacilitiesDialog
+            fee={fee}
+            facilities={facilities}
+            selected={selected}
+            prices={prices}
+            onSelectedChange={setSelected}
+          />
           {!editing && (
             <>
-              <Button size="sm" variant="outline" aria-label={`Sửa phí ${fee.name}`} onClick={() => setEditing(true)}>Sửa</Button>
-              <Button size="sm" variant="outline" disabled={pending} onClick={archive}>Lưu trữ</Button>
-              <Button size="sm" variant="outline" disabled={pending} aria-label={`Xoá phí ${fee.name}`} onClick={remove}>Xoá</Button>
+              <Button size="sm" variant="outline" aria-label={`Sửa phí ${fee.name}`} onClick={() => setEditing(true)}>
+                Sửa
+              </Button>
+              <Button size="sm" variant="outline" disabled={pending} onClick={archive}>
+                Lưu trữ
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={pending}
+                aria-label={`Xoá phí ${fee.name}`}
+                onClick={remove}
+              >
+                Xoá
+              </Button>
             </>
           )}
         </div>
@@ -94,11 +123,13 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
             error={error}
             submitLabel="Lưu"
             onCancel={() => setEditing(false)}
-            onSubmit={(values) => run(async () => {
-              const result = await updateFeeTypeAction(fee.id, values)
-              if (result.ok) setEditing(false)
-              return result
-            })}
+            onSubmit={(values) =>
+              run(async () => {
+                const result = await updateFeeTypeAction(fee.id, values)
+                if (result.ok) setEditing(false)
+                return result
+              })
+            }
           />
         </div>
       ) : null}

@@ -17,7 +17,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (!/^[0-9a-f-]{36}$/.test(id)) return new NextResponse('Not found', { status: 404 })
   try {
     const search = new URL(req.url).searchParams
-    const url = await getDownloadUrl(db, ctx, getStorage(), id, search.get('thumb') === '1', search.get('inline') === '1')
+    const url = await getDownloadUrl(
+      db,
+      ctx,
+      getStorage(),
+      id,
+      search.get('thumb') === '1',
+      search.get('inline') === '1',
+    )
     return NextResponse.redirect(url, 302)
   } catch (e) {
     if (e instanceof NotFoundError || e instanceof ForbiddenError) return new NextResponse('Not found', { status: 404 })

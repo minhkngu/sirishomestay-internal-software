@@ -29,7 +29,7 @@ test('soạn mẫu hoá đơn HTML, xem nhanh, chọn cho hợp đồng hoặc k
   await expect(invoiceTemplate).toContainText('Theo mặc định hệ thống')
   await page.goto('/invoices?view=draft')
   const invoice = page.locator('a[href^="/invoices/"]').filter({ hasNotText: 'Tạo' }).first()
-  test.skip(await invoice.count() === 0, 'Cần một hóa đơn demo')
+  test.skip((await invoice.count()) === 0, 'Cần một hóa đơn demo')
   await invoice.click()
   // Mẫu hoá đơn chỉ đổi trong sửa hợp đồng, trang hoá đơn không còn ô chọn mẫu
   await expect(page.getByLabel('Mẫu hóa đơn kỳ này')).toHaveCount(0)
@@ -37,7 +37,7 @@ test('soạn mẫu hoá đơn HTML, xem nhanh, chọn cho hợp đồng hoặc k
   const row = page.getByRole('listitem').filter({ hasText: name })
   // bản xem dựng sẵn hiện ngay trong mục của mẫu (từ 2 mẫu trở lên phải bấm tên mẫu để mở)
   const toggle = row.getByRole('button', { name, exact: false }).first()
-  if (await toggle.getAttribute('aria-expanded') === 'false') await toggle.click()
+  if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click()
   await expect(row.locator('iframe')).toBeVisible({ timeout: 30_000 })
   await row.getByRole('button', { name: 'Xoá' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Xoá' }).click()

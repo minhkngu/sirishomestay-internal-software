@@ -1,8 +1,14 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ['@napi-rs/canvas'],
-  outputFileTracingIncludes: { '/*': ['./src/server/pdf/fonts/*.ttf', './node_modules/pdfkit/js/standard-fonts/**/*.cjs', './node_modules/@napi-rs/canvas*/**/*'] },
+  outputFileTracingIncludes: {
+    '/*': [
+      './src/server/pdf/fonts/*.ttf',
+      './node_modules/pdfkit/js/standard-fonts/**/*.cjs',
+      './node_modules/@napi-rs/canvas*/**/*',
+    ],
+  },
   experimental: {
     // Nhập Excel gửi file/dòng dữ liệu qua server action (mặc định chỉ 1MB)
     serverActions: { bodySizeLimit: '12mb' },
@@ -16,12 +22,12 @@ const nextConfig: NextConfig = {
   },
   turbopack: {
     rules: {
-      "*.css": {
-        loaders: ["@tailwindcss/turbopack"],
-        as: "*.css",
+      '*.css': {
+        loaders: ['@tailwindcss/turbopack'],
+        as: '*.css',
       },
     },
   },
-};
+}
 
-export default nextConfig;
+export default nextConfig

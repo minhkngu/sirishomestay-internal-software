@@ -5,5 +5,9 @@ import InvoicePage from '../../../invoices/[id]/page'
 export default async function InterceptedInvoice({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const normalizedId = id.replace(/^(?:\(\.\))+/, '')
-  return <RouteModal title="Hoá đơn" description="Sửa các dòng, chỉ số, hạn thanh toán rồi bấm Lưu thay đổi." size="xl"><InvoicePage params={Promise.resolve({ id: normalizedId })} /></RouteModal>
+  return (
+    <RouteModal title="Hoá đơn" description="Sửa các dòng, chỉ số, hạn thanh toán rồi bấm Lưu thay đổi." size="xl">
+      <InvoicePage params={Promise.resolve({ id: normalizedId })} />
+    </RouteModal>
+  )
 }

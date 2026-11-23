@@ -7,7 +7,12 @@ describe('fieldGroups', () => {
   it('lease có hai nhóm vòng lặp với đúng trường con', () => {
     expect(g.loops.map((l) => l.key).sort()).toEqual(['nguoi_o', 'phi_dich_vu'])
     expect(g.loops.find((l) => l.key === 'nguoi_o')!.fields.map((f) => f.key)).toEqual(['ho_ten', 'giay_to'])
-    expect(g.loops.find((l) => l.key === 'phi_dich_vu')!.fields.map((f) => f.key)).toEqual(['ten', 'don_vi', 'so_luong', 'don_gia'])
+    expect(g.loops.find((l) => l.key === 'phi_dich_vu')!.fields.map((f) => f.key)).toEqual([
+      'ten',
+      'don_vi',
+      'so_luong',
+      'don_gia',
+    ])
   })
   it('chỗ điền thường không chứa khoá của vòng lặp', () => {
     const keys = g.fields.map((f) => f.key)

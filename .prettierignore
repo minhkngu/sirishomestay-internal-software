@@ -1,0 +1,9 @@
+.next/
+node_modules/
+drizzle/
+.claude/
+public/
+package-lock.json
+tests/fixtures/
+docs/
+*.md

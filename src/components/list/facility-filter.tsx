@@ -53,7 +53,9 @@ export function FacilityFilter({
         <span className="whitespace-nowrap">{checked.length ? `Toà (${checked.length})` : 'Tất cả toà'}</span>
         <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
       </summary>
-      <div className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} z-20 mt-1.5 min-w-56 space-y-2.5 rounded-2xl border border-border/80 bg-popover p-3.5 shadow-lg`}>
+      <div
+        className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} z-20 mt-1.5 min-w-56 space-y-2.5 rounded-2xl border border-border/80 bg-popover p-3.5 shadow-lg`}
+      >
         <div className="flex items-center justify-between border-b border-border/50 pb-2">
           <span className="text-xs font-semibold text-foreground">Chọn cơ sở</span>
           <button
@@ -73,13 +75,7 @@ export function FacilityFilter({
               <input
                 type="checkbox"
                 checked={checked.includes(f.id)}
-                onChange={(e) =>
-                  update(
-                    e.target.checked
-                      ? [...checked, f.id]
-                      : checked.filter((id) => id !== f.id)
-                  )
-                }
+                onChange={(e) => update(e.target.checked ? [...checked, f.id] : checked.filter((id) => id !== f.id))}
                 className="size-3.5 rounded border-border text-primary focus:ring-primary/30"
               />
               <span className="truncate">{f.name}</span>

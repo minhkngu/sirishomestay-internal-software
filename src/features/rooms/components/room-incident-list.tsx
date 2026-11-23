@@ -6,8 +6,13 @@ import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 
 export type RoomIncidentRow = {
-  id: string; title: string; status: string; priority: string
-  assigneeName: string | null; createdAt: string; cost: number | null
+  id: string
+  title: string
+  status: string
+  priority: string
+  assigneeName: string | null
+  createdAt: string
+  cost: number | null
 }
 
 const STATUS: Record<string, { label: string; badge: string }> = {
@@ -17,18 +22,42 @@ const STATUS: Record<string, { label: string; badge: string }> = {
 }
 const PRIORITY: Record<string, string> = { high: 'Ưu tiên cao', normal: 'Bình thường', low: 'Thấp' }
 
-const STATUS_FILTERS = [['', 'Tất cả'], ['new', 'Mới'], ['in_progress', 'Đang xử lý'], ['done', 'Xong']] as const
-const PRIORITY_FILTERS = [['', 'Mọi mức'], ['high', 'Ưu tiên cao'], ['normal', 'Bình thường'], ['low', 'Thấp']] as const
+const STATUS_FILTERS = [
+  ['', 'Tất cả'],
+  ['new', 'Mới'],
+  ['in_progress', 'Đang xử lý'],
+  ['done', 'Xong'],
+] as const
+const PRIORITY_FILTERS = [
+  ['', 'Mọi mức'],
+  ['high', 'Ưu tiên cao'],
+  ['normal', 'Bình thường'],
+  ['low', 'Thấp'],
+] as const
 
-function Chips({ value, onChange, options, count }: {
-  value: string; onChange: (v: string) => void; options: readonly (readonly [string, string])[]; count?: (v: string) => number
+function Chips({
+  value,
+  onChange,
+  options,
+  count,
+}: {
+  value: string
+  onChange: (v: string) => void
+  options: readonly (readonly [string, string])[]
+  count?: (v: string) => number
 }) {
   return (
     <div className="flex flex-wrap gap-1.5" role="group">
       {options.map(([v, label]) => (
-        <button key={v} type="button" aria-pressed={value === v} onClick={() => onChange(v)}
-          className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${value === v ? 'border-primary bg-primary text-primary-foreground' : 'border-border/80 bg-card text-muted-foreground hover:text-foreground'}`}>
-          {label}{count ? ` (${count(v)})` : ''}
+        <button
+          key={v}
+          type="button"
+          aria-pressed={value === v}
+          onClick={() => onChange(v)}
+          className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${value === v ? 'border-primary bg-primary text-primary-foreground' : 'border-border/80 bg-card text-muted-foreground hover:text-foreground'}`}
+        >
+          {label}
+          {count ? ` (${count(v)})` : ''}
         </button>
       ))}
     </div>
@@ -42,28 +71,44 @@ export function RoomIncidentList({ items }: { items: RoomIncidentRow[] }) {
   if (items.length === 0) return <p className="text-xs text-muted-foreground">Phòng chưa có sự cố nào.</p>
   const rank = (s: string) => (s === 'done' ? 1 : 0)
   const byPriority = items.filter((i) => !priority || i.priority === priority)
-  const sorted = byPriority.filter((i) => !status || i.status === status).sort((a, b) => rank(a.status) - rank(b.status))
+  const sorted = byPriority
+    .filter((i) => !status || i.status === status)
+    .sort((a, b) => rank(a.status) - rank(b.status))
   return (
     <div className="space-y-2.5">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <Chips value={status} onChange={setStatus} options={STATUS_FILTERS} count={(v) => byPriority.filter((i) => !v || i.status === v).length} />
+        <Chips
+          value={status}
+          onChange={setStatus}
+          options={STATUS_FILTERS}
+          count={(v) => byPriority.filter((i) => !v || i.status === v).length}
+        />
         <Chips value={priority} onChange={setPriority} options={PRIORITY_FILTERS} />
       </div>
       {sorted.length === 0 && <p className="text-xs text-muted-foreground">Không có sự cố khớp bộ lọc.</p>}
       <ul className="divide-y divide-border/60 rounded-2xl border border-border/80 bg-card shadow-2xs">
-      {sorted.map((i) => {
-        const st = STATUS[i.status] ?? STATUS.new
-        return (
-          <li key={i.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5 text-xs">
-            <span className={`w-24 shrink-0 rounded-full border px-2 py-0.5 text-center font-semibold ${st.badge}`}>{st.label}</span>
-            <Link href={`/incidents/${i.id}`} className="min-w-40 flex-1 text-sm font-semibold text-foreground hover:text-primary hover:underline underline-offset-4">{i.title}</Link>
-            <span className="text-muted-foreground">{PRIORITY[i.priority] ?? i.priority}</span>
-            <span className="w-32 truncate text-muted-foreground">{i.assigneeName ?? 'Chưa giao'}</span>
-            <span className="w-24 tabular-nums text-muted-foreground">{formatDateVN(i.createdAt.slice(0, 10))}</span>
-            <span className="w-24 text-right tabular-nums text-foreground">{i.cost != null ? formatVND(i.cost) : '—'}</span>
-          </li>
-        )
-      })}
+        {sorted.map((i) => {
+          const st = STATUS[i.status] ?? STATUS.new
+          return (
+            <li key={i.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5 text-xs">
+              <span className={`w-24 shrink-0 rounded-full border px-2 py-0.5 text-center font-semibold ${st.badge}`}>
+                {st.label}
+              </span>
+              <Link
+                href={`/incidents/${i.id}`}
+                className="min-w-40 flex-1 text-sm font-semibold text-foreground hover:text-primary hover:underline underline-offset-4"
+              >
+                {i.title}
+              </Link>
+              <span className="text-muted-foreground">{PRIORITY[i.priority] ?? i.priority}</span>
+              <span className="w-32 truncate text-muted-foreground">{i.assigneeName ?? 'Chưa giao'}</span>
+              <span className="w-24 tabular-nums text-muted-foreground">{formatDateVN(i.createdAt.slice(0, 10))}</span>
+              <span className="w-24 text-right tabular-nums text-foreground">
+                {i.cost != null ? formatVND(i.cost) : '—'}
+              </span>
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

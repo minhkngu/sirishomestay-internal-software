@@ -47,21 +47,44 @@ export function toTenantRow(d: TenantInput) {
   }
   if (d.kind === 'foreign') {
     Object.assign(row, {
-      fullName: d.fullName, nationality: d.nationality, passportNumber: d.passportNumber, passportExpiry: d.passportExpiry,
-      visaType: d.visaType, visaExpiry: d.visaExpiry, dateOfBirth: d.dateOfBirth,
+      fullName: d.fullName,
+      nationality: d.nationality,
+      passportNumber: d.passportNumber,
+      passportExpiry: d.passportExpiry,
+      visaType: d.visaType,
+      visaExpiry: d.visaExpiry,
+      dateOfBirth: d.dateOfBirth,
     })
   } else if (d.kind === 'vietnamese') {
     Object.assign(row, {
-      fullName: d.fullName, idNumber: d.idNumber, idIssueDate: d.idIssueDate, idIssuePlace: d.idIssuePlace,
-      dateOfBirth: d.dateOfBirth, permanentAddress: d.permanentAddress,
+      fullName: d.fullName,
+      idNumber: d.idNumber,
+      idIssueDate: d.idIssueDate,
+      idIssuePlace: d.idIssuePlace,
+      dateOfBirth: d.dateOfBirth,
+      permanentAddress: d.permanentAddress,
     })
   } else {
     Object.assign(row, {
-      companyName: d.companyName, taxCode: d.taxCode, companyAddress: d.companyAddress,
-      representative: d.representative, contactPerson: d.contactPerson,
+      companyName: d.companyName,
+      taxCode: d.taxCode,
+      companyAddress: d.companyAddress,
+      representative: d.representative,
+      contactPerson: d.contactPerson,
     })
   }
-  return { ...row, searchText: buildSearchText([row.fullName, row.companyName, row.phone, row.email, row.passportNumber, row.idNumber, row.taxCode]) }
+  return {
+    ...row,
+    searchText: buildSearchText([
+      row.fullName,
+      row.companyName,
+      row.phone,
+      row.email,
+      row.passportNumber,
+      row.idNumber,
+      row.taxCode,
+    ]),
+  }
 }
 
 type Row = ReturnType<typeof toTenantRow>
@@ -74,12 +97,19 @@ const DUP_MESSAGES = {
 } as const
 
 /** Tìm trường bị trùng với khách khác (trừ `exceptId`). */
-export async function findDuplicateField(db: Pick<DB, 'select'>, row: Row, exceptId?: string): Promise<keyof typeof DUP_MESSAGES | null> {
+export async function findDuplicateField(
+  db: Pick<DB, 'select'>,
+  row: Row,
+  exceptId?: string,
+): Promise<keyof typeof DUP_MESSAGES | null> {
   const checks: [keyof typeof DUP_MESSAGES, ReturnType<typeof eq>][] = []
   if (row.phone) checks.push(['phone', eq(tenants.phone, row.phone)])
-  if (row.kind === 'foreign' && row.passportNumber) checks.push(['passportNumber', and(eq(tenants.kind, 'foreign'), eq(tenants.passportNumber, row.passportNumber))!])
-  if (row.kind === 'vietnamese' && row.idNumber) checks.push(['idNumber', and(eq(tenants.kind, 'vietnamese'), eq(tenants.idNumber, row.idNumber))!])
-  if (row.kind === 'company' && row.taxCode) checks.push(['taxCode', and(eq(tenants.kind, 'company'), eq(tenants.taxCode, row.taxCode))!])
+  if (row.kind === 'foreign' && row.passportNumber)
+    checks.push(['passportNumber', and(eq(tenants.kind, 'foreign'), eq(tenants.passportNumber, row.passportNumber))!])
+  if (row.kind === 'vietnamese' && row.idNumber)
+    checks.push(['idNumber', and(eq(tenants.kind, 'vietnamese'), eq(tenants.idNumber, row.idNumber))!])
+  if (row.kind === 'company' && row.taxCode)
+    checks.push(['taxCode', and(eq(tenants.kind, 'company'), eq(tenants.taxCode, row.taxCode))!])
   for (const [field, cond] of checks) {
     const [hit] = await db.select({ id: tenants.id }).from(tenants).where(cond)
     if (hit && hit.id !== exceptId) return field
@@ -99,7 +129,14 @@ export async function createTenant(db: DB, ctx: AccessContext, input: unknown): 
     const dup = await findDuplicateField(tx, row)
     if (dup) throw dupError(dup)
     const [t] = await tx.insert(tenants).values(row).returning()
-    await recordAudit(tx, ctx, { action: 'create', entity: 'tenant', summary: 'Tạo khách thuê', entityId: t.id, facilityId: t.homeFacilityId ?? undefined, after: t })
+    await recordAudit(tx, ctx, {
+      action: 'create',
+      entity: 'tenant',
+      summary: 'Tạo khách thuê',
+      entityId: t.id,
+      facilityId: t.homeFacilityId ?? undefined,
+      after: t,
+    })
     return t
   })
 }
@@ -114,8 +151,20 @@ export async function updateTenant(db: DB, ctx: AccessContext, id: string, input
     const row = toTenantRow(data)
     const dup = await findDuplicateField(tx, row, id)
     if (dup) throw dupError(dup)
-    const [after] = await tx.update(tenants).set({ ...row, updatedAt: new Date() }).where(eq(tenants.id, id)).returning()
-    await recordAudit(tx, ctx, { action: 'update', entity: 'tenant', summary: 'Sửa khách thuê', entityId: id, facilityId: after.homeFacilityId ?? undefined, before, after })
+    const [after] = await tx
+      .update(tenants)
+      .set({ ...row, updatedAt: new Date() })
+      .where(eq(tenants.id, id))
+      .returning()
+    await recordAudit(tx, ctx, {
+      action: 'update',
+      entity: 'tenant',
+      summary: 'Sửa khách thuê',
+      entityId: id,
+      facilityId: after.homeFacilityId ?? undefined,
+      before,
+      after,
+    })
     return after
   })
 }
@@ -130,7 +179,14 @@ export async function getTenant(db: DB, ctx: AccessContext, id: string): Promise
 export async function searchTenants(
   db: DB,
   ctx: AccessContext,
-  opts: { q?: string; kind?: Tenant['kind']; facilityId?: string; facilityIds?: string[]; limit?: number | null; offset?: number },
+  opts: {
+    q?: string
+    kind?: Tenant['kind']
+    facilityId?: string
+    facilityIds?: string[]
+    limit?: number | null
+    offset?: number
+  },
 ): Promise<Tenant[]> {
   assertCan(ctx, 'tenants_contracts', opts.facilityId)
   const conds = []
@@ -140,13 +196,23 @@ export async function searchTenants(
     conds.push(inArray(tenants.homeFacilityId, scope))
   }
   if (opts.facilityId) conds.push(eq(tenants.homeFacilityId, opts.facilityId))
-  if (opts.facilityIds?.length) conds.push(inArray(tenants.homeFacilityId, opts.facilityIds.filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))))
+  if (opts.facilityIds?.length)
+    conds.push(
+      inArray(
+        tenants.homeFacilityId,
+        opts.facilityIds.filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)),
+      ),
+    )
   if (opts.kind) conds.push(eq(tenants.kind, opts.kind))
   const q = opts.q ? removeDiacritics(opts.q).toLowerCase().replace(/\s+/g, ' ').trim() : ''
   if (q) {
     const esc = (s: string) => `%${s.replace(/[%_\\]/g, '\\$&')}%`
     const phone = normalizePhone(q)
-    conds.push(phone ? or(ilike(tenants.searchText, esc(q)), ilike(tenants.searchText, esc(phone)))! : ilike(tenants.searchText, esc(q)))
+    conds.push(
+      phone
+        ? or(ilike(tenants.searchText, esc(q)), ilike(tenants.searchText, esc(phone)))!
+        : ilike(tenants.searchText, esc(q)),
+    )
   }
   const query = db
     .select()

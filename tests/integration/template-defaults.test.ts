@@ -11,12 +11,21 @@ import { exportDocument, registerDocLoader } from '@/server/templates/service'
 import { createTestDb } from '../helpers/db'
 import { addHtmlTemplate } from '../helpers/templates'
 
-const admin: AccessContext = { userId: crypto.randomUUID(), email: 'a@x.com', fullName: 'A', permissions: new Set(['settings']), facilityIds: new Set(), isAdmin: true }
+const admin: AccessContext = {
+  userId: crypto.randomUUID(),
+  email: 'a@x.com',
+  fullName: 'A',
+  permissions: new Set(['settings']),
+  facilityIds: new Set(),
+  isAdmin: true,
+}
 const STYLES = ['formal', 'modern'] as const
 
 describe('mẫu giấy tờ mặc định', () => {
   let db: DB
-  beforeEach(async () => { db = await createTestDb() })
+  beforeEach(async () => {
+    db = await createTestDb()
+  })
 
   describe.each(TEMPLATE_DOC_TYPES)('%s', (docType) => {
     it.each(STYLES)('kiểu %s điền đủ dữ liệu mẫu, không thiếu chỗ điền nào', (style) => {
@@ -71,7 +80,11 @@ describe('mẫu giấy tờ mặc định', () => {
     const facilityId = (await db.insert(facilities).values({ code: 'A', name: 'A' }).returning())[0].id
     registerDocLoader('lease', async () => ({ entities: { now: '2026-11-16' }, facilityId, baseName: 'hop-dong' }))
     const storage = new MemoryStorage()
-    const r = await exportDocument(db, admin, storage, { docType: 'lease', entityId: crypto.randomUUID(), format: 'pdf' })
+    const r = await exportDocument(db, admin, storage, {
+      docType: 'lease',
+      entityId: crypto.randomUUID(),
+      format: 'pdf',
+    })
     const [row] = await db.select().from(files).where(eq(files.id, r.fileId))
     expect(new TextDecoder().decode((await storage.read(row.storageKey)).slice(0, 5))).toBe('%PDF-')
     expect(await db.select().from(docTemplates).where(eq(docTemplates.docType, 'lease'))).toHaveLength(2)

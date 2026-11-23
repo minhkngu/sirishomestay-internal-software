@@ -22,7 +22,7 @@ export default async function TenantPage({ params }: { params: Promise<{ id: str
     getTenant(db, ctx, id).catch((e) => {
       if (e instanceof ForbiddenError) notFound()
       throw e
-    })
+    }),
   )
   const facs = await listFacilities(db, ctx)
   const docs = await listFiles(db, ctx, 'tenant_document', id)
@@ -62,9 +62,15 @@ export default async function TenantPage({ params }: { params: Promise<{ id: str
                 )}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                {tenant.phone && <span>SĐT: <strong className="font-medium text-foreground">{tenant.phone}</strong></span>}
+                {tenant.phone && (
+                  <span>
+                    SĐT: <strong className="font-medium text-foreground">{tenant.phone}</strong>
+                  </span>
+                )}
                 {tenant.email && <span>Email: {tenant.email}</span>}
-                {(tenant.idNumber || tenant.passportNumber) && <span>CCCD/Passport: {tenant.idNumber || tenant.passportNumber}</span>}
+                {(tenant.idNumber || tenant.passportNumber) && (
+                  <span>CCCD/Passport: {tenant.idNumber || tenant.passportNumber}</span>
+                )}
               </div>
             </div>
           </div>
@@ -119,7 +125,9 @@ export default async function TenantPage({ params }: { params: Promise<{ id: str
           <div className="rounded-xl border border-dashed border-border/80 p-8 text-center">
             <FileText className="mx-auto size-8 text-muted-foreground/50" />
             <p className="mt-2 text-sm font-medium text-foreground">Chưa có hợp đồng nào</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Tạo hợp đồng cọc hoặc hợp đồng thuê đầu tiên cho khách hàng</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Tạo hợp đồng cọc hoặc hợp đồng thuê đầu tiên cho khách hàng
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border/70 bg-card">
@@ -158,7 +166,7 @@ export default async function TenantPage({ params }: { params: Promise<{ id: str
                         'inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium',
                         isActive
                           ? 'border border-emerald-200/80 bg-emerald-50 text-emerald-700'
-                          : 'border border-border/80 bg-muted/60 text-muted-foreground'
+                          : 'border border-border/80 bg-muted/60 text-muted-foreground',
                       )}
                     >
                       {isActive ? 'Đang hiệu lực' : 'Đã kết thúc'}

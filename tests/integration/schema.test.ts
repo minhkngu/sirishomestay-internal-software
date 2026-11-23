@@ -37,7 +37,9 @@ describe('schema', () => {
     const [wifi] = await db.insert(amenities).values({ name: 'Wifi' }).returning()
     expect(wifi.isActive).toBe(true)
     await db.insert(roomAmenities).values({ roomId: room.id, amenityId: wifi.id })
-    expect(await dbError(db.insert(roomAmenities).values({ roomId: room.id, amenityId: wifi.id }))).toMatch(/unique|duplicate/i)
+    expect(await dbError(db.insert(roomAmenities).values({ roomId: room.id, amenityId: wifi.id }))).toMatch(
+      /unique|duplicate/i,
+    )
   })
 
   it('rejects a foreign tenant without passport number', async () => {
@@ -58,11 +60,19 @@ describe('schema', () => {
 
   it('enforces unique phone but allows companies without phone', async () => {
     await db.insert(tenants).values({
-      kind: 'vietnamese', homeFacilityId: fA, fullName: 'A', phone: '+84901111111', idNumber: '012345678901',
+      kind: 'vietnamese',
+      homeFacilityId: fA,
+      fullName: 'A',
+      phone: '+84901111111',
+      idNumber: '012345678901',
     })
     const msg = await dbError(
       db.insert(tenants).values({
-        kind: 'vietnamese', homeFacilityId: fA, fullName: 'B', phone: '+84901111111', idNumber: '012345678902',
+        kind: 'vietnamese',
+        homeFacilityId: fA,
+        fullName: 'B',
+        phone: '+84901111111',
+        idNumber: '012345678902',
       }),
     )
     expect(msg).toMatch(/unique|duplicate/i)

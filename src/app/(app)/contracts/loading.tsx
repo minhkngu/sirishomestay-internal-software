@@ -16,14 +16,18 @@ export default function Loading() {
           ))}
         </div>
         <div className="flex gap-6 border-b border-border/70 pb-3">
-          {Array.from({ length: 5 }, (_, i) => <div key={i} className="h-3.5 w-16 rounded bg-muted" />)}
+          {Array.from({ length: 5 }, (_, i) => (
+            <div key={i} className="h-3.5 w-16 rounded bg-muted" />
+          ))}
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
           <div className="h-9 w-full max-w-xs rounded-xl bg-muted" />
           <div className="h-9 w-28 rounded-xl bg-muted" />
         </div>
         <div className="space-y-3 rounded-2xl border border-border/80 bg-card p-4">
-          {Array.from({ length: 8 }, (_, i) => <div key={i} className="h-12 w-full rounded bg-muted/70" />)}
+          {Array.from({ length: 8 }, (_, i) => (
+            <div key={i} className="h-12 w-full rounded bg-muted/70" />
+          ))}
         </div>
       </div>
     </div>

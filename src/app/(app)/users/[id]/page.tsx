@@ -10,8 +10,15 @@ import { UserForm } from '@/features/users/components/user-form'
 export default async function UserPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const ctx = await getAccessContext()
-  try { assertCan(ctx, 'settings') } catch { notFound() }
-  const facs = await db.select({ id: facilities.id, name: facilities.name }).from(facilities).orderBy(asc(facilities.name))
+  try {
+    assertCan(ctx, 'settings')
+  } catch {
+    notFound()
+  }
+  const facs = await db
+    .select({ id: facilities.id, name: facilities.name })
+    .from(facilities)
+    .orderBy(asc(facilities.name))
   const user = (await listUsers(db, ctx)).find((u) => u.id === id)
   if (!user) notFound()
   return (

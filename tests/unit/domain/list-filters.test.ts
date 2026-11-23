@@ -12,11 +12,21 @@ it('tìm khách có dấu, số điện thoại nhiều dạng', () => {
 })
 it('lọc hợp đồng theo view', () => {
   const t = '2026-11-18'
-  expect(matchesContractView('expiring', { status: 'active', signStatus: 'signed', endDate: '2026-12-18' }, t, 30)).toBe(true)
-  expect(matchesContractView('expiring', { status: 'active', signStatus: 'signed', endDate: '2026-12-19' }, t, 30)).toBe(false)
-  expect(matchesContractView('unsigned', { status: 'ended', signStatus: 'exported', endDate: '2025-01-01' }, t, 30)).toBe(true)
-  expect(matchesContractView('active', { status: 'ended', signStatus: 'signed', endDate: '2025-01-01' }, t, 30)).toBe(false)
-  expect(matchesContractView('ended', { status: 'ended', signStatus: 'signed', endDate: '2025-01-01' }, t, 30)).toBe(true)
+  expect(
+    matchesContractView('expiring', { status: 'active', signStatus: 'signed', endDate: '2026-12-18' }, t, 30),
+  ).toBe(true)
+  expect(
+    matchesContractView('expiring', { status: 'active', signStatus: 'signed', endDate: '2026-12-19' }, t, 30),
+  ).toBe(false)
+  expect(
+    matchesContractView('unsigned', { status: 'ended', signStatus: 'exported', endDate: '2025-01-01' }, t, 30),
+  ).toBe(true)
+  expect(matchesContractView('active', { status: 'ended', signStatus: 'signed', endDate: '2025-01-01' }, t, 30)).toBe(
+    false,
+  )
+  expect(matchesContractView('ended', { status: 'ended', signStatus: 'signed', endDate: '2025-01-01' }, t, 30)).toBe(
+    true,
+  )
 })
 it('lọc hoá đơn theo trạng thái và kỳ', () => {
   expect(matchesInvoiceView('partial', 'unpaid')).toBe(true)

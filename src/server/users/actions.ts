@@ -30,9 +30,18 @@ export async function createUser(input: unknown): Promise<ActionResult<{ id: str
     if (!parsed.success) throw new ValidationError('Thông tin chưa hợp lệ', fieldErrorsOf(parsed.error))
     const password = tempPassword()
     const admin = supabaseAdmin()
-    const { data, error } = await admin.auth.admin.createUser({ email: parsed.data.email, password, email_confirm: true })
+    const { data, error } = await admin.auth.admin.createUser({
+      email: parsed.data.email,
+      password,
+      email_confirm: true,
+    })
     if (error || !data.user) {
-      throw new ValidationError(/already|registered/i.test(error?.message ?? '') ? 'Email đã được sử dụng' : 'Không tạo được tài khoản đăng nhập', { email: 'Email đã được sử dụng' })
+      throw new ValidationError(
+        /already|registered/i.test(error?.message ?? '')
+          ? 'Email đã được sử dụng'
+          : 'Không tạo được tài khoản đăng nhập',
+        { email: 'Email đã được sử dụng' },
+      )
     }
     try {
       await createUserProfile(db, ctx, data.user.id, parsed.data)
@@ -62,7 +71,12 @@ export async function setUserActive(id: string, active: boolean): Promise<Action
     const { listUsers } = await import('./queries')
     const user = (await listUsers(db, ctx)).find((u) => u.id === id)
     if (!user) throw new ValidationError('Không tìm thấy người dùng')
-    await saveUserAccess(db, ctx, id, { fullName: user.fullName, facilityIds: user.facilityIds, permissions: user.permissions, isActive: active })
+    await saveUserAccess(db, ctx, id, {
+      fullName: user.fullName,
+      facilityIds: user.facilityIds,
+      permissions: user.permissions,
+      isActive: active,
+    })
     revalidatePath('/users')
   })
 }
@@ -74,7 +88,12 @@ export async function resetUserPassword(id: string): Promise<ActionResult<{ pass
     const password = tempPassword()
     const { error } = await supabaseAdmin().auth.admin.updateUserById(id, { password })
     if (error) throw new ValidationError('Không đặt lại được mật khẩu')
-    await recordAudit(db, ctx, { action: 'update', entity: 'user_password', summary: 'Sửa mật khẩu người dùng', entityId: id })
+    await recordAudit(db, ctx, {
+      action: 'update',
+      entity: 'user_password',
+      summary: 'Sửa mật khẩu người dùng',
+      entityId: id,
+    })
     return { password }
   })
 }

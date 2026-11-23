@@ -9,7 +9,9 @@ test.beforeEach(async ({ page }) => {
 })
 
 test('menu có Thu chi; thêm rồi xoá một khoản chi', async ({ page }) => {
-  await expect(page.getByRole('navigation').first().getByRole('link', { name: 'Thu chi', exact: true }).first()).toBeVisible()
+  await expect(
+    page.getByRole('navigation').first().getByRole('link', { name: 'Thu chi', exact: true }).first(),
+  ).toBeVisible()
   await page.goto('/cashbook?month=all')
   await expect(page.getByRole('heading', { name: 'Thu chi', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Thêm khoản chi' }).click()

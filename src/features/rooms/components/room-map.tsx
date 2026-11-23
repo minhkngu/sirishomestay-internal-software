@@ -14,9 +14,26 @@ export function RoomMap({ rooms }: { rooms: MapRoom[] }) {
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap gap-2" role="group" aria-label="Lọc theo trạng thái">
-        <button type="button" onClick={() => setFilter('')} className={cn('rounded-full border px-3 py-1 text-xs', !filter && 'bg-[var(--primary-strong)] text-primary-foreground')}>Tất cả</button>
+        <button
+          type="button"
+          onClick={() => setFilter('')}
+          className={cn(
+            'rounded-full border px-3 py-1 text-xs',
+            !filter && 'bg-[var(--primary-strong)] text-primary-foreground',
+          )}
+        >
+          Tất cả
+        </button>
         {(Object.keys(ROOM_STATUS_LABELS) as RoomStatus[]).map((s) => (
-          <button key={s} type="button" onClick={() => setFilter(s)} className={cn('rounded-full border px-3 py-1 text-xs', filter === s && 'bg-[var(--primary-strong)] text-primary-foreground')}>
+          <button
+            key={s}
+            type="button"
+            onClick={() => setFilter(s)}
+            className={cn(
+              'rounded-full border px-3 py-1 text-xs',
+              filter === s && 'bg-[var(--primary-strong)] text-primary-foreground',
+            )}
+          >
             {ROOM_STATUS_LABELS[s]}
           </button>
         ))}

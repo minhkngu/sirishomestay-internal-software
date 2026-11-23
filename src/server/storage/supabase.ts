@@ -14,7 +14,11 @@ export class SupabaseStorage implements StorageAdapter {
     return data.signedUrl
   }
   async createDownloadUrl(key: string, expiresSec: number, downloadName?: string) {
-    const { data, error } = await this.bucket().createSignedUrl(key, expiresSec, downloadName ? { download: downloadName } : undefined)
+    const { data, error } = await this.bucket().createSignedUrl(
+      key,
+      expiresSec,
+      downloadName ? { download: downloadName } : undefined,
+    )
     if (error || !data) throw new Error(`Không tạo được URL tải xuống: ${error?.message}`)
     return data.signedUrl
   }
@@ -28,7 +32,10 @@ export class SupabaseStorage implements StorageAdapter {
     return data.arrayBuffer()
   }
   async write(key: string, data: ArrayBuffer | Uint8Array, contentType: string) {
-    const { error } = await this.bucket().upload(key, data instanceof Uint8Array ? data : new Uint8Array(data), { contentType, upsert: true })
+    const { error } = await this.bucket().upload(key, data instanceof Uint8Array ? data : new Uint8Array(data), {
+      contentType,
+      upsert: true,
+    })
     if (error) throw new Error(`Không lưu được tệp: ${error.message}`)
   }
 }

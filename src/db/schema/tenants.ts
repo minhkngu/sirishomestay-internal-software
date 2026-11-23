@@ -35,13 +35,24 @@ export const tenants = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    check('tenants_individual_required', sql`${t.kind} = 'company' or (${t.fullName} is not null and ${t.phone} is not null)`),
-    check('tenants_company_required', sql`${t.kind} <> 'company' or (${t.companyName} is not null and ${t.taxCode} is not null)`),
+    check(
+      'tenants_individual_required',
+      sql`${t.kind} = 'company' or (${t.fullName} is not null and ${t.phone} is not null)`,
+    ),
+    check(
+      'tenants_company_required',
+      sql`${t.kind} <> 'company' or (${t.companyName} is not null and ${t.taxCode} is not null)`,
+    ),
     check('tenants_foreign_required', sql`${t.kind} <> 'foreign' or ${t.passportNumber} is not null`),
     check('tenants_vietnamese_required', sql`${t.kind} <> 'vietnamese' or ${t.idNumber} is not null`),
-    uniqueIndex('tenants_passport_unique').on(t.passportNumber).where(sql`${t.kind} = 'foreign'`),
-    uniqueIndex('tenants_id_number_unique').on(t.idNumber).where(sql`${t.kind} = 'vietnamese'`),
-    uniqueIndex('tenants_tax_code_unique').on(t.taxCode).where(sql`${t.kind} = 'company'`),
+    uniqueIndex('tenants_passport_unique')
+      .on(t.passportNumber)
+      .where(sql`${t.kind} = 'foreign'`),
+    uniqueIndex('tenants_id_number_unique')
+      .on(t.idNumber)
+      .where(sql`${t.kind} = 'vietnamese'`),
+    uniqueIndex('tenants_tax_code_unique')
+      .on(t.taxCode)
+      .where(sql`${t.kind} = 'company'`),
   ],
 )
-

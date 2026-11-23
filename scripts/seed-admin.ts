@@ -4,8 +4,11 @@ import postgres from 'postgres'
 import { createClient } from '@supabase/supabase-js'
 import { userProfiles, userPermissions } from '../src/db'
 
-
-try { process.loadEnvFile('.env.local') } catch { /* không có .env.local: dùng biến môi trường hiện có */ }
+try {
+  process.loadEnvFile('.env.local')
+} catch {
+  /* không có .env.local: dùng biến môi trường hiện có */
+}
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`)

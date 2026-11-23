@@ -13,9 +13,13 @@ describe('loadAccessContext', () => {
     const [fa] = await db.insert(facilities).values({ code: 'A', name: 'A' }).returning()
     const [fb] = await db.insert(facilities).values({ code: 'B', name: 'B' }).returning()
     await db.insert(userProfiles).values({ id: uid, email: 'u@x.com', fullName: 'Người Dùng' })
-    await db.insert(userFacilities).values([{ userId: uid, facilityId: fa.id }, { userId: uid, facilityId: fb.id }])
+    await db.insert(userFacilities).values([
+      { userId: uid, facilityId: fa.id },
+      { userId: uid, facilityId: fb.id },
+    ])
     await db.insert(userPermissions).values([
-      { userId: uid, permission: 'billing' }, { userId: uid, permission: 'meters' },
+      { userId: uid, permission: 'billing' },
+      { userId: uid, permission: 'meters' },
     ])
   })
 

@@ -2,7 +2,11 @@ import { z } from 'zod'
 import { normalizePhone } from '@/domain/phone'
 import { parseFlexibleDate } from '@/domain/dates'
 
-const optText = z.string().trim().nullish().transform((v) => (v ? v : null))
+const optText = z
+  .string()
+  .trim()
+  .nullish()
+  .transform((v) => (v ? v : null))
 const reqText = (msg: string) => z.string({ error: msg }).trim().min(1, msg)
 
 const optDate = z
@@ -26,7 +30,11 @@ const phoneValue = (v: string, ctx: z.RefinementCtx) => {
   }
   return n
 }
-const requiredPhone = z.string({ error: 'Nhập số điện thoại' }).trim().min(1, 'Nhập số điện thoại').transform(phoneValue)
+const requiredPhone = z
+  .string({ error: 'Nhập số điện thoại' })
+  .trim()
+  .min(1, 'Nhập số điện thoại')
+  .transform(phoneValue)
 const optionalPhone = z
   .string()
   .trim()
@@ -43,7 +51,11 @@ const email = z
 const common = {
   homeFacilityId: z.string({ error: 'Chọn cơ sở' }).uuid('Chọn cơ sở'),
   email,
-  note: z.string().trim().nullish().transform((v) => v ?? ''),
+  note: z
+    .string()
+    .trim()
+    .nullish()
+    .transform((v) => v ?? ''),
 }
 
 export const foreignSchema = z.object({

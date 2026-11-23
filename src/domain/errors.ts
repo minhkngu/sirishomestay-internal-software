@@ -14,7 +14,10 @@ export class ForbiddenError extends Error {
 
 /** Lỗi nghiệp vụ / dữ liệu nhập sai, có thông báo tiếng Việt và (tuỳ chọn) lỗi theo từng ô. */
 export class ValidationError extends Error {
-  constructor(message: string, public fieldErrors?: Record<string, string>) {
+  constructor(
+    message: string,
+    public fieldErrors?: Record<string, string>,
+  ) {
     super(message)
     this.name = 'ValidationError'
   }

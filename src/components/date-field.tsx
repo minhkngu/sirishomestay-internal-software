@@ -42,12 +42,24 @@ export function DateField({
 
   return (
     <div className={cn('space-y-1.5', className)}>
-      <Label htmlFor={id} className="text-[13px] font-medium text-foreground">{label}</Label>
+      <Label htmlFor={id} className="text-[13px] font-medium text-foreground">
+        {label}
+      </Label>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
-          render={<Button type="button" id={id} variant="outline" aria-label={label} className="h-9 w-full justify-between bg-card px-3 text-[13px] font-normal" />}
+          render={
+            <Button
+              type="button"
+              id={id}
+              variant="outline"
+              aria-label={label}
+              className="h-9 w-full justify-between bg-card px-3 text-[13px] font-normal"
+            />
+          }
         >
-          <span className={value ? 'text-foreground' : 'text-muted-foreground'}>{value ? formatDateVN(value) : placeholder}</span>
+          <span className={value ? 'text-foreground' : 'text-muted-foreground'}>
+            {value ? formatDateVN(value) : placeholder}
+          </span>
           <CalendarDays className="size-4 text-muted-foreground" />
         </PopoverTrigger>
         <PopoverContent align="start" className="w-auto p-0">

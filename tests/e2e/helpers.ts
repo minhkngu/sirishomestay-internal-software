@@ -10,7 +10,7 @@ export const meterValue = () => Math.floor(Date.now() / 1000)
 export async function fillMeterReadings(page: Page) {
   // Mỗi dòng phí đồng hồ phải chọn một đồng hồ của phòng: chọn đồng hồ rảnh đầu tiên còn trống
   const pickers = page.getByLabel(/^Đồng hồ /)
-  for (let i = 0; i < await pickers.count(); i++) {
+  for (let i = 0; i < (await pickers.count()); i++) {
     const trigger = pickers.nth(i)
     if ((await trigger.innerText()).includes('Chọn đồng hồ')) {
       await trigger.click()
@@ -19,7 +19,8 @@ export async function fillMeterReadings(page: Page) {
     }
   }
   const inputs = page.getByLabel(/^Chỉ số ban đầu /)
-  for (let i = 0; i < await inputs.count(); i++) if (!(await inputs.nth(i).inputValue())) await inputs.nth(i).fill(String(meterValue()))
+  for (let i = 0; i < (await inputs.count()); i++)
+    if (!(await inputs.nth(i).inputValue())) await inputs.nth(i).fill(String(meterValue()))
 }
 
 /** Đăng nhập Admin rồi tạo một phòng tạm mã duy nhất ở Thảo Điền; trả về mã phòng. */
@@ -28,7 +29,10 @@ export async function createTempRoom(page: Page): Promise<string> {
   await page.getByRole('button', { name: /^Admin/ }).click()
   await expect(page.getByRole('heading', { name: 'Nhắc việc' })).toBeVisible()
   await page.goto('/facilities')
-  await page.getByRole('link', { name: /Thảo Điền/ }).first().click()
+  await page
+    .getByRole('link', { name: /Thảo Điền/ })
+    .first()
+    .click()
   await page.getByRole('button', { name: 'Tạo nhanh nhiều phòng' }).click()
   const prefix = `E2E${Date.now()}${Math.floor(Math.random() * 1000)}-`
   await page.getByLabel('Tiền tố mã (tuỳ chọn)').fill(prefix)
@@ -45,7 +49,8 @@ export async function addOccupant(page: Page, query: string): Promise<string> {
   await page.getByRole('button', { name: 'Thêm người ở cùng' }).click()
   await page.getByPlaceholder('Tìm theo tên hoặc số điện thoại…').fill(query)
   const option = page.getByRole('option', { name: new RegExp(escapeRegex(query)) }).first()
-  const name = (await option.getAttribute('data-name')) ?? ((await option.innerText()) ?? '').split('\n')[1]?.trim() ?? query
+  const name =
+    (await option.getAttribute('data-name')) ?? ((await option.innerText()) ?? '').split('\n')[1]?.trim() ?? query
   await option.click()
   return name
 }
@@ -54,7 +59,10 @@ export async function addOccupant(page: Page, query: string): Promise<string> {
 export async function choosePerson(page: Page, label: string, query: string) {
   await page.getByLabel(label, { exact: true }).click()
   await page.getByPlaceholder('Tìm theo tên hoặc số điện thoại…').fill(query)
-  await page.getByRole('option', { name: new RegExp(escapeRegex(query)) }).first().click()
+  await page
+    .getByRole('option', { name: new RegExp(escapeRegex(query)) })
+    .first()
+    .click()
 }
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

@@ -6,7 +6,10 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input'
 import { MoneyInput } from '@/components/ui/money-input'
 import {
-  buildFeeFacilityItems, FACILITY_SEARCH_MIN, filterFacilitiesByName, type FeeFacilityDraft,
+  buildFeeFacilityItems,
+  FACILITY_SEARCH_MIN,
+  filterFacilitiesByName,
+  type FeeFacilityDraft,
 } from '@/features/settings/components/fee-options'
 import { Msg } from '@/features/settings/components/use-run'
 import { formatVND } from '@/domain/money'
@@ -20,8 +23,17 @@ type Props = {
   onSelectedChange: (next: Record<string, boolean>) => void
 }
 
-function initialDraft(facilities: Props['facilities'], selected: Props['selected'], prices: Props['prices']): Record<string, FeeFacilityDraft> {
-  return Object.fromEntries(facilities.map((f) => [f.id, { on: selected[f.id] ?? false, price: prices[f.id] == null ? '' : String(prices[f.id]) }]))
+function initialDraft(
+  facilities: Props['facilities'],
+  selected: Props['selected'],
+  prices: Props['prices'],
+): Record<string, FeeFacilityDraft> {
+  return Object.fromEntries(
+    facilities.map((f) => [
+      f.id,
+      { on: selected[f.id] ?? false, price: prices[f.id] == null ? '' : String(prices[f.id]) },
+    ]),
+  )
 }
 
 /** Nút + popup chọn toà áp dụng phí và đặt giá riêng. Tick/nhập giá chỉ là nháp, bấm Áp dụng mới lưu một lần. */
@@ -32,30 +44,55 @@ export function FeeFacilitiesDialog({ fee, facilities, selected, prices, onSelec
   const [query, setQuery] = useState('')
   const [draft, setDraft] = useState(() => initialDraft(facilities, selected, prices))
   const visible = filterFacilitiesByName(facilities, query)
-  const { items, invalid } = buildFeeFacilityItems(facilities.map((f) => f.id), selected, prices, draft)
+  const { items, invalid } = buildFeeFacilityItems(
+    facilities.map((f) => f.id),
+    selected,
+    prices,
+    draft,
+  )
 
   function openDialog() {
     setDraft(initialDraft(facilities, selected, prices))
-    setQuery(''); setError(null); setOpen(true)
+    setQuery('')
+    setError(null)
+    setOpen(true)
   }
 
   async function apply() {
-    setSaving(true); setError(null)
+    setSaving(true)
+    setError(null)
     const result = await saveFeeFacilitiesAction({ feeTypeId: fee.id, items })
     setSaving(false)
-    if (!result.ok) { setError(result.error ?? 'Có lỗi'); return }
+    if (!result.ok) {
+      setError(result.error ?? 'Có lỗi')
+      return
+    }
     onSelectedChange(Object.fromEntries(facilities.map((f) => [f.id, draft[f.id]?.on ?? false])))
     setOpen(false)
   }
 
   return (
     <>
-      <Button type="button" size="sm" variant="outline" onClick={openDialog}>Áp dụng theo toà</Button>
-      <Dialog open={open} onOpenChange={(next) => { if (!saving) setOpen(next) }}>
+      <Button type="button" size="sm" variant="outline" onClick={openDialog}>
+        Áp dụng theo toà
+      </Button>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          if (!saving) setOpen(next)
+        }}
+      >
         <DialogContent className="sm:max-w-2xl">
-          <DialogHeader><DialogTitle>Áp dụng {fee.name} theo toà</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Áp dụng {fee.name} theo toà</DialogTitle>
+          </DialogHeader>
           {facilities.length >= FACILITY_SEARCH_MIN && (
-            <Input aria-label="Tìm toà" placeholder="Tìm toà" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <Input
+              aria-label="Tìm toà"
+              placeholder="Tìm toà"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
           )}
           {facilities.length === 0 ? (
             <p className="text-sm text-muted-foreground">Chưa có cơ sở nào</p>
@@ -65,7 +102,10 @@ export function FeeFacilitiesDialog({ fee, facilities, selected, prices, onSelec
             <div className="max-h-[60vh] overflow-y-auto rounded-md border">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-muted text-left">
-                  <tr><th className="p-2">Toà</th><th className="p-2">Giá riêng (đ)</th></tr>
+                  <tr>
+                    <th className="p-2">Toà</th>
+                    <th className="p-2">Giá riêng (đ)</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {visible.map((f) => {
@@ -74,7 +114,12 @@ export function FeeFacilitiesDialog({ fee, facilities, selected, prices, onSelec
                       <tr key={f.id} className="border-t">
                         <td className="p-2">
                           <label className="inline-flex items-center gap-2">
-                            <input type="checkbox" checked={row.on} disabled={saving} onChange={(e) => setDraft({ ...draft, [f.id]: { ...row, on: e.target.checked } })} />
+                            <input
+                              type="checkbox"
+                              checked={row.on}
+                              disabled={saving}
+                              onChange={(e) => setDraft({ ...draft, [f.id]: { ...row, on: e.target.checked } })}
+                            />
                             {f.name}
                           </label>
                         </td>
@@ -98,8 +143,12 @@ export function FeeFacilitiesDialog({ fee, facilities, selected, prices, onSelec
           <Msg error={error} ok={null} />
           {invalid && <p className="text-sm text-destructive">Giá riêng phải là số nguyên không âm</p>}
           <DialogFooter>
-            <Button type="button" variant="outline" disabled={saving} onClick={() => setOpen(false)}>Huỷ</Button>
-            <Button type="button" disabled={saving || invalid || items.length === 0} onClick={apply}>{saving ? 'Đang lưu…' : 'Áp dụng'}</Button>
+            <Button type="button" variant="outline" disabled={saving} onClick={() => setOpen(false)}>
+              Huỷ
+            </Button>
+            <Button type="button" disabled={saving || invalid || items.length === 0} onClick={apply}>
+              {saving ? 'Đang lưu…' : 'Áp dụng'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

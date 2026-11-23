@@ -1,13 +1,28 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { facilities, rooms, auditLogs } from '@/db'
-import { createAsset, updateAsset, listAssets, getAsset, moveAssets, assetHistory, setAssetStatus } from '@/server/assets/service'
+import {
+  createAsset,
+  updateAsset,
+  listAssets,
+  getAsset,
+  moveAssets,
+  assetHistory,
+  setAssetStatus,
+} from '@/server/assets/service'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import type { AccessContext, Permission } from '@/domain/access'
 import { createTestDb } from '../helpers/db'
 import type { DB } from '@/db/client'
 
 function ctxOf(perms: Permission[], facilityIds: string[] = []): AccessContext {
-  return { userId: crypto.randomUUID(), email: 'a@x.com', fullName: 'A', permissions: new Set(perms), facilityIds: new Set(facilityIds), isAdmin: perms.includes('settings') }
+  return {
+    userId: crypto.randomUUID(),
+    email: 'a@x.com',
+    fullName: 'A',
+    permissions: new Set(perms),
+    facilityIds: new Set(facilityIds),
+    isAdmin: perms.includes('settings'),
+  }
 }
 
 describe('assets', () => {
@@ -30,11 +45,26 @@ describe('assets', () => {
     r302 = (await db.insert(rooms).values({ facilityId: fa, code: '101' }).returning())[0].id
   })
   const mk = (code: string, over: Record<string, unknown> = {}) =>
-    createAsset(db, hung(), { code, name: 'Máy lạnh', category: 'Điện lạnh', value: 8_000_000, condition: 'Tốt', facilityId: fb, location: { kind: 'warehouse', id: fb }, ...over })
+    createAsset(db, hung(), {
+      code,
+      name: 'Máy lạnh',
+      category: 'Điện lạnh',
+      value: 8_000_000,
+      condition: 'Tốt',
+      facilityId: fb,
+      location: { kind: 'warehouse', id: fb },
+      ...over,
+    })
 
   it('tạo tài sản; trùng mã báo lỗi tiếng Việt', async () => {
     const a = await mk('AC-01')
-    expect(a).toMatchObject({ code: 'AC-01', locationKind: 'warehouse', locationId: fb, facilityId: fb, status: 'in_use' })
+    expect(a).toMatchObject({
+      code: 'AC-01',
+      locationKind: 'warehouse',
+      locationId: fb,
+      facilityId: fb,
+      status: 'in_use',
+    })
     await expect(mk('AC-01')).rejects.toThrow('Mã tài sản đã tồn tại')
   })
 
@@ -47,7 +77,12 @@ describe('assets', () => {
     for (const x of [a, b]) {
       const h = await assetHistory(db, hung(), x.id)
       expect(h.moves).toHaveLength(1)
-      expect(h.moves[0]).toMatchObject({ fromKind: 'warehouse', toKind: 'room', toId: r301, reason: 'Lắp cho khách mới' })
+      expect(h.moves[0]).toMatchObject({
+        fromKind: 'warehouse',
+        toKind: 'room',
+        toId: r301,
+        reason: 'Lắp cho khách mới',
+      })
     }
     expect((await db.select().from(auditLogs)).filter((l) => l.entity === 'asset_move')).toHaveLength(2)
   })
@@ -80,7 +115,9 @@ describe('assets', () => {
 
   it('chuyển cùng lúc nhiều món mà một món không tồn tại → NotFoundError, không đổi gì', async () => {
     const a = await mk('AC-01')
-    await expect(moveAssets(db, hung(), [a.id, crypto.randomUUID()], { kind: 'room', id: r301 }, 'x')).rejects.toThrow(NotFoundError)
+    await expect(moveAssets(db, hung(), [a.id, crypto.randomUUID()], { kind: 'room', id: r301 }, 'x')).rejects.toThrow(
+      NotFoundError,
+    )
     expect((await getAsset(db, hung(), a.id)).locationKind).toBe('warehouse')
   })
 
@@ -90,7 +127,17 @@ describe('assets', () => {
     await expect(moveAssets(db, lan(), [a.id], { kind: 'common', id: fb }, 'x')).rejects.toThrow(NotFoundError)
     expect(await listAssets(db, lan(), {})).toHaveLength(0)
     await expect(getAsset(db, ctxOf(['meters'], [fb]), a.id)).rejects.toThrow(ForbiddenError)
-    await expect(createAsset(db, ctxOf(['billing'], [fb]), { code: 'X', name: 'X', category: 'c', value: 1, condition: 'Tốt', facilityId: fb, location: { kind: 'warehouse', id: fb } })).rejects.toThrow(ForbiddenError)
+    await expect(
+      createAsset(db, ctxOf(['billing'], [fb]), {
+        code: 'X',
+        name: 'X',
+        category: 'c',
+        value: 1,
+        condition: 'Tốt',
+        facilityId: fb,
+        location: { kind: 'warehouse', id: fb },
+      }),
+    ).rejects.toThrow(ForbiddenError)
   })
 
   it('lọc theo vị trí, từ khoá không dấu, trạng thái; báo hỏng / thanh lý', async () => {

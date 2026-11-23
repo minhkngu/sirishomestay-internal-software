@@ -22,7 +22,8 @@ test.describe('sửa phí và chỉ số đầu trong popup hợp đồng', () =
   let sql: ReturnType<typeof postgres>
   test.beforeEach(async () => {
     const url = new URL(process.env.E2E_DATABASE_URL!)
-    if (!['127.0.0.1', 'localhost'].includes(url.hostname)) throw new Error('Kiểm thử chỉ được chạy với PostgreSQL cục bộ cô lập')
+    if (!['127.0.0.1', 'localhost'].includes(url.hostname))
+      throw new Error('Kiểm thử chỉ được chạy với PostgreSQL cục bộ cô lập')
     sql = postgres(process.env.E2E_DATABASE_URL!, { prepare: false })
     await sql`delete from lease_fee_meters where lease_fee_id = ${FEE_ID}`
     await sql`delete from lease_fee_snapshots where id = ${FEE_ID}`

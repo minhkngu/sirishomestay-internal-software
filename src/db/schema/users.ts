@@ -15,8 +15,12 @@ export const userProfiles = pgTable('user_profiles', {
 export const userFacilities = pgTable(
   'user_facilities',
   {
-    userId: uuid('user_id').notNull().references(() => userProfiles.id, { onDelete: 'cascade' }),
-    facilityId: uuid('facility_id').notNull().references(() => facilities.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => userProfiles.id, { onDelete: 'cascade' }),
+    facilityId: uuid('facility_id')
+      .notNull()
+      .references(() => facilities.id, { onDelete: 'cascade' }),
   },
   (t) => [primaryKey({ columns: [t.userId, t.facilityId] })],
 )
@@ -24,7 +28,9 @@ export const userFacilities = pgTable(
 export const userPermissions = pgTable(
   'user_permissions',
   {
-    userId: uuid('user_id').notNull().references(() => userProfiles.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => userProfiles.id, { onDelete: 'cascade' }),
     permission: text('permission').notNull(),
   },
   (t) => [

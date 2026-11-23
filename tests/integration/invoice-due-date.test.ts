@@ -7,7 +7,14 @@ import { ForbiddenError, ValidationError } from '@/domain/errors'
 import { approveInvoice, createDrafts, setInvoiceDueDate } from '@/server/invoices/service'
 import { createTestDb } from '../helpers/db'
 
-const context = (permissions: Permission[], facilityId: string): AccessContext => ({ userId: crypto.randomUUID(), email: 'test@example.com', fullName: 'Test', permissions: new Set(permissions), facilityIds: new Set([facilityId]), isAdmin: false })
+const context = (permissions: Permission[], facilityId: string): AccessContext => ({
+  userId: crypto.randomUUID(),
+  email: 'test@example.com',
+  fullName: 'Test',
+  permissions: new Set(permissions),
+  facilityIds: new Set([facilityId]),
+  isAdmin: false,
+})
 
 describe('hạn thanh toán trên hoá đơn', () => {
   let db: DB, facilityId: string, invoiceId: string
@@ -15,18 +22,39 @@ describe('hạn thanh toán trên hoá đơn', () => {
   const due = async () => (await db.select().from(invoices).where(eq(invoices.id, invoiceId)))[0].dueDate
   beforeEach(async () => {
     db = await createTestDb()
-    const [facility] = await db.insert(facilities).values({ code: 'TD', name: 'Thảo Điền' }).returning(); facilityId = facility.id
+    const [facility] = await db.insert(facilities).values({ code: 'TD', name: 'Thảo Điền' }).returning()
+    facilityId = facility.id
     const [room] = await db.insert(rooms).values({ facilityId, code: '301' }).returning()
-    const [tenant] = await db.insert(tenants).values({ kind: 'vietnamese', homeFacilityId: facilityId, fullName: 'Khách', phone: '+84901234567', idNumber: '012345678901' }).returning()
-    await db.insert(leases).values({ code: 'HD1', roomId: room.id, tenantId: tenant.id, startDate: '2026-01-01', endDate: '2027-12-31', monthlyRent: 9000000, depositAmount: 9000000 })
-    const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-07' }); invoiceId = inv.id
+    const [tenant] = await db
+      .insert(tenants)
+      .values({
+        kind: 'vietnamese',
+        homeFacilityId: facilityId,
+        fullName: 'Khách',
+        phone: '+84901234567',
+        idNumber: '012345678901',
+      })
+      .returning()
+    await db.insert(leases).values({
+      code: 'HD1',
+      roomId: room.id,
+      tenantId: tenant.id,
+      startDate: '2026-01-01',
+      endDate: '2027-12-31',
+      monthlyRent: 9000000,
+      depositAmount: 9000000,
+    })
+    const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-07' })
+    invoiceId = inv.id
   })
 
   it('mặc định theo cài đặt, sửa ngày trực tiếp trên hoá đơn nháp và ghi audit', async () => {
     expect(await due()).toBe('2026-07-05')
     await setInvoiceDueDate(db, ctx(), invoiceId, '2026-07-12')
     expect(await due()).toBe('2026-07-12')
-    expect((await db.select().from(auditLogs)).some(a => a.entity === 'invoice' && a.summary === 'Sửa hạn thanh toán')).toBe(true)
+    expect(
+      (await db.select().from(auditLogs)).some((a) => a.entity === 'invoice' && a.summary === 'Sửa hạn thanh toán'),
+    ).toBe(true)
   })
   it('duyệt không đè hạn đã sửa', async () => {
     await setInvoiceDueDate(db, ctx(), invoiceId, '2026-07-20')
@@ -43,6 +71,8 @@ describe('hạn thanh toán trên hoá đơn', () => {
     expect(await due()).toBe('2026-07-05')
   })
   it('thiếu quyền billing thì từ chối', async () => {
-    await expect(setInvoiceDueDate(db, context(['meters'], facilityId), invoiceId, '2026-07-12')).rejects.toThrow(ForbiddenError)
+    await expect(setInvoiceDueDate(db, context(['meters'], facilityId), invoiceId, '2026-07-12')).rejects.toThrow(
+      ForbiddenError,
+    )
   })
 })

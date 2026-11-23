@@ -1,6 +1,14 @@
 import { test, expect, type Page } from '@playwright/test'
 import { createCanvas } from '@napi-rs/canvas'
-import { addOccupant, chooseSelectOption, createTempRoom, fillMeterReadings, pickDate, pickTerm, selectOptionLabels } from './helpers'
+import {
+  addOccupant,
+  chooseSelectOption,
+  createTempRoom,
+  fillMeterReadings,
+  pickDate,
+  pickTerm,
+  selectOptionLabels,
+} from './helpers'
 
 test.skip(!process.env.E2E_BASE_URL, 'Cần E2E_BASE_URL trỏ tới môi trường thử có dữ liệu mẫu')
 
@@ -17,7 +25,10 @@ async function openFormWithRooms(page: Page, count = 1): Promise<string[]> {
   await page.getByRole('button', { name: /^Admin/ }).click()
   await expect(page.getByRole('heading', { name: 'Nhắc việc' })).toBeVisible()
   await page.goto('/facilities')
-  await page.getByRole('link', { name: /Thảo Điền/ }).first().click()
+  await page
+    .getByRole('link', { name: /Thảo Điền/ })
+    .first()
+    .click()
   await page.getByRole('button', { name: 'Tạo nhanh nhiều phòng' }).click()
   const prefix = `E2E${Date.now()}${Math.floor(Math.random() * 1000)}-`
   await page.getByLabel('Tiền tố mã (tuỳ chọn)').fill(prefix)
@@ -34,13 +45,19 @@ const facilitySelect = (page: Page) => page.getByLabel('Toà', { exact: true })
 
 async function pickFacility(page: Page) {
   await facilitySelect(page).click()
-  await page.getByRole('option', { name: /Thảo Điền/ }).first().click()
+  await page
+    .getByRole('option', { name: /Thảo Điền/ })
+    .first()
+    .click()
 }
 
 async function pickRoom(page: Page, code: string) {
   await pickFacility(page)
   await roomSelect(page).click()
-  await page.getByRole('option', { name: new RegExp(code) }).first().click()
+  await page
+    .getByRole('option', { name: new RegExp(code) })
+    .first()
+    .click()
 }
 
 async function expectOneRoom(page: Page, code: string) {
@@ -63,7 +80,10 @@ test('các mục cùng trang, lỗi cạnh trường và đổi phòng xóa tài
   await expect(page.getByText('Chọn phòng', { exact: true })).toBeVisible()
   await pickFacility(page)
   await roomSelect(page).click()
-  const rooms = page.getByRole('option').filter({ hasText: codes[0] }).or(page.getByRole('option').filter({ hasText: codes[1] }))
+  const rooms = page
+    .getByRole('option')
+    .filter({ hasText: codes[0] })
+    .or(page.getByRole('option').filter({ hasText: codes[1] }))
   await expect(rooms).toHaveCount(2)
   await rooms.nth(0).click()
   await expect(page.getByLabel('Mã tài sản mới')).toHaveCount(0)
@@ -167,7 +187,9 @@ test('tạo hợp đồng với tiền thực nhận, ghi chú và tài sản m�
   await page.getByLabel(`Tình trạng ${assetName}`).fill('Trầy nhẹ')
   const canvas = createCanvas(8, 8)
   canvas.getContext('2d').fillRect(0, 0, 8, 8)
-  await page.getByLabel(`Ảnh ${assetName}`).setInputFiles({ name: 'ban.png', mimeType: 'image/png', buffer: canvas.toBuffer('image/png') })
+  await page
+    .getByLabel(`Ảnh ${assetName}`)
+    .setInputFiles({ name: 'ban.png', mimeType: 'image/png', buffer: canvas.toBuffer('image/png') })
   await expect(page.getByAltText(`Ảnh ${assetName} 1`)).toBeVisible()
   await fillMeterReadings(page)
   await page.getByRole('button', { name: 'Tạo hợp đồng thuê' }).click()
@@ -176,7 +198,9 @@ test('tạo hợp đồng với tiền thực nhận, ghi chú và tài sản m�
   if (selectedTemplateName) {
     // mẫu đã chọn được lưu: mở popup sửa hợp đồng thì đúng mẫu đó đang được chọn
     await page.getByRole('button', { name: 'Sửa hợp đồng' }).first().click()
-    await expect(page.getByRole('radio', { name: new RegExp(selectedTemplateName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) })).toBeChecked({ timeout: 60_000 })
+    await expect(
+      page.getByRole('radio', { name: new RegExp(selectedTemplateName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }),
+    ).toBeChecked({ timeout: 60_000 })
     await page.keyboard.press('Escape')
   }
   await expect(page.getByText(/· Nháp/).first()).toBeVisible()
@@ -223,7 +247,7 @@ test('phí chỉ hiện khi mặc định hoặc được thêm và không có l
   const companySearch = page.getByPlaceholder('Tìm theo tên hoặc số điện thoại…')
   await companySearch.fill('Công ty')
   const companies = page.getByRole('option').filter({ hasText: 'Công ty' })
-  test.skip(await companies.count() === 0, 'Cần công ty demo')
+  test.skip((await companies.count()) === 0, 'Cần công ty demo')
   await companies.first().click()
   await expect(page.getByText(/Bên ký/)).toBeVisible()
 })
@@ -235,13 +259,19 @@ test('công ty ký và tạo đồng hồ cho phí riêng', async ({ page }) => 
   await page.getByRole('button', { name: 'Thêm người ở cùng' }).click()
   await page.getByPlaceholder('Tìm theo tên hoặc số điện thoại…').fill('Công ty')
   const companies = page.getByRole('option').filter({ hasText: 'Công ty' })
-  test.skip(await companies.count() === 0, 'Cần công ty demo')
-  const companyName = (await companies.first().getAttribute('data-name')) ?? ((await companies.first().innerText()) ?? '').split('\n')[1]?.trim() ?? 'Công ty'
+  test.skip((await companies.count()) === 0, 'Cần công ty demo')
+  const companyName =
+    (await companies.first().getAttribute('data-name')) ??
+    ((await companies.first().innerText()) ?? '').split('\n')[1]?.trim() ??
+    'Công ty'
   await companies.first().click()
   await expect(page.getByText(/Bên ký/)).toBeVisible()
   await page.getByRole('button', { name: 'Thêm người ở cùng' }).click()
   await page.getByPlaceholder('Tìm theo tên hoặc số điện thoại…').fill('Nguyễn Văn An')
-  await page.getByRole('option', { name: /Nguyễn Văn An/ }).first().click()
+  await page
+    .getByRole('option', { name: /Nguyễn Văn An/ })
+    .first()
+    .click()
   await pickDate(page, 'Ngày bắt đầu', '2026-12-01')
   await pickTerm(page, 12)
   await page.getByLabel('Giá thuê tháng (VND)').fill('9000000')

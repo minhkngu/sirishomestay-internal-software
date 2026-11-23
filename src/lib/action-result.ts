@@ -1,8 +1,7 @@
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 
 export type ActionResult<T = void> =
-  | { ok: true; data: T }
-  | { ok: false; error: string; fieldErrors?: Record<string, string> }
+  { ok: true; data: T } | { ok: false; error: string; fieldErrors?: Record<string, string> }
 
 const UNIQUE_MESSAGES: Record<string, { message: string; field?: string }> = {
   tenants_phone_unique: { message: 'Số điện thoại đã thuộc về khách khác', field: 'phone' },
@@ -15,7 +14,11 @@ const UNIQUE_MESSAGES: Record<string, { message: string; field?: string }> = {
 
 /** Lỗi 23505 (trùng khoá duy nhất) do hai người lưu cùng lúc: đổi thành thông báo tiếng Việt. */
 function uniqueViolation(e: unknown): { message: string; field?: string } | null {
-  for (let cur = e as { code?: string; constraint?: string; message?: string; cause?: unknown } | undefined, i = 0; cur && i < 4; cur = cur.cause as typeof cur, i++) {
+  for (
+    let cur = e as { code?: string; constraint?: string; message?: string; cause?: unknown } | undefined, i = 0;
+    cur && i < 4;
+    cur = cur.cause as typeof cur, i++
+  ) {
     if (cur.code === '23505') {
       const name = cur.constraint ?? /"([a-z_]+)"/.exec(cur.message ?? '')?.[1] ?? ''
       return UNIQUE_MESSAGES[name] ?? { message: 'Dữ liệu bị trùng với bản ghi đã có' }

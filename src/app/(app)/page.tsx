@@ -53,9 +53,7 @@ export default async function HomePage() {
   const { stats, reminders } = await getDashboard(db, ctx)
   const rank = { danger: 0, warning: 1, info: 2 }
   const sorted = [...reminders].sort(
-    (a, b) =>
-      Math.min(...a.items.map((i) => rank[i.severity])) -
-      Math.min(...b.items.map((i) => rank[i.severity]))
+    (a, b) => Math.min(...a.items.map((i) => rank[i.severity])) - Math.min(...b.items.map((i) => rank[i.severity])),
   )
 
   const allTasks = sorted.flatMap((r) =>
@@ -63,7 +61,7 @@ export default async function HomePage() {
       kind: r.kind,
       categoryTitle: r.title,
       ...i,
-    }))
+    })),
   )
 
   return (
@@ -72,7 +70,8 @@ export default async function HomePage() {
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">Nhắc việc</h1>
         <p className="text-xs text-muted-foreground">
-          Xin chào, <span className="font-semibold text-foreground">{ctx.fullName || 'bạn'}</span> 👋 — Tổng quan tình trạng vận hành và các đầu việc cần xử lý.
+          Xin chào, <span className="font-semibold text-foreground">{ctx.fullName || 'bạn'}</span> 👋 — Tổng quan tình
+          trạng vận hành và các đầu việc cần xử lý.
         </p>
       </div>
 
@@ -101,10 +100,18 @@ export default async function HomePage() {
               <thead className="border-b border-border/60 bg-muted/40 text-left">
                 <tr>
                   <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground">Hạng mục</th>
-                  <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground">Đối tượng / Phòng</th>
-                  <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground">Chi tiết / Hạn chót</th>
-                  <th className="p-3 w-32 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Mức độ</th>
-                  <th className="p-3 text-right font-semibold uppercase tracking-wider text-muted-foreground">Thao tác</th>
+                  <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground">
+                    Đối tượng / Phòng
+                  </th>
+                  <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground">
+                    Chi tiết / Hạn chót
+                  </th>
+                  <th className="p-3 w-32 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                    Mức độ
+                  </th>
+                  <th className="p-3 text-right font-semibold uppercase tracking-wider text-muted-foreground">
+                    Thao tác
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
@@ -122,10 +129,7 @@ export default async function HomePage() {
                         </div>
                       </td>
                       <td className="p-3">
-                        <Link
-                          href={t.href}
-                          className="font-semibold text-primary hover:underline underline-offset-2"
-                        >
+                        <Link href={t.href} className="font-semibold text-primary hover:underline underline-offset-2">
                           {t.label}
                         </Link>
                       </td>
@@ -159,12 +163,8 @@ export default async function HomePage() {
       {/* Categorized Cards: Phân nhóm thẻ việc */}
       <div className="space-y-3 pt-2">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold tracking-tight text-foreground">
-            Chi tiết theo nhóm việc
-          </h2>
-          <span className="text-xs text-muted-foreground">
-            {sorted.length} nhóm
-          </span>
+          <h2 className="text-sm font-semibold tracking-tight text-foreground">Chi tiết theo nhóm việc</h2>
+          <span className="text-xs text-muted-foreground">{sorted.length} nhóm</span>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -185,9 +185,7 @@ export default async function HomePage() {
                         >
                           {i.label}
                         </Link>
-                        <span
-                          className={`shrink-0 rounded-full px-1.5 py-0.2 text-[10px] font-medium ${sev.badge}`}
-                        >
+                        <span className={`shrink-0 rounded-full px-1.5 py-0.2 text-[10px] font-medium ${sev.badge}`}>
                           {sev.label}
                         </span>
                       </div>

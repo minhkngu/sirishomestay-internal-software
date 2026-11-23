@@ -19,11 +19,17 @@ describe('roomStatus', () => {
     expect(roomStatus({ isActive: true }, { endDate: '2026-11-10' }, null, today, 30)).toBe('ending_soon')
   })
   it('đang ở · có cọc chờ khi vừa có hợp đồng vừa có cọc chờ', () => {
-    expect(roomStatus({ isActive: true }, { endDate: '2027-06-30' }, { expectedMoveIn: '2027-07-01' }, today, 30)).toBe('occupied_with_next')
+    expect(roomStatus({ isActive: true }, { endDate: '2027-06-30' }, { expectedMoveIn: '2027-07-01' }, today, 30)).toBe(
+      'occupied_with_next',
+    )
   })
   it('có nhãn tiếng Việt cho từng trạng thái', () => {
     expect(ROOM_STATUS_LABELS).toEqual({
-      vacant: 'Trống', deposited: 'Đã cọc', occupied: 'Đang ở', ending_soon: 'Sắp trả', occupied_with_next: 'Đang ở · có cọc chờ',
+      vacant: 'Trống',
+      deposited: 'Đã cọc',
+      occupied: 'Đang ở',
+      ending_soon: 'Sắp trả',
+      occupied_with_next: 'Đang ở · có cọc chờ',
     })
   })
 })

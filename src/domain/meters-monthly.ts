@@ -34,7 +34,10 @@ export function buildMonthlyCells(periods: string[], meters: Meter[], readings: 
     const removedInMonth = meters.filter((m) => m.removedOn && m.removedOn >= start && m.removedOn <= end)
     const replaced = removedInMonth.length > 0
     const values = replaced
-      ? [...removedInMonth.flatMap((m) => (m.finalReading != null ? [m.finalReading] : [])), ...inMonth.filter((r) => meters.find((m) => m.id === r.meterId)?.removedOn == null).map((r) => r.value)]
+      ? [
+          ...removedInMonth.flatMap((m) => (m.finalReading != null ? [m.finalReading] : [])),
+          ...inMonth.filter((r) => meters.find((m) => m.id === r.meterId)?.removedOn == null).map((r) => r.value),
+        ]
       : inMonth.map((r) => r.value).slice(-1)
     let usage: number | null = null
     if (values.length > 0) {
@@ -48,10 +51,15 @@ export function buildMonthlyCells(periods: string[], meters: Meter[], readings: 
     const prevHasReading = monthly.some((r) => r.period === prevPeriod(period))
     const earlier = readings.some((r) => r.readOn < start)
     return {
-      period, values, usage, replaced,
+      period,
+      values,
+      usage,
+      replaced,
       estimated: removedInMonth.some((m) => m.finalReadingEstimated === true),
       gapBefore: values.length > 0 && !prevHasReading && earlier,
-      handover: readings.filter((r) => r.kind === 'handover' && r.readOn >= start && r.readOn <= end).map((r) => r.value),
+      handover: readings
+        .filter((r) => r.kind === 'handover' && r.readOn >= start && r.readOn <= end)
+        .map((r) => r.value),
     }
   })
 }

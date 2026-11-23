@@ -12,8 +12,12 @@ export const amenities = pgTable('amenities', {
 export const roomAmenities = pgTable(
   'room_amenities',
   {
-    roomId: uuid('room_id').notNull().references(() => rooms.id),
-    amenityId: uuid('amenity_id').notNull().references(() => amenities.id),
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => rooms.id),
+    amenityId: uuid('amenity_id')
+      .notNull()
+      .references(() => amenities.id),
   },
   (t) => [primaryKey({ columns: [t.roomId, t.amenityId] })],
 )

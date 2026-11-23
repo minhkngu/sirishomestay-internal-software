@@ -24,12 +24,20 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   })
   const balance = await tenantBalance(db, ctx, d.tenantId)
   const inv = d.invoice
-  const [feeTypes, feeUnits, feePrices] = inv.status === 'draft' ? await Promise.all([listFeeTypes(db, ctx), listFeeUnits(db, ctx), listFeeTypePrices(db, ctx)]) : [[], [], {} as Record<string, Record<string, number>>]
+  const [feeTypes, feeUnits, feePrices] =
+    inv.status === 'draft'
+      ? await Promise.all([listFeeTypes(db, ctx), listFeeUnits(db, ctx), listFeeTypePrices(db, ctx)])
+      : [[], [], {} as Record<string, Record<string, number>>]
   const unitName = new Map(feeUnits.map((u) => [u.id, u.name]))
   const remaining = d.total - d.paid
   const settings = await getSettings(db)
   const dueRule = settings.dueRule
-  const dueDefaultLabel = dueRule.kind === 'day_of_invoice_month' ? `ngày ${dueRule.day} của chính tháng hoá đơn` : dueRule.kind === 'day_of_next_month' ? `ngày ${dueRule.day} của tháng sau` : `${dueRule.days} ngày sau khi duyệt`
+  const dueDefaultLabel =
+    dueRule.kind === 'day_of_invoice_month'
+      ? `ngày ${dueRule.day} của chính tháng hoá đơn`
+      : dueRule.kind === 'day_of_next_month'
+        ? `ngày ${dueRule.day} của tháng sau`
+        : `${dueRule.days} ngày sau khi duyệt`
 
   return (
     <div className="max-w-5xl space-y-6">
@@ -41,75 +49,90 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           <ArrowLeft className="size-3.5" />
           <span>Danh sách hoá đơn</span>
         </Link>
-
       </div>
 
       <InvoiceEditorWithFees
         header={
           <>
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <h1 className="text-xl font-bold tracking-tight text-foreground">{inv.code}</h1>
-                    <InvoiceStatus state={d.state} />
-                    <span className="rounded-full border border-border/80 bg-muted/60 px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                      Phòng {d.roomCode}
-                    </span>
-                  </div>
-    
-                  <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1.5 font-medium text-foreground">
-                      <User className="size-3.5 text-primary" />
-                      <span>{d.tenantName}</span>
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <Calendar className="size-3.5 text-muted-foreground" />
-                      <span>
-                        {formatDateVN(inv.periodStart)} – {formatDateVN(inv.periodEnd)}
-                      </span>
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <FileText className="size-3.5 text-muted-foreground" />
-                      <span>
-                        Hợp đồng{' '}
-                        <PopupLink
-                          className="font-medium text-primary hover:underline underline-offset-2"
-                          href={`/contracts/${inv.leaseId}`}
-                        >
-                          {d.leaseCode}
-                        </PopupLink>
-                      </span>
-                    </span>
-                  </div>
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <h1 className="text-xl font-bold tracking-tight text-foreground">{inv.code}</h1>
+                  <InvoiceStatus state={d.state} />
+                  <span className="rounded-full border border-border/80 bg-muted/60 px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                    Phòng {d.roomCode}
+                  </span>
                 </div>
-    
-                {/* Financial Highlights */}
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:flex md:items-center md:gap-2.5">
-                  <div className="flex flex-col justify-between rounded-xl border border-border/70 bg-card p-3 min-w-[125px] text-left md:text-right shadow-2xs">
-                    <div className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">Tổng hoá đơn</div>
-                    <div className="mt-1 text-sm font-bold text-foreground tabular-nums">{formatVND(d.total)}</div>
-                  </div>
-                  <div className="flex flex-col justify-between rounded-xl border border-emerald-200/70 bg-emerald-50/40 p-3 min-w-[125px] text-left md:text-right shadow-2xs">
-                    <div className="text-[11px] font-medium text-emerald-800 whitespace-nowrap">Đã thanh toán</div>
-                    <div className="mt-1 text-sm font-bold text-emerald-700 tabular-nums">{formatVND(d.paid)}</div>
-                  </div>
-                  <div className="flex flex-col justify-between rounded-xl border border-amber-200/70 bg-amber-50/40 p-3 min-w-[125px] text-left md:text-right shadow-2xs">
-                    <div className="text-[11px] font-medium text-amber-800 whitespace-nowrap">Còn lại</div>
-                    <div className="mt-1 text-sm font-bold text-amber-700 tabular-nums">{formatVND(remaining)}</div>
-                  </div>
-                  <div className="flex flex-col justify-between rounded-xl border border-border/70 bg-card p-3 min-w-[125px] text-left md:text-right shadow-2xs">
-                    <div className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">Công nợ khách</div>
-                    <div className="mt-1 text-sm font-bold text-foreground tabular-nums">{formatVND(balance.balance)}</div>
+
+                <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1.5 font-medium text-foreground">
+                    <User className="size-3.5 text-primary" />
+                    <span>{d.tenantName}</span>
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Calendar className="size-3.5 text-muted-foreground" />
+                    <span>
+                      {formatDateVN(inv.periodStart)} – {formatDateVN(inv.periodEnd)}
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <FileText className="size-3.5 text-muted-foreground" />
+                    <span>
+                      Hợp đồng{' '}
+                      <PopupLink
+                        className="font-medium text-primary hover:underline underline-offset-2"
+                        href={`/contracts/${inv.leaseId}`}
+                      >
+                        {d.leaseCode}
+                      </PopupLink>
+                    </span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Financial Highlights */}
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:flex md:items-center md:gap-2.5">
+                <div className="flex flex-col justify-between rounded-xl border border-border/70 bg-card p-3 min-w-[125px] text-left md:text-right shadow-2xs">
+                  <div className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">Tổng hoá đơn</div>
+                  <div className="mt-1 text-sm font-bold text-foreground tabular-nums">{formatVND(d.total)}</div>
+                </div>
+                <div className="flex flex-col justify-between rounded-xl border border-emerald-200/70 bg-emerald-50/40 p-3 min-w-[125px] text-left md:text-right shadow-2xs">
+                  <div className="text-[11px] font-medium text-emerald-800 whitespace-nowrap">Đã thanh toán</div>
+                  <div className="mt-1 text-sm font-bold text-emerald-700 tabular-nums">{formatVND(d.paid)}</div>
+                </div>
+                <div className="flex flex-col justify-between rounded-xl border border-amber-200/70 bg-amber-50/40 p-3 min-w-[125px] text-left md:text-right shadow-2xs">
+                  <div className="text-[11px] font-medium text-amber-800 whitespace-nowrap">Còn lại</div>
+                  <div className="mt-1 text-sm font-bold text-amber-700 tabular-nums">{formatVND(remaining)}</div>
+                </div>
+                <div className="flex flex-col justify-between rounded-xl border border-border/70 bg-card p-3 min-w-[125px] text-left md:text-right shadow-2xs">
+                  <div className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">Công nợ khách</div>
+                  <div className="mt-1 text-sm font-bold text-foreground tabular-nums">
+                    {formatVND(balance.balance)}
                   </div>
                 </div>
               </div>
+            </div>
           </>
         }
-        beforeLines={inv.status === 'draft' ? <InvoiceFeeQuantities key={inv.updatedAt.toISOString()} invoiceId={id} fees={d.periodFees} /> : null}
+        beforeLines={
+          inv.status === 'draft' ? (
+            <InvoiceFeeQuantities key={inv.updatedAt.toISOString()} invoiceId={id} fees={d.periodFees} />
+          ) : null
+        }
         meterPanels={d.meterPanels}
         addFee={{
           // Loại phí tính theo đồng hồ cần gắn đồng hồ nên chỉ thêm qua hợp đồng
-          feeTypes: feeTypes.filter((f) => f.quantityFrom !== 'meter').map((f) => ({ id: f.id, name: f.name, unit: unitName.get(f.unitId) ?? '', defaultPrice: f.defaultPrice, prices: feePrices[f.id] ?? {}, billing: f.billing, quantityFrom: f.quantityFrom })),
+          feeTypes: feeTypes
+            .filter((f) => f.quantityFrom !== 'meter')
+            .map((f) => ({
+              id: f.id,
+              name: f.name,
+              unit: unitName.get(f.unitId) ?? '',
+              defaultPrice: f.defaultPrice,
+              prices: feePrices[f.id] ?? {},
+              billing: f.billing,
+              quantityFrom: f.quantityFrom,
+            })),
           usedTypeIds: d.leaseFeeTypeIds,
           facilityId: inv.facilityId,
           units: feeUnits.map((u) => ({ id: u.id, name: u.name })),
@@ -137,7 +160,6 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           meta: (l.meta as Record<string, unknown> | null) ?? null,
         }))}
       />
-
     </div>
   )
 }

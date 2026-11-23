@@ -15,7 +15,9 @@ describe('hasTenant', () => {
 
 describe('vacancySummary', () => {
   it('chỉ đếm phòng trống hẳn, không đếm phòng đã cọc', () => {
-    expect(vacancySummary([{ status: 'vacant' }, { status: 'deposited' }, { status: 'occupied' }, { status: 'vacant' }])).toEqual({ vacant: 2, total: 4 })
+    expect(
+      vacancySummary([{ status: 'vacant' }, { status: 'deposited' }, { status: 'occupied' }, { status: 'vacant' }]),
+    ).toEqual({ vacant: 2, total: 4 })
   })
   it('danh sách rỗng là 0 / 0', () => {
     expect(vacancySummary([])).toEqual({ vacant: 0, total: 0 })

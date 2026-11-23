@@ -1,4 +1,3 @@
-
 import { invoiceTemplates } from '@/db'
 import { storeInvoiceTemplatePreview } from './service'
 import type { DB } from '@/db/client'
@@ -10,12 +9,17 @@ import { defaultInvoiceTemplate } from '@/domain/invoice-template'
 export async function restoreDefaultInvoiceTemplates(db: DB, ctx: AccessContext): Promise<number> {
   assertCan(ctx, 'settings')
   const createdIds = await db.transaction(async (tx) => {
-    const existing = new Set((await tx.select({ name: invoiceTemplates.name }).from(invoiceTemplates)).map((r) => r.name))
+    const existing = new Set(
+      (await tx.select({ name: invoiceTemplates.name }).from(invoiceTemplates)).map((r) => r.name),
+    )
     const ids: string[] = []
     for (const style of ['formal', 'modern'] as const) {
       const { name, html } = DEFAULT_INVOICE_TEMPLATES[style]
       if (existing.has(name)) continue
-      const [row] = await tx.insert(invoiceTemplates).values({ name, config: defaultInvoiceTemplate, body: html, style }).returning()
+      const [row] = await tx
+        .insert(invoiceTemplates)
+        .values({ name, config: defaultInvoiceTemplate, body: html, style })
+        .returning()
       ids.push(row.id)
     }
     return ids

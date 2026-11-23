@@ -6,9 +6,24 @@ import { createDefaultMeters } from '@/server/meters/service'
 
 /** Mọi bảng dữ liệu hợp đồng và đồng hồ; TRUNCATE ... CASCADE xoá thêm các bảng phụ thuộc vào chúng. */
 const TABLES = [
-  'meter_readings', 'lease_fee_meters', 'meters', 'lease_fee_snapshots', 'invoice_lines', 'invoice_fee_quantities', 'payments', 'invoices',
-  'pending_adjustments', 'one_off_charges', 'addenda', 'handover_items', 'handovers', 'deposit_entries', 'deposit_contracts', 'lease_occupants',
-  'contract_versions', 'leases',
+  'meter_readings',
+  'lease_fee_meters',
+  'meters',
+  'lease_fee_snapshots',
+  'invoice_lines',
+  'invoice_fee_quantities',
+  'payments',
+  'invoices',
+  'pending_adjustments',
+  'one_off_charges',
+  'addenda',
+  'handover_items',
+  'handovers',
+  'deposit_entries',
+  'deposit_contracts',
+  'lease_occupants',
+  'contract_versions',
+  'leases',
 ]
 
 /**

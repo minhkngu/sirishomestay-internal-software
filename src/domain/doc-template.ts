@@ -62,9 +62,15 @@ function inlinesOf(nodes: Node[], scope: Scope, ctx: Ctx, fmt: Fmt = {}): Inline
 function trimEnds(list: Inline[]): Inline[] {
   const out = list.slice()
   const first = out[0]
-  if (first && 'text' in first) { first.text = first.text.replace(/^\s+/, ''); if (!first.text) out.shift() }
+  if (first && 'text' in first) {
+    first.text = first.text.replace(/^\s+/, '')
+    if (!first.text) out.shift()
+  }
   const last = out[out.length - 1]
-  if (last && 'text' in last) { last.text = last.text.replace(/\s+$/, ''); if (!last.text) out.pop() }
+  if (last && 'text' in last) {
+    last.text = last.text.replace(/\s+$/, '')
+    if (!last.text) out.pop()
+  }
   return out
 }
 
@@ -76,24 +82,42 @@ function alignOf(el: HTMLElement): Align | undefined {
 
 function cellInlines(cell: HTMLElement, scope: Scope, ctx: Ctx): Inline[] {
   // ô có nhiều đoạn: nối bằng xuống dòng
-  const paras = cell.childNodes.filter((n): n is HTMLElement => n instanceof HTMLElement && n.tagName?.toLowerCase() === 'p')
+  const paras = cell.childNodes.filter(
+    (n): n is HTMLElement => n instanceof HTMLElement && n.tagName?.toLowerCase() === 'p',
+  )
   if (paras.length === 0) return inlinesOf(cell.childNodes, scope, ctx)
   const out: Inline[] = []
-  paras.forEach((p, i) => { if (i > 0) out.push({ br: true }); out.push(...inlinesOf(p.childNodes, scope, ctx)) })
+  paras.forEach((p, i) => {
+    if (i > 0) out.push({ br: true })
+    out.push(...inlinesOf(p.childNodes, scope, ctx))
+  })
   return out
 }
 
 function tableBlock(el: HTMLElement, scope: Scope, ctx: Ctx): DocBlock {
   const rows: { cells: { inlines: Inline[]; header?: boolean }[] }[] = []
   const addRow = (tr: HTMLElement, s: Scope) => {
-    const cells = tr.childNodes.filter((n): n is HTMLElement => n instanceof HTMLElement && ['td', 'th'].includes(n.tagName?.toLowerCase() ?? ''))
-    rows.push({ cells: cells.map(c => ({ inlines: cellInlines(c, s, ctx), ...(c.tagName.toLowerCase() === 'th' && { header: true }) })) })
+    const cells = tr.childNodes.filter(
+      (n): n is HTMLElement => n instanceof HTMLElement && ['td', 'th'].includes(n.tagName?.toLowerCase() ?? ''),
+    )
+    rows.push({
+      cells: cells.map((c) => ({
+        inlines: cellInlines(c, s, ctx),
+        ...(c.tagName.toLowerCase() === 'th' && { header: true }),
+      })),
+    })
   }
   for (const tr of el.querySelectorAll('tr')) {
     const loop = tr.getAttribute('data-loop')
-    if (!loop) { addRow(tr, scope); continue }
+    if (!loop) {
+      addRow(tr, scope)
+      continue
+    }
     const items = ctx.data[loop]
-    if (!Array.isArray(items)) { if (!ctx.warnings.includes(loop)) ctx.warnings.push(loop); continue }
+    if (!Array.isArray(items)) {
+      if (!ctx.warnings.includes(loop)) ctx.warnings.push(loop)
+      continue
+    }
     for (const item of items) addRow(tr, [item as Record<string, unknown>, ...scope])
   }
   return { type: 'table', rows }
@@ -111,16 +135,41 @@ function blocksOf(nodes: Node[], scope: Scope, ctx: Ctx): DocBlock[] {
   }
   for (const node of nodes) {
     const tag = node instanceof HTMLElement ? node.tagName?.toLowerCase() : ''
-    if (!(node instanceof HTMLElement) || !BLOCK_TAGS.has(tag) || node.getAttribute('data-field')) { pending.push(node); continue }
+    if (!(node instanceof HTMLElement) || !BLOCK_TAGS.has(tag) || node.getAttribute('data-field')) {
+      pending.push(node)
+      continue
+    }
     flush()
-    if (tag === 'h1' || tag === 'h2' || tag === 'h3') out.push({ type: 'heading', level: Number(tag[1]) as 1 | 2 | 3, ...(alignOf(node) && { align: alignOf(node) }), inlines: inlinesOf(node.childNodes, scope, ctx) })
-    else if (tag === 'p') out.push({ type: 'paragraph', ...(alignOf(node) && { align: alignOf(node) }), inlines: inlinesOf(node.childNodes, scope, ctx) })
-    else if (tag === 'ul' || tag === 'ol') out.push({ type: 'list', ordered: tag === 'ol', items: node.querySelectorAll('li').map(li => inlinesOf(li.childNodes, scope, ctx)) })
+    if (tag === 'h1' || tag === 'h2' || tag === 'h3')
+      out.push({
+        type: 'heading',
+        level: Number(tag[1]) as 1 | 2 | 3,
+        ...(alignOf(node) && { align: alignOf(node) }),
+        inlines: inlinesOf(node.childNodes, scope, ctx),
+      })
+    else if (tag === 'p')
+      out.push({
+        type: 'paragraph',
+        ...(alignOf(node) && { align: alignOf(node) }),
+        inlines: inlinesOf(node.childNodes, scope, ctx),
+      })
+    else if (tag === 'ul' || tag === 'ol')
+      out.push({
+        type: 'list',
+        ordered: tag === 'ol',
+        items: node.querySelectorAll('li').map((li) => inlinesOf(li.childNodes, scope, ctx)),
+      })
     else if (tag === 'table') out.push(tableBlock(node, scope, ctx))
-    else if (tag === 'hr') { if (node.hasAttribute('data-page-break')) out.push({ type: 'pageBreak' }) }
-    else if (node.getAttribute('data-role') === 'qr') out.push({ type: 'qr' })
+    else if (tag === 'hr') {
+      if (node.hasAttribute('data-page-break')) out.push({ type: 'pageBreak' })
+    } else if (node.getAttribute('data-role') === 'qr') out.push({ type: 'qr' })
     else if (node.getAttribute('data-role') === 'summary') {
-      out.push({ type: 'summary', cells: node.childNodes.filter((n): n is HTMLElement => n instanceof HTMLElement).map(c => ({ label: c.getAttribute('data-label') ?? '', value: inlinesOf(c.childNodes, scope, ctx) })) })
+      out.push({
+        type: 'summary',
+        cells: node.childNodes
+          .filter((n): n is HTMLElement => n instanceof HTMLElement)
+          .map((c) => ({ label: c.getAttribute('data-label') ?? '', value: inlinesOf(c.childNodes, scope, ctx) })),
+      })
     } else out.push(...blocksOf(node.childNodes, scope, ctx))
   }
   flush()
@@ -142,7 +191,9 @@ export function sampleTemplateHtml(docType: DocType): string {
   for (const f of TEMPLATE_FIELDS[docType]) {
     if (f.loop) {
       parts.push(`<p><strong>${esc(f.label)}:</strong></p>`)
-      parts.push(`<table><tr data-loop="${f.loop.key}">${f.loop.fields.map(x => `<td><span data-field="${x.key}">${esc(x.label)}</span></td>`).join('')}</tr></table>`)
+      parts.push(
+        `<table><tr data-loop="${f.loop.key}">${f.loop.fields.map((x) => `<td><span data-field="${x.key}">${esc(x.label)}</span></td>`).join('')}</tr></table>`,
+      )
     } else parts.push(`<p>${esc(f.label)}: <span data-field="${f.key}">${esc(f.label)}</span></p>`)
   }
   return parts.join('')

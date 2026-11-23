@@ -7,7 +7,9 @@ export type AdjustmentDraft = { description: string; amount: number; sourceKey: 
 
 const monthOf = (d: ISODate) => d.slice(0, 7)
 const fixedMonthly = (fees: ContractFee[], occupants: number) =>
-  fees.filter((f) => f.billing === 'monthly_fixed').reduce((s, f) => s + (f.quantityFrom === 'occupants' ? occupants : f.quantity) * f.unitPrice, 0)
+  fees
+    .filter((f) => f.billing === 'monthly_fixed')
+    .reduce((s, f) => s + (f.quantityFrom === 'occupants' ? occupants : f.quantity) * f.unitPrice, 0)
 
 /**
  * Với mỗi phụ lục có hiệu lực BÊN TRONG kỳ của một hoá đơn đã duyệt: chênh lệch tiền phòng + phí cố định
@@ -36,7 +38,12 @@ export function midPeriodAdjustments(input: {
       if (to < a.effectiveDate) continue
       const occ = (t: typeof before) => t.occupantIds.length
       const rentDiff = prorate(after.monthlyRent - before.monthlyRent, a.effectiveDate, to, proration).amount
-      const feeDiff = prorate(fixedMonthly(after.fees, occ(after)) - fixedMonthly(before.fees, occ(before)), a.effectiveDate, to, proration).amount
+      const feeDiff = prorate(
+        fixedMonthly(after.fees, occ(after)) - fixedMonthly(before.fees, occ(before)),
+        a.effectiveDate,
+        to,
+        proration,
+      ).amount
       const amount = rentDiff + feeDiff
       if (amount === 0) continue
       const label = a.type === 'transfer' ? 'chuyển phòng' : a.type === 'occupants' ? 'đổi người ở' : 'gia hạn đổi giá'

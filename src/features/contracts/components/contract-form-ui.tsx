@@ -56,7 +56,9 @@ export function Field({
 }) {
   return (
     <div className={cn('space-y-1.5', className)}>
-      <Label htmlFor={htmlFor} className="text-[13px] font-medium text-foreground">{label}</Label>
+      <Label htmlFor={htmlFor} className="text-[13px] font-medium text-foreground">
+        {label}
+      </Label>
       {children}
       {hint && <div className="text-xs text-muted-foreground">{hint}</div>}
       {error}
@@ -78,7 +80,13 @@ export function SummaryRow({
   return (
     <div className="flex items-start justify-between gap-3">
       <dt className="shrink-0 text-muted-foreground">{label}</dt>
-      <dd className={cn('max-w-[62%] text-right', muted ? 'text-muted-foreground' : 'text-foreground', strong && 'font-semibold')}>
+      <dd
+        className={cn(
+          'max-w-[62%] text-right',
+          muted ? 'text-muted-foreground' : 'text-foreground',
+          strong && 'font-semibold',
+        )}
+      >
         {value}
       </dd>
     </div>
@@ -117,12 +125,18 @@ export function FormSelect({
         items={options}
         disabled={disabled}
       >
-        <SelectTrigger id={id} aria-label={label} className="h-9 w-full justify-between bg-card text-[13px] font-normal">
+        <SelectTrigger
+          id={id}
+          aria-label={label}
+          className="h-9 w-full justify-between bg-card text-[13px] font-normal"
+        >
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
           {options.map((option) => (
-            <SelectItem key={option.value || '__empty__'} value={option.value} disabled={option.disabled}>{option.label}</SelectItem>
+            <SelectItem key={option.value || '__empty__'} value={option.value} disabled={option.disabled}>
+              {option.label}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
@@ -158,12 +172,18 @@ export function BareSelect({
       items={options}
       disabled={disabled}
     >
-      <SelectTrigger id={id} aria-label={ariaLabel} className={cn('h-9 w-full justify-between bg-card text-[13px] font-normal', className)}>
+      <SelectTrigger
+        id={id}
+        aria-label={ariaLabel}
+        className={cn('h-9 w-full justify-between bg-card text-[13px] font-normal', className)}
+      >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
         {options.map((option) => (
-          <SelectItem key={option.value || '__empty__'} value={option.value} disabled={option.disabled}>{option.label}</SelectItem>
+          <SelectItem key={option.value || '__empty__'} value={option.value} disabled={option.disabled}>
+            {option.label}
+          </SelectItem>
         ))}
       </SelectContent>
     </Select>

@@ -21,7 +21,8 @@ export async function login(_prev: ActionResult | null, formData: FormData): Pro
 
 /** Đăng nhập nhanh bằng tài khoản mẫu — chỉ khi bật demo mode và đúng là tài khoản is_demo. */
 export async function demoLogin(email: string): Promise<ActionResult> {
-  if (process.env.NEXT_PUBLIC_DEMO_MODE !== '1' || !process.env.DEMO_PASSWORD) return { ok: false, error: 'Không bật chế độ thử' }
+  if (process.env.NEXT_PUBLIC_DEMO_MODE !== '1' || !process.env.DEMO_PASSWORD)
+    return { ok: false, error: 'Không bật chế độ thử' }
   const account = (await listDemoAccounts(db)).find((a) => a.email === email)
   if (!account) return { ok: false, error: 'Không có tài khoản mẫu này' }
   const supabase = await createSupabaseServerClient()

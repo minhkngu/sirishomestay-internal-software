@@ -11,21 +11,35 @@ export const docTemplates = pgTable('doc_templates', {
   /** Kiểu trình bày khi xuất: 'formal' (Trang trọng) hoặc 'modern' (Hiện đại). */
   style: text('style').notNull().default('formal'),
   /** Bản xem PDF dựng sẵn (base64) và phiên bản bộ dựng đã dùng; null nghĩa là chưa dựng. */
-  previewPdf: text('preview_pdf'), previewVersion: integer('preview_version'),
+  previewPdf: text('preview_pdf'),
+  previewVersion: integer('preview_version'),
   isDefault: boolean('is_default').notNull().default(false),
   isDemo: boolean('is_demo').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
-export const invoiceTemplates = pgTable('invoice_templates', {
-  id: uuid('id').primaryKey().defaultRandom(), name: text('name').notNull(), config: jsonb('config').notNull(),
-  /** Nội dung mẫu soạn trong app (HTML); mẫu chỉ có `config` là mẫu cũ dựng theo khối. */
-  body: text('body'),
-  /** Kiểu trình bày khi xuất: 'formal' hoặc 'modern'. */
-  style: text('style').notNull().default('formal'),
-  /** Bản xem PDF dựng sẵn (base64) và phiên bản bộ dựng đã dùng; null nghĩa là chưa dựng. */
-  previewPdf: text('preview_pdf'), previewVersion: integer('preview_version'),
-  isDefault: boolean('is_default').notNull().default(false), isSystem: boolean('is_system').notNull().default(false),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, t => [uniqueIndex('invoice_templates_one_default').on(t.isDefault).where(sql`${t.isDefault}`)]).enableRLS()
+export const invoiceTemplates = pgTable(
+  'invoice_templates',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: text('name').notNull(),
+    config: jsonb('config').notNull(),
+    /** Nội dung mẫu soạn trong app (HTML); mẫu chỉ có `config` là mẫu cũ dựng theo khối. */
+    body: text('body'),
+    /** Kiểu trình bày khi xuất: 'formal' hoặc 'modern'. */
+    style: text('style').notNull().default('formal'),
+    /** Bản xem PDF dựng sẵn (base64) và phiên bản bộ dựng đã dùng; null nghĩa là chưa dựng. */
+    previewPdf: text('preview_pdf'),
+    previewVersion: integer('preview_version'),
+    isDefault: boolean('is_default').notNull().default(false),
+    isSystem: boolean('is_system').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('invoice_templates_one_default')
+      .on(t.isDefault)
+      .where(sql`${t.isDefault}`),
+  ],
+).enableRLS()

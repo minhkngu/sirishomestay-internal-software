@@ -47,7 +47,12 @@ export function TenantList({
           <TenantSearch />
         </div>
       </div>
-      <TenantTable tenants={pageRows} facilityNames={names} visaWarningDays={visaWarningDays} roomsByTenant={roomsByTenant} />
+      <TenantTable
+        tenants={pageRows}
+        facilityNames={names}
+        visaWarningDays={visaWarningDays}
+        roomsByTenant={roomsByTenant}
+      />
       <Pager {...pager} />
     </>
   )

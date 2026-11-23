@@ -39,7 +39,11 @@ export function SignChip({ status, className }: { status: string; className?: st
 export function SignStateChip({ status, className }: { status: string; className?: string }) {
   const tone = status === 'signed' ? 'positive' : status === 'exported' ? 'warning' : 'neutral'
   const label = status === 'signed' ? 'Đã ký' : status === 'exported' ? 'Đã xuất' : 'Nháp'
-  return <StatusChip tone={tone} className={className}>{label}</StatusChip>
+  return (
+    <StatusChip tone={tone} className={className}>
+      {label}
+    </StatusChip>
+  )
 }
 
 /** Tỉ lệ thời hạn đã đi qua, dùng chung cho danh sách và chi tiết. */
@@ -77,11 +81,7 @@ export function TermBar({
   const danger = !ended && left <= 30
   return (
     <div className={cn('space-y-1.5', className)}>
-      <div
-        className="h-1 overflow-hidden rounded-full bg-muted"
-        role="img"
-        aria-label={termLabel(left, ended)}
-      >
+      <div className="h-1 overflow-hidden rounded-full bg-muted" role="img" aria-label={termLabel(left, ended)}>
         <div
           className={cn('h-full rounded-full', ended ? 'bg-border' : danger ? 'bg-amber-500' : 'bg-primary')}
           style={{ width: `${ended ? 100 : Math.min(100, Math.max(2, pct))}%` }}
@@ -116,7 +116,12 @@ export function Stat({
     <div className="min-w-0 px-4 py-4 sm:px-5">
       <p className="text-xs text-muted-foreground">{label}</p>
       {value !== undefined && (
-        <p className={cn('mt-1.5 whitespace-nowrap font-semibold tabular-nums text-foreground', lead ? 'text-[26px] leading-8 tracking-[-0.02em]' : 'text-lg leading-7')}>
+        <p
+          className={cn(
+            'mt-1.5 whitespace-nowrap font-semibold tabular-nums text-foreground',
+            lead ? 'text-[26px] leading-8 tracking-[-0.02em]' : 'text-lg leading-7',
+          )}
+        >
           {value}
           {unit && <span className="ml-1 text-xs font-normal text-muted-foreground">{unit}</span>}
         </p>

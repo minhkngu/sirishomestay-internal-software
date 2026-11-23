@@ -28,7 +28,12 @@ export function prorateFraction(from: ISODate, to: ISODate, mode: Proration): nu
   return sum
 }
 
-export function prorate(monthly: number, from: ISODate, to: ISODate, mode: Proration): { coefficient: number; amount: number } {
+export function prorate(
+  monthly: number,
+  from: ISODate,
+  to: ISODate,
+  mode: Proration,
+): { coefficient: number; amount: number } {
   const sum = prorateFraction(from, to, mode)
   return { coefficient: round4(sum), amount: Math.round(monthly * sum) }
 }

@@ -13,11 +13,28 @@ const TABS = [
   { id: 'stock', label: 'Vật tư' },
 ] as const
 
-function SummaryCell({ label, value, suffix, tone, className }: { label: string; value: string; suffix?: string; tone?: 'attention'; className?: string }) {
+function SummaryCell({
+  label,
+  value,
+  suffix,
+  tone,
+  className,
+}: {
+  label: string
+  value: string
+  suffix?: string
+  tone?: 'attention'
+  className?: string
+}) {
   return (
     <div className={cn('px-4 py-3.5', className)}>
       <p className="text-[13px] font-medium text-muted-foreground">{label}</p>
-      <p className={cn('mt-1 text-xl font-semibold tracking-tight tabular-nums sm:text-2xl', tone === 'attention' && 'text-rose-700')}>
+      <p
+        className={cn(
+          'mt-1 text-xl font-semibold tracking-tight tabular-nums sm:text-2xl',
+          tone === 'attention' && 'text-rose-700',
+        )}
+      >
         {value}
         {suffix && <span className="ml-1 align-baseline text-sm font-normal text-muted-foreground">{suffix}</span>}
       </p>
@@ -25,15 +42,7 @@ function SummaryCell({ label, value, suffix, tone, className }: { label: string;
   )
 }
 
-export function AssetsView({
-  tree,
-  assets,
-  stock,
-}: {
-  tree: TreeFacility[]
-  assets: AssetRow[]
-  stock: StockRow[]
-}) {
+export function AssetsView({ tree, assets, stock }: { tree: TreeFacility[]; assets: AssetRow[]; stock: StockRow[] }) {
   const [facilityId, setFacility] = useState('')
   const [location, setLocation] = useState('')
 
@@ -48,7 +57,8 @@ export function AssetsView({
   const shownStock = useMemo(() => {
     const match = (kind: string | null, id: string | null) => {
       if (!location) return true
-      if (location === 'warehouse' || location === 'common' || location === 'unassigned') return kind === location || (location === 'unassigned' && kind === null)
+      if (location === 'warehouse' || location === 'common' || location === 'unassigned')
+        return kind === location || (location === 'unassigned' && kind === null)
       return kind === 'room' && id === location
     }
     return stock.filter((r) => (!facilityId || r.facilityId === facilityId) && match(r.locationKind, r.locationId))
@@ -69,10 +79,30 @@ export function AssetsView({
       </div>
 
       <div className="grid grid-cols-2 overflow-hidden rounded-2xl border border-border/70 bg-card lg:grid-cols-4">
-        <SummaryCell label="Tài sản" value={String(shownAssets.length)} className="border-b border-border/60 lg:border-b-0 lg:border-r" />
-        <SummaryCell label="Tổng giá trị" value={formatVND(totalValue)} suffix="₫" className="border-b border-l border-border/60 lg:border-b-0 lg:border-l-0 lg:border-r" />
-        <SummaryCell label="Cần chú ý" value={String(attention)} suffix="món" tone={attention > 0 ? 'attention' : undefined} className="border-b border-border/60 lg:border-b-0 lg:border-r" />
-        <SummaryCell label="Vật tư" value={String(shownStock.length)} suffix="dòng" className="border-l border-border/60 lg:border-l-0" />
+        <SummaryCell
+          label="Tài sản"
+          value={String(shownAssets.length)}
+          className="border-b border-border/60 lg:border-b-0 lg:border-r"
+        />
+        <SummaryCell
+          label="Tổng giá trị"
+          value={formatVND(totalValue)}
+          suffix="₫"
+          className="border-b border-l border-border/60 lg:border-b-0 lg:border-l-0 lg:border-r"
+        />
+        <SummaryCell
+          label="Cần chú ý"
+          value={String(attention)}
+          suffix="món"
+          tone={attention > 0 ? 'attention' : undefined}
+          className="border-b border-border/60 lg:border-b-0 lg:border-r"
+        />
+        <SummaryCell
+          label="Vật tư"
+          value={String(shownStock.length)}
+          suffix="dòng"
+          className="border-l border-border/60 lg:border-l-0"
+        />
       </div>
 
       <div className="flex gap-6 border-b border-border/70" role="tablist" aria-label="Tài sản và vật tư">
@@ -87,7 +117,9 @@ export function AssetsView({
               onClick={() => setTab(t.id)}
               className={cn(
                 '-mb-px flex items-baseline gap-2 border-b-2 px-0.5 pb-2.5 text-sm transition-colors',
-                active ? 'border-primary font-medium text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
+                active
+                  ? 'border-primary font-medium text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground',
               )}
             >
               {t.label}
@@ -96,9 +128,31 @@ export function AssetsView({
         })}
       </div>
 
-      {tab === 'assets'
-        ? <AssetTable assets={shownAssets} facilities={tree} facilityId={facilityId} location={location} onFacilityChange={(value) => { setFacility(value); setLocation('') }} onLocationChange={setLocation} />
-        : <StockTable facilities={tree} rows={shownStock} facilityId={facilityId} location={location} onFacilityChange={(value) => { setFacility(value); setLocation('') }} onLocationChange={setLocation} />}
+      {tab === 'assets' ? (
+        <AssetTable
+          assets={shownAssets}
+          facilities={tree}
+          facilityId={facilityId}
+          location={location}
+          onFacilityChange={(value) => {
+            setFacility(value)
+            setLocation('')
+          }}
+          onLocationChange={setLocation}
+        />
+      ) : (
+        <StockTable
+          facilities={tree}
+          rows={shownStock}
+          facilityId={facilityId}
+          location={location}
+          onFacilityChange={(value) => {
+            setFacility(value)
+            setLocation('')
+          }}
+          onLocationChange={setLocation}
+        />
+      )}
     </div>
   )
 }

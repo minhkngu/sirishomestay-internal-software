@@ -43,7 +43,8 @@ export function meterUsage(
       continue
     }
     // Các lần ghi độc lập nhau: chỉ kiểm số đầu và số cuối của kỳ đang tính, số cuối nhỏ hơn số đầu thì không ra tiêu thụ âm
-    if (end < begin) throw new ValidationError('Chỉ số mới nhỏ hơn chỉ số cũ', { value: 'Chỉ số mới nhỏ hơn chỉ số cũ' })
+    if (end < begin)
+      throw new ValidationError('Chỉ số mới nhỏ hơn chỉ số cũ', { value: 'Chỉ số mới nhỏ hơn chỉ số cũ' })
     segments.push({ meterId: m.id, start: begin, end, ...(estimated && { estimated: true }) })
     usage += end - begin
   }
@@ -54,7 +55,10 @@ export function meterUsage(
  * Gợi ý chỉ số cuối khi công tơ hỏng, không đọc được: chỉ số ghi gần nhất cộng mức dùng trung bình
  * (người gọi truyền tối đa 3 mức dùng tháng gần nhất). Chưa có mức dùng thì giữ chỉ số gần nhất.
  */
-export function suggestFinalReading(lastReading: number, monthlyUsages: number[]): { value: number; basis: 'average' | 'last' } {
+export function suggestFinalReading(
+  lastReading: number,
+  monthlyUsages: number[],
+): { value: number; basis: 'average' | 'last' } {
   if (monthlyUsages.length === 0) return { value: lastReading, basis: 'last' }
   const average = monthlyUsages.reduce((a, b) => a + b, 0) / monthlyUsages.length
   return { value: lastReading + Math.round(average), basis: 'average' }

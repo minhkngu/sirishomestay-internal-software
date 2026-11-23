@@ -1,1 +1,3 @@
-export default function ModalDefault() { return null }
+export default function ModalDefault() {
+  return null
+}

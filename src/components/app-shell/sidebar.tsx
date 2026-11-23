@@ -5,7 +5,15 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import type { NavItem } from './nav'
 
-export function Sidebar({ items, onNavigate, className }: { items: NavItem[]; onNavigate?: () => void; className?: string }) {
+export function Sidebar({
+  items,
+  onNavigate,
+  className,
+}: {
+  items: NavItem[]
+  onNavigate?: () => void
+  className?: string
+}) {
   const pathname = usePathname()
   return (
     <div className={cn('flex h-full flex-col justify-between p-3', className)}>
@@ -24,13 +32,13 @@ export function Sidebar({ items, onNavigate, className }: { items: NavItem[]; on
                 'group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-150',
                 active
                   ? 'border border-primary/20 bg-primary/10 font-semibold text-primary shadow-2xs'
-                  : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
+                  : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
               )}
             >
               <Icon
                 className={cn(
                   'size-4 shrink-0 transition-colors',
-                  active ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
+                  active ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground',
                 )}
               />
               <span>{i.label}</span>

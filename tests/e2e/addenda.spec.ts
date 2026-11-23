@@ -5,10 +5,16 @@ test.skip(!process.env.E2E_BASE_URL, 'Cần E2E_BASE_URL trỏ tới môi trư�
 test('gia hạn tăng cọc: xem trước tiền, lưu, sổ cọc có khoản thu bổ sung', async ({ page }) => {
   test.setTimeout(300_000)
   await page.goto((await createTempLease(page)).url)
-  const term = await page.getByText('Thời hạn hợp đồng', { exact: true }).locator('xpath=following-sibling::div[1]').innerText()
+  const term = await page
+    .getByText('Thời hạn hợp đồng', { exact: true })
+    .locator('xpath=following-sibling::div[1]')
+    .innerText()
   const [dd, mm, yyyy] = term.split('–')[1].trim().split('/')
   const newEnd = `${Number(yyyy) + 1}-${mm}-${dd}`
-  const depositText = await page.getByText('Tiền cọc giữ', { exact: true }).locator('xpath=following-sibling::div[1]').innerText()
+  const depositText = await page
+    .getByText('Tiền cọc giữ', { exact: true })
+    .locator('xpath=following-sibling::div[1]')
+    .innerText()
   const newDeposit = Number(depositText.replace(/\D/g, '')) + 1000000
   await page.getByRole('button', { name: 'Gia hạn hợp đồng' }).click()
   await page.getByLabel('Ngày hiệu lực').fill('2026-12-15')

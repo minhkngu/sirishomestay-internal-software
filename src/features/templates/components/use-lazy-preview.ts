@@ -11,7 +11,11 @@ export function useLazyPreview(initial: Record<string, string | null>, fetcher: 
     setLoading((cur) => new Set(cur).add(id))
     const r = await fetcher(id)
     setPreviews((cur) => ({ ...cur, [id]: r.ok && r.data ? r.data.base64 : null }))
-    setLoading((cur) => { const next = new Set(cur); next.delete(id); return next })
+    setLoading((cur) => {
+      const next = new Set(cur)
+      next.delete(id)
+      return next
+    })
   }
   return { previews, loading, ensure }
 }

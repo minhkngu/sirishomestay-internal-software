@@ -1,5 +1,17 @@
 import { sql } from 'drizzle-orm'
-import { boolean, check, date, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
+import {
+  boolean,
+  check,
+  date,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core'
 import { rooms } from './facilities'
 import { feeTypes } from './fees'
 import { tenants } from './tenants'
@@ -9,8 +21,12 @@ export const depositContracts = pgTable(
   'deposit_contracts',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    roomId: uuid('room_id').notNull().references(() => rooms.id),
-    tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => rooms.id),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
     depositAmount: integer('deposit_amount').notNull(),
     agreedRent: integer('agreed_rent').notNull(),
     expectedMoveIn: date('expected_move_in', { mode: 'string' }).notNull(),
@@ -22,7 +38,11 @@ export const depositContracts = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('deposit_contracts_one_pending_per_room').on(t.roomId).where(sql`${t.status} = 'pending'`)],
+  (t) => [
+    uniqueIndex('deposit_contracts_one_pending_per_room')
+      .on(t.roomId)
+      .where(sql`${t.status} = 'pending'`),
+  ],
 )
 
 export const leases = pgTable(
@@ -30,8 +50,12 @@ export const leases = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     code: text('code').notNull().unique(),
-    roomId: uuid('room_id').notNull().references(() => rooms.id),
-    tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => rooms.id),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
     startDate: date('start_date', { mode: 'string' }).notNull(),
     endDate: date('end_date', { mode: 'string' }).notNull(),
     monthlyRent: integer('monthly_rent').notNull(),
@@ -51,21 +75,32 @@ export const leases = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('leases_one_active_per_room').on(t.roomId).where(sql`${t.status} = 'active'`), check('leases_billing_cycle_range', sql`${t.billingCycleMonths} between 1 and 12`)],
+  (t) => [
+    uniqueIndex('leases_one_active_per_room')
+      .on(t.roomId)
+      .where(sql`${t.status} = 'active'`),
+    check('leases_billing_cycle_range', sql`${t.billingCycleMonths} between 1 and 12`),
+  ],
 )
 
 export const leaseOccupants = pgTable(
   'lease_occupants',
   {
-    leaseId: uuid('lease_id').notNull().references(() => leases.id, { onDelete: 'cascade' }),
-    tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+    leaseId: uuid('lease_id')
+      .notNull()
+      .references(() => leases.id, { onDelete: 'cascade' }),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
   },
   (t) => [primaryKey({ columns: [t.leaseId, t.tenantId] })],
 )
 
 export const leaseFeeSnapshots = pgTable('lease_fee_snapshots', {
   id: uuid('id').primaryKey().defaultRandom(),
-  leaseId: uuid('lease_id').notNull().references(() => leases.id, { onDelete: 'cascade' }),
+  leaseId: uuid('lease_id')
+    .notNull()
+    .references(() => leases.id, { onDelete: 'cascade' }),
   feeTypeId: uuid('fee_type_id').references(() => feeTypes.id),
   name: text('name').notNull(),
   unit: text('unit').notNull(),
@@ -90,13 +125,17 @@ export const depositEntries = pgTable('deposit_entries', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
-export const contractVersions = pgTable('contract_versions', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  contractId: uuid('contract_id').notNull(),
-  kind: text('kind').notNull(),
-  operation: text('operation').notNull(),
-  sequence: integer('sequence').notNull(),
-  actorId: uuid('actor_id').notNull(),
-  snapshot: jsonb('snapshot').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, t => [uniqueIndex('contract_versions_kind_contract_sequence_idx').on(t.kind, t.contractId, t.sequence)]).enableRLS()
+export const contractVersions = pgTable(
+  'contract_versions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    contractId: uuid('contract_id').notNull(),
+    kind: text('kind').notNull(),
+    operation: text('operation').notNull(),
+    sequence: integer('sequence').notNull(),
+    actorId: uuid('actor_id').notNull(),
+    snapshot: jsonb('snapshot').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('contract_versions_kind_contract_sequence_idx').on(t.kind, t.contractId, t.sequence)],
+).enableRLS()

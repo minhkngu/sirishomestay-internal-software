@@ -6,4 +6,3 @@ export interface StorageAdapter {
   read(key: string): Promise<ArrayBuffer>
   write(key: string, data: ArrayBuffer | Uint8Array, contentType: string): Promise<void>
 }
-

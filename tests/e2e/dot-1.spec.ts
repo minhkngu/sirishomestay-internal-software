@@ -25,8 +25,14 @@ test('Hùng không thể mở trực tiếp trang khách thuê', async ({ page }
 })
 
 test('Admin thêm quyền cho Vy và khôi phục sau khi kiểm tra', async ({ browser }) => {
-  const adminContext = await browser.newContext({ baseURL: process.env.E2E_BASE_URL, storageState: process.env.E2E_STORAGE_STATE })
-  const vyContext = await browser.newContext({ baseURL: process.env.E2E_BASE_URL, storageState: process.env.E2E_STORAGE_STATE })
+  const adminContext = await browser.newContext({
+    baseURL: process.env.E2E_BASE_URL,
+    storageState: process.env.E2E_STORAGE_STATE,
+  })
+  const vyContext = await browser.newContext({
+    baseURL: process.env.E2E_BASE_URL,
+    storageState: process.env.E2E_STORAGE_STATE,
+  })
   const admin = await adminContext.newPage()
   const vy = await vyContext.newPage()
   await login(admin, /^Admin/)
@@ -55,7 +61,10 @@ test('Admin thêm quyền cho Vy và khôi phục sau khi kiểm tra', async ({ 
 test('Admin tạo nhanh phòng 501–503', async ({ page }) => {
   await login(page, /^Admin/)
   await page.goto('/facilities')
-  await page.getByRole('link', { name: /Thảo Điền/ }).first().click()
+  await page
+    .getByRole('link', { name: /Thảo Điền/ })
+    .first()
+    .click()
   await page.getByRole('button', { name: 'Tạo nhanh nhiều phòng' }).click()
   const prefix = `E2E${Date.now()}-`
   await page.getByLabel('Tiền tố mã (tuỳ chọn)').fill(prefix)
@@ -64,7 +73,8 @@ test('Admin tạo nhanh phòng 501–503', async ({ page }) => {
   await page.getByLabel('Đến số').fill('503')
   await page.getByRole('button', { name: 'Tạo', exact: true }).click()
   await expect(page.getByText('Đã tạo 3 phòng', { exact: true })).toBeVisible()
-  for (const room of ['501', '502', '503']) await expect(page.getByText(`${prefix}${room}`, { exact: true }).first()).toBeVisible()
+  for (const room of ['501', '502', '503'])
+    await expect(page.getByText(`${prefix}${room}`, { exact: true }).first()).toBeVisible()
 })
 
 test('Khách nước ngoài báo trùng điện thoại rồi lưu số khác', async ({ page }) => {

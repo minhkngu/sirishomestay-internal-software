@@ -1,6 +1,29 @@
 import { sql } from 'drizzle-orm'
 import { describe, it, expect } from 'vitest'
-import { facilities, rooms, userProfiles, userPermissions, userFacilities, feeTypes, feeUnits, tenants, docTemplates, files, leases, depositContracts, depositEntries, leaseOccupants, assets, meters, meterReadings, handovers, handoverItems, stockItems, stockLevels, stockMoves } from '@/db'
+import {
+  facilities,
+  rooms,
+  userProfiles,
+  userPermissions,
+  userFacilities,
+  feeTypes,
+  feeUnits,
+  tenants,
+  docTemplates,
+  files,
+  leases,
+  depositContracts,
+  depositEntries,
+  leaseOccupants,
+  assets,
+  meters,
+  meterReadings,
+  handovers,
+  handoverItems,
+  stockItems,
+  stockLevels,
+  stockMoves,
+} from '@/db'
 import { runSeed, type AuthAdmin } from '../../scripts/seed'
 import { addDays } from '@/domain/dates'
 import { TEMPLATE_DOC_TYPES } from '@/domain/template-fields'
@@ -36,16 +59,33 @@ describe('runSeed', () => {
     expect(users.every((u) => u.isDemo)).toBe(true)
     const perms = await db.select().from(userPermissions)
     const hung = users.find((u) => u.fullName.startsWith('Hùng'))!
-    expect(perms.filter((p) => p.userId === hung.id).map((p) => p.permission).sort()).toEqual(['assets', 'incidents', 'meters'])
+    expect(
+      perms
+        .filter((p) => p.userId === hung.id)
+        .map((p) => p.permission)
+        .sort(),
+    ).toEqual(['assets', 'incidents', 'meters'])
     const bt = facs.find((f) => f.code === 'BT')!
-    expect((await db.select().from(userFacilities)).filter((u) => u.userId === hung.id).map((u) => u.facilityId)).toEqual([bt.id])
+    expect(
+      (await db.select().from(userFacilities)).filter((u) => u.userId === hung.id).map((u) => u.facilityId),
+    ).toEqual([bt.id])
   })
 
   it('nạp 6 loại phí và đơn vị', async () => {
     const db = await seededDb()
     const types = await db.select().from(feeTypes)
-    expect(types.map((t) => t.name).sort()).toEqual(['Dọn phòng thêm', 'Giặt ủi', 'Gửi xe máy', 'Internet', 'Nước theo người', 'Phí dịch vụ'])
-    expect(types.find((t) => t.name === 'Phí dịch vụ')).toMatchObject({ billing: 'monthly_fixed', quantityFrom: 'occupants' })
+    expect(types.map((t) => t.name).sort()).toEqual([
+      'Dọn phòng thêm',
+      'Giặt ủi',
+      'Gửi xe máy',
+      'Internet',
+      'Nước theo người',
+      'Phí dịch vụ',
+    ])
+    expect(types.find((t) => t.name === 'Phí dịch vụ')).toMatchObject({
+      billing: 'monthly_fixed',
+      quantityFrom: 'occupants',
+    })
     expect(types.find((t) => t.name === 'Giặt ủi')).toMatchObject({ billing: 'per_occurrence' })
     expect((await db.select().from(feeUnits)).map((u) => u.name).sort()).toEqual(['kg', 'lần', 'người', 'phòng', 'xe'])
   })
@@ -58,7 +98,9 @@ describe('runSeed', () => {
     expect(foreign).toHaveLength(14)
     expect(all.filter((t) => t.kind === 'vietnamese')).toHaveLength(12)
     expect(all.filter((t) => t.kind === 'company')).toHaveLength(4)
-    expect(foreign.map((t) => t.visaExpiry).sort()).toEqual([-5, 0, 3, 9, 16, 24, 29, 30, 45, 70, 120, 200, 260, 330].map((d) => addDays('2026-11-16', d)).sort())
+    expect(foreign.map((t) => t.visaExpiry).sort()).toEqual(
+      [-5, 0, 3, 9, 16, 24, 29, 30, 45, 70, 120, 200, 260, 330].map((d) => addDays('2026-11-16', d)).sort(),
+    )
     expect(all.every((t) => t.isDemo && t.searchText.length > 0)).toBe(true)
     expect(all.filter((t) => t.kind !== 'company').every((t) => /^\+\d{8,15}$/.test(t.phone!))).toBe(true)
   })
@@ -117,7 +159,10 @@ describe('runSeed', () => {
     expect(new Set(rs.map((r) => r.period))).toEqual(new Set(['2026-08', '2026-09', '2026-10']))
     // chỉ số không giảm theo thời gian trên cùng đồng hồ
     for (const m of ms) {
-      const mine = rs.filter((r) => r.meterId === m.id).sort((a, b) => (a.readOn < b.readOn ? -1 : 1)).map((r) => r.value)
+      const mine = rs
+        .filter((r) => r.meterId === m.id)
+        .sort((a, b) => (a.readOn < b.readOn ? -1 : 1))
+        .map((r) => r.value)
       expect([...mine].sort((a, b) => a - b)).toEqual(mine)
     }
     // vài phòng chưa ghi kỳ vừa rồi để nhắc việc
@@ -149,21 +194,25 @@ describe('runSeed', () => {
     const opts = { today: '2026-11-16', password: 'x' }
     await runSeed(db, auth, opts)
     const snapshot = async () => ({
-      facilities: (await db.select().from(facilities)).map(x => x.id).sort(),
-      tenants: (await db.select().from(tenants)).map(x => x.id).sort(),
-      leases: (await db.select().from(leases)).map(x => x.id).sort(),
-      users: (await db.select().from(userProfiles)).map(x => x.id).sort(),
-      stock: (await db.select().from(stockItems)).map(x => x.id).sort(),
-      levels: (await db.select().from(stockLevels)).map(x => x.id).sort(),
+      facilities: (await db.select().from(facilities)).map((x) => x.id).sort(),
+      tenants: (await db.select().from(tenants)).map((x) => x.id).sort(),
+      leases: (await db.select().from(leases)).map((x) => x.id).sort(),
+      users: (await db.select().from(userProfiles)).map((x) => x.id).sort(),
+      stock: (await db.select().from(stockItems)).map((x) => x.id).sort(),
+      levels: (await db.select().from(stockLevels)).map((x) => x.id).sort(),
     })
     const [realFacility] = await db.insert(facilities).values({ code: 'REAL', name: 'Cơ sở người dùng' }).returning()
     await db.insert(rooms).values({ facilityId: realFacility.id, code: '101' })
     const counts = async () => {
-      const names = await db.execute(sql`select tablename from pg_tables where schemaname = 'public' order by tablename`)
+      const names = await db.execute(
+        sql`select tablename from pg_tables where schemaname = 'public' order by tablename`,
+      )
       const result: Record<string, number> = {}
       const nameRows = Array.isArray(names) ? names : names.rows
       for (const row of nameRows as { tablename: string }[]) {
-        const count = await db.execute(sql.raw(`select count(*)::int as n from "${row.tablename.replaceAll('"', '""')}"`))
+        const count = await db.execute(
+          sql.raw(`select count(*)::int as n from "${row.tablename.replaceAll('"', '""')}"`),
+        )
         const countRows = Array.isArray(count) ? count : count.rows
         result[row.tablename] = Number((countRows[0] as { n: number }).n)
       }

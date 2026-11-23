@@ -30,7 +30,10 @@ test('tạo hoá đơn hàng loạt → sửa kỳ → duyệt → thu một ph�
   // Ghi thu theo hợp đồng ở danh sách hoá đơn: icon thu tiền mở popup, mặc định điền tổng dư nợ
   await page.goto('/invoices')
   await page.waitForLoadState('networkidle')
-  await page.getByRole('button', { name: /^Thu tiền / }).first().click()
+  await page
+    .getByRole('button', { name: /^Thu tiền / })
+    .first()
+    .click()
   await expect(page.getByLabel('Số tiền thu')).not.toHaveValue('')
   await page.getByLabel('Số tiền thu').fill('1000000')
   await page.getByRole('button', { name: 'Ghi thu', exact: true }).click()
@@ -41,7 +44,8 @@ test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → 
   test.setTimeout(300_000) // luồng dài nhiều trang, môi trường thử chậm
   await login(page, /^Admin/)
   const name = `Khách luồng ${Date.now()}`
-  await page.goto('/tenants/new'); await page.waitForLoadState('networkidle')
+  await page.goto('/tenants/new')
+  await page.waitForLoadState('networkidle')
   await page.getByLabel('Họ tên', { exact: true }).fill(name)
   await page.getByLabel('Quốc tịch').fill('Mỹ')
   await page.getByLabel('Số passport').fill(`FLOW${Date.now()}`)
@@ -49,9 +53,13 @@ test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → 
   await page.getByRole('button', { name: 'Tạo khách' }).click()
   await expect(page).toHaveURL(/\/tenants\/[a-f0-9-]+$/)
 
-  await page.goto('/contracts/new?kind=deposit'); await page.waitForLoadState('networkidle')
+  await page.goto('/contracts/new?kind=deposit')
+  await page.waitForLoadState('networkidle')
   await page.getByLabel('Toà', { exact: true }).click()
-  await page.getByRole('option', { name: /Bình Thạnh/ }).first().click()
+  await page
+    .getByRole('option', { name: /Bình Thạnh/ })
+    .first()
+    .click()
   await page.getByLabel('Phòng', { exact: true }).click()
   const roomOption = page.getByRole('option').filter({ hasText: 'Trống' }).first()
   await expect(roomOption).toBeVisible()
@@ -91,16 +99,27 @@ test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → 
   await expect(page.getByRole('row').filter({ hasText: name })).toBeVisible()
 
   // thanh lý hợp đồng vừa tạo: hoá đơn thanh lý nháp, duyệt xong hợp đồng kết thúc
-  await page.goto('/contracts'); await page.waitForLoadState('networkidle')
+  await page.goto('/contracts')
+  await page.waitForLoadState('networkidle')
   await page.getByRole('row').filter({ hasText: name }).getByRole('button', { name: 'Thanh lý hợp đồng' }).click()
   await page.getByLabel('Ngày trả phòng').fill('2026-12-10')
-  for (const input of await page.getByText('Chỉ số tại ngày trả phòng').locator('xpath=..').locator('input[type=number]').all()) await input.fill(String(meterValue()))
+  for (const input of await page
+    .getByText('Chỉ số tại ngày trả phòng')
+    .locator('xpath=..')
+    .locator('input[type=number]')
+    .all())
+    await input.fill(String(meterValue()))
   await page.getByRole('button', { name: 'Xem trước tiền' }).click()
   await expect(page.getByText(/Hoá đơn thanh lý \(nháp\)/)).toBeVisible()
   await page.getByRole('button', { name: 'Lưu phụ lục' }).click()
   await expect(page.getByText('Đã lưu phụ lục')).toBeVisible()
   await page.goto('/invoices?view=draft')
-  await page.getByRole('row').filter({ hasText: name }).filter({ hasText: /10\/12\/2026/ }).getByRole('link').click()
+  await page
+    .getByRole('row')
+    .filter({ hasText: name })
+    .filter({ hasText: /10\/12\/2026/ })
+    .getByRole('link')
+    .click()
   await page.waitForLoadState('networkidle')
   await page.getByRole('button', { name: 'Duyệt hoá đơn' }).click()
   await expect(page.getByText(/Chưa thu|Chờ hoàn khách/).first()).toBeVisible()
@@ -139,7 +158,10 @@ test('tạo hoá đơn lẻ từ popup: toà → phòng → tháng → xem trư�
   await page.getByRole('link', { name: 'Tạo hoá đơn lẻ' }).click()
   await page.getByLabel('Toà', { exact: true }).click()
   // Chọn toà có hợp đồng thuê (toà thử không có phòng để lập hoá đơn)
-  await page.getByRole('option', { name: /Bình Thạnh|Thảo Điền/ }).first().click()
+  await page
+    .getByRole('option', { name: /Bình Thạnh|Thảo Điền/ })
+    .first()
+    .click()
   await page.getByLabel('Phòng', { exact: true }).click()
   await page.getByRole('option').first().click()
   // Chọn xong tháng chỉ hiện bản xem trước chưa lưu; hoá đơn chỉ được tạo khi bấm Lưu thay đổi

@@ -11,7 +11,9 @@ import { createAmenity, updateAmenity } from './service'
 
 async function guard<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
   return toActionResult(async () => {
-    try { return await fn() } catch (e) {
+    try {
+      return await fn()
+    } catch (e) {
       if (e instanceof ZodError) throw new ValidationError('Thông tin chưa hợp lệ', fieldErrorsOf(e))
       throw e
     }

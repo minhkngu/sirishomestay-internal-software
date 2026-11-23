@@ -25,15 +25,42 @@ function periodChoices(today: string): Array<{ value: string; label: string }> {
 const periodLabel = (period: string) => `Tháng ${Number(period.slice(5))}/${period.slice(0, 4)}`
 
 function uniqueRooms(rows: Array<{ roomId: string; roomCode: string }>) {
-  return [...new Map(rows.map((row) => [row.roomId, { value: row.roomId, label: row.roomCode }])).values()]
-    .sort((a, b) => a.label.localeCompare(b.label, 'vi', { numeric: true }))
+  return [...new Map(rows.map((row) => [row.roomId, { value: row.roomId, label: row.roomCode }])).values()].sort(
+    (a, b) => a.label.localeCompare(b.label, 'vi', { numeric: true }),
+  )
 }
 
-export default async function MetersPage({ searchParams }: { searchParams: Promise<{ facility?: string; period?: string; room?: string; meter?: string; year?: string; month?: string }> }) {
-  return <RequirePermission perm="meters"><Meters searchParams={searchParams} /></RequirePermission>
+export default async function MetersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    facility?: string
+    period?: string
+    room?: string
+    meter?: string
+    year?: string
+    month?: string
+  }>
+}) {
+  return (
+    <RequirePermission perm="meters">
+      <Meters searchParams={searchParams} />
+    </RequirePermission>
+  )
 }
 
-async function Meters({ searchParams }: { searchParams: Promise<{ facility?: string; period?: string; room?: string; meter?: string; year?: string; month?: string }> }) {
+async function Meters({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    facility?: string
+    period?: string
+    room?: string
+    meter?: string
+    year?: string
+    month?: string
+  }>
+}) {
   const sp = await searchParams
   const ctx = await getAccessContext()
   const facs = await listFacilities(db, ctx)
@@ -53,9 +80,16 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
   const roomId = roomOptions.some((room) => room.value === sp.room) ? sp.room! : ''
 
   // Bộ lọc luôn liệt kê mọi loại đồng hồ trong Cài đặt, thêm các tên loại đang có ở dữ liệu nhưng chưa khai báo
-  const typeNames = sortMeterTypes([...meterTypes.map((t) => t.name), ...historyAll.map((row) => row.meterName), ...readingMeterTypes(readingRows)])
+  const typeNames = sortMeterTypes([
+    ...meterTypes.map((t) => t.name),
+    ...historyAll.map((row) => row.meterName),
+    ...readingMeterTypes(readingRows),
+  ])
   const meter = typeNames.includes(sp.meter ?? '') ? sp.meter! : ''
-  const meterOptions = [{ value: '', label: 'Tất cả loại đồng hồ' }, ...typeNames.map((type) => ({ value: type, label: type }))]
+  const meterOptions = [
+    { value: '', label: 'Tất cả loại đồng hồ' },
+    ...typeNames.map((type) => ({ value: type, label: type })),
+  ]
   const unitByType = Object.fromEntries(meterTypes.map((t) => [t.name, t.unit]))
 
   // Năm → Tháng: chưa chọn gì (mặc định) hiện 15 lần chốt mới nhất; 'all' hiện hết; chọn năm thì chọn thêm tháng. Có phân trang khi không phải mặc định
@@ -63,27 +97,53 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
   const month = /^\d{4}$/.test(year) && /^(0[1-9]|1[0-2])$/.test(sp.month ?? '') ? sp.month! : ''
   const years = [...new Set(historyAll.map((row) => row.period.slice(0, 4)))].sort().reverse()
   const yearOptions = [{ value: 'all', label: 'Tất cả' }, ...years.map((y) => ({ value: y, label: `Năm ${y}` }))]
-  const filtered = historyAll.filter((row) => (!roomId || row.roomId === roomId) && (!meter || row.meterName === meter)
-    && (!/^\d{4}$/.test(year) || row.period.startsWith(year)) && (!month || row.period.slice(5) === month))
+  const filtered = historyAll.filter(
+    (row) =>
+      (!roomId || row.roomId === roomId) &&
+      (!meter || row.meterName === meter) &&
+      (!/^\d{4}$/.test(year) || row.period.startsWith(year)) &&
+      (!month || row.period.slice(5) === month),
+  )
   const shown = year === '' ? filtered.slice(0, 15) : filtered
 
   const periodOptions = periodChoices(today)
-  if (!periodOptions.some((option) => option.value === period)) periodOptions.unshift({ value: period, label: periodLabel(period) })
+  if (!periodOptions.some((option) => option.value === period))
+    periodOptions.unshift({ value: period, label: periodLabel(period) })
 
   const addMeterRooms = uniqueRooms(readingRows).map((room) => ({ id: room.value, code: room.label }))
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Chỉ số" action={facilityId ? (
-        <div className="flex items-center gap-2">
-          <AddMeterButton rooms={addMeterRooms} types={meterTypes.filter((t) => !t.isSystem).map((t) => ({ name: t.name, unit: t.unit }))} />
-          <CloseReadingsButton facilities={facs.map((f) => ({ value: f.id, label: f.name }))} defaultFacilityId={facilityId} meterOptions={meterOptions} periodOptions={periodOptions} defaultPeriod={period} today={today} unitByType={unitByType} />
-        </div>
-      ) : undefined} />
-      <p className="-mt-2 text-sm text-muted-foreground">Các lần chốt gần đây; lọc theo năm, tháng hoặc xem tất cả. Bấm Chốt chỉ số để điền số cho đồng hồ chưa chốt.</p>
+      <PageHeader
+        title="Chỉ số"
+        action={
+          facilityId ? (
+            <div className="flex items-center gap-2">
+              <AddMeterButton
+                rooms={addMeterRooms}
+                types={meterTypes.filter((t) => !t.isSystem).map((t) => ({ name: t.name, unit: t.unit }))}
+              />
+              <CloseReadingsButton
+                facilities={facs.map((f) => ({ value: f.id, label: f.name }))}
+                defaultFacilityId={facilityId}
+                meterOptions={meterOptions}
+                periodOptions={periodOptions}
+                defaultPeriod={period}
+                today={today}
+                unitByType={unitByType}
+              />
+            </div>
+          ) : undefined
+        }
+      />
+      <p className="-mt-2 text-sm text-muted-foreground">
+        Các lần chốt gần đây; lọc theo năm, tháng hoặc xem tất cả. Bấm Chốt chỉ số để điền số cho đồng hồ chưa chốt.
+      </p>
 
       {facs.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border/80 bg-card/60 p-8 text-center text-xs text-muted-foreground">Chưa có cơ sở nào.</div>
+        <div className="rounded-2xl border border-dashed border-border/80 bg-card/60 p-8 text-center text-xs text-muted-foreground">
+          Chưa có cơ sở nào.
+        </div>
       ) : (
         <>
           <MeterFilters
@@ -100,9 +160,16 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
             year={year}
             month={month}
           />
-          {historyRows
-            ? <ReadingHistory facilityName={facs.find((f) => f.id === facilityId)?.name ?? ''} rows={shown} paged={year !== ''} total={filtered.length} />
-            : <EmptyData />}
+          {historyRows ? (
+            <ReadingHistory
+              facilityName={facs.find((f) => f.id === facilityId)?.name ?? ''}
+              rows={shown}
+              paged={year !== ''}
+              total={filtered.length}
+            />
+          ) : (
+            <EmptyData />
+          )}
         </>
       )}
     </div>
@@ -110,5 +177,9 @@ async function Meters({ searchParams }: { searchParams: Promise<{ facility?: str
 }
 
 function EmptyData() {
-  return <div className="rounded-2xl border border-dashed border-border/80 bg-card/60 p-8 text-center text-xs text-muted-foreground">Cơ sở này chưa có dữ liệu chỉ số.</div>
+  return (
+    <div className="rounded-2xl border border-dashed border-border/80 bg-card/60 p-8 text-center text-xs text-muted-foreground">
+      Cơ sở này chưa có dữ liệu chỉ số.
+    </div>
+  )
 }

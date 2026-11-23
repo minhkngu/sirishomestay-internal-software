@@ -13,7 +13,14 @@ import { createTestDb } from '../helpers/db'
 import type { DB } from '@/db/client'
 
 function ctxOf(perms: Permission[], facilityIds: string[] = []): AccessContext {
-  return { userId: crypto.randomUUID(), email: 'a@x.com', fullName: 'A', permissions: new Set(perms), facilityIds: new Set(facilityIds), isAdmin: perms.includes('settings') }
+  return {
+    userId: crypto.randomUUID(),
+    email: 'a@x.com',
+    fullName: 'A',
+    permissions: new Set(perms),
+    facilityIds: new Set(facilityIds),
+    isAdmin: perms.includes('settings'),
+  }
 }
 
 describe('handovers', () => {
@@ -34,13 +41,45 @@ describe('handovers', () => {
     r301 = (await db.insert(rooms).values({ facilityId: fa, code: '301' }).returning())[0].id
     r302 = (await db.insert(rooms).values({ facilityId: fa, code: '302' }).returning())[0].id
     const add = async (code: string, roomId: string, value: number, extra: Record<string, unknown> = {}) => {
-      ids[code] = (await db.insert(assets).values({ code, name: `Tài sản ${code}`, value, facilityId: fa, locationKind: 'room', locationId: roomId, ...extra }).returning())[0].id
+      ids[code] = (
+        await db
+          .insert(assets)
+          .values({
+            code,
+            name: `Tài sản ${code}`,
+            value,
+            facilityId: fa,
+            locationKind: 'room',
+            locationId: roomId,
+            ...extra,
+          })
+          .returning()
+      )[0].id
     }
-    await add('AC-301', r301, 9_000_000); await add('BED-301', r301, 4_500_000); await add('TV-301', r301, 6_000_000)
+    await add('AC-301', r301, 9_000_000)
+    await add('BED-301', r301, 4_500_000)
+    await add('TV-301', r301, 6_000_000)
     await add('AC-302', r302, 9_000_000)
     await add('OLD-301', r301, 100_000, { status: 'disposed' })
-    const tenant = (await createTenant(db, admin, { kind: 'vietnamese', homeFacilityId: fa, fullName: 'Khách A', phone: '0901234567', idNumber: '012345678901' })).id
-    leaseId = (await createLease(db, lan(), { roomId: r301, tenantId: tenant, startDate: '2026-10-15', endDate: '2027-10-14', monthlyRent: 9_000_000, depositAmount: 9_000_000 })).lease.id
+    const tenant = (
+      await createTenant(db, admin, {
+        kind: 'vietnamese',
+        homeFacilityId: fa,
+        fullName: 'Khách A',
+        phone: '0901234567',
+        idNumber: '012345678901',
+      })
+    ).id
+    leaseId = (
+      await createLease(db, lan(), {
+        roomId: r301,
+        tenantId: tenant,
+        startDate: '2026-10-15',
+        endDate: '2027-10-14',
+        monthlyRent: 9_000_000,
+        depositAmount: 9_000_000,
+      })
+    ).lease.id
   })
 
   it('check-in lấy đúng các tài sản đang ở phòng (bỏ đã thanh lý và phòng khác); bắt đầu lại khi còn nháp thì trả về bản cũ', async () => {
@@ -65,7 +104,9 @@ describe('handovers', () => {
     const h = await startHandover(db, lan(), leaseId, 'check_out')
     const items = (await getHandover(db, lan(), h.id)).items
     const byCode = (c: string) => items.find((i) => i.assetCode === c)!
-    await saveHandover(db, lan(), h.id, { items: [{ id: byCode('AC-301').id, condition: 'Hư', damaged: true, penalty: 500_000 }] })
+    await saveHandover(db, lan(), h.id, {
+      items: [{ id: byCode('AC-301').id, condition: 'Hư', damaged: true, penalty: 500_000 }],
+    })
     expect((await getHandover(db, lan(), h.id)).penaltyTotal).toBe(500_000)
     await saveHandover(db, lan(), h.id, { items: [{ id: byCode('TV-301').id, condition: 'Mất', missing: true }] })
     const after = await getHandover(db, lan(), h.id)
@@ -91,16 +132,24 @@ describe('handovers', () => {
     const h = await startHandover(db, lan(), leaseId, 'check_in')
     const item = (await getHandover(db, lan(), h.id)).items[0]
     const storage = new MemoryStorage()
-    const up = await requestUpload(db, lan(), storage, { ownerType: 'handover_photo', ownerId: item.id, contentType: 'image/webp' })
+    const up = await requestUpload(db, lan(), storage, {
+      ownerType: 'handover_photo',
+      ownerId: item.id,
+      contentType: 'image/webp',
+    })
     await confirmUpload(db, lan(), up.fileId)
     expect(await listFiles(db, lan(), 'handover_photo', item.id)).toHaveLength(1)
     expect((await getHandover(db, lan(), h.id)).items.find((i) => i.id === item.id)!.photoIds).toEqual([up.fileId])
     const other = ctxOf(['tenants_contracts'], [fb])
     await expect(getHandover(db, other, h.id)).rejects.toThrow(NotFoundError)
     await expect(startHandover(db, other, leaseId, 'check_in')).rejects.toThrow(NotFoundError)
-    await expect(requestUpload(db, other, storage, { ownerType: 'handover_photo', ownerId: item.id, contentType: 'image/webp' })).rejects.toThrow(NotFoundError)
+    await expect(
+      requestUpload(db, other, storage, { ownerType: 'handover_photo', ownerId: item.id, contentType: 'image/webp' }),
+    ).rejects.toThrow(NotFoundError)
     await expect(getHandover(db, ctxOf(['billing'], [fa]), h.id)).rejects.toThrow(ForbiddenError)
-    await expect(startHandover(db, ctxOf(['meters', 'assets', 'incidents'], [fa]), leaseId, 'check_in')).rejects.toThrow(ForbiddenError)
+    await expect(
+      startHandover(db, ctxOf(['meters', 'assets', 'incidents'], [fa]), leaseId, 'check_in'),
+    ).rejects.toThrow(ForbiddenError)
   })
 
   it('lịch sử tài sản có dòng bàn giao', async () => {

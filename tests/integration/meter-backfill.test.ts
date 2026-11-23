@@ -19,7 +19,8 @@ async function runBackfill(db: DB) {
 describe('migration bổ sung công tơ cho phòng', () => {
   let db: DB
   let fac: string
-  const room = async (code: string, isActive = true) => (await db.insert(rooms).values({ facilityId: fac, code, isActive }).returning())[0]
+  const room = async (code: string, isActive = true) =>
+    (await db.insert(rooms).values({ facilityId: fac, code, isActive }).returning())[0]
   const metersOf = (roomId: string) => db.select().from(meters).where(eq(meters.roomId, roomId))
 
   beforeEach(async () => {
@@ -58,8 +59,22 @@ describe('migration bổ sung công tơ cho phòng', () => {
   it('phòng chỉ có công tơ điện đã gỡ nhận công tơ điện mới tiếp nối chỉ số cuối', async () => {
     const r = await room('101')
     await db.insert(meters).values([
-      { roomId: r.id, utility: 'electric', installedOn: '2024-01-01', startReading: 0, removedOn: '2025-03-01', finalReading: 500 },
-      { roomId: r.id, utility: 'electric', installedOn: '2025-03-01', startReading: 0, removedOn: '2025-09-15', finalReading: 900 },
+      {
+        roomId: r.id,
+        utility: 'electric',
+        installedOn: '2024-01-01',
+        startReading: 0,
+        removedOn: '2025-03-01',
+        finalReading: 500,
+      },
+      {
+        roomId: r.id,
+        utility: 'electric',
+        installedOn: '2025-03-01',
+        startReading: 0,
+        removedOn: '2025-09-15',
+        finalReading: 900,
+      },
     ])
     await runBackfill(db)
     const fresh = (await metersOf(r.id)).filter((m) => m.utility === 'electric' && m.removedOn === null)
@@ -78,7 +93,10 @@ describe('migration bổ sung công tơ cho phòng', () => {
     const r = await room('101')
     await db.insert(meters).values({ roomId: r.id, utility: 'fee', installedOn: '2025-01-01', startReading: 0 })
     await runBackfill(db)
-    const ms = await db.select().from(meters).where(and(eq(meters.roomId, r.id)))
+    const ms = await db
+      .select()
+      .from(meters)
+      .where(and(eq(meters.roomId, r.id)))
     expect(ms.map((m) => m.utility).sort()).toEqual(['electric', 'fee', 'water'])
   })
 })

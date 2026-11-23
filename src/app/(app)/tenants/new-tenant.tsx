@@ -8,7 +8,11 @@ import { TenantForm } from '@/features/tenants/components/tenant-form'
 /** Nội dung trang thêm khách; dùng cho cả trang đầy đủ lẫn popup. */
 export async function NewTenant({ showHeading = true }: { showHeading?: boolean }) {
   const ctx = await getAccessContext()
-  try { assertCan(ctx, 'tenants_contracts') } catch { notFound() }
+  try {
+    assertCan(ctx, 'tenants_contracts')
+  } catch {
+    notFound()
+  }
   const facs = await listFacilities(db, ctx)
   return (
     <div className="space-y-4">

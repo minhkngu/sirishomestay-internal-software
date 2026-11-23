@@ -6,7 +6,14 @@ import { createTestDb } from '../helpers/db'
 import type { DB } from '@/db/client'
 
 function ctxOf(perms: Permission[]): AccessContext {
-  return { userId: crypto.randomUUID(), email: 'a@x.com', fullName: 'A', permissions: new Set(perms), facilityIds: new Set(), isAdmin: perms.includes('settings') }
+  return {
+    userId: crypto.randomUUID(),
+    email: 'a@x.com',
+    fullName: 'A',
+    permissions: new Set(perms),
+    facilityIds: new Set(),
+    isAdmin: perms.includes('settings'),
+  }
 }
 
 describe('danh mục tiện ích', () => {

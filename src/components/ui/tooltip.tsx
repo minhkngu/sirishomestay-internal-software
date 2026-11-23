@@ -1,11 +1,15 @@
-"use client"
+'use client'
 
-import type { ReactElement, ReactNode } from "react"
-import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip"
+import type { ReactElement, ReactNode } from 'react'
+import { Tooltip as TooltipPrimitive } from '@base-ui/react/tooltip'
 
 /** Bọc cả nhóm icon: tooltip hiện ngay, và chuyển giữa các icon không bị trễ. */
 function IconTipGroup({ children }: { children: ReactNode }) {
-  return <TooltipPrimitive.Provider delay={0} closeDelay={0}>{children}</TooltipPrimitive.Provider>
+  return (
+    <TooltipPrimitive.Provider delay={0} closeDelay={0}>
+      {children}
+    </TooltipPrimitive.Provider>
+  )
 }
 
 /** Gợi ý tên cho một icon (đặt trong IconTipGroup), hiện khi rê chuột hoặc focus bàn phím, khác thuộc tính title không phải chờ. */

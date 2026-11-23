@@ -11,7 +11,11 @@ import { listExpenseDetails } from '@/server/cashbook/service'
 
 export default async function CashbookPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
   const ctx = await getAccessContext()
-  try { assertCan(ctx, 'billing') } catch { notFound() }
+  try {
+    assertCan(ctx, 'billing')
+  } catch {
+    notFound()
+  }
   const sp = await searchParams
   const month = sp.month === 'all' ? 'all' : /^\d{4}-\d{2}$/.test(sp.month ?? '') ? sp.month! : todayVN().slice(0, 7)
   const [facs, book, rooms, leases, details] = await Promise.all([
@@ -25,7 +29,15 @@ export default async function CashbookPage({ searchParams }: { searchParams: Pro
   const expenses: Record<string, ExpenseDetail> = Object.fromEntries(details.map((d) => [d.id, d]))
   return (
     <div className="space-y-5">
-      <CashbookList rows={book.rows} depositHeld={book.depositHeld} facilities={facilities} rooms={rooms.map((r) => ({ id: r.id, code: r.code, facilityId: r.facilityId }))} leases={leases} expenses={expenses} month={month} />
+      <CashbookList
+        rows={book.rows}
+        depositHeld={book.depositHeld}
+        facilities={facilities}
+        rooms={rooms.map((r) => ({ id: r.id, code: r.code, facilityId: r.facilityId }))}
+        leases={leases}
+        expenses={expenses}
+        month={month}
+      />
     </div>
   )
 }

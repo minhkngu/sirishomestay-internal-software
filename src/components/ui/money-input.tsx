@@ -70,7 +70,7 @@ export function MoneyInput({
       if (typeof ref === 'function') ref(el)
       else if (ref) (ref as React.MutableRefObject<HTMLInputElement | null>).current = el
     },
-    [ref]
+    [ref],
   )
 
   React.useLayoutEffect(() => {

@@ -12,7 +12,9 @@ export const feeUnits = pgTable('fee_units', {
 export const feeTypes = pgTable('fee_types', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
-  unitId: uuid('unit_id').notNull().references(() => feeUnits.id),
+  unitId: uuid('unit_id')
+    .notNull()
+    .references(() => feeUnits.id),
   defaultPrice: integer('default_price').notNull().default(0),
   billing: text('billing').notNull().default('monthly_fixed'), // monthly_fixed | per_occurrence
   quantityFrom: text('quantity_from').notNull().default('period_input'), // occupants | room | meter | period_input
@@ -22,16 +24,32 @@ export const feeTypes = pgTable('fee_types', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
-export const feeTypePrices = pgTable('fee_type_prices', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  feeTypeId: uuid('fee_type_id').notNull().references(() => feeTypes.id, { onDelete: 'cascade' }),
-  facilityId: uuid('facility_id').notNull().references(() => facilities.id, { onDelete: 'cascade' }),
-  price: integer('price').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [unique('fee_type_prices_fee_facility_unique').on(t.feeTypeId, t.facilityId)]).enableRLS()
+export const feeTypePrices = pgTable(
+  'fee_type_prices',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    feeTypeId: uuid('fee_type_id')
+      .notNull()
+      .references(() => feeTypes.id, { onDelete: 'cascade' }),
+    facilityId: uuid('facility_id')
+      .notNull()
+      .references(() => facilities.id, { onDelete: 'cascade' }),
+    price: integer('price').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique('fee_type_prices_fee_facility_unique').on(t.feeTypeId, t.facilityId)],
+).enableRLS()
 
-export const feeDefaults = pgTable('fee_defaults', {
-  facilityId: uuid('facility_id').notNull().references(() => facilities.id, { onDelete: 'cascade' }),
-  feeTypeId: uuid('fee_type_id').notNull().references(() => feeTypes.id, { onDelete: 'cascade' }),
-}, (t) => [unique('fee_defaults_facility_fee_unique').on(t.facilityId, t.feeTypeId)]).enableRLS()
+export const feeDefaults = pgTable(
+  'fee_defaults',
+  {
+    facilityId: uuid('facility_id')
+      .notNull()
+      .references(() => facilities.id, { onDelete: 'cascade' }),
+    feeTypeId: uuid('fee_type_id')
+      .notNull()
+      .references(() => feeTypes.id, { onDelete: 'cascade' }),
+  },
+  (t) => [unique('fee_defaults_facility_fee_unique').on(t.facilityId, t.feeTypeId)],
+).enableRLS()

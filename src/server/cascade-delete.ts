@@ -35,7 +35,8 @@ async function purge(tx: Tx, table: string, where: string, path: string[]): Prom
   for (const fk of await referencing(tx, table)) {
     if (fk.child === table || path.includes(fk.child)) continue
     const cond = `${quote(fk.col)} in (select ${quote(fk.refcol)} from ${quote(table)} where ${where})`
-    if (DETACH_ONLY_TABLES.has(fk.child) && fk.notnull) throw new ValidationError('Cần cập nhật cơ sở dữ liệu (npm run db:migrate) để xoá cơ sở mà vẫn giữ khách thuê')
+    if (DETACH_ONLY_TABLES.has(fk.child) && fk.notnull)
+      throw new ValidationError('Cần cập nhật cơ sở dữ liệu (npm run db:migrate) để xoá cơ sở mà vẫn giữ khách thuê')
     const detach = DETACH_ONLY_TABLES.has(fk.child) || (!fk.notnull && !OWNER_COLUMNS.has(fk.col))
     if (detach) await tx.execute(sql.raw(`update ${quote(fk.child)} set ${quote(fk.col)} = null where ${cond}`))
     else await purge(tx, fk.child, cond, [...path, table])
@@ -46,7 +47,12 @@ async function purge(tx: Tx, table: string, where: string, path: string[]): Prom
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** Xoá hẳn các dòng `table` có `column` thuộc `ids`, cùng toàn bộ dữ liệu phụ thuộc. */
-export async function deleteCascade(tx: Tx, table: 'rooms' | 'facilities', column: 'id' | 'facility_id', ids: string[]): Promise<void> {
+export async function deleteCascade(
+  tx: Tx,
+  table: 'rooms' | 'facilities',
+  column: 'id' | 'facility_id',
+  ids: string[],
+): Promise<void> {
   if (ids.length === 0) return
   if (!ids.every((id) => UUID.test(id))) throw new Error('id không hợp lệ')
   await purge(tx, table, `${quote(column)} in (${ids.map((id) => `'${id}'`).join(',')})`, [])

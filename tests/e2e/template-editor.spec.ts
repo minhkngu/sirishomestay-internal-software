@@ -8,7 +8,10 @@ async function login(page: Page, name: RegExp) {
   await expect(page.getByRole('heading', { name: 'Nhắc việc' })).toBeVisible()
 }
 
-test('soạn mẫu hợp đồng thuê: gõ chữ, chèn chip, kéo thả chip, chọn kiểu, xem trước PDF, lưu', async ({ page, context }) => {
+test('soạn mẫu hợp đồng thuê: gõ chữ, chèn chip, kéo thả chip, chọn kiểu, xem trước PDF, lưu', async ({
+  page,
+  context,
+}) => {
   await login(page, /^Admin/)
   await page.goto('/templates')
   await page.waitForLoadState('networkidle')
@@ -60,7 +63,10 @@ test('thả chỗ điền của danh sách người ở ra ngoài hàng lặp b�
   const dialog = page.getByRole('dialog')
   const editor = dialog.getByLabel('Nội dung mẫu')
   const before = await editor.innerHTML()
-  await dialog.getByLabel('Bảng chỗ điền').getByRole('button', { name: /^Họ tên$/ }).click()
+  await dialog
+    .getByLabel('Bảng chỗ điền')
+    .getByRole('button', { name: /^Họ tên$/ })
+    .click()
   await expect(dialog.getByRole('status')).toContainText('hàng lặp')
   expect(await editor.innerHTML()).toBe(before)
 })

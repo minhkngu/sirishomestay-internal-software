@@ -10,15 +10,30 @@ import type { Addendum, ISODate, Lease, Meter, MeterReading } from './types'
  * lấy chỉ số bàn giao ngày bắt đầu làm chỉ số đầu; `missing` liệt kê đồng hồ còn thiếu chỉ số cần thiết.
  */
 export function meterFeeUsage(input: {
-  lease: Lease; addenda: Addendum[]; linked: Meter; meters: Meter[]; readings: MeterReading[]; from: ISODate; to: ISODate; startDate: ISODate
+  lease: Lease
+  addenda: Addendum[]
+  linked: Meter
+  meters: Meter[]
+  readings: MeterReading[]
+  from: ISODate
+  to: ISODate
+  startDate: ISODate
 }): { usage: number; segments: ReturnType<typeof meterUsage>['segments']; missing: string[] } {
   const { linked, readings, from, to, startDate } = input
-  const chainOf = (roomId: string) => linked.utility === 'electric' || linked.utility === 'water' ? input.meters.filter(m => m.roomId === roomId && m.utility === linked.utility) : [linked]
-  const hasReading = (m: Meter, day: ISODate) => readings.some(r => r.meterId === m.id && r.readOn === day)
+  const chainOf = (roomId: string) =>
+    linked.utility === 'electric' || linked.utility === 'water'
+      ? input.meters.filter((m) => m.roomId === roomId && m.utility === linked.utility)
+      : [linked]
+  const hasReading = (m: Meter, day: ISODate) => readings.some((r) => r.meterId === m.id && r.readOn === day)
   // Đồng hồ cần chỉ số tại ngày đổi phòng: mọi đồng hồ chưa gỡ của phòng (không xét ngày lắp)
   const activeOn = (m: Meter, day: ISODate) => !m.removedOn || m.removedOn > day
   const beginsInRange = startDate >= from && startDate <= to
-  const roomSegments = termSegments(input.lease, input.addenda.filter(a => a.newRoomId != null), from, to)
+  const roomSegments = termSegments(
+    input.lease,
+    input.addenda.filter((a) => a.newRoomId != null),
+    from,
+    to,
+  )
   let usage = 0
   const segments: ReturnType<typeof meterUsage>['segments'] = []
   const missing: string[] = []
@@ -28,12 +43,19 @@ export function meterFeeUsage(input: {
     const last = index + 1 === roomSegments.length
     const start = first ? (beginsInRange ? addDays(startDate, 1) : segment.from) : addDays(segment.from, 1)
     const end = last ? segment.to : addDays(segment.to, 1)
-        const boundary = first ? (beginsInRange ? startDate : null) : segment.from
+    const boundary = first ? (beginsInRange ? startDate : null) : segment.from
     const endBoundary = last ? null : addDays(segment.to, 1)
     // Hợp đồng bắt đầu trong kỳ: chỉ cần chỉ số ban đầu của đồng hồ đã gắn phí (người dùng chọn và điền), không đòi đồng hồ nào khác
-    if (first && beginsInRange) { if (!hasReading(linked, startDate)) missing.push(linked.id) }
-    else if (boundary) missing.push(...chain.filter(m => activeOn(m, boundary) && !hasReading(m, boundary)).map(m => m.id))
-    if (endBoundary) missing.push(...chain.filter(m => (!m.removedOn || m.removedOn > endBoundary) && !hasReading(m, endBoundary)).map(m => m.id))
+    if (first && beginsInRange) {
+      if (!hasReading(linked, startDate)) missing.push(linked.id)
+    } else if (boundary)
+      missing.push(...chain.filter((m) => activeOn(m, boundary) && !hasReading(m, boundary)).map((m) => m.id))
+    if (endBoundary)
+      missing.push(
+        ...chain
+          .filter((m) => (!m.removedOn || m.removedOn > endBoundary) && !hasReading(m, endBoundary))
+          .map((m) => m.id),
+      )
     if (start > end) return // không còn ngày nào để tính (vd. hợp đồng bắt đầu đúng ngày cuối kỳ)
     const part = meterUsage(chain, readings, start, end)
     usage += part.usage
