@@ -17,7 +17,7 @@ export const feeTypes = pgTable('fee_types', {
     .references(() => feeUnits.id),
   defaultPrice: integer('default_price').notNull().default(0),
   billing: text('billing').notNull().default('monthly_fixed'), // monthly_fixed | per_occurrence
-  quantityFrom: text('quantity_from').notNull().default('manual'), // manual | occupants
+  quantityFrom: text('quantity_from').notNull().default('period_input'), // occupants | room | meter | period_input
   isActive: boolean('is_active').notNull().default(true),
   isDemo: boolean('is_demo').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
