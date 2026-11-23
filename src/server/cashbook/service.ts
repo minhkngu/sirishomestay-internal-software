@@ -6,7 +6,7 @@ import { depositHeld, depositMovement, expenseLabel, type LedgerRow } from '@/do
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { displayName } from '@/domain/tenant-name'
 import { recordAudit } from '@/server/audit'
-import { expenseInput } from './schemas'
+import { expenseInput, paymentEditInput } from './schemas'
 
 /** Cột ngày thuộc tháng YYYY-MM (cột kiểu date không dùng LIKE được). */
 const inMonth = (column: Parameters<typeof inArray>[0], month?: string): SQL | undefined => month ? sql`to_char(${column}, 'YYYY-MM') = ${month}` : undefined
@@ -39,7 +39,7 @@ export async function listCashbook(db: DB, ctx: AccessContext, input: { month?: 
     db.select({ type: depositEntries.type, status: depositEntries.status, amount: depositEntries.amount }).from(depositEntries).innerJoin(leases, eq(leases.id, depositEntries.leaseId)).innerJoin(rooms, eq(rooms.id, leases.roomId)).where(inScope(rooms.facilityId, scope)),
   ])
   const rows: LedgerRow[] = [
-    ...pay.map((r): LedgerRow => ({ key: `payment:${r.p.id}`, source: 'payment', id: r.p.id, date: r.p.paidOn, direction: 'in', kind: 'rent', label: 'Thu tiền thuê', amount: r.p.amount, counted: true, facilityId: r.facilityId, roomCode: r.roomCode, party: displayName(r), method: r.p.method, note: r.p.note || r.code, status: 'done', ...when(r.p.createdAt) })),
+    ...pay.map((r): LedgerRow => ({ key: `payment:${r.p.id}`, source: 'payment', id: r.p.id, date: r.p.paidOn, direction: 'in', kind: 'rent', label: 'Thu tiền thuê', amount: r.p.amount, counted: true, facilityId: r.facilityId, roomCode: r.roomCode, party: displayName(r), method: r.p.method, note: r.p.note || r.code, rawNote: r.p.note, status: 'done', ...when(r.p.createdAt) })),
     // Sổ quỹ chỉ ghi khi tiền đã thực nhận hoặc đã chi: bỏ cọc chờ thu/hoàn và bù trừ, mất cọc (không có tiền đi qua)
     ...dep.filter(r => r.e.status === 'done' && depositMovement(r.e.type, r.e.status).counted).map((r): LedgerRow => { const m = depositMovement(r.e.type, r.e.status); return { key: `deposit:${r.e.id}`, source: 'deposit', id: r.e.id, date: r.e.date, direction: m.direction, kind: 'deposit', label: m.label, amount: r.e.amount, counted: m.counted, facilityId: r.facilityId, roomCode: r.roomCode, party: displayName(r), method: r.e.method, note: r.e.note, status: r.e.status === 'done' ? 'done' : 'pending', ...when(r.e.createdAt) } }),
     ...exp.map((r): LedgerRow => ({ key: `expense:${r.x.id}`, source: 'expense', id: r.x.id, date: r.x.date, direction: 'out', kind: r.x.category, label: `Chi ${expenseLabel(r.x.category).toLowerCase()}`, amount: r.x.amount, counted: true, facilityId: r.x.facilityId, roomCode: r.roomCode, party: r.x.payee, method: r.x.method, note: r.x.note, status: 'done', ...when(r.x.createdAt) })),
@@ -84,6 +84,31 @@ export async function deleteExpense(db: DB, ctx: AccessContext, id: string): Pro
     await recordAudit(tx, ctx, { action: 'delete', entity: 'expense', entityId: id, facilityId: before.facilityId, summary: 'Xoá khoản chi', before })
   })
 }
+/**
+ * Sửa khoản thu tiền thuê: số tiền phải lớn hơn 0 và không vượt phần còn nợ của hoá đơn (tổng hoá đơn trừ các khoản thu khác).
+ * Mọi thay đổi có ghi nhật ký với trạng thái trước và sau.
+ */
+export async function updatePayment(db: DB, ctx: AccessContext, id: string, input: unknown): Promise<void> {
+  const parsed = paymentEditInput.safeParse(input)
+  if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message, Object.fromEntries(parsed.error.issues.map(i => [String(i.path[0] ?? '_'), i.message])))
+  const data = parsed.data
+  await db.transaction(async tx0 => {
+    const tx = tx0 as unknown as DB
+    const [before] = await tx.select().from(payments).where(eq(payments.id, id))
+    if (!before) throw new NotFoundError()
+    await tx.execute(sql`select id from invoices where id = ${before.invoiceId} for update`)
+    const [inv] = await tx.select({ id: invoices.id, facilityId: invoices.facilityId, code: invoices.code }).from(invoices).where(eq(invoices.id, before.invoiceId))
+    if (!inv) throw new NotFoundError()
+    assertCan(ctx, 'billing', inv.facilityId)
+    const [{ total }] = await tx.select({ total: sql<number>`coalesce(sum(${invoiceLines.amount}), 0)::float8` }).from(invoiceLines).where(eq(invoiceLines.invoiceId, inv.id))
+    const [{ others }] = await tx.select({ others: sql<number>`coalesce(sum(${payments.amount}), 0)::float8` }).from(payments).where(and(eq(payments.invoiceId, inv.id), sql`${payments.id} <> ${id}`))
+    const owed = total - others
+    if (data.amount > owed) throw new ValidationError(`Số tiền vượt phần còn nợ ${Math.max(owed, 0).toLocaleString('vi-VN')}`, { amount: 'Vượt phần còn nợ của hoá đơn' })
+    const [after] = await tx.update(payments).set({ paidOn: data.paidOn, amount: data.amount, method: data.method, note: data.note, updatedAt: new Date() }).where(eq(payments.id, id)).returning()
+    await recordAudit(tx, ctx, { action: 'update', entity: 'payment', entityId: id, facilityId: inv.facilityId, summary: `Sửa khoản thu của ${inv.code}`, before, after })
+  })
+}
+
 async function assertRoomInFacility(db: Pick<DB, 'select'>, roomId: string | null, facilityId: string) {
   if (!roomId) return
   const [room] = await db.select({ facilityId: rooms.facilityId }).from(rooms).where(eq(rooms.id, roomId))
