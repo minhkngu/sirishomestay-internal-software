@@ -13,7 +13,7 @@ export type Permission = (typeof PERMISSIONS)[number]
 export const PERMISSION_LABELS: Record<Permission, string> = {
   tenants_contracts: 'Khách & hợp đồng',
   delete_contracts: 'Xoá hợp đồng',
-  billing: 'Hoá đơn & thu tiền',
+  billing: 'Hoá đơn, thu chi',
   meters: 'Ghi điện nước',
   assets: 'Tài sản & kho',
   incidents: 'Sự cố & sửa chữa',
@@ -23,7 +23,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
 export const PERMISSION_DESCRIPTIONS: Record<Permission, string> = {
   tenants_contracts: 'Xem và sửa khách thuê, hợp đồng, giấy tờ tuỳ thân',
   delete_contracts: 'Xoá hợp đồng và dữ liệu liên quan trong cơ sở được cấp',
-  billing: 'Lập hoá đơn, thu tiền, sổ cọc',
+  billing: 'Lập hoá đơn, thu tiền, thu chi, sổ cọc',
   meters: 'Ghi chỉ số điện nước',
   assets: 'Quản lý tài sản, kho, chuyển tài sản',
   incidents: 'Xử lý sự cố và sửa chữa',

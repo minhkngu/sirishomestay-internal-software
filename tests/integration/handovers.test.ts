@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { assets, facilities, leaseFeeMeters, leaseFeeSnapshots, meterReadings, meters, rooms } from '@/db'
+import { assets, facilities, rooms } from '@/db'
 import { createTenant } from '@/modules/tenants/server/tenants/service'
 import { createLease } from '@/server/contracts/service'
 import { startHandover, getHandover, saveHandover, completeHandover, listHandovers } from '@/server/handovers/service'
@@ -30,7 +30,6 @@ describe('handovers', () => {
   let r301: string
   let r302: string
   let leaseId: string
-  let eMeter: string
   const ids: Record<string, string> = {}
   const admin = ctxOf(['settings'])
   const lan = () => ctxOf(['tenants_contracts'], [fa])
@@ -62,12 +61,6 @@ describe('handovers', () => {
     await add('TV-301', r301, 6_000_000)
     await add('AC-302', r302, 9_000_000)
     await add('OLD-301', r301, 100_000, { status: 'disposed' })
-    eMeter = (
-      await db
-        .insert(meters)
-        .values({ roomId: r301, utility: 'electric', serial: 'E-301', installedOn: '2025-01-01', startReading: 0 })
-        .returning()
-    )[0].id
     const tenant = (
       await createTenant(db, admin, {
         kind: 'vietnamese',
@@ -113,61 +106,25 @@ describe('handovers', () => {
     const byCode = (c: string) => items.find((i) => i.assetCode === c)!
     await saveHandover(db, lan(), h.id, {
       items: [{ id: byCode('AC-301').id, condition: 'Hư', damaged: true, penalty: 500_000 }],
-      meterReadings: [],
     })
     expect((await getHandover(db, lan(), h.id)).penaltyTotal).toBe(500_000)
-    await saveHandover(db, lan(), h.id, {
-      items: [{ id: byCode('TV-301').id, condition: 'Mất', missing: true }],
-      meterReadings: [],
-    })
+    await saveHandover(db, lan(), h.id, { items: [{ id: byCode('TV-301').id, condition: 'Mất', missing: true }] })
     const after = await getHandover(db, lan(), h.id)
     expect(after.items.find((i) => i.assetCode === 'TV-301')).toMatchObject({ missing: true, penalty: 6_000_000 })
     expect(after.penaltyTotal).toBe(6_500_000)
   })
 
-  it('chỉ số đồng hồ nhập ở bàn giao được ghi thành chỉ số của đồng hồ, kèm ngày bàn giao', async () => {
+  it('biên bản không còn phần chỉ số đồng hồ', async () => {
     const h = await startHandover(db, lan(), leaseId, 'check_in')
-    await saveHandover(db, lan(), h.id, { items: [], meterReadings: [{ meterId: eMeter, value: 1200 }] })
-    const rows = await db.select().from(meterReadings).where(eq(meterReadings.meterId, eMeter))
-    expect(rows).toHaveLength(1)
-    expect(rows[0]).toMatchObject({ value: 1200, readOn: h.date, period: h.date.slice(0, 7) })
-    expect((await getHandover(db, lan(), h.id)).readings[0]).toMatchObject({
-      meterId: eMeter,
-      value: 1200,
-      serial: 'E-301',
-    })
-  })
-
-  it('biên bản gọi đồng hồ theo tên phí gắn với hợp đồng', async () => {
-    const [fee] = await db
-      .insert(leaseFeeSnapshots)
-      .values({ leaseId, name: 'Giặt', unit: 'lượt', quantitySource: 'meter', unitPrice: 5000 })
-      .returning()
-    const [meter] = await db
-      .insert(meters)
-      .values({ roomId: r301, utility: 'fee', installedOn: '2026-10-15', startReading: 0 })
-      .returning()
-    await db.insert(leaseFeeMeters).values({ leaseFeeId: fee.id, meterId: meter.id })
-    const h = await startHandover(db, lan(), leaseId, 'check_in')
-    expect((await getHandover(db, lan(), h.id)).meters.find((m) => m.meterId === meter.id)).toMatchObject({
-      label: 'Giặt',
-    })
-  })
-
-  it('chỉ số thấp hơn chỉ số trước của đồng hồ → lỗi', async () => {
-    await db.insert(meterReadings).values({ meterId: eMeter, period: '2020-01', readOn: '2020-01-31', value: 5000 })
-    const h = await startHandover(db, lan(), leaseId, 'check_in')
-    await expect(
-      saveHandover(db, lan(), h.id, { items: [], meterReadings: [{ meterId: eMeter, value: 100 }] }),
-    ).rejects.toThrow('Chỉ số mới nhỏ hơn chỉ số cũ')
+    const full = await getHandover(db, lan(), h.id)
+    expect(full).not.toHaveProperty('readings')
+    expect(full).not.toHaveProperty('meters')
   })
 
   it('biên bản đã hoàn tất thì không sửa được', async () => {
     const h = await startHandover(db, lan(), leaseId, 'check_in')
     await completeHandover(db, lan(), h.id)
-    await expect(saveHandover(db, lan(), h.id, { items: [], meterReadings: [] })).rejects.toThrow(
-      'Biên bản đã hoàn tất',
-    )
+    await expect(saveHandover(db, lan(), h.id, { items: [] })).rejects.toThrow('Biên bản đã hoàn tất')
     expect((await listHandovers(db, lan(), leaseId)).map((x) => [x.kind, x.status])).toEqual([['check_in', 'done']])
   })
 
@@ -198,10 +155,7 @@ describe('handovers', () => {
   it('lịch sử tài sản có dòng bàn giao', async () => {
     const h = await startHandover(db, lan(), leaseId, 'check_out')
     const item = (await getHandover(db, lan(), h.id)).items.find((i) => i.assetCode === 'AC-301')!
-    await saveHandover(db, lan(), h.id, {
-      items: [{ id: item.id, condition: 'Hư', damaged: true, penalty: 500_000 }],
-      meterReadings: [],
-    })
+    await saveHandover(db, lan(), h.id, { items: [{ id: item.id, condition: 'Hư', damaged: true, penalty: 500_000 }] })
     const hist = await assetHistory(db, ctxOf(['assets'], [fa]), ids['AC-301'])
     expect(hist.handovers).toHaveLength(1)
     expect(hist.handovers[0]).toMatchObject({ kind: 'check_out', condition: 'Hư', damaged: true, penalty: 500_000 })
@@ -210,9 +164,7 @@ describe('handovers', () => {
 
   it('hợp đồng không tồn tại → NotFoundError', async () => {
     await expect(startHandover(db, lan(), crypto.randomUUID(), 'check_in')).rejects.toThrow(NotFoundError)
-    await expect(saveHandover(db, lan(), crypto.randomUUID(), { items: [], meterReadings: [] })).rejects.toThrow(
-      NotFoundError,
-    )
+    await expect(saveHandover(db, lan(), crypto.randomUUID(), { items: [] })).rejects.toThrow(NotFoundError)
     expect(ValidationError).toBeDefined()
   })
 })

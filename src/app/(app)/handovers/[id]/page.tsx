@@ -29,7 +29,6 @@ async function Handover({ params }: { params: Promise<{ id: string }> }) {
   const templates = (
     await listTemplates(db, ctx, h.kind === 'check_in' ? 'handover_check_in' : 'handover_check_out')
   ).filter(isUsableTemplate)
-  const readByMeter = new Map(h.readings.map((r) => [r.meterId, r.value]))
   return (
     <div className="space-y-4">
       <div>
@@ -46,7 +45,6 @@ async function Handover({ params }: { params: Promise<{ id: string }> }) {
         readOnly={h.status === 'done'}
         hasTemplate={templates.length > 0}
         checkInConditions={checkInConditions}
-        meters={h.meters.map((m) => ({ ...m, value: readByMeter.get(m.meterId) ?? null }))}
         items={h.items.map((i) => ({
           id: i.id,
           assetCode: i.assetCode,
