@@ -235,7 +235,7 @@ function MeterReadingsPanel({ panel, editable, consumption, snapshot, onSnapshot
     <div className="text-[11px] text-muted-foreground">
       <Select value={null} onValueChange={(v) => { if (v) open(String(v)) }} items={items}>
         <SelectTrigger aria-label={`Chỉ số đã chốt ${panel.name}`} className="h-8 w-full rounded-lg border-border/80 bg-background text-xs"><SelectValue placeholder={rowLabel(last)} /></SelectTrigger>
-        <SelectContent>{items.map((o) => <SelectItem key={o.value} value={o.value}><span className="flex w-full items-center justify-between gap-3"><span>{o.label}</span>{o.latest && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">Mới nhất</span>}</span></SelectItem>)}</SelectContent>
+        <SelectContent className="w-max min-w-(--anchor-width) max-w-[min(32rem,92vw)]">{items.map((o) => <SelectItem key={o.value} value={o.value}><span className="flex w-full items-center justify-between gap-3 whitespace-nowrap"><span>{o.label}</span>{o.latest && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">Mới nhất</span>}</span></SelectItem>)}</SelectContent>
       </Select>
       {(() => {
         // Hoá đơn tháng đầu: chưa có lần chốt nào, chỉ số ban đầu ghi ở hợp đồng làm cả số đầu lẫn số cuối kỳ (chưa phát sinh)
