@@ -10,6 +10,10 @@ import { cn } from '@/lib/utils'
 
 type Option = { value: string; label: string }
 
+const MONTH_OPTIONS: Option[] = [
+  ...Array.from({ length: 12 }, (_, i) => ({ value: String(i + 1).padStart(2, '0'), label: `Tháng ${i + 1}` })),
+]
+
 function FilterField({ label, className, children }: { label: string; className?: string; children: React.ReactNode }) {
   return (
     <div className={cn('min-w-0 space-y-1', className)}>
@@ -24,16 +28,20 @@ function FilterSelect({
   value,
   options,
   onChange,
+  disabled,
+  placeholder,
 }: {
   label: string
   value: string
   options: Option[]
   onChange: (value: string) => void
+  disabled?: boolean
+  placeholder?: string
 }) {
   return (
-    <Select value={value} onValueChange={(next) => onChange(String(next ?? ''))} items={options}>
+    <Select value={value} onValueChange={(next) => onChange(String(next ?? ''))} items={options} disabled={disabled}>
       <SelectTrigger aria-label={label} className="h-9 w-full justify-between bg-card text-[13px] font-normal">
-        <SelectValue />
+        <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
         {options.map((option) => (
@@ -113,6 +121,10 @@ export function MeterFilters({
   periodOptions,
   period,
   showPeriod,
+  range,
+  yearOptions,
+  year,
+  month,
 }: {
   facilities: Option[]
   facilityId: string
@@ -123,6 +135,12 @@ export function MeterFilters({
   periodOptions: Option[]
   period: string
   showPeriod: boolean
+  /** Chế độ lịch sử: lọc từ tháng – đến tháng thay cho ô Kỳ ghi. */
+  range?: { from: string; to: string }
+  /** Lọc Năm → Tháng (thay ô Kỳ ghi): '' là 15 lần chốt mới nhất, 'all' là tất cả. */
+  yearOptions?: Option[]
+  year?: string
+  month?: string
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -138,7 +156,7 @@ export function MeterFilters({
     start(() => router.replace(`${pathname}?${params.toString()}`, { scroll: false }))
   }
 
-  const active = Boolean(roomId || meter)
+  const active = Boolean(roomId || meter || year || month)
 
   return (
     <div
@@ -167,7 +185,54 @@ export function MeterFilters({
           onChange={(value) => update({ meter: value || null })}
         />
       </FilterField>
-      {showPeriod && (
+      {range && (
+        <>
+          <FilterField label="Từ tháng" className="sm:w-40">
+            <input
+              type="month"
+              aria-label="Từ tháng"
+              value={range.from}
+              max={range.to}
+              onChange={(e) => e.target.value && update({ from: e.target.value })}
+              className="h-9 w-full rounded-xl border border-input bg-card px-3 text-[13px]"
+            />
+          </FilterField>
+          <FilterField label="Đến tháng" className="sm:w-40">
+            <input
+              type="month"
+              aria-label="Đến tháng"
+              value={range.to}
+              min={range.from}
+              onChange={(e) => e.target.value && update({ to: e.target.value })}
+              className="h-9 w-full rounded-xl border border-input bg-card px-3 text-[13px]"
+            />
+          </FilterField>
+        </>
+      )}
+      {yearOptions && (
+        <>
+          <FilterField label="Năm" className="sm:w-40">
+            <FilterSelect
+              label="Năm"
+              value={year ?? ''}
+              options={yearOptions}
+              placeholder="Năm"
+              onChange={(value) => update({ year: value || null, month: null })}
+            />
+          </FilterField>
+          <FilterField label="Tháng" className="sm:w-36">
+            <FilterSelect
+              label="Tháng"
+              value={month ?? ''}
+              options={MONTH_OPTIONS}
+              placeholder="Tháng"
+              disabled={!/^\d{4}$/.test(year ?? '')}
+              onChange={(value) => update({ month: value || null })}
+            />
+          </FilterField>
+        </>
+      )}
+      {showPeriod && !range && (
         <FilterField label="Kỳ ghi" className="sm:w-40">
           <FilterSelect
             label="Kỳ ghi"
@@ -181,9 +246,9 @@ export function MeterFilters({
         <button
           type="button"
           className="pb-2 text-xs font-medium text-primary hover:underline hover:underline-offset-2"
-          onClick={() => update({ room: null, meter: null })}
+          onClick={() => update({ room: null, meter: null, year: null, month: null })}
         >
-          Xoá lọc phòng, đồng hồ
+          Xoá lọc
         </button>
       )}
     </div>

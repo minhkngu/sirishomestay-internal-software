@@ -14,7 +14,7 @@ export type FeeFormValues = {
   newUnitName?: string
   defaultPrice: number
   billing: 'monthly_fixed' | 'per_occurrence'
-  quantityFrom: 'manual' | 'occupants' | 'room' | 'meter' | 'period_input'
+  quantityFrom: 'occupants' | 'room' | 'meter' | 'period_input'
 }
 
 export type FeeFormInitial = {
@@ -55,7 +55,7 @@ export function FeeTypeForm({
   const [newUnitName, setNewUnitName] = useState('')
   const [price, setPrice] = useState(initial?.defaultPrice == null ? '' : String(initial.defaultPrice))
   const [billing, setBilling] = useState(initial?.billing ?? 'monthly_fixed')
-  const [quantityFrom, setQuantityFrom] = useState(initial?.quantityFrom ?? 'manual')
+  const [quantityFrom, setQuantityFrom] = useState(initial?.quantityFrom ?? 'period_input')
   const [localErrors, setLocalErrors] = useState<Record<string, string>>({})
 
   function submit() {
