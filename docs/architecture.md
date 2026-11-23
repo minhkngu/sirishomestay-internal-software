@@ -57,7 +57,7 @@ src/modules/<mảng>/
   index.ts     cổng công khai phía server (service, kiểu)
   actions.ts   cổng server action cho giao diện (re-export, không có 'use server' ở file cổng)
   ui.ts        cổng component
-src/modules/registrations.ts   import mọi file có register* (mục 6)
+src/modules/registrations.ts   import mọi file có register* (mục 6) (hiện ở src/server/registrations.ts cho tới Task 12)
 ```
 
 Luật:
@@ -90,7 +90,7 @@ Luật chuyển tiếp (bỏ ở Task 22): code cũ (`src/server`, `src/features
 
 | Bẫy | Hậu quả | Cách xử lý / trạng thái |
 |---|---|---|
-| Đăng ký kiểu side-effect: `registerOwnerResolver`, `registerExportOwnerResolver`, `registerDocLoader`, `registerPdfLoader` chỉ chạy khi file đăng ký đã được import | Route lạnh báo "Loại tệp chưa được hỗ trợ" hoặc không xuất được giấy tờ | Hiện có `src/server/files/register.ts` (thiếu hoá đơn) và mẹo `await import('@/server/invoices/service')` ở `templates/service.ts:166`. Task 8 gom vào một file import ở mọi điểm vào; module mới có `register*` phải thêm vào file đó (test kiểm) |
+| Đăng ký kiểu side-effect: `registerOwnerResolver`, `registerExportOwnerResolver`, `registerDocLoader`, `registerPdfLoader` chỉ chạy khi file đăng ký đã được import | Route lạnh báo "Loại tệp chưa được hỗ trợ" hoặc không xuất được giấy tờ | Đã xử lý (Task 8): `src/server/registrations.ts` import mọi file có `register*`, và được import ở dòng đầu mọi `actions.ts`, API `route.ts` và `src/app/(app)/layout.tsx`; test `tests/unit/architecture/registrations.test.ts` kiểm. Module mới có `register*` phải thêm vào file đó |
 | Font PDF dùng đường dẫn cứng `src/server/pdf/fonts/` ở `next.config.ts` (`outputFileTracingIncludes`) và `src/server/pdf/fonts.ts` | Dời thư mục mà quên: local, test vẫn xanh, **PDF trên Vercel hỏng** | Sửa cả hai chỗ; Task 17 thêm `tests/unit/pdf-fonts.test.ts`; luôn thử "Xem PDF" trên preview |
 | `cascade-delete.ts` (xoá cơ sở/phòng) ghi bảng của hợp đồng, hoá đơn… | Vi phạm luật "ghi bảng module khác" | Ngoại lệ có chủ ý vì DB không có `ON DELETE CASCADE`; không "sửa" bằng cách thêm cascade trong schema nếu chưa bàn |
 | Phụ thuộc hai chiều `addenda ↔ invoices`, `invoices ↔ templates` | Khó tách, dễ vòng import | Cả `addenda` và `invoices` vào `leasing`; `invoices ↔ templates` gỡ ở Task 8 |

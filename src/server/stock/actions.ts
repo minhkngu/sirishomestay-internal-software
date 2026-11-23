@@ -1,4 +1,6 @@
 'use server'
+
+import '@/server/registrations'
 import { revalidatePath } from 'next/cache'
 import { db } from '@/db/client'
 import { toActionResult } from '@/lib/action-result'

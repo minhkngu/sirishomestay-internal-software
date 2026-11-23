@@ -1,5 +1,7 @@
 'use server'
 
+import '@/server/registrations'
+
 import { eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { after } from 'next/server'

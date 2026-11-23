@@ -1,5 +1,7 @@
 'use server'
 
+import '@/server/registrations'
+
 import { randomBytes } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import { db } from '@/db/client'
