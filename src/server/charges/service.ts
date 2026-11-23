@@ -147,6 +147,61 @@ export async function markDepositDone(db: DB, ctx: AccessContext, id: string, in
   })
 }
 
+/** Khoản cọc sửa, xoá được ở tab Thu chi: đã hoàn tất và là thu cọc hoặc hoàn cọc; khoản trừ/mất cọc là bù trừ nội bộ. */
+const EDITABLE_DEPOSIT_TYPES = ['collect', 'topup', 'refund'] as const
+const depositEditInput = z.object({
+  date,
+  amount: z.number().int().positive().max(2147483647),
+  method: z.enum(['cash', 'transfer', 'other']),
+  note: z.string().trim().default(''),
+})
+async function loadEditableDeposit(tx: DB, ctx: AccessContext, id: string) {
+  const [before] = await tx.select().from(depositEntries).where(eq(depositEntries.id, id))
+  if (!before?.leaseId) throw new NotFoundError()
+  const facilityId = await facilityForLease(tx, ctx, before.leaseId)
+  if (before.status !== 'done' || !(EDITABLE_DEPOSIT_TYPES as readonly string[]).includes(before.type))
+    throw new ValidationError('Chỉ sửa hoặc xoá được khoản thu, hoàn cọc đã hoàn tất')
+  return { before, facilityId }
+}
+export async function updateDepositEntry(db: DB, ctx: AccessContext, id: string, input: unknown): Promise<void> {
+  const data = parse(depositEditInput, input)
+  await db.transaction(async (tx0) => {
+    const tx = tx0 as unknown as DB
+    await tx.execute(sql`select id from deposit_entries where id = ${id} for update`)
+    const { before, facilityId } = await loadEditableDeposit(tx, ctx, id)
+    const [after] = await tx
+      .update(depositEntries)
+      .set({ date: data.date, amount: data.amount, method: data.method, note: data.note, updatedAt: new Date() })
+      .where(eq(depositEntries.id, id))
+      .returning()
+    await recordAudit(tx, ctx, {
+      action: 'update',
+      entity: 'deposit_entry',
+      entityId: id,
+      facilityId,
+      summary: 'Sửa dòng sổ cọc',
+      before,
+      after,
+    })
+  })
+}
+export async function deleteDepositEntry(db: DB, ctx: AccessContext, id: string): Promise<void> {
+  await db.transaction(async (tx0) => {
+    const tx = tx0 as unknown as DB
+    await tx.execute(sql`select id from deposit_entries where id = ${id} for update`)
+    const { before, facilityId } = await loadEditableDeposit(tx, ctx, id)
+    await tx.delete(depositEntries).where(eq(depositEntries.id, id))
+    await recordAudit(tx, ctx, {
+      action: 'delete',
+      entity: 'deposit_entry',
+      entityId: id,
+      facilityId,
+      summary: 'Xoá dòng sổ cọc',
+      before,
+    })
+  })
+}
+
 /** Chỉ trả mã hợp đồng để người có quyền tài chính thao tác tại trang phòng. */
 export async function activeLeaseForBilling(db: DB, ctx: AccessContext, roomId: string): Promise<string | null> {
   const [room] = await db.select({ facilityId: rooms.facilityId }).from(rooms).where(eq(rooms.id, roomId))
