@@ -1,8 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
+import { getServerEnv, publicEnv } from '@/lib/env'
 
 /** Client dùng service role — chỉ dùng ở server (tạo/khoá người dùng). */
 export function supabaseAdmin() {
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  return createClient(publicEnv.supabaseUrl, getServerEnv().supabaseServiceRoleKey!, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 }
