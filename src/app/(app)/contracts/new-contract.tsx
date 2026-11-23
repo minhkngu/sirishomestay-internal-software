@@ -144,9 +144,11 @@ export async function NewContract({ sp, showHeading = true }: { sp: NewContractS
     defaults: {
       proration: settings.proration,
       dueRuleLabel:
-        settings.dueRule.kind === 'day_of_next_month'
-          ? `ngày ${settings.dueRule.day} của tháng sau`
-          : `${settings.dueRule.days} ngày sau khi duyệt`,
+        settings.dueRule.kind === 'day_of_invoice_month'
+          ? `ngày ${settings.dueRule.day} của chính tháng hoá đơn`
+          : settings.dueRule.kind === 'day_of_next_month'
+            ? `ngày ${settings.dueRule.day} của tháng sau`
+            : `${settings.dueRule.days} ngày sau khi duyệt`,
     },
   }
   const depositFormProps = {

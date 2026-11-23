@@ -1,0 +1,1 @@
+ALTER TABLE "fee_types" ALTER COLUMN "quantity_from" SET DEFAULT 'period_input';

@@ -26,7 +26,7 @@ import { contractTermsAt } from '@/domain/contract-terms'
 import type { ContractFee, InvoiceLineInput, LeaseTerms, Proration } from '@/domain/types'
 import { recordAudit } from '@/modules/platform'
 import { captureContractVersion } from './history'
-import { ensureFeeMeter } from '@/server/meters/service'
+import { ensureFeeMeter, updateLeaseFeeMeter } from '@/server/meters/service'
 import { createAssetInTransaction, moveAssetsInTransaction, setAssetStatusInTransaction } from '@/server/assets/service'
 import { startHandoverInTransaction } from '@/server/handovers/service'
 import { leaseData, loadAddenda } from '@/server/invoices/service'
@@ -613,7 +613,7 @@ export type LeaseEditInput = Pick<
     leaseFeeId?: string
     feeTypeId?: string | null
     unitPrice: number
-    /** Phí theo đồng hồ thêm mới: chỉ số ban đầu và đồng hồ có sẵn (bỏ trống thì tạo đồng hồ mới). */ initialReading?: number
+    /** Phí theo đồng hồ: chỉ số ban đầu và đồng hồ có sẵn (bỏ trống thì tạo đồng hồ mới khi thêm phí). Dòng phí cũ gửi kèm hai trường này để sửa đồng hồ/chỉ số đầu. */ initialReading?: number
     existingMeterId?: string
   }[]
 }
@@ -625,6 +625,7 @@ async function applyLeaseFeeEdits(
   leaseId: string,
   edits: NonNullable<LeaseEditInput['fees']>,
   roomId: string,
+  startDate: string,
 ): Promise<void> {
   const existing = await tx
     .select({
@@ -646,11 +647,27 @@ async function applyLeaseFeeEdits(
     if (!Number.isSafeInteger(edit.unitPrice) || edit.unitPrice < 0 || edit.unitPrice > 2_147_483_647)
       throw new ValidationError('Đơn giá phí không hợp lệ')
     if (edit.leaseFeeId) {
-      if (!existing.some((r) => r.id === edit.leaseFeeId)) throw new ValidationError('Phí không thuộc hợp đồng này')
+      const old = existing.find((r) => r.id === edit.leaseFeeId)
+      if (!old) throw new ValidationError('Phí không thuộc hợp đồng này')
       await tx
         .update(leaseFeeSnapshots)
         .set({ unitPrice: edit.unitPrice })
         .where(eq(leaseFeeSnapshots.id, edit.leaseFeeId))
+      // Phí theo đồng hồ: sửa kèm đồng hồ/chỉ số đầu; phí khác bỏ qua phần này
+      if (old.source === 'meter' && (edit.existingMeterId !== undefined || edit.initialReading !== undefined)) {
+        if (!edit.existingMeterId)
+          throw new ValidationError('Chọn đồng hồ cho phí', { existingMeterId: 'Chọn đồng hồ của phòng' })
+        if (edit.initialReading === undefined)
+          throw new ValidationError('Nhập chỉ số ban đầu hợp lệ', { initialReading: 'Nhập chỉ số nguyên không âm' })
+        await updateLeaseFeeMeter(tx, ctx, {
+          leaseId,
+          leaseFeeId: edit.leaseFeeId,
+          roomId,
+          meterId: edit.existingMeterId,
+          initialReading: edit.initialReading,
+          startDate,
+        })
+      }
       continue
     }
     if (!edit.feeTypeId) throw new ValidationError('Chọn loại phí đã cài đặt')
@@ -741,7 +758,7 @@ export async function updateLease(
       if (!template || template.docType !== 'lease' || !template.body)
         throw new ValidationError('Mẫu hợp đồng không hợp lệ hoặc chưa sẵn sàng')
     }
-    if (input.fees !== undefined) await applyLeaseFeeEdits(tx, ctx, id, input.fees, input.roomId)
+    if (input.fees !== undefined) await applyLeaseFeeEdits(tx, ctx, id, input.fees, input.roomId, input.startDate)
     await captureContractVersion(tx, ctx, 'lease', id, 'edit')
     const [after] = await tx
       .update(leases)
