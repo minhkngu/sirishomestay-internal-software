@@ -1,0 +1,1 @@
+ALTER TABLE "meter_readings" ADD COLUMN "opening" integer;
