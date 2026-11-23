@@ -36,7 +36,6 @@ describe('meterFeeUsage', () => {
     const r = meterFeeUsage({ ...base, lease: lease({ startDate: '2026-11-15' }), startDate: '2026-11-15', linked: m, meters: [m], readings: [reading('m', '2026-11-30', 150)] })
     expect(r.missing).toEqual(['m'])
   })
-
   it('cắt đầu kỳ theo ngày bắt đầu hợp đồng: không tính phần của khách trước', () => {
     const m = electric('m', 'R1')
     // khách mới vào 15/11, chỉ số bàn giao 120; tính từ 15/11 chứ không từ 01/11
@@ -49,5 +48,27 @@ describe('meterFeeUsage', () => {
     expect(r.usage).toBe(0)
     expect(r.missing).toEqual([])
     expect(r.segments[0]).toMatchObject({ start: 1232, end: 1232 })
+  })
+
+  it('đồng hồ lắp sau ngày bắt đầu hợp đồng vẫn chốt được, không báo thiếu', () => {
+    const m = electric('m', 'R1', { installedOn: '2026-11-20' })
+    const r = meterFeeUsage({ ...base, lease: lease({ startDate: '2026-11-15' }), startDate: '2026-11-15', linked: m, meters: [m], readings: [reading('m', '2026-11-15', 120, 'handover'), reading('m', '2026-11-30', 150)] })
+    expect(r.missing).toEqual([])
+    expect(r.usage).toBe(30)
+  })
+
+  it('thay đồng hồ giữa kỳ vẫn đòi chỉ số tại ngày thay: đồng hồ cũ thiếu chỉ số cuối thì nằm trong missing', () => {
+    const old = electric('old', 'R1', { removedOn: '2026-11-10' })
+    const cur = electric('cur', 'R1', { installedOn: '2026-11-10' })
+    const r = meterFeeUsage({ ...base, lease: lease(), startDate: '2026-01-01', linked: cur, meters: [old, cur], readings: [reading('cur', '2026-11-30', 50)] })
+    expect(r.missing).toContain('old')
+  })
+
+  it('chuyển phòng giữa kỳ đòi chỉ số đồng hồ chưa gỡ của phòng cũ tại ngày chuyển', () => {
+    const old = electric('old', 'R1')
+    const next = electric('next', 'R2')
+    const transfer: Addendum = { id: 'A1', leaseId: 'L1', type: 'transfer', effectiveDate: '2026-11-15', newRoomId: 'R2', oldRoomId: 'R1' }
+    const r = meterFeeUsage({ ...base, lease: lease(), addenda: [transfer], startDate: '2026-01-01', linked: old, meters: [old, next], readings: [reading('next', '2026-11-30', 40)] })
+    expect(r.missing).toContain('old')
   })
 })

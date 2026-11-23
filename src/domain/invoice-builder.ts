@@ -115,7 +115,8 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): { lines: Invoic
       // Kỳ ký hợp đồng: chưa dùng, chỉ số đầu và cuối đều là chỉ số ghi lúc ký
       const link = input.feeMeterLinks?.find(x => x.leaseFeeId === f.leaseFeeId)
       const start = input.readings.find(r => r.meterId === link?.meterId && r.kind === 'handover' && r.readOn === terms.startDate)
-      if (start) lines.push({ type: 'fee', description: f.name, quantity: 0, unitPrice: f.unitPrice, amount: 0, meta: { leaseFeeId: f.leaseFeeId, unit: f.unit } })
+      // Số đầu, số cuối chép từ chỉ số ban đầu của hợp đồng vào dòng; từ đó là số riêng của hoá đơn, hợp đồng đổi không kéo theo
+      if (start) lines.push({ type: 'fee', description: f.name, quantity: 0, unitPrice: f.unitPrice, amount: 0, meta: { leaseFeeId: f.leaseFeeId, unit: f.unit, opening: start.value, closing: start.value } })
       continue
     }
     if (f.quantitySource === 'meter' && terms.startDate <= prevEnd && terms.endDate >= prevStart) {

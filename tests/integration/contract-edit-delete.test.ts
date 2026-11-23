@@ -227,18 +227,15 @@ describe('sửa và xoá hợp đồng', () => {
       expect((await db.select().from(auditLogs)).some((a) => a.entity === 'meter_readings' && a.action === 'update')).toBe(true)
     })
 
-    it('chặn số âm, nhỏ hơn lần chốt trước, lớn hơn lần chốt sau và trước ngày lắp', async () => {
+    it('chặn số âm; không ràng buộc với lần chốt trước hay sau', async () => {
       const { lease, fee, meter } = await setup()
       await db.insert(meterReadings).values({ meterId: meter.id, period: '2025-12', readOn: '2025-12-31', value: 500, kind: 'handover' })
       const edit = (initialReading: number) => editFees(lease.id, [{ leaseFeeId: fee.id, unitPrice: 3500, existingMeterId: meter.id, initialReading }])
       await expect(edit(-1)).rejects.toThrow('chỉ số')
-      await expect(edit(400)).rejects.toThrow('nhỏ hơn')
+      await expect(edit(400)).resolves.toBeDefined() // chỉ số ban đầu độc lập, không bị chặn bởi lần chốt trước
       await db.insert(meterReadings).values({ meterId: meter.id, period: '2026-02', readOn: '2026-02-28', value: 1400, kind: 'monthly' })
-      await expect(edit(1500)).rejects.toThrow('lớn hơn')
+      await expect(edit(1500)).resolves.toBeDefined() // cũng không bị chặn bởi lần chốt sau
 
-      const [lateRoom] = await db.insert(rooms).values({ facilityId, code: '103' }).returning()
-      const late = await setup({ installedOn: '2026-02-01', roomId: lateRoom.id })
-      await expect(editFees(late.lease.id, [{ leaseFeeId: late.fee.id, unitPrice: 3500, existingMeterId: late.meter.id, initialReading: 1300 }], '2026-01-01', lateRoom.id)).rejects.toThrow('chưa được lắp')
     })
 
     it('đổi sang đồng hồ khác cùng phòng, chặn đồng hồ phòng khác và đồng hồ đang bận', async () => {

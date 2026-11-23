@@ -186,6 +186,13 @@ describe('meters', () => {
     expect(r.errors).toEqual([])
   })
 
+  it('đồng hồ lắp sau ngày ghi vẫn ghi được chỉ số, không báo lỗi chưa lắp', async () => {
+    await db.update(meters).set({ installedOn: '2026-10-20' }).where(eq(meters.id, m.E101))
+    const r = await saveReadings(db, hung(), '2026-10', [{ meterId: m.E101, value: 1100, readOn: '2026-10-15' }])
+    expect(r.saved).toBe(1)
+    expect(r.errors).toEqual([])
+  })
+
   it('ghi lại cùng kỳ thì cập nhật, không tạo dòng trùng', async () => {
     await saveReadings(db, hung(), '2026-10', [{ meterId: m.E101, value: 1100, readOn: '2026-10-31' }])
     await saveReadings(db, hung(), '2026-10', [{ meterId: m.E101, value: 1120, readOn: '2026-10-31' }])
@@ -365,12 +372,10 @@ describe('meters', () => {
       })
     })
 
-    it('không có lần chốt sau ngày bắt đầu thì dùng chỉ số lúc lắp đồng hồ', async () => {
+    it('không có lần chốt từ ngày bắt đầu thì chưa có chỉ số ban đầu, không lấy chỉ số lúc lắp', async () => {
       const { fee } = await feeLease('2026-10-15')
       await db.insert(meterReadings).values({ meterId: m.E101, period: '2025-01', readOn: '2025-01-01', value: 500, kind: 'handover' })
-      expect(await listLeaseMeterInitials(db, hung(), fee.leaseId)).toEqual({
-        [fee.id]: { meterId: m.E101, meterCode: null, value: 0, readOn: '2025-01-01', readingId: null },
-      })
+      expect(await listLeaseMeterInitials(db, hung(), fee.leaseId)).toEqual({})
     })
 
     it('người không có quyền meters nhận rỗng', async () => {

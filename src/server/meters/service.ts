@@ -166,7 +166,6 @@ export async function applyReadings(tx: DB, ctx: AccessContext, period: string, 
       const fail = (message: string) => errors.push({ meterId: row.meterId, message })
       if (!Number.isInteger(row.value) || row.value < 0) { fail('Chỉ số không hợp lệ'); continue }
       if (row.readOn < start || row.readOn > end) { fail('Ngày ghi không thuộc kỳ này'); continue }
-      if (m.installedOn > row.readOn) { fail('Đồng hồ chưa được lắp vào ngày này'); continue }
       if (m.removedOn) { fail('Đồng hồ này đã được gỡ, hãy ghi trên đồng hồ mới'); continue }
       if (row.opening !== undefined && (!Number.isInteger(row.opening) || row.opening < 0)) { fail('Số đầu kỳ không hợp lệ'); continue }
       // Số đầu tự điền bằng số cuối lần ghi liền trước (hoặc số lúc lắp) tại thời điểm ghi; sau đó độc lập, sửa riêng được
@@ -309,15 +308,9 @@ export async function updateLeaseFeeMeter(tx: DB, ctx: AccessContext, input: { l
   // Ngày chốt của chỉ số đầu: lần chốt đầu của đồng hồ đang dùng từ ngày bắt đầu hợp đồng, không có thì ngày bắt đầu
   const currentHandovers = link ? await tx.select().from(meterReadings).where(and(eq(meterReadings.meterId, link.meterId), eq(meterReadings.kind, 'handover'))).orderBy(asc(meterReadings.readOn)) : []
   const readOn = currentHandovers.find((r) => r.readOn >= input.startDate)?.readOn ?? input.startDate
-  if (meter.installedOn > readOn) throw new ValidationError('Đồng hồ chưa được lắp vào ngày này', { initialReading: 'Chọn chỉ số từ ngày lắp đồng hồ' })
 
   const readings = await tx.select().from(meterReadings).where(eq(meterReadings.meterId, meter.id))
-  const earlier = readings.filter((r) => r.readOn < readOn).sort((a, b) => (a.readOn < b.readOn ? 1 : -1))[0]
-  const later = readings.filter((r) => r.readOn > readOn).sort((a, b) => (a.readOn < b.readOn ? -1 : 1))[0]
-  // Không có lần chốt trước thì mốc dưới là chỉ số lúc lắp
-  const floor = earlier ? earlier.value : meter.startReading
-  if (input.initialReading < floor) throw new ValidationError(`Chỉ số đầu không được nhỏ hơn chỉ số lần chốt trước (${floor})`, { initialReading: `Không nhỏ hơn ${floor}` })
-  if (later && input.initialReading > later.value) throw new ValidationError(`Chỉ số đầu không được lớn hơn chỉ số lần chốt sau (${later.value})`, { initialReading: `Không lớn hơn ${later.value}` })
+  // Chỉ số ban đầu chỉ là số gợi ý lúc tạo hoá đơn, độc lập với mọi lần chốt: không ràng buộc với số trước hay số sau
   const sameDay = readings.find((r) => r.kind === 'handover' && r.readOn === readOn)
 
   if (link && link.meterId === meter.id) {
@@ -461,10 +454,9 @@ export async function updateMeterReading(db: DB, ctx: AccessContext, id: string,
       if (result.errors.length) throw new ValidationError(result.errors[0].message)
       return
     }
-    // Chỉ số bàn giao đứng riêng, độc lập với chuỗi chỉ số tháng: chỉ kiểm giá trị, ngày và ngày lắp
+    // Chỉ số bàn giao đứng riêng, độc lập với chuỗi chỉ số tháng: chỉ kiểm giá trị và ngày
     if (!Number.isInteger(input.value) || input.value < 0) throw new ValidationError('Chỉ số không hợp lệ')
     if (!/^\d{4}-\d{2}-\d{2}$/.test(input.readOn)) throw new ValidationError('Ngày chốt không hợp lệ')
-    if (f.m.installedOn > input.readOn) throw new ValidationError('Đồng hồ chưa được lắp vào ngày này')
     const [clash] = await tx.select({ id: meterReadings.id }).from(meterReadings).where(and(eq(meterReadings.meterId, f.m.id), eq(meterReadings.kind, 'handover'), eq(meterReadings.readOn, input.readOn), sql`${meterReadings.id} <> ${id}`))
     if (clash) throw new ValidationError('Đồng hồ đã có chỉ số bàn giao vào ngày này')
     await tx.update(meterReadings).set({ value: input.value, readOn: input.readOn, period: input.readOn.slice(0, 7), updatedAt: new Date() }).where(eq(meterReadings.id, id))
@@ -495,8 +487,8 @@ export async function deleteMeterReadings(db: DB, ctx: AccessContext, ids: strin
   return { deleted, skipped: unique.length - deleted }
 }
 
-/** Đồng hồ của các phí tính theo đồng hồ trong một hợp đồng, kèm chỉ số đầu: lần chốt sớm nhất từ ngày bắt đầu hợp đồng, không có thì chỉ số lúc lắp. Khoá theo id dòng phí hợp đồng. */
-export type LeaseMeterInitial = { meterId: string; meterCode: string | null; value: number; readOn: string; readingId: string | null }
+/** Đồng hồ của các phí tính theo đồng hồ trong một hợp đồng, kèm chỉ số ban đầu: lần chốt sớm nhất từ ngày bắt đầu hợp đồng; chưa điền thì không có mục. Khoá theo id dòng phí hợp đồng. */
+export type LeaseMeterInitial = { meterId: string; meterCode: string | null; value: number; readOn: string; readingId: string }
 
 export async function listLeaseMeterInitials(db: DB, ctx: AccessContext, leaseId: string): Promise<Record<string, LeaseMeterInitial>> {
   const links = await db.select({ leaseFeeId: leaseFeeMeters.leaseFeeId, meterId: leaseFeeMeters.meterId, code: meters.code, startReading: meters.startReading, installedOn: meters.installedOn, facilityId: rooms.facilityId, startDate: leases.startDate })
@@ -506,9 +498,10 @@ export async function listLeaseMeterInitials(db: DB, ctx: AccessContext, leaseId
   // Chỉ người có quyền Chỉ số của toà mới thấy số này; người khác xem hợp đồng bình thường, không có phần chỉ số
   if (!can(ctx, 'meters', links[0].facilityId)) return {}
   const handovers = await db.select({ id: meterReadings.id, meterId: meterReadings.meterId, readOn: meterReadings.readOn, value: meterReadings.value }).from(meterReadings).where(and(inArray(meterReadings.meterId, links.map(l => l.meterId)), eq(meterReadings.kind, 'handover'))).orderBy(asc(meterReadings.readOn))
-  return Object.fromEntries(links.map(l => {
+  // Chỉ số ban đầu chỉ có khi người dùng chọn đồng hồ và điền số; không tự lấy chỉ số lúc lắp thay vào
+  return Object.fromEntries(links.flatMap(l => {
     // Chốt trước ngày bắt đầu hợp đồng là của khách cũ, không phải chỉ số đầu của hợp đồng này
     const h = handovers.find(x => x.meterId === l.meterId && x.readOn >= l.startDate)
-    return [l.leaseFeeId, { meterId: l.meterId, meterCode: l.code, value: h?.value ?? l.startReading, readOn: h?.readOn ?? l.installedOn, readingId: h?.id ?? null }]
+    return h ? [[l.leaseFeeId, { meterId: l.meterId, meterCode: l.code, value: h.value, readOn: h.readOn, readingId: h.id }]] : []
   }))
 }

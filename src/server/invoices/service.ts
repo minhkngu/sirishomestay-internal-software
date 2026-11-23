@@ -326,7 +326,9 @@ async function refreshMeterLines(tx: DB, inv: InvoiceRow, lease: Lease, strict =
     const line = calculated.lines.find(l => l.meta?.leaseFeeId === fee.leaseFeeId)
     if (!line) continue
     const where = and(eq(invoiceLines.invoiceId, inv.id), sql`${invoiceLines.meta}->>'leaseFeeId' = ${fee.leaseFeeId}`)
-    const [saved] = await tx.select({ quantity: invoiceLines.quantity, amount: invoiceLines.amount }).from(invoiceLines).where(where).limit(1)
+    const [saved] = await tx.select({ quantity: invoiceLines.quantity, amount: invoiceLines.amount, meta: invoiceLines.meta }).from(invoiceLines).where(where).limit(1)
+    // Hoá đơn kỳ ký hợp đồng giữ số đầu, số cuối riêng trên dòng, không tính lại từ chỉ số
+    if (saved && typeof (saved.meta as Record<string, unknown> | null)?.opening === 'number') continue
     if (saved && saved.quantity === line.quantity && saved.amount === line.amount) continue
     await tx.delete(invoiceLines).where(where)
     await tx.insert(invoiceLines).values({ ...line, invoiceId: inv.id })
@@ -721,9 +723,9 @@ async function buildMeterPanels(db: DB, leaseId: string, periodStart: string, mo
   const periods = recent.filter(p => !leaseRow || p >= leaseRow.startDate.slice(0, 7))
   const meterRows = meterFees.length ? await db.select({ id: meters.id, startReading: meters.startReading, installedOn: meters.installedOn }).from(meters).where(inArray(meters.id, meterFees.map(f => f.meterId))) : []
   const meterStart = new Map(meterRows.map(m => [m.id, m.startReading]))
-  // Chỉ số ban đầu ghi ở hợp đồng: lần chốt sớm nhất từ ngày bắt đầu hợp đồng, không có thì chỉ số đầu khi lắp đồng hồ
+  // Chỉ số ban đầu ghi ở hợp đồng: lần chốt sớm nhất từ ngày bắt đầu hợp đồng; chưa điền thì không có
   const handovers = meterFees.length ? await db.select({ meterId: meterReadings.meterId, readOn: meterReadings.readOn, value: meterReadings.value }).from(meterReadings).where(and(inArray(meterReadings.meterId, meterFees.map(f => f.meterId)), eq(meterReadings.kind, 'handover'))).orderBy(asc(meterReadings.readOn)) : []
-  const initialOf = (meterId: string) => { const h = handovers.find(x => x.meterId === meterId && (!leaseRow || x.readOn >= leaseRow.startDate)); const m = meterRows.find(x => x.id === meterId); return h ? { value: h.value, readOn: h.readOn } : m ? { value: m.startReading, readOn: m.installedOn } : null }
+  const initialOf = (meterId: string) => { const h = handovers.find(x => x.meterId === meterId && (!leaseRow || x.readOn >= leaseRow.startDate)); return h ? { value: h.value, readOn: h.readOn } : null }
   const monthly = meterFees.length && periods.length ? await db.select().from(meterReadings).where(and(inArray(meterReadings.meterId, meterFees.map(f => f.meterId)), eq(meterReadings.kind, 'monthly'), inArray(meterReadings.period, periods))) : []
   // Số đầu kỳ của mỗi tháng = chỉ số gần nhất của đồng hồ trước ngày 1 của tháng đó (số chốt tháng trước, hoặc số ban đầu / bàn giao)
   const earlier = meterFees.length ? await db.select({ meterId: meterReadings.meterId, readOn: meterReadings.readOn, value: meterReadings.value, kind: meterReadings.kind }).from(meterReadings).where(and(inArray(meterReadings.meterId, meterFees.map(f => f.meterId)), sql`${meterReadings.readOn} < ${`${recent[recent.length - 1]}-01`}`)) : []
