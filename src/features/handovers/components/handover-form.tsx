@@ -103,7 +103,7 @@ export function HandoverForm({ id, kind, readOnly, items: initial, checkInCondit
                 setError(null)
                 const r = await exportHandoverAction(id)
                 if (!r.ok) setError(r.error)
-                else window.location.href = `/api/files/${r.data.fileId}`
+                else window.location.assign(new URL(`/api/files/${r.data.fileId}`, window.location.origin))
               })
             }
           >

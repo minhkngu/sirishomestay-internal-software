@@ -159,7 +159,7 @@ describe('fees & rates', () => {
     await archiveFeeType(db, admin, t.id)
     expect(await listFeeTypes(db, admin)).toHaveLength(0)
     expect(await listFeeTypes(db, admin, { includeArchived: true })).toHaveLength(1)
-    expect((await listFeeUnits(db, admin)).map((u) => u.name)).toEqual(['người'])
+    expect((await listFeeUnits(db)).map((u) => u.name)).toEqual(['người'])
   })
 
   it('tạo loại phí kèm đơn vị mới, hoặc dùng lại đơn vị cùng tên', async () => {
@@ -170,7 +170,7 @@ describe('fees & rates', () => {
       billing: 'per_occurrence',
       quantityFrom: 'meter',
     })
-    const units = await listFeeUnits(db, admin)
+    const units = await listFeeUnits(db)
     expect(units.find((u) => u.name === 'kWh')?.id).toBe(dien.unitId)
 
     const again = await createFeeType(db, admin, {

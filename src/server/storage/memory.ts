@@ -19,7 +19,7 @@ export class MemoryStorage implements StorageAdapter {
     if (!b) throw new Error(`Không có tệp ${key}`)
     return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer
   }
-  async write(key: string, data: ArrayBuffer | Uint8Array, _contentType?: string) {
+  async write(key: string, data: ArrayBuffer | Uint8Array) {
     this.blobs.set(key, data instanceof Uint8Array ? data : new Uint8Array(data))
   }
 }

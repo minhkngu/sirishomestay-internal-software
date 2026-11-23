@@ -245,7 +245,6 @@ export function ContractEditActions({
     .map((o) => o.id)
     .sort()
     .join(',')
-  const occIds = occ.filter((o) => !o.isCompany).map((o) => o.id)
   const addable = (people ?? []).filter((p) => !occ.some((o) => o.id === p.id))
 
   const [confirmingSave, setConfirmingSave] = useState(false)
@@ -361,7 +360,14 @@ export function ContractEditActions({
       if (assets && assetsDraftChanged(assetDraft)) {
         const r = await updateLeaseAssetsAction(contract.id, {
           add: assetDraft.add.map((a) => a.id),
-          create: assetDraft.create.map(({ key: _key, ...a }) => a),
+          create: assetDraft.create.map(({ code, name, model, category, value, condition }) => ({
+            code,
+            name,
+            model,
+            category,
+            value,
+            condition,
+          })),
           remove: Object.entries(assetDraft.remove).map(([assetId, action]) => ({ assetId, action })),
         })
         if (!r.ok) {

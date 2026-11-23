@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
-import { facilities, invoices, leaseFeeMeters, leaseFeeSnapshots, leases, meterReadings, meters, rooms } from '@/db'
+import { facilities, leaseFeeMeters, leaseFeeSnapshots, leases, meterReadings, meters, rooms } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, can, type AccessContext } from '@/domain/access'
 import { daysInMonth } from '@/domain/dates'

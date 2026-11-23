@@ -51,7 +51,7 @@ export async function NewInvoice({ sp }: { sp: NewInvoiceParams }) {
 
   const [feeTypes, feeUnits, feePrices, settings] = await Promise.all([
     listFeeTypes(db, ctx),
-    listFeeUnits(db, ctx),
+    listFeeUnits(db),
     listFeeTypePrices(db, ctx),
     getSettings(db),
   ])

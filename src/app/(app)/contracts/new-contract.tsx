@@ -36,7 +36,7 @@ export async function NewContract({ sp, showHeading = true }: { sp: NewContractS
       listFacilities(db, ctx),
       searchTenants(db, ctx, { limit: 500 }),
       listFeeTypes(db, ctx),
-      listFeeUnits(db, ctx),
+      listFeeUnits(db),
       getSettings(db),
       listFeeTypePrices(db, ctx),
       listFeeDefaults(db, ctx),

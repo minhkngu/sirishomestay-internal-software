@@ -10,7 +10,6 @@ import {
   feeUnits,
   tenants,
   docTemplates,
-  files,
   leases,
   depositContracts,
   depositEntries,
@@ -184,7 +183,13 @@ describe('runSeed', () => {
     const [a, b] = [await createTestDb(), await createTestDb()]
     await runSeed(a, fakeAuth(), { today: '2026-11-16', password: 'x' })
     await runSeed(b, fakeAuth(), { today: '2026-11-16', password: 'x' })
-    const strip = (r: Record<string, unknown>[]) => r.map(({ createdAt: _c, updatedAt: _u, ...rest }) => rest)
+    const strip = (r: Record<string, unknown>[]) =>
+      r.map((row) => {
+        const rest = { ...row }
+        delete rest.createdAt
+        delete rest.updatedAt
+        return rest
+      })
     expect(strip(await a.select().from(rooms))).toEqual(strip(await b.select().from(rooms)))
   })
 

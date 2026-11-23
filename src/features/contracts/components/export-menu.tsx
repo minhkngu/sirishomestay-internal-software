@@ -55,7 +55,7 @@ export function ExportMenu({
         return
       }
       setMsg(r.data.warnings.length ? `Chỗ điền thiếu dữ liệu: ${r.data.warnings.join(', ')}` : 'Đã xuất')
-      window.location.href = `/api/files/${r.data.fileId}`
+      window.location.assign(new URL(`/api/files/${r.data.fileId}`, window.location.origin))
     })
 
   if (compact)

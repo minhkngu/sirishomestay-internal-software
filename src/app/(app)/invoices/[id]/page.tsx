@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { PopupLink } from '@/components/popup-link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, Calendar, FileText, Home, User } from 'lucide-react'
+import { ArrowLeft, Calendar, FileText, User } from 'lucide-react'
 import { db } from '@/db/client'
 import { NotFoundError } from '@/domain/errors'
 import { formatDateVN, todayVN } from '@/domain/dates'
@@ -26,7 +26,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const inv = d.invoice
   const [feeTypes, feeUnits, feePrices] =
     inv.status === 'draft'
-      ? await Promise.all([listFeeTypes(db, ctx), listFeeUnits(db, ctx), listFeeTypePrices(db, ctx)])
+      ? await Promise.all([listFeeTypes(db, ctx), listFeeUnits(db), listFeeTypePrices(db, ctx)])
       : [[], [], {} as Record<string, Record<string, number>>]
   const unitName = new Map(feeUnits.map((u) => [u.id, u.name]))
   const remaining = d.total - d.paid

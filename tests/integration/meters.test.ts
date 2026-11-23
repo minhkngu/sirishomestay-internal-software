@@ -1,15 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import {
-  facilities,
-  invoices,
-  leaseFeeMeters,
-  leaseFeeSnapshots,
-  leases,
-  meterReadings,
-  meters,
-  rooms,
-  tenants,
-} from '@/db'
+import { facilities, leaseFeeMeters, leaseFeeSnapshots, leases, meterReadings, meters, rooms, tenants } from '@/db'
 import {
   addRoomMeter,
   createDefaultMeters,

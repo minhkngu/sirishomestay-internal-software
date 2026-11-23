@@ -1,4 +1,5 @@
-import { Document, Image, Page, StyleSheet, Text, View, renderToBuffer } from '@react-pdf/renderer'
+// Image của @react-pdf không phải thẻ <img> HTML và không có thuộc tính alt; đặt tên khác để jsx-a11y/alt-text không áp dụng nhầm.
+import { Document, Image as PdfImage, Page, StyleSheet, Text, View, renderToBuffer } from '@react-pdf/renderer'
 import type { Align, DocBlock, Inline, TemplateStyle } from '@/domain/doc-template'
 import './fonts'
 
@@ -150,7 +151,7 @@ function Block({ block, style, qr }: { block: DocBlock; style: TemplateStyle; qr
   if (block.type === 'qr')
     return qr ? (
       <View wrap={false} style={{ marginVertical: 6 }}>
-        <Image src={qr} style={{ width: 96, height: 96 }} />
+        <PdfImage src={qr} style={{ width: 96, height: 96 }} />
       </View>
     ) : (
       <View />

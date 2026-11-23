@@ -7,7 +7,6 @@ import { midPeriodAdjustments } from '@/domain/adjustments'
 import { buildMonthlyInvoice, buildFirstInvoice } from '@/domain/invoice-builder'
 import { depositBalance, depositDiffEntry } from '@/domain/deposit'
 import { buildTerminationInvoice } from '@/domain/liquidation'
-import { ValidationError } from '@/domain/errors'
 import type { Addendum, ContractFee, DepositEntry, Invoice, Lease, Meter, MeterReading } from '@/domain/types'
 
 const fee = (over: Partial<ContractFee> = {}): ContractFee => ({

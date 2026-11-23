@@ -1,4 +1,5 @@
-import { Document, Image, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
+// Image của @react-pdf không phải thẻ <img> HTML và không có thuộc tính alt; đặt tên khác để jsx-a11y/alt-text không áp dụng nhầm.
+import { Document, Image as PdfImage, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
 import { formatVND, numberToVietnameseWords } from '@/domain/money'
 import type { InvoicePdfData } from './types'
 import type { InvoiceTemplateConfig, InvoiceSection } from '@/domain/invoice-template'
@@ -39,7 +40,7 @@ export function InvoiceDocument({
   const blocks: Record<InvoiceSection, React.ReactNode> = {
     header: (
       <View style={[styles.header, { borderBottomColor: template.color }]}>
-        {template.logo && <Image style={{ width: 90, height: 42, objectFit: 'contain' }} src={template.logo} />}
+        {template.logo && <PdfImage style={{ width: 90, height: 42, objectFit: 'contain' }} src={template.logo} />}
         <Text style={[styles.brand, { color: template.color }]}>{template.brand}</Text>
         <Text>{data.facility.name}</Text>
         <Text style={styles.muted}>{data.facility.address}</Text>
@@ -89,7 +90,7 @@ export function InvoiceDocument({
     ),
     payment: data.bank && (
       <View style={styles.payment}>
-        {qr && <Image style={styles.qr} src={qr} />}
+        {qr && <PdfImage style={styles.qr} src={qr} />}
         <View style={styles.paymentDetails}>
           <Text>
             {sample

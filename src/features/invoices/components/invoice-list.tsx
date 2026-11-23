@@ -59,7 +59,7 @@ export function InvoiceList({
         format: 'png',
       })
       if (!r.ok) toast.error(r.error)
-      else window.location.href = `/api/files/${r.data.fileId}`
+      else window.location.assign(new URL(`/api/files/${r.data.fileId}`, window.location.origin))
     })
   // Tổng dư nợ theo hợp đồng: các hoá đơn đã duyệt còn thiếu tiền (hoá đơn hoàn khách không tính)
   const debtByLease = useMemo(() => {

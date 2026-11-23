@@ -329,7 +329,7 @@ describe('khôi phục hợp đồng', () => {
       })
       .returning()
     const storage = new MemoryStorage()
-    await storage.write('test-export', new Uint8Array([1]), 'application/pdf')
+    await storage.write('test-export', new Uint8Array([1]))
     const [file] = await db
       .insert(files)
       .values({

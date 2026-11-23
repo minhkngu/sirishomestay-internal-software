@@ -37,7 +37,6 @@ import { NotFoundError, ValidationError } from '@/domain/errors'
 import type { DocEntities } from '@/domain/template-fields'
 import { meterFeeUsage } from '@/domain/meter-fee-usage'
 import { buildTerminationInvoice } from '@/domain/liquidation'
-import { meterUsage } from '@/domain/meters'
 import type {
   ContractFee,
   DepositEntry,
@@ -260,12 +259,12 @@ async function applyAdjustments(
   return out
 }
 
-async function activeMeters(tx: DB, roomId: string, date: string) {
+async function activeMeters(tx: DB, roomId: string) {
   return (await tx.select().from(meters).where(eq(meters.roomId, roomId))).filter((m) => !m.removedOn)
 }
 /** Chốt chỉ số tại ngày thay đổi: mọi đồng hồ đang chạy của các phòng liên quan phải có chỉ số, không được giảm. Không tính tiền từ chỉ số thiếu. */
 async function recordReadings(tx: DB, roomIds: string[], date: string, input: { meterId: string; value: number }[]) {
-  const needed = (await Promise.all(roomIds.map((r) => activeMeters(tx, r, date)))).flat()
+  const needed = (await Promise.all(roomIds.map((r) => activeMeters(tx, r)))).flat()
   for (const m of needed)
     if (!input.some((r) => r.meterId === m.id))
       throw new ValidationError(

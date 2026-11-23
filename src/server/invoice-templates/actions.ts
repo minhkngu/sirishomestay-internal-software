@@ -82,7 +82,7 @@ export async function previewInvoiceTemplateHtmlAction(input: { body: string; st
 }
 /** Xem nhanh mẫu hoá đơn đã lưu với dữ liệu mẫu (để chọn mẫu cho hợp đồng). */
 export async function previewInvoiceTemplateByIdAction(id: string) {
-  const ctx = await getAccessContext()
+  await getAccessContext()
   return toActionResult(async () => ({
     base64: Buffer.from(await previewInvoiceTemplateById(db, id)).toString('base64'),
   }))

@@ -1,4 +1,4 @@
-import { boolean, date, integer, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core'
+import { boolean, integer, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core'
 import { facilities } from './facilities'
 
 export const feeUnits = pgTable('fee_units', {

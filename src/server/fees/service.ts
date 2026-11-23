@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, lte } from 'drizzle-orm'
+import { and, asc, eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 import {
   feeTypes,
@@ -12,10 +12,8 @@ import {
 } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
-import { todayVN } from '@/domain/dates'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/server/audit'
-import { getFacility } from '@/server/facilities/service'
 
 export type FeeType = typeof feeTypes.$inferSelect
 export type FeeUnit = typeof feeUnits.$inferSelect
@@ -49,7 +47,7 @@ function parse<T>(schema: z.ZodType<T>, input: unknown): T {
 }
 
 // Đọc loại phí/đơn vị: ai đăng nhập cũng xem được (không nhạy cảm, cần cho wizard hợp đồng, hoá đơn…)
-export async function listFeeUnits(db: Pick<DB, 'select'>, _ctx: AccessContext): Promise<FeeUnit[]> {
+export async function listFeeUnits(db: Pick<DB, 'select'>): Promise<FeeUnit[]> {
   return db.select().from(feeUnits).orderBy(asc(feeUnits.name))
 }
 

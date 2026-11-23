@@ -80,7 +80,7 @@ it('chuyển nhượng đổi người đứng tên và người ở, giữ nguy
   expect(assignment.oldOccupantIds).toEqual([oldTenant.id])
   await expect(setAddendumSignStatus(db, ctx, assignment.id, 'signed')).rejects.toThrow('tệp')
   const storage = new MemoryStorage()
-  await storage.write('signed-addendum', new Uint8Array([1]), 'application/pdf')
+  await storage.write('signed-addendum', new Uint8Array([1]))
   const [file] = await db
     .insert(files)
     .values({

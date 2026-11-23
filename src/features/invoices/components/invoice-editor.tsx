@@ -417,8 +417,6 @@ function MeterReadingsPanel({
   const [saving, startSaving] = useTransition()
   const [initialEdit, setInitialEdit] = useState<{ id: string; readOn: string; text: string } | null>(null)
   const row = panel.rows.find((r) => r.period === period)
-  // Số đầu kỳ: nếu tháng liền trước đang được điền (chưa lưu) thì lấy số đó
-  const prevRow = row ? panel.rows[panel.rows.indexOf(row) - 1] : undefined
   // Số đầu kỳ chính là chỉ số chốt của tháng liền trước: sửa được khi tháng đó nằm trong danh sách (cùng quy tắc 3 tháng gần nhất)
   // Số đầu là chốt tháng trước thì sửa qua tháng đó; là chỉ số bàn giao hoặc chỉ số ban đầu thì sửa trực tiếp, không khoá
   const openingEditable = editable && !!row

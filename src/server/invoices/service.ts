@@ -2,11 +2,8 @@ import { and, asc, desc, eq, inArray, like, lt, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import {
   addenda,
-  auditLogs,
   depositEntries,
   facilities,
-  feeTypes,
-  feeUnits,
   invoiceLines,
   invoices,
   invoiceFeeQuantities,

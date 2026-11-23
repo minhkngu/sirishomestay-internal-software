@@ -52,6 +52,7 @@ function PhotoPreview({
   return (
     <div className="relative">
       {url && (
+        // eslint-disable-next-line @next/next/no-img-element -- xem trước ảnh vừa chọn bằng data URL, next/image không xử lý được
         <img
           src={url}
           alt={`Ảnh ${name} ${index + 1}`}

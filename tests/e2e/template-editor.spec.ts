@@ -8,10 +8,7 @@ async function login(page: Page, name: RegExp) {
   await expect(page.getByRole('heading', { name: 'Nhắc việc' })).toBeVisible()
 }
 
-test('soạn mẫu hợp đồng thuê: gõ chữ, chèn chip, kéo thả chip, chọn kiểu, xem trước PDF, lưu', async ({
-  page,
-  context,
-}) => {
+test('soạn mẫu hợp đồng thuê: gõ chữ, chèn chip, kéo thả chip, chọn kiểu, xem trước PDF, lưu', async ({ page }) => {
   await login(page, /^Admin/)
   await page.goto('/templates')
   await page.waitForLoadState('networkidle')

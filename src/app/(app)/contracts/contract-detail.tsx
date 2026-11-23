@@ -599,6 +599,7 @@ export default async function ContractDetail({ id }: { id: string }) {
                     href={`/api/files/${f.id}`}
                     className="block overflow-hidden rounded-lg border border-border/60"
                   >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- ảnh thu nhỏ từ route /api/files có kiểm quyền; next/image cần khai báo thêm cấu hình ảnh */}
                     <img
                       src={`/api/files/${f.id}?thumb=1`}
                       alt={f.name || 'Ảnh hợp đồng'}
