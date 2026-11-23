@@ -15,8 +15,7 @@ import { getRoomDetail } from '@/server/rooms/service'
 import { listAssets } from '@/server/assets/service'
 import { RoomIncidentList } from '@/features/rooms/components/room-incident-list'
 import { listIncidents } from '@/server/incidents/service'
-import { userProfiles } from '@/db'
-import { inArray } from 'drizzle-orm'
+import { userNamesByIds } from '@/server/users/queries'
 import { getPendingDepositContract, listLeases } from '@/server/contracts/service'
 
 export default async function RoomPage({ params }: { params: Promise<{ id: string }> }) {
@@ -36,12 +35,7 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
   const active = history.find((l) => l.status === 'active')
   const terms = detail.lease?.terms
   const assigneeIds = [...new Set((roomIncidents ?? []).map((i) => i.assigneeId).filter((x): x is string => !!x))]
-  const people = assigneeIds.length
-    ? await db
-        .select({ id: userProfiles.id, name: userProfiles.fullName })
-        .from(userProfiles)
-        .where(inArray(userProfiles.id, assigneeIds))
-    : []
+  const people = await userNamesByIds(db, ctx, assigneeIds)
   return (
     <div className="max-w-5xl space-y-6">
       <div className="space-y-2">
@@ -282,7 +276,7 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
                 priority: i.priority,
                 cost: i.cost,
                 createdAt: i.createdAt.toISOString(),
-                assigneeName: people.find((p) => p.id === i.assigneeId)?.name ?? null,
+                assigneeName: (i.assigneeId ? people.get(i.assigneeId) : undefined) ?? null,
               }))}
           />
         </section>

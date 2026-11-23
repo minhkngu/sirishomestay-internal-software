@@ -1,7 +1,7 @@
 import { and, asc, eq, isNotNull } from 'drizzle-orm'
 import { files } from '@/db'
 import type { DB } from '@/db/client'
-import { assertCan, type AccessContext } from '@/domain/access'
+import { assertCan, can, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/server/audit'
 import type { StorageAdapter } from '@/server/storage/types'
@@ -139,4 +139,23 @@ export async function getDownloadUrl(
     300,
     f.ownerType === 'export' && !thumb && !(inline && f.contentType === 'application/pdf') ? f.name : undefined,
   )
+}
+
+/** Số tệp hợp đồng chờ dọn: chờ xoá (cần quyền xoá hợp đồng) và chờ khôi phục, lọc theo cơ sở của người xem. */
+export async function countPendingContractFiles(
+  db: DB,
+  ctx: AccessContext,
+): Promise<{ deletes: number; restores: number }> {
+  const deletes = can(ctx, 'delete_contracts')
+    ? (
+        await db
+          .select({ facilityId: files.facilityId })
+          .from(files)
+          .where(eq(files.ownerType, 'pending_contract_delete'))
+      ).filter((f) => (f.facilityId ? can(ctx, 'delete_contracts', f.facilityId) : ctx.isAdmin)).length
+    : 0
+  const restores = (
+    await db.select({ facilityId: files.facilityId }).from(files).where(eq(files.ownerType, 'pending_contract_restore'))
+  ).filter((f) => (f.facilityId ? can(ctx, 'tenants_contracts', f.facilityId) : ctx.isAdmin)).length
+  return { deletes, restores }
 }

@@ -5,12 +5,11 @@ import { notFound } from 'next/navigation'
 import { buttonVariants } from '@/components/ui/button'
 import { db } from '@/db/client'
 import { assertCan, can } from '@/domain/access'
-import { eq } from 'drizzle-orm'
-import { files } from '@/db'
 import { PendingFileCleanup } from '@/features/contracts/components/pending-file-cleanup'
 import { todayVN } from '@/domain/dates'
 import { getAccessContext } from '@/server/session'
 import { getSettings } from '@/server/settings/service'
+import { countPendingContractFiles } from '@/server/files/service'
 import { listDepositContracts, listLeases } from '@/server/contracts/service'
 import { ContractListView } from './contract-actions'
 import { NewContract } from './new-contract'
@@ -33,17 +32,7 @@ export default async function ContractsPage({ searchParams }: { searchParams: Pr
     listLeases(db, ctx, {}),
     listDepositContracts(db, ctx, { status: 'pending' }),
   ])
-  const pendingFiles = can(ctx, 'delete_contracts')
-    ? (
-        await db
-          .select({ facilityId: files.facilityId })
-          .from(files)
-          .where(eq(files.ownerType, 'pending_contract_delete'))
-      ).filter((f) => (f.facilityId ? can(ctx, 'delete_contracts', f.facilityId) : ctx.isAdmin)).length
-    : 0
-  const pendingRestoreFiles = (
-    await db.select({ facilityId: files.facilityId }).from(files).where(eq(files.ownerType, 'pending_contract_restore'))
-  ).filter((f) => (f.facilityId ? can(ctx, 'tenants_contracts', f.facilityId) : ctx.isAdmin)).length
+  const { deletes: pendingFiles, restores: pendingRestoreFiles } = await countPendingContractFiles(db, ctx)
   const modalKind = sp.new === 'deposit' ? 'deposit' : sp.new === 'lease' ? 'lease' : null
   const closeParams = new URLSearchParams()
   for (const [key, value] of Object.entries(sp)) {

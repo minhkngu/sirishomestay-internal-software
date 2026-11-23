@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { rooms, roomAmenities, meters } from '@/db'
+import { facilities, rooms, roomAmenities, meters } from '@/db'
 import { saveReadings } from '@/server/meters/service'
 import { listFacilities, getFacility, createFacility, updateFacility } from '@/server/facilities/service'
 import {
@@ -231,5 +231,19 @@ describe('phòng có diện tích, giường và tiện ích', () => {
     expect(keep.room.beds).toBeNull()
     expect(keep.amenities).toEqual([])
     expect(await db.select().from(roomAmenities)).toHaveLength(2)
+  })
+})
+
+describe('thứ tự listFacilities', () => {
+  it('mặc định theo mã; orderBy "name" theo tên', async () => {
+    const db = await createTestDb()
+    await db.insert(facilities).values([
+      { code: 'A', name: 'Zeta' },
+      { code: 'B', name: 'Alpha' },
+    ])
+    const admin = ctxOf(['settings'])
+    admin.isAdmin = true
+    expect((await listFacilities(db, admin)).map((f) => f.code)).toEqual(['A', 'B'])
+    expect((await listFacilities(db, admin, { orderBy: 'name' })).map((f) => f.name)).toEqual(['Alpha', 'Zeta'])
   })
 })

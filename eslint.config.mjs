@@ -51,10 +51,40 @@ const boundariesConfig = {
   },
 }
 
+// Trang và route không tự truy vấn DB: đi qua service trong src/server (vẫn được dùng client `@/db/client` để truyền cho service).
+const appNoDbConfig = {
+  files: ['src/app/**/*.{ts,tsx}'],
+  rules: {
+    'no-restricted-imports': [
+      'error',
+      {
+        paths: [
+          { name: '@/db', message: 'Trang không tự truy vấn DB: thêm hàm vào service trong src/server rồi gọi.' },
+          {
+            name: '@/db/schema',
+            message: 'Trang không tự truy vấn DB: thêm hàm vào service trong src/server rồi gọi.',
+          },
+          {
+            name: 'drizzle-orm',
+            message: 'Trang không tự truy vấn DB: thêm hàm vào service trong src/server rồi gọi.',
+          },
+        ],
+        patterns: [
+          {
+            group: ['@/db/schema/*'],
+            message: 'Trang không tự truy vấn DB: thêm hàm vào service trong src/server rồi gọi.',
+          },
+        ],
+      },
+    ],
+  },
+}
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   boundariesConfig,
+  appNoDbConfig,
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

@@ -1,11 +1,10 @@
-import { eq } from 'drizzle-orm'
 import { RequirePermission } from '@/components/require-permission'
 import { db } from '@/db/client'
-import { rooms, facilities } from '@/db'
+import type { AccessContext } from '@/domain/access'
 import { formatVND } from '@/domain/money'
 import { orNotFound } from '@/lib/or-not-found'
 import { getAccessContext } from '@/server/session'
-import { assetHistory, getAsset } from '@/server/assets/service'
+import { assetHistory, assetLocationLabel, getAsset } from '@/server/assets/service'
 
 export default async function AssetPage({ params }: { params: Promise<{ id: string }> }) {
   return (
@@ -15,13 +14,10 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
   )
 }
 
-async function placeName(kind: string, id: string) {
-  if (kind === 'room') {
-    const [r] = await db.select().from(rooms).where(eq(rooms.id, id))
-    return r ? `Phòng ${r.code}` : '?'
-  }
-  const [f] = await db.select().from(facilities).where(eq(facilities.id, id))
-  return `${kind === 'warehouse' ? 'Kho' : kind === 'unassigned' ? 'Chưa xếp' : 'Khu chung'} ${f?.name ?? ''}`
+async function placeName(ctx: AccessContext, kind: string, id: string) {
+  if (kind === 'room') return assetLocationLabel(db, ctx, 'room', id)
+  const name = await assetLocationLabel(db, ctx, 'facility', id)
+  return `${kind === 'warehouse' ? 'Kho' : kind === 'unassigned' ? 'Chưa xếp' : 'Khu chung'} ${name}`
 }
 
 async function Asset({ params }: { params: Promise<{ id: string }> }) {
@@ -32,8 +28,8 @@ async function Asset({ params }: { params: Promise<{ id: string }> }) {
   const moves = await Promise.all(
     history.moves.map(async (m) => ({
       ...m,
-      from: await placeName(m.fromKind, m.fromId),
-      to: await placeName(m.toKind, m.toId),
+      from: await placeName(ctx, m.fromKind, m.fromId),
+      to: await placeName(ctx, m.toKind, m.toId),
     })),
   )
   return (
@@ -49,7 +45,7 @@ async function Asset({ params }: { params: Promise<{ id: string }> }) {
         <dt className="text-muted-foreground">Tình trạng</dt>
         <dd>{a.condition}</dd>
         <dt className="text-muted-foreground">Vị trí hiện tại</dt>
-        <dd>{await placeName(a.locationKind, a.locationId)}</dd>
+        <dd>{await placeName(ctx, a.locationKind, a.locationId)}</dd>
       </dl>
       {history.handovers.length > 0 && (
         <>

@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { assetMoves, assets, facilities, handoverItems, handovers, rooms } from '@/db'
 import type { DB } from '@/db/client'
 import { incidentsForAsset } from '@/server/incidents/service'
-import { assertCan, facilityScope, type AccessContext } from '@/domain/access'
+import { assertCan, can, facilityScope, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { buildSearchText, removeDiacritics } from '@/domain/text'
 import { recordAudit } from '@/server/audit'
@@ -273,4 +273,31 @@ export async function assetHistory(db: DB, ctx: AccessContext, id: string) {
     .where(eq(handoverItems.assetId, id))
     .orderBy(desc(handovers.date))
   return { moves, handovers: hs, incidents: await incidentsForAsset(db, id) }
+}
+
+/** Nhãn vị trí: "Phòng <mã>" (hoặc "?" khi không có phòng) hoặc tên cơ sở (chuỗi rỗng khi không có cơ sở). Quyền do trang gọi kiểm trước. */
+export async function assetLocationLabel(
+  db: DB,
+  ctx: AccessContext,
+  kind: 'room' | 'facility',
+  id: string,
+): Promise<string> {
+  // Cố ý không lọc theo phạm vi cơ sở: trang gọi đã kiểm quyền trước, giữ nguyên như khi truy vấn còn nằm trong trang.
+  void ctx
+  if (kind === 'room') {
+    const [r] = await db.select().from(rooms).where(eq(rooms.id, id))
+    return r ? `Phòng ${r.code}` : '?'
+  }
+  const [f] = await db.select().from(facilities).where(eq(facilities.id, id))
+  return f?.name ?? ''
+}
+
+/** Tài sản chọn được khi tạo hợp đồng: người có quyền tài sản thấy theo quyền, người khác thấy tài sản chưa thanh lý của các cơ sở được truyền vào. */
+export async function listContractAssetOptions(db: DB, ctx: AccessContext, facilityIds: string[]): Promise<Asset[]> {
+  if (can(ctx, 'assets')) return listAssets(db, ctx, {})
+  if (!facilityIds.length) return []
+  return db
+    .select()
+    .from(assets)
+    .where(and(inArray(assets.facilityId, facilityIds), ne(assets.status, 'disposed')))
 }
