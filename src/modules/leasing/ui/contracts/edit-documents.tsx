@@ -5,12 +5,18 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatDateVN, todayVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
-import { DEPOSIT_ENTRY_LABELS } from '@/domain/deposit'
+import { DEPOSIT_ENTRY_LABELS, runningDepositBalances } from '@/domain/deposit'
 import { PAYMENT_METHOD_LABELS } from '@/domain/payment-labels'
 import type { DepositEntry } from '@/domain/types'
 import { BareSelect } from './contract-form-ui'
 
-export type DepositRow = { id: string; date: string; type: string; amount: number; status: string }
+export type DepositRow = {
+  id: string
+  date: string
+  type: DepositEntry['type']
+  amount: number
+  status: DepositEntry['status']
+}
 export type DocsDraft = {
   signedFile: File | null
   photos: File[]
@@ -47,13 +53,7 @@ export function EditDocuments({
   const signedInput = useRef<HTMLInputElement>(null)
   const photoInput = useRef<HTMLInputElement>(null)
   const set = (patch: Partial<DocsDraft>) => onChange({ ...draft, ...patch })
-  const balances = entries.reduce<number[]>(
-    (acc, e) => [
-      ...acc,
-      (acc.at(-1) ?? 0) + (e.status === 'done' ? (['collect', 'topup'].includes(e.type) ? e.amount : -e.amount) : 0),
-    ],
-    [],
-  )
+  const balances = runningDepositBalances(entries)
   return (
     <div className="space-y-4 rounded-xl border p-3">
       <div className="space-y-2">
@@ -154,7 +154,7 @@ export function EditDocuments({
                   return (
                     <tr key={e.id}>
                       <td className="py-1.5 pr-3">{formatDateVN(e.date)}</td>
-                      <td className="py-1.5 pr-3">{DEPOSIT_ENTRY_LABELS[e.type as DepositEntry['type']] ?? e.type}</td>
+                      <td className="py-1.5 pr-3">{DEPOSIT_ENTRY_LABELS[e.type] ?? e.type}</td>
                       <td className="py-1.5 pr-3">{formatVND(e.amount)}</td>
                       <td className="py-1.5 pr-3">{done ? 'Sẽ hoàn tất' : e.status === 'done' ? 'Đã xong' : 'Chờ'}</td>
                       <td className="py-1.5 pr-3">{formatVND(balances[i])}</td>

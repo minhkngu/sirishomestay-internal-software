@@ -195,15 +195,7 @@ export default async function ContractDetail({ id }: { id: string }) {
       converted: 'Đã chuyển hợp đồng',
       cancelled: 'Đã huỷ',
     }
-    const collected = depositBalance(
-      deposit.entries.map((e) => ({
-        id: e.id,
-        date: e.date,
-        type: e.type as 'collect',
-        amount: e.amount,
-        status: e.status as 'done',
-      })),
-    )
+    const collected = depositBalance(deposit.entries)
 
     return (
       <div className="space-y-5">
