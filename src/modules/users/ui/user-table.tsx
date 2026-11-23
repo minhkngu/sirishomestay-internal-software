@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { PERMISSION_LABELS } from '@/domain/access'
-import type { UserRow } from '@/server/users/queries'
+import type { UserRow } from '../server/users/queries'
 
 export function UserTable({ users }: { users: UserRow[] }) {
   return (

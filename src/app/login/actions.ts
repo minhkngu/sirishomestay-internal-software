@@ -6,7 +6,7 @@ import { db } from '@/db/client'
 import { getServerEnv, publicEnv } from '@/lib/env'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import type { ActionResult } from '@/lib/action-result'
-import { listDemoAccounts } from '@/server/users/service'
+import { listDemoAccounts } from '@/modules/users'
 
 const loginInput = z.object({ email: z.string().trim().email(), password: z.string().min(1) })
 const BAD = 'Email hoặc mật khẩu không đúng'

@@ -9,7 +9,7 @@ import { listIncidents } from '@/server/incidents/service'
 import { getAccessContext } from '@/modules/platform'
 import { listFacilities } from '@/server/facilities/service'
 import { roomCodesByIds } from '@/server/rooms/service'
-import { userNamesByIds } from '@/server/users/queries'
+import { userNamesByIds } from '@/modules/users'
 
 export default async function IncidentsPage() {
   const ctx = await getAccessContext()

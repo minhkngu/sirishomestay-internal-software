@@ -3,8 +3,8 @@ import { db } from '@/db/client'
 import { assertCan } from '@/domain/access'
 import { listFacilities } from '@/server/facilities/service'
 import { getAccessContext } from '@/modules/platform'
-import { listUsers } from '@/server/users/queries'
-import { UserForm } from '@/features/users/components/user-form'
+import { listUsers } from '@/modules/users'
+import { UserForm } from '@/modules/users/ui'
 
 export default async function UserPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

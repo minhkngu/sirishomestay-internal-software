@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { PERMISSIONS, PERMISSION_DESCRIPTIONS, PERMISSION_LABELS, type Permission } from '@/domain/access'
-import { createUser, resetUserPassword, updateUser } from '@/server/users/actions'
+import { createUser, resetUserPassword, updateUser } from '../server/users/actions'
 
 type Props = {
   facilities: { id: string; name: string }[]

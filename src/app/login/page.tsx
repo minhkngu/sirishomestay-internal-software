@@ -1,6 +1,6 @@
 import { db } from '@/db/client'
 import { publicEnv } from '@/lib/env'
-import { listDemoAccounts } from '@/server/users/service'
+import { listDemoAccounts } from '@/modules/users'
 import { PERMISSION_LABELS } from '@/domain/access'
 import { Building2 } from 'lucide-react'
 import { LoginForm } from './login-form'

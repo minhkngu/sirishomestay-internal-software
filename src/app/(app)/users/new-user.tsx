@@ -3,7 +3,7 @@ import { db } from '@/db/client'
 import { assertCan } from '@/domain/access'
 import { listFacilities } from '@/server/facilities/service'
 import { getAccessContext } from '@/modules/platform'
-import { UserForm } from '@/features/users/components/user-form'
+import { UserForm } from '@/modules/users/ui'
 
 /** Nội dung trang thêm người dùng; dùng cho cả trang đầy đủ lẫn popup. */
 export async function NewUser({ showHeading = true }: { showHeading?: boolean }) {

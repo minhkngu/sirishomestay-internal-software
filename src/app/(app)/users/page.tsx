@@ -4,8 +4,8 @@ import { buttonVariants } from '@/components/ui/button'
 import { getAccessContext } from '@/modules/platform'
 import { assertCan } from '@/domain/access'
 import { notFound } from 'next/navigation'
-import { listUsers } from '@/server/users/queries'
-import { UserTable } from '@/features/users/components/user-table'
+import { listUsers } from '@/modules/users'
+import { UserTable } from '@/modules/users/ui'
 
 export default async function UsersPage() {
   const ctx = await getAccessContext()
