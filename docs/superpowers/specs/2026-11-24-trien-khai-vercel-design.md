@@ -94,7 +94,7 @@ nhánh PR ──PR──► main ──(Vercel: Preview, tên miền test)──
    - Tải bản `.dump` mới nhất trong Google Drive (dùng lại `GDRIVE_SERVICE_ACCOUNT_JSON`, `GDRIVE_FOLDER_ID` của workflow sao lưu); tuỳ chọn đầu vào: tên file cụ thể.
    - **Chốt an toàn**: dừng nếu `TEST_DATABASE_URL` trỏ cùng host/project ref với `BACKUP_DATABASE_URL` (DB PROD).
    - `pg_restore --clean --if-exists --no-owner` schema `public` + `auth` vào DB test (giống `docs/operations/backup-restore.md`).
-   - Chạy migration của `main` lên DB test.
+   - Chạy migration của `main` lên DB test. Bảng ghi migration đã chạy của drizzle nằm ở schema `drizzle` (`drizzle.__drizzle_migrations`), mà bản sao lưu hiện chỉ có `public` + `auth`. Vì vậy sao lưu đêm phải dump thêm `--schema=drizzle`, nếu không thì migrate sau khi restore sẽ chạy lại từ đầu và lỗi. Việc này cũng sửa luôn quy trình khôi phục PROD. Workflow dừng nếu bản dump thiếu schema `drizzle`.
    - Đồng bộ ảnh: `rclone sync` từ bucket R2 PROD sang bucket R2 test (chỉ đọc bucket PROD).
    - `concurrency` riêng, không chạy song song với job migrate test.
 
