@@ -2,14 +2,13 @@
 
 Spec: [Thiết kế tổng](../specs/2026-11-16-quan-ly-khach-thue-design.md) (spec duy nhất của dự án).
 
-Plan làm xong thì xoá khỏi thư mục này (lần gần nhất: 23/11/2026: plan và spec hoá đơn, chỉ số, thu chi đã xong, nội dung ở mục Tính năng của [README](../../../README.md)); xem lại trong lịch sử git. Ghi chú môi trường ở [docs/operations/supabase.md](../../operations/supabase.md).
+Plan làm xong thì xoá khỏi thư mục này (lần gần nhất: 24/11/2026: plan chuẩn hoá repo, chuyển sang Modular Monolith, đã merge qua PR #26–#51; cấu trúc hiện tại ở [docs/architecture.md](../../architecture.md)); xem lại trong lịch sử git. Ghi chú môi trường ở [docs/operations/supabase.md](../../operations/supabase.md).
 
 ## Plan đang mở
 
 | Plan | Nội dung | Tiến độ (17/11/2026) |
 |---|---|---|
 | [Lưu trữ và chạy thật](2026-11-16-luu-tru.md) | Chuyển file sang R2, tự xoá ảnh sau thanh lý, sao lưu Google Drive, xoá dữ liệu giả, chuyển sang dữ liệu thật | Task 22 (sao lưu) đã cài, chưa thử khôi phục. Phần còn lại làm sau khi người dùng duyệt chức năng. |
-| [Chuẩn hoá repo](2026-11-19-chuan-hoa-repo.md) | Chuẩn hoá repo (Prettier, CI, lint) và chuyển sang Modular Monolith — 22 task, mỗi task một PR xếp chồng | Đã làm đủ 22 task (20/11/2026), chờ merge |
 
 ## Việc còn lại trước khi người dùng duyệt
 
