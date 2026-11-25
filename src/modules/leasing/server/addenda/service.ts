@@ -38,7 +38,7 @@ import { depositBalance, depositDiffEntry } from '@/domain/deposit'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import type { DocEntities } from '@/domain/template-fields'
 import { meterFeeUsage } from '../../domain/meter-fee-usage'
-import { buildTerminationInvoice } from '../../domain/liquidation'
+import { buildTerminationInvoice, RENT_REFUND_MODES } from '../../domain/liquidation'
 import type {
   ContractFee,
   DepositEntry,
@@ -110,6 +110,9 @@ const terminationSchema = z.object({
   forfeit: z
     .object({ mode: z.enum(['all', 'partial', 'none']), amount: z.number().int().nonnegative().optional() })
     .default({ mode: 'none' }),
+  rentRefund: z
+    .object({ mode: z.enum(RENT_REFUND_MODES), amount: z.number().int().nonnegative().optional() })
+    .default({ mode: 'by_days' }),
   readings: readingsSchema,
 })
 function parse<T>(schema: z.ZodType<T>, input: unknown): T {
@@ -730,7 +733,12 @@ export async function createTermination(
         })),
       ),
       forfeit: data.forfeit as ForfeitInput,
+      rentRefund: data.rentRefund,
     })
+    if (data.rentRefund.mode === 'partial' && (data.rentRefund.amount ?? 0) > built.maxRefund)
+      throw new ValidationError('Số tiền hoàn vượt mức tính theo ngày', {
+        rentRefund: 'Số tiền hoàn vượt mức tính theo ngày',
+      })
     const lastEnd = approved
       .map((i) => i.periodEnd)
       .sort()

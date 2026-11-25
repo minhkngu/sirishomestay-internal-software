@@ -147,6 +147,9 @@ export type DepositEntry = {
 
 export type ForfeitInput = { mode: 'all' | 'partial' | 'none'; amount?: number }
 
+/** Cách xử lý tiền phòng, phí cố định đã trả trước cho các ngày sau ngày trả phòng khi thanh lý. */
+export type RentRefundInput = { mode: 'by_days' | 'partial' | 'none'; amount?: number }
+
 export type BankAccount = {
   bankBin: string
   bankName: string

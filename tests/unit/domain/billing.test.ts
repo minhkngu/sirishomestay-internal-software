@@ -678,6 +678,95 @@ describe('buildTerminationInvoice', () => {
     expect(r.lines.find((l) => l.type === 'rent')?.amount).toBe(6_000_000)
     expect(r.total).toBe(-9_000_000 + 6_000_000 + 920_000)
   })
+
+  describe('hoàn tiền phòng đã trả trước', () => {
+    const rentLine = {
+      type: 'rent' as const,
+      description: 'Tiền phòng tháng 11',
+      quantity: 1,
+      unitPrice: 9_000_000,
+      amount: 9_000_000,
+    }
+    const paidNovFee = invoice({
+      lines: [
+        rentLine,
+        {
+          type: 'fee',
+          description: 'Wifi',
+          quantity: 1,
+          unitPrice: 300_000,
+          amount: 300_000,
+          meta: { leaseFeeId: 'f1', from: '2026-11-01', to: '2026-11-30', coefficient: 1 },
+        },
+        // phí theo đồng hồ thu sau: không có meta.from nên không hoàn
+        {
+          type: 'fee',
+          description: 'Điện',
+          quantity: 100,
+          unitPrice: 3500,
+          amount: 350_000,
+          meta: { leaseFeeId: 'e1', unit: 'kWh' },
+        },
+      ],
+    })
+    const refunds = (r: ReturnType<typeof buildTerminationInvoice>) => r.lines.filter((l) => l.type === 'refund')
+
+    it('hoàn theo ngày: hoàn cả phí cố định, không hoàn phí đồng hồ', () => {
+      const r = buildTerminationInvoice({ ...input(), approvedInvoices: [paidNovFee] })
+      expect(refunds(r).map((l) => l.amount)).toEqual([-3_000_000, -100_000])
+      expect(refunds(r)[1].description).toMatch(/^Hoàn Wifi/)
+      expect(r.maxRefund).toBe(3_100_000)
+      expect(r.total).toBe(-11_180_000)
+    })
+    it('hoàn theo ngày: hoàn mọi kỳ trả trước', () => {
+      const dec = invoice({ id: 'I2', periodStart: '2026-12-01', periodEnd: '2026-12-31', lines: [rentLine] })
+      const r = buildTerminationInvoice({ ...input(), approvedInvoices: [paidNov, dec] })
+      expect(refunds(r).reduce((s, l) => s + l.amount, 0)).toBe(-12_000_000)
+    })
+    it('hoá đơn nháp không bị hoàn', () => {
+      const r = buildTerminationInvoice({ ...input(), approvedInvoices: [{ ...paidNov, status: 'draft' }] })
+      expect(r.maxRefund).toBe(0)
+    })
+    it('không hoàn: một dòng hoàn 0 đồng kèm chú thích', () => {
+      const r = buildTerminationInvoice({ ...input(), approvedInvoices: [paidNovFee], rentRefund: { mode: 'none' } })
+      expect(refunds(r)).toHaveLength(1)
+      expect(refunds(r)[0]).toMatchObject({ amount: 0 })
+      expect(refunds(r)[0].description).toMatch(/^Không hoàn/)
+      expect(r.total).toBe(-8_080_000)
+      expect(r.maxRefund).toBe(3_100_000)
+    })
+    it('hoàn một phần: một dòng gộp', () => {
+      const r = buildTerminationInvoice({ ...input(), rentRefund: { mode: 'partial', amount: 1_000_000 } })
+      expect(refunds(r).map((l) => l.amount)).toEqual([-1_000_000])
+      expect(r.total).toBe(-9_080_000)
+    })
+    it('hoàn một phần vượt mức tối đa thì cắt về mức tối đa', () => {
+      const r = buildTerminationInvoice({ ...input(), rentRefund: { mode: 'partial', amount: 5_000_000 } })
+      expect(refunds(r).map((l) => l.amount)).toEqual([-3_000_000])
+    })
+    it('hoàn một phần nhập 0 → dòng hoàn 0 đồng', () => {
+      const r = buildTerminationInvoice({ ...input(), rentRefund: { mode: 'partial', amount: 0 } })
+      expect(refunds(r).map((l) => l.amount)).toEqual([0])
+    })
+    it('không có kỳ nào vượt ngày trả → vẫn có một dòng hoàn 0 đồng ở cả ba chế độ', () => {
+      const base = buildTerminationInvoice({ ...input(), endDate: '2026-11-30' })
+      for (const rentRefund of [
+        { mode: 'by_days' as const },
+        { mode: 'partial' as const, amount: 100 },
+        { mode: 'none' as const },
+      ]) {
+        const r = buildTerminationInvoice({ ...input(), endDate: '2026-11-30', rentRefund })
+        expect(refunds(r).map((l) => l.amount)).toEqual([0])
+        expect(r.maxRefund).toBe(0)
+        expect(r.total).toBe(base.total)
+      }
+    })
+    it('không truyền rentRefund = hoàn theo ngày', () => {
+      const a = buildTerminationInvoice(input())
+      const b = buildTerminationInvoice({ ...input(), rentRefund: { mode: 'by_days' } })
+      expect(a).toEqual(b)
+    })
+  })
 })
 
 describe('kỳ thanh toán và hoàn khách', () => {
