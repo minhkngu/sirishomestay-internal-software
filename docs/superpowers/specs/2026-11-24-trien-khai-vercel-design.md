@@ -1,6 +1,6 @@
 # Thiết kế: triển khai Vercel theo hai môi trường test (`main`) và PROD (`production`)
 
-Ngày: 24/11/2026 · Trạng thái: chờ duyệt
+Ngày: 24/11/2026 · Trạng thái: đã duyệt (25/11/2026), chưa triển khai
 
 ## 1. Vì sao
 
