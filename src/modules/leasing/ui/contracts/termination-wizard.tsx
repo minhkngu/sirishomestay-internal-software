@@ -8,9 +8,17 @@ import { Button } from '@/components/ui/button'
 import { MoneyInput } from '@/components/ui/money-input'
 import { formatVND } from '@/domain/money'
 import { uploadOne } from '@/modules/platform/ui'
+import { RENT_REFUND_MODES } from '../../domain/liquidation'
 import { createTerminationAction } from '../../server/addenda/actions'
 import { BareSelect } from './contract-form-ui'
 import { Field, inputCls, ReadingInputs, toReadings, type MeterOption } from './addendum-shell'
+
+type RentRefundMode = (typeof RENT_REFUND_MODES)[number]
+const REFUND_LABELS: Record<RentRefundMode, string> = {
+  by_days: 'Hoàn theo ngày không ở',
+  partial: 'Hoàn một phần',
+  none: 'Không hoàn',
+}
 
 export type CheckoutAssetOption = {
   assetId: string
@@ -63,6 +71,8 @@ export function TerminationWizard({
   const [endDate, setEnd] = useState(today)
   const [mode, setMode] = useState<'none' | 'partial' | 'all'>('none')
   const [forfeitAmount, setForfeitAmount] = useState('')
+  const [refundMode, setRefundMode] = useState<RentRefundMode>('by_days')
+  const [refundAmount, setRefundAmount] = useState('')
   const [readings, setReadings] = useState<Record<string, string>>(() =>
     Object.fromEntries(meters.map((m) => [m.meterId, m.latestReading ? String(m.latestReading.value) : ''])),
   )
@@ -89,6 +99,7 @@ export function TerminationWizard({
   const input = {
     endDate,
     forfeit: { mode, ...(mode === 'partial' ? { amount: Number(forfeitAmount) || 0 } : {}) },
+    rentRefund: { mode: refundMode, ...(refundMode === 'partial' ? { amount: Number(refundAmount) || 0 } : {}) },
     readings: toReadings(readings),
     handoverItems: assetRows.map((a) => ({
       assetId: a.assetId,
@@ -325,6 +336,22 @@ export function TerminationWizard({
                   {forfeitError}
                 </p>
               )}
+            </Field>
+          )}
+          <Field label="Tiền phòng đã trả trước">
+            <BareSelect
+              ariaLabel="Tiền phòng đã trả trước"
+              value={refundMode}
+              onValueChange={(next) => setRefundMode(next as RentRefundMode)}
+              options={RENT_REFUND_MODES.map((value) => ({ value, label: REFUND_LABELS[value] }))}
+            />
+          </Field>
+          {refundMode === 'partial' && (
+            <Field label="Số tiền hoàn">
+              <MoneyInput className={inputCls} value={refundAmount} onValueChange={setRefundAmount} />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Tối đa bằng số tính theo ngày; nhập vượt sẽ báo lỗi khi xác nhận.
+              </p>
             </Field>
           )}
         </div>

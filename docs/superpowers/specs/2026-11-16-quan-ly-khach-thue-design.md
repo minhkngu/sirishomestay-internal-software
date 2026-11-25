@@ -97,7 +97,7 @@ Thành công = đội chuyển hẳn khỏi phần mềm cũ (nhập được d�
 
 **Sổ cọc**: thu cọc, thu bổ sung, khấu trừ, hoàn cọc, mất cọc; số dư = tổng.
 
-**Hoá đơn thanh lý**: tiền phòng lẻ đến ngày trả (hoặc phần hoàn nếu trả dư), điện nước đến ngày trả (tính trên mọi phòng của hợp đồng, đồng hồ gắn với dòng phí), phí theo lần chưa tính, phạt từ check-out, nợ cũ, trừ số dư cọc → hoàn khách hoặc thu thêm. Trả phòng trước hạn: nhân viên chọn mất cọc toàn bộ / một phần / không; hệ thống không tự áp quy tắc báo trước.
+**Hoá đơn thanh lý**: tiền phòng lẻ đến ngày trả, dòng hoàn tiền phòng và phí cố định đã trả trước cho các ngày sau ngày trả (luôn có dòng này, 0 đồng nếu không hoàn hoặc không có gì để hoàn; nhân viên chọn hoàn theo ngày / hoàn một phần, tối đa bằng số tính theo ngày / không hoàn; phí theo đồng hồ không hoàn), điện nước đến ngày trả (tính trên mọi phòng của hợp đồng, đồng hồ gắn với dòng phí), phí theo lần chưa tính, phạt từ check-out, nợ cũ, trừ số dư cọc → hoàn khách hoặc thu thêm. Trả phòng trước hạn: nhân viên chọn mất cọc toàn bộ / một phần / không; hệ thống không tự áp quy tắc báo trước.
 
 **Tiền phòng và ngày kết thúc**: hiện tiền phòng còn tính đến hết ngày kết thúc hợp đồng; chưa đổi theo "ngày kết thúc là sáng khách dọn đi" (chờ quyết định).
 

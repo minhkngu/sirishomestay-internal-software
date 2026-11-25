@@ -9,7 +9,12 @@ import type {
   OneOffCharge,
   PendingAdjustment,
   Proration,
+  RentRefundInput,
 } from '@/domain/types'
+
+export const RENT_REFUND_MODES = ['by_days', 'partial', 'none'] as const
+
+const rangeLabel = (from: ISODate, to: ISODate) => `${formatDateVN(from).slice(0, 5)}–${formatDateVN(to).slice(0, 5)}`
 
 export type TerminationInput = {
   terms: LeaseTerms
@@ -24,6 +29,8 @@ export type TerminationInput = {
   unpaidTotal: number
   depositBalance: number
   forfeit: ForfeitInput
+  /** thiếu = hoàn theo ngày */
+  rentRefund?: RentRefundInput
   proration: Proration
 }
 
@@ -31,32 +38,96 @@ export type TerminationInput = {
  * Hoá đơn thanh lý. total > 0: khách phải trả thêm; total < 0: hoàn cho khách.
  * Tiền phòng đã trả trước vượt `endDate` → dòng hoàn (âm); dòng trừ cọc = −(số dư cọc − phần mất cọc).
  */
-export function buildTerminationInvoice(input: TerminationInput): { lines: InvoiceLineInput[]; total: number } {
+export function buildTerminationInvoice(input: TerminationInput): {
+  lines: InvoiceLineInput[]
+  total: number
+  /** tổng tiền hoàn theo ngày (tiền phòng + phí cố định), tính cả khi chọn không hoàn hoặc hoàn một phần */
+  maxRefund: number
+} {
   const { terms, endDate } = input
   const lines: InvoiceLineInput[] = []
 
-  // tiền phòng đã trả trước vượt ngày trả → hoàn; chưa có hoá đơn tiền phòng đến ngày trả → tính phần còn thiếu
+  // tiền phòng và phí cố định đã trả trước vượt ngày trả → các dòng hoàn theo ngày (ứng viên), áp lựa chọn rentRefund bên dưới;
+  // chưa có hoá đơn tiền phòng đến ngày trả → tính phần còn thiếu
   const rentInvoices = input.approvedInvoices.filter(
     (i) => i.status === 'approved' && i.lines.some((l) => l.type === 'rent'),
   )
+  const refundCandidates: InvoiceLineInput[] = []
+  const refundSpans: [ISODate, ISODate][] = []
+  const dayAfterEnd = addDays(endDate, 1)
   let covered: ISODate | null = null
   for (const inv of rentInvoices) {
     if (!covered || inv.periodEnd > covered) covered = inv.periodEnd
     if (inv.periodEnd > endDate) {
-      const from = addDays(endDate, 1) > inv.periodStart ? addDays(endDate, 1) : inv.periodStart
+      const from = dayAfterEnd > inv.periodStart ? dayAfterEnd : inv.periodStart
       const sum = prorateFraction(from, inv.periodEnd, input.proration)
       const amount = -Math.round(terms.monthlyRent * sum)
       if (amount !== 0) {
-        lines.push({
+        refundCandidates.push({
           type: 'refund',
-          description: `Hoàn tiền phòng đã trả trước ${formatDateVN(from).slice(0, 5)}–${formatDateVN(inv.periodEnd).slice(0, 5)}`,
+          description: `Hoàn tiền phòng đã trả trước ${rangeLabel(from, inv.periodEnd)}`,
           quantity: Math.round(sum * 10000) / 10000,
           unitPrice: terms.monthlyRent,
           amount,
         })
+        refundSpans.push([from, inv.periodEnd])
+      }
+      // phí cố định hằng tháng thu trước (dòng `fee` có meta.from/to); phí theo đồng hồ thu sau nên không có meta này
+      for (const l of inv.lines) {
+        const metaFrom = l.meta?.from
+        const metaTo = l.meta?.to
+        if (l.type !== 'fee' || typeof metaFrom !== 'string' || typeof metaTo !== 'string' || metaTo <= endDate)
+          continue
+        const feeFrom = dayAfterEnd > metaFrom ? dayAfterEnd : metaFrom
+        const feeSum = prorateFraction(feeFrom, metaTo, input.proration)
+        const feeAmount = -Math.round(l.quantity * l.unitPrice * feeSum)
+        if (feeAmount === 0) continue
+        refundCandidates.push({
+          type: 'refund',
+          description: `Hoàn ${l.description} đã trả trước ${rangeLabel(feeFrom, metaTo)}`,
+          quantity: Math.round(feeSum * 10000) / 10000,
+          unitPrice: l.quantity * l.unitPrice,
+          amount: feeAmount,
+        })
+        refundSpans.push([feeFrom, metaTo])
       }
     }
   }
+  const maxRefund = 0 - refundCandidates.reduce((s, l) => s + l.amount, 0)
+  const refund = input.rentRefund ?? { mode: 'by_days' as const }
+  if (refund.mode === 'by_days') {
+    lines.push(...refundCandidates)
+  } else {
+    const kept = refund.mode === 'partial' ? Math.min(refund.amount ?? 0, maxRefund) : 0
+    if (kept > 0) {
+      lines.push({
+        type: 'refund',
+        description: 'Hoàn một phần tiền phòng và phí dịch vụ đã trả trước',
+        quantity: 1,
+        unitPrice: -kept,
+        amount: -kept,
+      })
+    } else {
+      const from = refundSpans.map((s) => s[0]).sort()[0]
+      const to = refundSpans
+        .map((s) => s[1])
+        .sort()
+        .at(-1)
+      lines.push({
+        type: 'refund',
+        description:
+          from && to
+            ? `Không hoàn tiền phòng và phí dịch vụ đã trả trước ${rangeLabel(from, to)}`
+            : 'Không hoàn tiền phòng đã trả trước',
+        quantity: 1,
+        unitPrice: 0,
+        amount: 0,
+      })
+    }
+  }
+  // hoá đơn thanh lý luôn có dòng hoàn: không có gì để hoàn thì 0 đồng
+  if (!lines.some((l) => l.type === 'refund'))
+    lines.push({ type: 'refund', description: 'Hoàn tiền phòng đã trả trước: 0', quantity: 1, unitPrice: 0, amount: 0 })
   if (!covered || covered < endDate) {
     const monthStart = `${endDate.slice(0, 7)}-01`
     const base = covered ? addDays(covered, 1) : monthStart
@@ -132,7 +203,7 @@ export function buildTerminationInvoice(input: TerminationInput): { lines: Invoi
       amount: -offset,
     })
   }
-  return { lines, total: lines.reduce((s, l) => s + l.amount, 0) }
+  return { lines, total: lines.reduce((s, l) => s + l.amount, 0), maxRefund }
 }
 
 export { daysInMonth }
