@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { facilities } from '@/db'
+import { facilities, leases, rooms } from '@/db'
 import { createTenant } from '@/modules/tenants/server/tenants/service'
 import { updateSettings } from '@/modules/platform/server/settings/service'
 import { getExpiringVisas } from '@/modules/dashboard/server/dashboard/service'
@@ -25,17 +25,35 @@ describe('getExpiringVisas', () => {
   let fb: string
   let admin: AccessContext
   let n = 0
-  const add = (visaExpiry: string | null, over: Record<string, unknown> = {}) => {
+  const add = async (
+    visaExpiry: string | null,
+    over: Record<string, unknown> = {},
+    opts: { withLease?: boolean; facilityId?: string } = {},
+  ) => {
     n++
-    return createTenant(db, admin, {
+    const fid = opts.facilityId ?? (over.homeFacilityId as string | undefined) ?? fa
+    const tenant = await createTenant(db, admin, {
       kind: 'foreign',
-      homeFacilityId: fa,
+      homeFacilityId: fid,
       fullName: `Khách ${visaExpiry}`,
       phone: `+1415555${String(n).padStart(4, '0')}`,
       passportNumber: `P${n}`,
       visaExpiry,
       ...over,
     })
+    if (opts.withLease !== false) {
+      const [room] = await db.insert(rooms).values({ facilityId: fid, code: `R${n}` }).returning()
+      await db.insert(leases).values({
+        code: `HD-${n}`,
+        roomId: room.id,
+        tenantId: tenant.id,
+        startDate: '2026-01-01',
+        endDate: '2027-01-01',
+        monthlyRent: 100,
+        depositAmount: 0,
+      })
+    }
+    return tenant
   }
   beforeEach(async () => {
     db = await createTestDb()
@@ -96,6 +114,11 @@ describe('getExpiringVisas', () => {
     expect(r).toEqual([])
     await add('2026-11-16')
     expect((await getExpiringVisas(db, admin, undefined, new Date('2026-11-15T23:30:00Z')))[0].daysLeft).toBe(0)
+  })
+
+  it('bỏ qua khách không có hợp đồng thuê hiệu lực (chưa ở hoặc đã trả phòng)', async () => {
+    await add('2026-11-16', {}, { withLease: false })
+    expect(await getExpiringVisas(db, admin, TODAY)).toEqual([])
   })
 })
 

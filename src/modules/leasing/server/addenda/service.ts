@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import {
   addenda,
@@ -53,6 +53,7 @@ import type {
 } from '@/domain/types'
 import { recordAudit, registerExportOwnerResolver, registerOwnerResolver, getSettings } from '@/modules/platform'
 import { captureContractVersion, recordTerminationHandover, recordTerminationReadings } from '../contracts/history'
+import { applyTerminationClosure } from './finalize'
 import { leaseData, loadAddenda, nextInvoiceCode } from '../invoices/service'
 import type { StorageAdapter } from '@/modules/platform'
 import { exportDocument, registerDocLoader } from '@/modules/documents'
@@ -69,6 +70,7 @@ export type AddendumResult = {
   adjustments: AdjustmentPreview[]
   depositEntry: Omit<DepositEntry, 'id'> | null
   invoice: { id: string; code: string; lines: InvoiceLineInput[]; total: number } | null
+  handoverItems?: { assetId: string; itemId: string }[]
 }
 
 const date = z.iso.date()
@@ -105,12 +107,26 @@ const transferSchema = z.object({
   adjustmentTarget: target,
 })
 const assignmentSchema = z.object({ effectiveDate: date, newTenantId: z.uuid() })
+const terminationHandoverItemSchema = z.object({
+  assetId: z.uuid(),
+  condition: z.string().trim().default('Tốt'),
+  note: z.string().trim().default(''),
+  damaged: z.boolean().default(false),
+  missing: z.boolean().default(false),
+  penalty: z.number().int().nonnegative().default(0),
+})
+const terminationPenaltySchema = z.object({
+  description: z.string().trim().min(1, 'Nhập nội dung phạt'),
+  amount: z.number().int().positive('Số tiền phạt phải lớn hơn 0'),
+})
 const terminationSchema = z.object({
   endDate: date,
   forfeit: z
     .object({ mode: z.enum(['all', 'partial', 'none']), amount: z.number().int().nonnegative().optional() })
     .default({ mode: 'none' }),
   readings: readingsSchema,
+  handoverItems: z.array(terminationHandoverItemSchema).optional(),
+  penalties: z.array(terminationPenaltySchema).optional(),
 })
 function parse<T>(schema: z.ZodType<T>, input: unknown): T {
   const r = schema.safeParse(input)
@@ -258,9 +274,25 @@ async function applyAdjustments(
 async function activeMeters(tx: DB, roomId: string) {
   return (await tx.select().from(meters).where(eq(meters.roomId, roomId))).filter((m) => !m.removedOn)
 }
-/** Chốt chỉ số tại ngày thay đổi: mọi đồng hồ đang chạy của các phòng liên quan phải có chỉ số, không được giảm. Không tính tiền từ chỉ số thiếu. */
-async function recordReadings(tx: DB, roomIds: string[], date: string, input: { meterId: string; value: number }[]) {
-  const needed = (await Promise.all(roomIds.map((r) => activeMeters(tx, r)))).flat()
+async function linkedMeterIdsForLease(db: DB, leaseId: string): Promise<Set<string>> {
+  const rows = await db
+    .select({ meterId: leaseFeeMeters.meterId })
+    .from(leaseFeeMeters)
+    .innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId))
+    .where(and(eq(leaseFeeSnapshots.leaseId, leaseId), eq(leaseFeeSnapshots.quantitySource, 'meter')))
+  return new Set(rows.map((x) => x.meterId))
+}
+/** Chốt chỉ số tại ngày thay đổi: đồng hồ cần chốt của các phòng liên quan phải có chỉ số, không được giảm. Không tính tiền từ chỉ số thiếu. */
+async function recordReadings(
+  tx: DB,
+  roomIds: string[],
+  date: string,
+  input: { meterId: string; value: number }[],
+  onlyMeterIds?: Set<string>,
+) {
+  const needed = (await Promise.all(roomIds.map((r) => activeMeters(tx, r))))
+    .flat()
+    .filter((m) => !onlyMeterIds || onlyMeterIds.has(m.id))
   for (const m of needed)
     if (!input.some((r) => r.meterId === m.id))
       throw new ValidationError(
@@ -505,7 +537,8 @@ export async function createAssignment(
     if (data.newTenantId === l.tenantId) throw new ValidationError('Người nhận trùng bên thuê hiện tại')
     const [tenant] = await tx.select().from(tenants).where(eq(tenants.id, data.newTenantId))
     if (!tenant) throw new NotFoundError()
-    if (tenant.homeFacilityId !== facilityId) throw new ValidationError('Người nhận phải thuộc cùng cơ sở')
+    if (tenant.homeFacilityId && tenant.homeFacilityId !== facilityId)
+      throw new ValidationError('Người nhận phải thuộc cùng cơ sở')
     const oldOccupantIds = (await tx.select().from(leaseOccupants).where(eq(leaseOccupants.leaseId, leaseId))).map(
       (o) => o.tenantId,
     )
@@ -568,22 +601,69 @@ export async function createTermination(
       .limit(1)
     if (dup) throw new ValidationError('Hợp đồng đã có phụ lục thanh lý')
     const versionId = await captureContractVersion(tx, ctx, 'lease', leaseId, 'termination')
-    await recordReadings(tx, [l.roomId], data.endDate, data.readings)
+    await recordReadings(tx, [l.roomId], data.endDate, data.readings, await linkedMeterIdsForLease(tx, leaseId))
     await recordTerminationReadings(
       tx,
       versionId,
       data.endDate,
       data.readings.map((r) => r.meterId),
     )
-    // Dùng biên bản check-out đã lập (phạt tài sản nằm ở đó); chưa có thì tạo mới
-    const [existingCheckout] = await tx
-      .select()
-      .from(handovers)
-      .where(and(eq(handovers.leaseId, leaseId), eq(handovers.roomId, l.roomId), eq(handovers.kind, 'check_out')))
-      .orderBy(desc(handovers.createdAt))
-      .limit(1)
-    const checkout = existingCheckout ?? (await newHandover(tx, leaseId, l.roomId, 'check_out', data.endDate))
-    await recordTerminationHandover(tx, versionId, existingCheckout ? null : checkout.id)
+    // Biên bản check-out: nếu popup gửi danh sách kiểm kê thì tạo mới & chốt done; ngược lại dùng bản đã có
+    let checkout: typeof handovers.$inferSelect
+    let createdItemLinks: { assetId: string; itemId: string }[] = []
+    if (data.handoverItems !== undefined) {
+      const [created] = await tx
+        .insert(handovers)
+        .values({ leaseId, roomId: l.roomId, kind: 'check_out', date: data.endDate, status: 'done' })
+        .returning()
+      checkout = created
+      if (data.handoverItems.length) {
+        const insertedItems = await tx
+          .insert(handoverItems)
+          .values(
+            data.handoverItems.map((it) => ({
+              handoverId: checkout.id,
+              assetId: it.assetId,
+              condition: it.condition || 'Tốt',
+              note: it.note,
+              damaged: it.damaged,
+              missing: it.missing,
+              penalty: it.penalty,
+            })),
+          )
+          .returning()
+        createdItemLinks = insertedItems.map((x) => ({ assetId: x.assetId, itemId: x.id }))
+      }
+      await recordTerminationHandover(tx, versionId, checkout.id)
+    } else {
+      const [existingCheckout] = await tx
+        .select()
+        .from(handovers)
+        .where(and(eq(handovers.leaseId, leaseId), eq(handovers.roomId, l.roomId), eq(handovers.kind, 'check_out')))
+        .orderBy(desc(handovers.createdAt))
+        .limit(1)
+      checkout = existingCheckout ?? (await newHandover(tx, leaseId, l.roomId, 'check_out', data.endDate))
+      if (checkout.status !== 'done') {
+        await tx
+          .update(handovers)
+          .set({ status: 'done', date: data.endDate, updatedAt: new Date() })
+          .where(eq(handovers.id, checkout.id))
+      }
+      await recordTerminationHandover(tx, versionId, existingCheckout ? null : checkout.id)
+    }
+
+    if (data.penalties?.length) {
+      await tx.insert(oneOffCharges).values(
+        data.penalties.map((p) => ({
+          leaseId,
+          kind: 'penalty',
+          description: p.description,
+          date: data.endDate,
+          quantity: 1,
+          unitPrice: p.amount,
+        })),
+      )
+    }
     const [row] = await tx
       .insert(addenda)
       .values({
@@ -761,6 +841,7 @@ export async function createTermination(
           .set({ invoiceId: inv.id })
           .where(and(eq(pendingAdjustments.id, line.meta.pendingId), isNull(pendingAdjustments.invoiceId)))
     }
+    await applyTerminationClosure(tx, ctx, { leaseId, facilityId, endDate: data.endDate, versionId })
     await recordAudit(tx, ctx, {
       action: 'create',
       entity: 'addendum',
@@ -782,8 +863,65 @@ export async function createTermination(
       adjustments: [],
       depositEntry: null,
       invoice: { id: inv.id, code: inv.code, lines: built.lines, total: built.total },
+      handoverItems: createdItemLinks,
     }
   })
+}
+
+export type TerminationCheckoutAsset = {
+  assetId: string
+  code: string
+  name: string
+  value: number
+  checkInCondition: string | null
+}
+
+/** Danh sách tài sản để kiểm kê trong popup thanh lý (ưu tiên từ biên bản check-in gần nhất). */
+export async function getTerminationCheckoutAssets(
+  db: DB,
+  ctx: AccessContext,
+  leaseId: string,
+): Promise<TerminationCheckoutAsset[]> {
+  const { l } = await lockLease(db, ctx, leaseId)
+  const [checkIn] = await db
+    .select()
+    .from(handovers)
+    .where(and(eq(handovers.leaseId, leaseId), eq(handovers.kind, 'check_in')))
+    .orderBy(desc(handovers.createdAt))
+    .limit(1)
+  if (checkIn) {
+    const rows = await db
+      .select({
+        assetId: assets.id,
+        code: assets.code,
+        name: assets.name,
+        value: assets.value,
+        checkInCondition: handoverItems.condition,
+      })
+      .from(handoverItems)
+      .innerJoin(assets, eq(assets.id, handoverItems.assetId))
+      .where(eq(handoverItems.handoverId, checkIn.id))
+      .orderBy(asc(assets.code))
+    if (rows.length) return rows
+  }
+  const roomAssets = await db
+    .select({
+      assetId: assets.id,
+      code: assets.code,
+      name: assets.name,
+      value: assets.value,
+      condition: assets.condition,
+    })
+    .from(assets)
+    .where(and(eq(assets.locationKind, 'room'), eq(assets.locationId, l.roomId)))
+    .orderBy(asc(assets.code))
+  return roomAssets.map((a) => ({
+    assetId: a.assetId,
+    code: a.code,
+    name: a.name,
+    value: a.value,
+    checkInCondition: a.condition,
+  }))
 }
 
 export type AddendumKind = 'occupants' | 'extension' | 'transfer' | 'termination'
@@ -987,16 +1125,41 @@ export async function addendumFormData(db: DB, ctx: AccessContext, leaseId: stri
   )
   const free = roomRows.filter((r) => !busy.has(r.id) && !held.has(r.id))
   const ids = [row.l.roomId, ...free.map((r) => r.id)]
-  const ms = (
-    await db
-      .select()
-      .from(meters)
-      .where(and(inArray(meters.roomId, ids), isNull(meters.removedOn)))
-  ).map((m) => ({ meterId: m.id, roomId: m.roomId, utility: m.utility as 'electric' | 'water', serial: m.serial }))
+  const meterRows = await db
+    .select()
+    .from(meters)
+    .where(and(inArray(meters.roomId, ids), isNull(meters.removedOn)))
+  const readingRows = meterRows.length
+    ? await db
+        .select({ meterId: meterReadings.meterId, value: meterReadings.value, readOn: meterReadings.readOn })
+        .from(meterReadings)
+        .where(
+          inArray(
+            meterReadings.meterId,
+            meterRows.map((m) => m.id),
+          ),
+        )
+    : []
+  const latestByMeter = new Map<string, { value: number; readOn: string | null }>()
+  for (const r of readingRows) {
+    const prev = latestByMeter.get(r.meterId)
+    if (!prev || (prev.readOn ?? '') < r.readOn) {
+      latestByMeter.set(r.meterId, { value: r.value, readOn: r.readOn })
+    }
+  }
+  const ms = meterRows.map((m) => ({
+    meterId: m.id,
+    roomId: m.roomId,
+    utility: m.utility as 'electric' | 'water',
+    serial: m.serial,
+    latestReading: latestByMeter.get(m.id) ?? { value: m.startReading, readOn: null },
+  }))
+  const linkedMeterIds = await linkedMeterIdsForLease(db, leaseId)
+  const terminationMeters = ms.filter((m) => m.roomId === row.l.roomId && linkedMeterIds.has(m.meterId))
   const people = await db
     .select({ id: tenants.id, name: tenants.fullName })
     .from(tenants)
-    .where(and(ne(tenants.kind, 'company'), eq(tenants.homeFacilityId, row.facilityId)))
+    .where(and(ne(tenants.kind, 'company'), or(eq(tenants.homeFacilityId, row.facilityId), isNull(tenants.homeFacilityId))))
     .orderBy(asc(tenants.fullName))
   const fees = await db
     .select({ id: feeTypes.id, name: feeTypes.name, defaultPrice: feeTypes.defaultPrice })
@@ -1008,11 +1171,13 @@ export async function addendumFormData(db: DB, ctx: AccessContext, leaseId: stri
   }))
   return {
     currentRoomId: row.l.roomId,
+    startDate: row.l.startDate,
     endDate: row.l.endDate,
     monthlyRent: row.l.monthlyRent,
     depositAmount: row.l.depositAmount,
     freeRooms: free.map((r) => ({ id: r.id, code: r.code })),
     meters: ms,
+    terminationMeters,
     people: people.map((p) => ({ id: p.id, name: p.name ?? '' })),
     fees: resolvedFees,
     today: todayVN(),

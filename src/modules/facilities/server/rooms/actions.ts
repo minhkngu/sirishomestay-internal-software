@@ -9,7 +9,16 @@ import { getAccessContext } from '@/modules/platform'
 import { toActionResult, type ActionResult } from '@/lib/action-result'
 import { ValidationError } from '@/domain/errors'
 import { fieldErrorsOf } from '@/lib/zod-errors'
-import { createRoom, createRoomsBulk, deleteRoom, setRoomActive, updateRoom } from './service'
+import {
+  createRoom,
+  createRoomsBulk,
+  deleteRoom,
+  deleteRoomsBulk,
+  setRoomActive,
+  setRoomsActiveBulk,
+  updateRoom,
+  updateRoomsBulk,
+} from './service'
 
 async function guard<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
   return toActionResult(async () => {
@@ -27,6 +36,7 @@ export async function createRoomAction(input: unknown) {
   return guard(async () => {
     const r = await createRoom(db, ctx, input as never)
     revalidatePath('/facilities')
+    revalidatePath('/rooms')
     return { id: r.id }
   })
 }
@@ -36,6 +46,7 @@ export async function updateRoomAction(id: string, input: unknown) {
   return guard(async () => {
     await updateRoom(db, ctx, id, input as never)
     revalidatePath('/facilities')
+    revalidatePath('/rooms')
     return {}
   })
 }
@@ -55,6 +66,7 @@ export async function createRoomsBulkAction(facilityId: string, input: unknown) 
   return guard(async () => {
     const r = await createRoomsBulk(db, ctx, facilityId, input as never)
     revalidatePath('/facilities')
+    revalidatePath('/rooms')
     return r
   })
 }
@@ -66,5 +78,35 @@ export async function deleteRoomAction(id: string) {
     revalidatePath('/facilities')
     revalidatePath('/rooms')
     return {}
+  })
+}
+
+export async function updateRoomsBulkAction(input: unknown) {
+  const ctx = await getAccessContext()
+  return guard(async () => {
+    const count = await updateRoomsBulk(db, ctx, input as never)
+    revalidatePath('/facilities')
+    revalidatePath('/rooms')
+    return { count }
+  })
+}
+
+export async function setRoomsActiveBulkAction(ids: string[], active: boolean) {
+  const ctx = await getAccessContext()
+  return guard(async () => {
+    const count = await setRoomsActiveBulk(db, ctx, ids, active)
+    revalidatePath('/facilities')
+    revalidatePath('/rooms')
+    return { count }
+  })
+}
+
+export async function deleteRoomsBulkAction(ids: string[]) {
+  const ctx = await getAccessContext()
+  return guard(async () => {
+    const count = await deleteRoomsBulk(db, ctx, ids)
+    revalidatePath('/facilities')
+    revalidatePath('/rooms')
+    return { count }
   })
 }

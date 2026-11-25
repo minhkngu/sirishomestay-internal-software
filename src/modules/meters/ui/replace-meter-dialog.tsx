@@ -138,35 +138,47 @@ export function ReplaceMeterDialog({
           </div>
         </div>
       )}
-      {error && <p className="text-sm text-destructive">{error}</p>}
-      <div className="flex justify-end gap-2">
-        <Button variant="outline" size="sm" onClick={onCancel}>
-          Huỷ
-        </Button>
-        <Button
-          size="sm"
-          disabled={pending || v.finalReading === ''}
-          onClick={() =>
-            start(async () => {
-              setError(null)
-              setNoteError(null)
-              const r = await replaceMeterAction(roomId, utility, {
-                removedOn: v.removedOn,
-                finalReading: Number(v.finalReading),
-                newSerial: v.newSerial || undefined,
-                startReading: Number(v.startReading),
-                ...(estimated && { estimated: true, note }),
-              })
-              if (!r.ok) {
-                if (r.fieldErrors?.note) setNoteError(r.fieldErrors.note)
-                else setError(r.fieldErrors?.finalReading ?? r.error)
-              } else onDone()
-            })
-          }
-        >
-          Thay đồng hồ
-        </Button>
-      </div>
+      {(() => {
+        const liveReadingError =
+          (v.finalReading.trim() !== '' && !/^\d+$/.test(v.finalReading.trim())) ||
+          (v.startReading.trim() !== '' && !/^\d+$/.test(v.startReading.trim()))
+            ? 'Chỉ số đồng hồ phải là số nguyên không âm'
+            : null
+        const shownError = liveReadingError ?? error
+        return (
+          <>
+            {shownError && <p className="text-sm text-destructive">{shownError}</p>}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={onCancel}>
+                Huỷ
+              </Button>
+              <Button
+                size="sm"
+                disabled={pending || v.finalReading === '' || !!liveReadingError}
+                onClick={() =>
+                  start(async () => {
+                    setError(null)
+                    setNoteError(null)
+                    const r = await replaceMeterAction(roomId, utility, {
+                      removedOn: v.removedOn,
+                      finalReading: Number(v.finalReading),
+                      newSerial: v.newSerial || undefined,
+                      startReading: Number(v.startReading),
+                      ...(estimated && { estimated: true, note }),
+                    })
+                    if (!r.ok) {
+                      if (r.fieldErrors?.note) setNoteError(r.fieldErrors.note)
+                      else setError(r.fieldErrors?.finalReading ?? r.error)
+                    } else onDone()
+                  })
+                }
+              >
+                Thay đồng hồ
+              </Button>
+            </div>
+          </>
+        )
+      })()}
     </div>
   )
 }

@@ -75,23 +75,36 @@ export async function NewContract({ sp, showHeading = true }: { sp: NewContractS
     deposit: undefined as number | undefined,
     startDate: undefined as string | undefined,
     receivedDeposit: 0,
+    fees: undefined as
+      | {
+          feeTypeId: string | null
+          name: string
+          unit: string
+          quantitySource: 'occupants' | 'room' | 'meter' | 'period_input'
+          unitPrice: number
+          quantity: number
+          legacyFixed?: boolean
+        }[]
+      | undefined,
   }
   if (sp.deposit) {
     const d = await getDepositContract(db, ctx, sp.deposit)
+    const held = depositBalance(
+      d.entries.map((e) => ({
+        ...e,
+        type: e.type as DepositEntry['type'],
+        status: e.status as DepositEntry['status'],
+      })),
+    )
     initial = {
       roomId: d.roomId,
       tenantId: d.tenantId,
       depositId: d.id,
       rent: d.agreedRent,
-      deposit: d.depositAmount,
+      deposit: d.agreedDeposit ?? d.depositAmount,
       startDate: d.expectedMoveIn,
-      receivedDeposit: depositBalance(
-        d.entries.map((e) => ({
-          ...e,
-          type: e.type as DepositEntry['type'],
-          status: e.status as DepositEntry['status'],
-        })),
-      ),
+      receivedDeposit: held || d.depositAmount,
+      fees: d.agreedFees ?? undefined,
     }
   }
 
@@ -150,6 +163,9 @@ export async function NewContract({ sp, showHeading = true }: { sp: NewContractS
   const depositFormProps = {
     rooms: roomOptions((s) => s === 'vacant' || s === 'occupied' || s === 'ending_soon'),
     tenants: tenantOptions,
+    feeTypes: leaseFormProps.feeTypes,
+    feeDefaults,
+    feeUnits: leaseFormProps.feeUnits,
     initialRoomId: sp.room,
     initialTenantId: sp.tenant,
   }

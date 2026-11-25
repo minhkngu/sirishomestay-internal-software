@@ -11,7 +11,7 @@ import { matchesContractView, type ContractView } from '@/domain/list-filters'
 import { formatVND } from '@/domain/money'
 import type { DepositListItem, LeaseListItem } from '../../server/contracts/service'
 import type { ReactNode } from 'react'
-import { SignStateChip, Stat, TermBar, termLabel, termProgress } from '@/components/contract-ui'
+import { SignStateChip, Stat, termLabel, termProgress } from '@/components/contract-ui'
 
 const VIEWS = [
   ['active', 'Hiệu lực'],
@@ -142,8 +142,8 @@ export function ContractList({
         })}
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <label className="relative block sm:max-w-xs sm:flex-1">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <label className="relative min-w-52 flex-1 sm:max-w-xs">
           <span className="sr-only">Tìm hợp đồng</span>
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -156,17 +156,18 @@ export function ContractList({
         <FacilityFilter facilities={facilities} align="right" />
       </div>
 
-      <div className="hidden overflow-hidden rounded-2xl border border-border/80 bg-card min-[1400px]:block">
+      <div className="overflow-x-auto rounded-2xl border border-border/80 bg-card">
         <table className="w-full text-[13px]">
           <caption className="sr-only">{`${pager.total} hợp đồng trong phạm vi đang chọn`}</caption>
           <thead>
             <tr className="border-b border-border/70 text-left text-xs font-normal text-muted-foreground">
-              <th className="px-4 py-3 font-normal">Hợp đồng</th>
-              <th className="px-4 py-3 font-normal">Vị trí</th>
-              <th className="px-4 py-3 font-normal">Thời hạn</th>
-              <th className="px-4 py-3 text-right font-normal">Giá thuê / tháng</th>
-              <th className="px-4 py-3 font-normal">Ký</th>
-              <th className="px-4 py-3 text-right font-normal">Thao tác</th>
+              <th className="px-3 py-2.5 font-normal whitespace-nowrap xl:px-4 xl:py-3">Thao tác</th>
+              <th className="px-3 py-2.5 font-normal whitespace-nowrap xl:px-4 xl:py-3">Mã HĐ</th>
+              <th className="px-3 py-2.5 font-normal whitespace-nowrap xl:px-4 xl:py-3">Khách thuê</th>
+              <th className="px-3 py-2.5 font-normal whitespace-nowrap xl:px-4 xl:py-3">Phòng / Toà</th>
+              <th className="px-3 py-2.5 font-normal whitespace-nowrap xl:px-4 xl:py-3">Thời hạn</th>
+              <th className="px-3 py-2.5 text-right font-normal whitespace-nowrap xl:px-4 xl:py-3">Giá thuê</th>
+              <th className="px-3 py-2.5 font-normal whitespace-nowrap xl:px-4 xl:py-3">Ký</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60">
@@ -174,48 +175,8 @@ export function ContractList({
               const { left } = termProgress(l.startDate, l.endDate, today)
               return (
                 <tr key={l.id} className="transition-colors hover:bg-muted/30">
-                  <td className="px-4 py-3">
-                    <PopupLink
-                      className="font-medium text-foreground hover:text-primary hover:underline hover:underline-offset-2"
-                      href={`/contracts/${l.id}`}
-                    >
-                      {l.code}
-                    </PopupLink>
-                    <p className="mt-0.5 max-w-52 truncate text-xs text-muted-foreground">{l.tenantName}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="text-foreground">Phòng {l.roomCode}</p>
-                    {facilities.length > 1 && (
-                      <p className="mt-0.5 text-xs text-muted-foreground">{names[l.facilityId]}</p>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="whitespace-nowrap text-foreground">
-                      {formatDateVN(l.startDate)} – {formatDateVN(l.endDate)}
-                    </p>
-                    <div className="mt-1.5 flex items-center gap-2">
-                      <TermBar
-                        startDate={l.startDate}
-                        endDate={l.endDate}
-                        today={today}
-                        ended={l.status !== 'active'}
-                        className="w-24"
-                      />
-                      <span
-                        className={`whitespace-nowrap text-[11px] ${left <= 30 ? 'text-amber-800' : 'text-muted-foreground'}`}
-                      >
-                        {termLabel(left, l.status !== 'active')}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium tabular-nums text-foreground">
-                    {formatVND(l.monthlyRent)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <SignStateChip status={l.signStatus} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end">
+                  <td className="px-3 py-2.5 whitespace-nowrap xl:px-4 xl:py-3">
+                    <div className="flex justify-start">
                       {renderActions({
                         id: l.id,
                         kind: 'lease',
@@ -224,38 +185,46 @@ export function ContractList({
                       })}
                     </div>
                   </td>
+                  <td className="px-3 py-2.5 whitespace-nowrap xl:px-4 xl:py-3">
+                    <PopupLink
+                      className="font-medium text-foreground hover:text-primary hover:underline hover:underline-offset-2"
+                      href={`/contracts/${l.id}`}
+                    >
+                      {l.code}
+                    </PopupLink>
+                  </td>
+                  <td className="px-3 py-2.5 whitespace-nowrap xl:px-4 xl:py-3">
+                    <span className="block max-w-44 truncate text-foreground">{l.tenantName}</span>
+                  </td>
+                  <td className="px-3 py-2.5 whitespace-nowrap xl:px-4 xl:py-3">
+                    <span className="font-medium text-foreground">Phòng {l.roomCode}</span>
+                    {facilities.length > 1 && names[l.facilityId] && (
+                      <span className="text-muted-foreground"> · {names[l.facilityId]}</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5 whitespace-nowrap xl:px-4 xl:py-3">
+                    <span className="text-foreground">
+                      {formatDateVN(l.startDate)} – {formatDateVN(l.endDate)}
+                    </span>
+                    <span
+                      className={`ml-1.5 text-xs ${l.status === 'active' && left <= 30 ? 'text-amber-800' : 'text-muted-foreground'}`}
+                    >
+                      ({termLabel(left, l.status !== 'active')})
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5 text-right font-medium tabular-nums text-foreground whitespace-nowrap xl:px-4 xl:py-3">
+                    {formatVND(l.monthlyRent)}
+                  </td>
+                  <td className="px-3 py-2.5 whitespace-nowrap xl:px-4 xl:py-3">
+                    <SignStateChip status={l.signStatus} />
+                  </td>
                 </tr>
               )
             })}
             {shown.deposits.map((c) => (
               <tr key={c.id} className="transition-colors hover:bg-muted/30">
-                <td className="px-4 py-3">
-                  <PopupLink
-                    className="font-medium text-foreground hover:text-primary hover:underline hover:underline-offset-2"
-                    href={`/contracts/${c.id}`}
-                  >
-                    Cọc {c.roomCode}
-                  </PopupLink>
-                  <p className="mt-0.5 max-w-52 truncate text-xs text-muted-foreground">{c.tenantName}</p>
-                </td>
-                <td className="px-4 py-3">
-                  <p className="text-foreground">Phòng {c.roomCode}</p>
-                  {facilities.length > 1 && (
-                    <p className="mt-0.5 text-xs text-muted-foreground">{names[c.facilityId]}</p>
-                  )}
-                </td>
-                <td className="px-4 py-3">
-                  <p className="whitespace-nowrap text-foreground">Vào ở {formatDateVN(c.expectedMoveIn)}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">Giữ chỗ · chưa chuyển thành hợp đồng thuê</p>
-                </td>
-                <td className="px-4 py-3 text-right font-medium tabular-nums text-foreground">
-                  {formatVND(c.agreedRent)}
-                </td>
-                <td className="px-4 py-3">
-                  <SignStateChip status={c.signStatus} />
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex justify-end">
+                <td className="px-3 py-2.5 whitespace-nowrap xl:px-4 xl:py-3">
+                  <div className="flex justify-start">
                     {renderActions({
                       id: c.id,
                       kind: 'deposit',
@@ -264,110 +233,44 @@ export function ContractList({
                     })}
                   </div>
                 </td>
+                <td className="px-3 py-2.5 whitespace-nowrap xl:px-4 xl:py-3">
+                  <PopupLink
+                    className="font-medium text-foreground hover:text-primary hover:underline hover:underline-offset-2"
+                    href={`/contracts/${c.id}`}
+                  >
+                    Cọc {c.roomCode}
+                  </PopupLink>
+                </td>
+                <td className="px-3 py-2.5 whitespace-nowrap xl:px-4 xl:py-3">
+                  <span className="block max-w-44 truncate text-foreground">{c.tenantName}</span>
+                </td>
+                <td className="px-3 py-2.5 whitespace-nowrap xl:px-4 xl:py-3">
+                  <span className="font-medium text-foreground">Phòng {c.roomCode}</span>
+                  {facilities.length > 1 && names[c.facilityId] && (
+                    <span className="text-muted-foreground"> · {names[c.facilityId]}</span>
+                  )}
+                </td>
+                <td className="px-3 py-2.5 whitespace-nowrap xl:px-4 xl:py-3">
+                  <span className="text-foreground">Vào ở {formatDateVN(c.expectedMoveIn)}</span>
+                  <span className="ml-1.5 text-xs text-muted-foreground">(Giữ chỗ)</span>
+                </td>
+                <td className="px-3 py-2.5 text-right font-medium tabular-nums text-foreground whitespace-nowrap xl:px-4 xl:py-3">
+                  {formatVND(c.agreedRent)}
+                </td>
+                <td className="px-3 py-2.5 whitespace-nowrap xl:px-4 xl:py-3">
+                  <SignStateChip status={c.signStatus} />
+                </td>
               </tr>
             ))}
             {shown.leases.length + shown.deposits.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                <td colSpan={7} className="px-4 py-10 text-center text-sm text-muted-foreground">
                   {query ? `Không có hợp đồng nào khớp “${query}”.` : 'Không có hợp đồng nào ở trạng thái này.'}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
-      </div>
-
-      <div className="overflow-hidden rounded-2xl border border-border/80 bg-card min-[1400px]:hidden">
-        <ul className="divide-y divide-border/60">
-          {shown.leases.map((l) => (
-            <li key={l.id} className="space-y-2.5 px-4 py-3.5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <PopupLink className="font-medium text-foreground" href={`/contracts/${l.id}`}>
-                    {l.code}
-                  </PopupLink>
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{l.tenantName}</p>
-                </div>
-                <div className="shrink-0 text-right">
-                  <p className="font-semibold tabular-nums text-foreground">{formatVND(l.monthlyRent)}</p>
-                  <p className="text-[11px] text-muted-foreground">/ tháng</p>
-                  <SignStateChip status={l.signStatus} className="mt-1.5" />
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                <span>Phòng {l.roomCode}</span>
-                {facilities.length > 1 && (
-                  <>
-                    <span>·</span>
-                    <span>{names[l.facilityId]}</span>
-                  </>
-                )}
-                <span>·</span>
-                <span>
-                  {formatDateVN(l.startDate)} – {formatDateVN(l.endDate)}
-                </span>
-              </div>
-              <div className="space-y-1.5">
-                <TermBar
-                  startDate={l.startDate}
-                  endDate={l.endDate}
-                  today={today}
-                  ended={l.status !== 'active'}
-                  withLabel
-                />
-                <div className="flex justify-end">
-                  {renderActions({
-                    id: l.id,
-                    kind: 'lease',
-                    active: l.status === 'active',
-                    canDelete: deleteFacilityIds.includes(l.facilityId),
-                  })}
-                </div>
-              </div>
-            </li>
-          ))}
-          {shown.deposits.map((c) => (
-            <li key={c.id} className="space-y-2.5 px-4 py-3.5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <PopupLink className="font-medium text-foreground" href={`/contracts/${c.id}`}>
-                    Cọc {c.roomCode}
-                  </PopupLink>
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{c.tenantName}</p>
-                </div>
-                <div className="shrink-0 text-right">
-                  <p className="font-semibold tabular-nums text-foreground">{formatVND(c.agreedRent)}</p>
-                  <p className="text-[11px] text-muted-foreground">/ tháng</p>
-                  <SignStateChip status={c.signStatus} className="mt-1.5" />
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                <span>Phòng {c.roomCode}</span>
-                {facilities.length > 1 && (
-                  <>
-                    <span>·</span>
-                    <span>{names[c.facilityId]}</span>
-                  </>
-                )}
-                <span>·</span>
-                <span>Vào ở {formatDateVN(c.expectedMoveIn)}</span>
-              </div>
-              <div className="flex justify-end">
-                {renderActions({
-                  id: c.id,
-                  kind: 'deposit',
-                  active: false,
-                  canDelete: deleteFacilityIds.includes(c.facilityId),
-                })}
-              </div>
-            </li>
-          ))}
-          {shown.leases.length + shown.deposits.length === 0 && (
-            <li className="px-4 py-10 text-center text-sm text-muted-foreground">
-              {query ? `Không có hợp đồng nào khớp “${query}”.` : 'Không có hợp đồng nào ở trạng thái này.'}
-            </li>
-          )}
-        </ul>
       </div>
       <Pager {...pager} />
     </>

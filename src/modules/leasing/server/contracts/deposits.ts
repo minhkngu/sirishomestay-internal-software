@@ -1,5 +1,6 @@
 import { and, asc, eq, inArray, ne } from 'drizzle-orm'
 import { depositContracts, depositEntries, leases, rooms, tenants } from '@/db'
+import type { AgreedFee } from '@/db/schema/contracts'
 import type { DB } from '@/db/client'
 import { assertCan, facilityScope, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
@@ -15,7 +16,9 @@ export type DepositInput = {
   roomId: string
   tenantId: string
   depositAmount: number
+  agreedDeposit?: number | null
   agreedRent: number
+  agreedFees?: AgreedFee[] | null
   expectedMoveIn: string
   collected?: boolean
 }
@@ -28,7 +31,8 @@ export async function createDepositContract(
   const room = await loadRoom(db, ctx, input.roomId)
   await loadTenant(db, ctx, input.tenantId)
   if (!room.isActive) throw new ValidationError('Phòng đã ngừng sử dụng')
-  if (input.depositAmount < 0 || input.agreedRent < 0) throw new ValidationError('Số tiền không hợp lệ')
+  if (input.depositAmount < 0 || input.agreedRent < 0 || (input.agreedDeposit ?? 0) < 0)
+    throw new ValidationError('Số tiền không hợp lệ')
   return db.transaction(async (tx) => {
     const [dup] = await tx
       .select()
@@ -51,7 +55,9 @@ export async function createDepositContract(
         roomId: room.id,
         tenantId: input.tenantId,
         depositAmount: input.depositAmount,
+        agreedDeposit: input.agreedDeposit ?? input.agreedRent,
         agreedRent: input.agreedRent,
+        agreedFees: input.agreedFees ?? null,
         expectedMoveIn: input.expectedMoveIn,
       })
       .returning()
@@ -148,6 +154,7 @@ export async function updateDepositContract(
     if (before.signStatus === 'signed' && confirmedSigned !== true)
       throw new ValidationError('Cần xác nhận sửa hợp đồng đã ký')
     checkMoney(input.depositAmount)
+    if (input.agreedDeposit != null) checkMoney(input.agreedDeposit)
     checkMoney(input.agreedRent)
     checkDate(input.expectedMoveIn)
     if (!room.isActive && room.id !== before.roomId) throw new ValidationError('Phòng đã ngừng sử dụng')
@@ -171,7 +178,9 @@ export async function updateDepositContract(
         roomId: input.roomId,
         tenantId: input.tenantId,
         depositAmount: input.depositAmount,
+        ...(input.agreedDeposit !== undefined && { agreedDeposit: input.agreedDeposit }),
         agreedRent: input.agreedRent,
+        ...(input.agreedFees !== undefined && { agreedFees: input.agreedFees }),
         expectedMoveIn: input.expectedMoveIn,
         updatedAt: new Date(),
       })

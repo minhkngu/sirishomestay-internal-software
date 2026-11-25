@@ -5,6 +5,7 @@ import { useState, useTransition, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { FormDialog } from '@/components/form-dialog'
 import { Button } from '@/components/ui/button'
+import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { previewAddendumAction } from '../../server/addenda/actions'
 
@@ -14,7 +15,13 @@ type Preview = {
   invoice: { code: string; lines: { description: string; amount: number }[]; total: number } | null
 }
 type Result = { ok: true; data: unknown } | { ok: false; error: string }
-export type MeterOption = { meterId: string; roomId: string; utility: 'electric' | 'water'; serial: string | null }
+export type MeterOption = {
+  meterId: string
+  roomId: string
+  utility: 'electric' | 'water'
+  serial: string | null
+  latestReading?: { value: number; readOn: string | null }
+}
 
 /** Khung dùng chung của các wizard phụ lục: nhập → "Xem trước tiền" → lưu. Đổi dữ liệu nhập thì phải xem trước lại. */
 export function AddendumShell({
@@ -178,14 +185,22 @@ export function ReadingInputs({
     <div className="grid gap-1">
       <span className="font-medium">{title}</span>
       {meters.map((m) => (
-        <label key={m.meterId} className="flex items-center gap-2">
-          {m.utility === 'electric' ? 'Điện' : 'Nước'} {m.serial ?? ''}
+        <label key={m.meterId} className="flex flex-wrap items-center gap-2">
+          <span>
+            {m.utility === 'electric' ? 'Điện' : 'Nước'} {m.serial ?? ''}
+          </span>
           <input
             type="number"
             className={`${inputCls} w-32`}
             value={values[m.meterId] ?? ''}
             onChange={(e) => onChange({ ...values, [m.meterId]: e.target.value })}
           />
+          {m.latestReading && (
+            <span className="text-xs text-muted-foreground tabular-nums">
+              (Chốt gần nhất: {m.latestReading.value.toLocaleString('vi-VN')}
+              {m.latestReading.readOn ? ` · ${formatDateVN(m.latestReading.readOn)}` : ''})
+            </span>
+          )}
         </label>
       ))}
     </div>

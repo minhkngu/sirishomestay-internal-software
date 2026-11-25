@@ -19,64 +19,19 @@ import type { DepositEntry, ForfeitInput } from '@/domain/types'
 import { recordAudit, getSettings } from '@/modules/platform'
 
 /**
- * Chạy khi hoá đơn thanh lý được duyệt: hợp đồng → ended; sổ cọc ghi `forfeit` (mất cọc) và `deduct` (phần cọc đã trừ vào hoá đơn)
- * ở trạng thái done để số dư về 0; đặt hạn xoá ảnh. Tiền hoàn khách theo dõi trên chính hoá đơn, không ghi thêm dòng `refund`.
+ * Chốt trạng thái hợp đồng thanh lý (`ended`), cập nhật `endDate`, đặt hạn xoá ảnh bàn giao/giấy tờ,
+ * và đánh dấu `terminationFinalized: true` trong `contractVersions` để khôi phục vẫn hoạt động trọn vẹn.
  */
-export async function finalizeTermination(
+export async function applyTerminationClosure(
   tx: DB,
   ctx: AccessContext,
-  invoice: { id: string; leaseId: string; facilityId: string },
+  opts: { leaseId: string; facilityId: string; endDate: string; versionId?: string },
 ): Promise<void> {
-  const [a] = await tx
-    .select()
-    .from(addenda)
-    .where(and(eq(addenda.leaseId, invoice.leaseId), eq(addenda.type, 'termination')))
-    .orderBy(desc(addenda.createdAt))
-    .limit(1)
-  if (!a) return
-  const [lease] = await tx.select().from(leases).where(eq(leases.id, invoice.leaseId))
+  const [lease] = await tx.select().from(leases).where(eq(leases.id, opts.leaseId))
   if (!lease || lease.status === 'ended') return
-  const endDate = a.effectiveDate
+  const endDate = opts.endDate
   await tx.update(leases).set({ status: 'ended', endDate, updatedAt: new Date() }).where(eq(leases.id, lease.id))
 
-  const entries = await tx.select().from(depositEntries).where(eq(depositEntries.leaseId, lease.id))
-  const balance = depositBalance(
-    entries.map((e) => ({
-      id: e.id,
-      date: e.date,
-      type: e.type as DepositEntry['type'],
-      amount: e.amount,
-      status: e.status as DepositEntry['status'],
-    })),
-  )
-  const forfeit = (a.depositForfeit ?? { mode: 'none' }) as ForfeitInput
-  const forfeited =
-    forfeit.mode === 'all' ? balance : forfeit.mode === 'partial' ? Math.min(forfeit.amount ?? 0, balance) : 0
-  const offsetLines = await tx
-    .select({ amount: invoiceLines.amount })
-    .from(invoiceLines)
-    .where(and(eq(invoiceLines.invoiceId, invoice.id), eq(invoiceLines.type, 'deposit_offset')))
-  const offset = Math.min(-offsetLines.reduce((n, l) => n + l.amount, 0), balance - forfeited)
-  if (forfeited > 0)
-    await tx.insert(depositEntries).values({
-      leaseId: lease.id,
-      date: endDate,
-      type: 'forfeit',
-      amount: forfeited,
-      status: 'done',
-      note: 'Mất cọc khi thanh lý',
-    })
-  if (offset > 0)
-    await tx.insert(depositEntries).values({
-      leaseId: lease.id,
-      date: endDate,
-      type: 'deduct',
-      amount: offset,
-      status: 'done',
-      note: `Trừ vào hoá đơn thanh lý`,
-    })
-
-  // Hạn xoá ảnh: ảnh bàn giao của hợp đồng; ảnh giấy tờ chỉ khi khách không còn hợp đồng thuê/cọc khác
   const { photoRetentionDays } = await getSettings(tx)
   const deleteAfter = addDays(endDate, photoRetentionDays)
   const items = await tx
@@ -85,7 +40,7 @@ export async function finalizeTermination(
     .innerJoin(handovers, eq(handovers.id, handoverItems.handoverId))
     .where(eq(handovers.leaseId, lease.id))
   const beforeFiles: (typeof files.$inferSelect)[] = []
-  if (items.length)
+  if (items.length) {
     beforeFiles.push(
       ...(await tx
         .select()
@@ -100,7 +55,6 @@ export async function finalizeTermination(
           ),
         )),
     )
-  if (items.length)
     await tx
       .update(files)
       .set({ deleteAfter, updatedAt: new Date() })
@@ -113,6 +67,7 @@ export async function finalizeTermination(
           ),
         ),
       )
+  }
   const occupants = await tx
     .select({ id: leaseOccupants.tenantId })
     .from(leaseOccupants)
@@ -148,18 +103,20 @@ export async function finalizeTermination(
         .where(and(eq(files.ownerType, 'tenant_document'), eq(files.ownerId, tenantId)))
     }
   }
-  const [version] = await tx
-    .select()
-    .from(contractVersions)
-    .where(
-      and(
-        eq(contractVersions.contractId, lease.id),
-        eq(contractVersions.kind, 'lease'),
-        eq(contractVersions.operation, 'termination'),
-      ),
-    )
-    .orderBy(desc(contractVersions.sequence))
-    .limit(1)
+  const [version] = opts.versionId
+    ? await tx.select().from(contractVersions).where(eq(contractVersions.id, opts.versionId)).limit(1)
+    : await tx
+        .select()
+        .from(contractVersions)
+        .where(
+          and(
+            eq(contractVersions.contractId, lease.id),
+            eq(contractVersions.kind, 'lease'),
+            eq(contractVersions.operation, 'termination'),
+          ),
+        )
+        .orderBy(desc(contractVersions.sequence))
+        .limit(1)
   if (version) {
     const retention = beforeFiles.map((file) => ({
       id: file.id,
@@ -177,9 +134,76 @@ export async function finalizeTermination(
     action: 'update',
     entity: 'lease',
     entityId: lease.id,
-    facilityId: invoice.facilityId,
+    facilityId: opts.facilityId,
     summary: `Thanh lý hợp đồng ${lease.code}`,
     before: { status: lease.status, endDate: lease.endDate },
-    after: { status: 'ended', endDate, forfeited, offset },
+    after: { status: 'ended', endDate },
   })
+}
+
+/**
+ * Chạy khi hoá đơn thanh lý được duyệt: chốt hợp đồng nếu chưa chốt (dữ liệu cũ);
+ * ghi sổ cọc `forfeit` (mất cọc) và `deduct` (phần cọc đã trừ vào hoá đơn) ở trạng thái done để số dư về 0.
+ */
+export async function finalizeTermination(
+  tx: DB,
+  ctx: AccessContext,
+  invoice: { id: string; leaseId: string; facilityId: string },
+): Promise<void> {
+  const [a] = await tx
+    .select()
+    .from(addenda)
+    .where(and(eq(addenda.leaseId, invoice.leaseId), eq(addenda.type, 'termination')))
+    .orderBy(desc(addenda.createdAt))
+    .limit(1)
+  if (!a) return
+  const [lease] = await tx.select().from(leases).where(eq(leases.id, invoice.leaseId))
+  if (!lease) return
+  const endDate = a.effectiveDate
+  if (lease.status !== 'ended') {
+    await applyTerminationClosure(tx, ctx, {
+      leaseId: lease.id,
+      facilityId: invoice.facilityId,
+      endDate,
+    })
+  }
+
+  const entries = await tx.select().from(depositEntries).where(eq(depositEntries.leaseId, lease.id))
+  const alreadySettled = entries.some((e) => e.status === 'done' && (e.type === 'forfeit' || e.type === 'deduct'))
+  if (alreadySettled) return
+  const balance = depositBalance(
+    entries.map((e) => ({
+      id: e.id,
+      date: e.date,
+      type: e.type as DepositEntry['type'],
+      amount: e.amount,
+      status: e.status as DepositEntry['status'],
+    })),
+  )
+  const forfeit = (a.depositForfeit ?? { mode: 'none' }) as ForfeitInput
+  const forfeited =
+    forfeit.mode === 'all' ? balance : forfeit.mode === 'partial' ? Math.min(forfeit.amount ?? 0, balance) : 0
+  const offsetLines = await tx
+    .select({ amount: invoiceLines.amount })
+    .from(invoiceLines)
+    .where(and(eq(invoiceLines.invoiceId, invoice.id), eq(invoiceLines.type, 'deposit_offset')))
+  const offset = Math.min(-offsetLines.reduce((n, l) => n + l.amount, 0), balance - forfeited)
+  if (forfeited > 0)
+    await tx.insert(depositEntries).values({
+      leaseId: lease.id,
+      date: endDate,
+      type: 'forfeit',
+      amount: forfeited,
+      status: 'done',
+      note: 'Mất cọc khi thanh lý',
+    })
+  if (offset > 0)
+    await tx.insert(depositEntries).values({
+      leaseId: lease.id,
+      date: endDate,
+      type: 'deduct',
+      amount: offset,
+      status: 'done',
+      note: `Trừ vào hoá đơn thanh lý`,
+    })
 }

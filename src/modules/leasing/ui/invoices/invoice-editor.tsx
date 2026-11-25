@@ -229,14 +229,12 @@ function FirstInvoiceReadings({
   editable,
   consumption,
   onSave,
-  initial,
 }: {
   snap: { opening: number; closing: number }
   unit: string
   editable: boolean
   consumption: number
   onSave: (opening: number, closing: number) => void
-  initial?: { value: number; readOn: string } | null
 }) {
   const [open, setOpen] = useState(false)
   const [o, setO] = useState(''),
@@ -252,15 +250,6 @@ function FirstInvoiceReadings({
         Số đầu kỳ <span className="font-medium text-foreground">{fmtN(snap.opening)}</span> · Số cuối kỳ{' '}
         <span className="font-medium text-foreground">{fmtN(snap.closing)}</span>
       </p>
-      {initial && (
-        <p className="mt-0.5 tabular-nums">
-          Chốt lúc ký hợp đồng {formatDateVN(initial.readOn)}:{' '}
-          <span className="font-medium text-foreground">
-            {fmtN(initial.value)} {unit}
-          </span>{' '}
-          <span className="text-muted-foreground/80">(số hiện tại của hợp đồng)</span>
-        </p>
-      )}
       <p className="mt-0.5">
         Tiêu thụ:{' '}
         <span className="font-medium tabular-nums text-foreground">
@@ -473,7 +462,6 @@ function MeterReadingsPanel({
         editable={editable && !!onSnapshot}
         consumption={consumption}
         onSave={(o, c) => onSnapshot?.(o, c)}
-        initial={panel.initial}
       />
     )
   }
@@ -553,6 +541,11 @@ function MeterReadingsPanel({
                 onChange={(e) => setInitialEdit({ ...initialEdit, text: e.target.value })}
                 className="h-9 text-right tabular-nums"
               />
+              {initialEdit.text.trim() !== '' && !/^\d+$/.test(initialEdit.text.trim()) && (
+                <p role="alert" className="text-xs text-destructive">
+                  Chỉ số phải là số nguyên không âm
+                </p>
+              )}
             </div>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="ghost" onClick={() => setInitialEdit(null)}>

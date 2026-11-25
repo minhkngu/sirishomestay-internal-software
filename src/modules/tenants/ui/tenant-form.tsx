@@ -56,23 +56,24 @@ export type CreatedTenant = {
 }
 
 type Props = {
-  facilities: { id: string; name: string }[]
+  facilities?: { id: string; name: string }[]
   /** Dùng trong popup tạo nhanh: tạo xong gọi hàm này thay vì chuyển sang trang khách. */
   onCreated?: (tenant: CreatedTenant) => void
+  /** Dùng khi sửa trong popup: lưu xong gọi hàm này thay vì điều hướng. */
+  onSaved?: () => void
   /** Không tạo ngay: chỉ trả bản nháp qua onCreated để nơi gọi tạo khi lưu. */
   deferCreate?: boolean
   /** Chỉ cho chọn các loại khách này (mặc định cả ba). */
   kinds?: Kind[]
   /** Bỏ khung card khi form đã nằm trong popup. */
   bare?: boolean
-  tenant?: { id: string; kind: Kind; homeFacilityId: string; note: string } & Record<string, string | null>
+  tenant?: { id: string; kind: Kind; homeFacilityId: string | null; note: string } & Record<string, string | null>
 }
 
-export function TenantForm({ facilities, tenant, onCreated, kinds, deferCreate, bare = false }: Props) {
+export function TenantForm({ tenant, onCreated, onSaved, kinds, deferCreate, bare = false }: Props) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [kind, setKind] = useState<Kind>(tenant?.kind ?? kinds?.[0] ?? 'foreign')
-  const [homeFacilityId, setHome] = useState(tenant?.homeFacilityId ?? facilities[0]?.id ?? '')
   const [note, setNote] = useState(tenant?.note ?? '')
   const [values, setValues] = useState<Record<string, string>>(() => {
     const v: Record<string, string> = {}
@@ -88,7 +89,7 @@ export function TenantForm({ facilities, tenant, onCreated, kinds, deferCreate, 
     start(async () => {
       const payload = {
         kind,
-        homeFacilityId,
+        homeFacilityId: tenant?.homeFacilityId ?? null,
         note,
         ...Object.fromEntries(FIELDS[kind].map((f) => [f.key, values[f.key] ?? ''])),
       }
@@ -120,6 +121,11 @@ export function TenantForm({ facilities, tenant, onCreated, kinds, deferCreate, 
         })
         return
       }
+      if (tenant && onSaved) {
+        onSaved()
+        router.refresh()
+        return
+      }
       router.push(`/tenants/${r.data.id}`)
       router.refresh()
     })
@@ -143,22 +149,6 @@ export function TenantForm({ facilities, tenant, onCreated, kinds, deferCreate, 
             {TENANT_KIND_LABELS[k]}
           </button>
         ))}
-      </div>
-      <div className="space-y-1">
-        <Label htmlFor="home">Cơ sở quản lý</Label>
-        <select
-          id="home"
-          value={homeFacilityId}
-          onChange={(e) => setHome(e.target.value)}
-          className="h-8 w-full rounded-lg border px-2 text-sm"
-        >
-          {facilities.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.name}
-            </option>
-          ))}
-        </select>
-        {fe.homeFacilityId && <p className="text-sm text-destructive">{fe.homeFacilityId}</p>}
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {FIELDS[kind].map((f) => (

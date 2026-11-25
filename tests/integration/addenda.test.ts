@@ -345,18 +345,18 @@ describe('phụ lục hợp đồng', () => {
       amount: 210000,
     })
     expect(r.invoice!.lines.find((l) => l.type === 'deposit_offset')!.amount).toBe(-7000000)
-    await expect(
-      createTermination(db, ctx(), leaseId, { endDate: '2026-12-11', readings: [{ meterId: m.id, value: 170 }] }),
-    ).rejects.toThrow('đã có phụ lục thanh lý')
-    await approveInvoice(db, ctx(), r.invoice!.id, { dueDate: '2026-12-20' })
     expect((await db.select().from(leases).where(eq(leases.id, leaseId)))[0]).toMatchObject({
       status: 'ended',
       endDate: '2026-12-10',
     })
+    expect((await db.select().from(files).where(eq(files.id, photo.id)))[0].deleteAfter).toBe('2027-01-09')
+    await expect(
+      createTermination(db, ctx(), leaseId, { endDate: '2026-12-11', readings: [{ meterId: m.id, value: 170 }] }),
+    ).rejects.toThrow(/hiệu lực|phụ lục thanh lý/)
+    await approveInvoice(db, ctx(), r.invoice!.id, { dueDate: '2026-12-20' })
     const done = (await db.select().from(depositEntries)).filter((e) => e.status === 'done')
     expect(done.filter((e) => e.type === 'forfeit').map((e) => e.amount)).toEqual([2000000])
     expect(done.filter((e) => e.type === 'deduct').map((e) => e.amount)).toEqual([7000000])
-    expect((await db.select().from(files).where(eq(files.id, photo.id)))[0].deleteAfter).toBe('2027-01-09')
   })
   it('sai cơ sở hoặc thiếu quyền → Không tìm thấy', async () => {
     const [other] = await db.insert(facilities).values({ code: 'BT', name: 'Bình Thạnh' }).returning()

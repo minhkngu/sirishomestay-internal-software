@@ -29,6 +29,11 @@ export function AddMeterButton({
   const [installedOn, setInstalledOn] = useState(() => todayVN())
   const [error, setError] = useState<string | null>(null)
 
+  const invalidStartReading =
+    startReading.trim() !== '' && !/^\d+$/.test(startReading.trim())
+      ? 'Nhập chỉ số đầu là số nguyên không âm'
+      : null
+
   function submit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
@@ -40,7 +45,7 @@ export function AddMeterButton({
       setError('Chọn loại đồng hồ')
       return
     }
-    if (!/^\d+$/.test(startReading.trim())) {
+    if (invalidStartReading || startReading.trim() === '') {
       setError('Nhập chỉ số đầu là số nguyên không âm')
       return
     }
@@ -145,12 +150,12 @@ export function AddMeterButton({
             />
           </div>
           <DateField id="add-meter-date" label="Ngày lắp" value={installedOn} onValueChange={setInstalledOn} />
-          {error && (
+          {(invalidStartReading ?? error) && (
             <p role="alert" className="text-sm text-destructive">
-              {error}
+              {invalidStartReading ?? error}
             </p>
           )}
-          <Button type="submit" disabled={pending}>
+          <Button type="submit" disabled={pending || !!invalidStartReading}>
             Thêm đồng hồ
           </Button>
         </form>

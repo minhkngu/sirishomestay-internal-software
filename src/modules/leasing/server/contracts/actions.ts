@@ -171,14 +171,29 @@ export async function quickContractDataAction(kind: 'lease' | 'deposit', id: str
     const { getLease, getDepositContract } = await import('./service')
     const { listRooms } = await import('@/modules/facilities')
     const { searchTenants, displayName } = await import('@/modules/tenants')
-    const { addendumFormData } = await import('../addenda/service')
+    const { addendumFormData, getTerminationCheckoutAssets } = await import('../addenda/service')
     const { listLeaseOccupants } = await import('./service')
+    const { depositBalance } = await import('@/domain/deposit')
     const contract = kind === 'lease' ? await getLease(db, ctx, id) : await getDepositContract(db, ctx, id)
-    const [allRooms, allTenants, form] = await Promise.all([
+    const isActiveLease = kind === 'lease' && 'status' in contract && contract.status === 'active'
+    const [allRooms, allTenants, form, checkoutAssets] = await Promise.all([
       listRooms(db, ctx, { includeInactive: true }),
       searchTenants(db, ctx, { limit: null }),
-      kind === 'lease' && 'status' in contract && contract.status === 'active' ? addendumFormData(db, ctx, id) : null,
+      isActiveLease ? addendumFormData(db, ctx, id) : null,
+      isActiveLease ? getTerminationCheckoutAssets(db, ctx, id) : [],
     ])
+    const currentDepositBalance =
+      kind === 'lease'
+        ? depositBalance(
+            (contract as Awaited<ReturnType<typeof getLease>>).depositEntries.map((e) => ({
+              id: e.id,
+              date: e.date,
+              type: e.type,
+              amount: e.amount,
+              status: e.status,
+            })),
+          )
+        : 0
     const editContract =
       kind === 'lease'
         ? (() => {
@@ -216,7 +231,7 @@ export async function quickContractDataAction(kind: 'lease' | 'deposit', id: str
           ])
         : []
     const people = allTenants
-      .filter((t) => t.homeFacilityId === contract.facilityId)
+      .filter((t) => !t.homeFacilityId || t.homeFacilityId === contract.facilityId)
       .map((t) => ({
         id: t.id,
         name: displayName(t),
@@ -388,15 +403,19 @@ export async function quickContractDataAction(kind: 'lease' | 'deposit', id: str
       contract: editContract,
       rooms: allRooms.filter((r) => r.facilityId === contract.facilityId).map((r) => ({ id: r.id, label: r.code })),
       tenants: allTenants
-        .filter((t) => t.homeFacilityId === contract.facilityId)
+        .filter((t) => !t.homeFacilityId || t.homeFacilityId === contract.facilityId)
         .map((t) => ({ id: t.id, label: displayName(t) })),
       form: form
         ? {
+            startDate: form.startDate,
             endDate: form.endDate,
             today: form.today,
             meters: form.meters,
+            terminationMeters: form.terminationMeters,
             currentRoomId: form.currentRoomId,
             freeRooms: form.freeRooms,
+            checkoutAssets,
+            depositBalance: currentDepositBalance,
           }
         : null,
     }

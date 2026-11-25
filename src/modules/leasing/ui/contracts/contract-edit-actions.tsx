@@ -1023,22 +1023,33 @@ export function ContractEditActions({
         confirmLabel="Lưu thay đổi"
         onConfirm={doSave}
       />
-      {error && (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      )}
-      {editing && (
-        <div className="sticky bottom-0 -mx-1 flex flex-wrap items-center gap-3 border-t bg-background px-1 pt-3">
-          <Button type="submit" form="edit-contract-form" disabled={pending}>
-            Lưu thay đổi
-          </Button>
-          <p className="text-xs text-muted-foreground">
-            Mọi thay đổi trong cửa sổ này (thông tin, người ở, phí, mẫu, tài sản, giấy tờ, sổ cọc) chỉ được lưu khi bấm
-            nút này.
-          </p>
-        </div>
-      )}
+      {(() => {
+        const repError =
+          editOccupants && !occ.some((o) => o.id === tenantId)
+            ? 'Người đại diện phải nằm trong danh sách người ở'
+            : ''
+        const shownError = repError || error
+        return (
+          <>
+            {shownError && (
+              <p role="alert" className="text-sm text-destructive">
+                {shownError}
+              </p>
+            )}
+            {editing && (
+              <div className="sticky bottom-0 -mx-1 flex flex-wrap items-center gap-3 border-t bg-background px-1 pt-3">
+                <Button type="submit" form="edit-contract-form" disabled={pending || !!repError}>
+                  Lưu thay đổi
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Mọi thay đổi trong cửa sổ này (thông tin, người ở, phí, mẫu, tài sản, giấy tờ, sổ cọc) chỉ được lưu
+                  khi bấm nút này.
+                </p>
+              </div>
+            )}
+          </>
+        )
+      })()}
       <FormDialog
         open={meterFee !== null}
         onOpenChange={(o) => {
@@ -1073,6 +1084,11 @@ export function ContractEditActions({
                 value={meterReading}
                 onChange={(e) => setMeterReading(e.target.value)}
               />
+              {meterReading.trim() !== '' && !/^\d+$/.test(meterReading.trim()) && (
+                <p role="alert" className="text-xs text-destructive">
+                  Chỉ số phải là số nguyên không âm
+                </p>
+              )}
             </div>
             <Button
               type="button"

@@ -31,6 +31,15 @@ type Initial = {
   deposit?: number
   startDate?: string
   receivedDeposit?: number
+  fees?: {
+    feeTypeId: string | null
+    name: string
+    unit: string
+    quantitySource: 'occupants' | 'room' | 'meter' | 'period_input'
+    unitPrice: number
+    quantity: number
+    legacyFixed?: boolean
+  }[]
 }
 type Props = {
   assets: AssetOption[]
@@ -126,27 +135,68 @@ export function LeaseWizard({
   const defaultFees = (facilityId?: string) =>
     feeTypes.filter((f) => (feeDefaults[facilityId ?? ''] ?? []).includes(f.id)).map((f) => makeFee(f, facilityId))
   const [fees, setFees] = useState<FeeDraft[]>(() =>
-    defaultFees(rooms.find((r) => r.id === initial.roomId)?.facilityId),
+    initial.fees?.length
+      ? initial.fees.map((f) => ({
+          key: crypto.randomUUID(),
+          feeTypeId: f.feeTypeId,
+          name: f.name,
+          unit: f.unit,
+          quantitySource: f.quantitySource,
+          legacyFixed: f.legacyFixed,
+          price: String(f.unitPrice),
+          quantity: String(f.quantity),
+          initialReading: '',
+        }))
+      : defaultFees(rooms.find((r) => r.id === initial.roomId)?.facilityId),
   )
   const [overrideProration, setOverrideProration] = useState('')
   const [dayOfMonth, setDayOfMonth] = useState('')
   const [cycle, setCycle] = useState('1')
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
-  const fieldError = (name: string) =>
-    fieldErrors[name] ? (
-      <p role="alert" className="text-xs text-destructive">
-        {fieldErrors[name]}
-      </p>
-    ) : null
 
-  // Cảnh báo ngay khi gõ, không đợi bấm tạo
-  const warnBig = (v: string) =>
-    Number(v) > MAX_MONEY ? (
+  // Cảnh báo ngay sau khi điền trường (không đợi bấm tạo)
+  const liveErrors: Record<string, string> = {}
+  if (endDate && startDate && endDate < startDate) liveErrors.endDate = 'Ngày kết thúc phải sau ngày bắt đầu'
+  if (rent.trim() !== '') {
+    if (!Number.isSafeInteger(Number(rent)) || Number(rent) < 0) liveErrors.monthlyRent = 'Nhập giá thuê hợp lệ'
+    else if (Number(rent) > MAX_MONEY) liveErrors.monthlyRent = TOO_BIG
+  }
+  if (deposit.trim() !== '') {
+    if (!Number.isSafeInteger(Number(deposit)) || Number(deposit) < 0) liveErrors.depositAmount = 'Nhập tiền cọc hợp lệ'
+    else if (Number(deposit) > MAX_MONEY) liveErrors.depositAmount = TOO_BIG
+  }
+  if (
+    received.trim() !== '' &&
+    (!Number.isSafeInteger(Number(received)) ||
+      Number(received) < (initial.receivedDeposit ?? 0) ||
+      (deposit.trim() !== '' && Number(received) > Number(deposit)))
+  ) {
+    liveErrors.receivedDeposit = 'Tiền thực nhận phải từ cọc kế thừa đến tiền cọc'
+  }
+  for (const fee of fees) {
+    if (
+      (fee.price.trim() !== '' && (!Number.isSafeInteger(Number(fee.price)) || Number(fee.price) < 0)) ||
+      (fee.legacyFixed &&
+        fee.quantity.trim() !== '' &&
+        (!Number.isSafeInteger(Number(fee.quantity)) || Number(fee.quantity) < 0))
+    ) {
+      liveErrors.fees = `Kiểm tra đơn giá hoặc số lượng phí ${fee.name}`
+    }
+    if (fee.initialReading.trim() !== '' && !/^\d+$/.test(fee.initialReading.trim())) {
+      liveErrors.fees = `Chỉ số đầu phí ${fee.name} phải là số nguyên không âm`
+    }
+  }
+  const hasLiveError = Object.keys(liveErrors).length > 0
+
+  const fieldError = (name: string) => {
+    const msg = liveErrors[name] ?? fieldErrors[name]
+    return msg ? (
       <p role="alert" className="text-xs text-destructive">
-        {TOO_BIG}
+        {msg}
       </p>
     ) : null
+  }
 
   const tenant = tenants.find((t) => t.id === tenantId)
   const room = rooms.find((r) => r.id === roomId)
@@ -508,12 +558,12 @@ export function LeaseWizard({
             <Field
               label="Giá thuê tháng (VND)"
               htmlFor="rent"
-              error={fieldError('monthlyRent') ?? warnBig(rent)}
+              error={fieldError('monthlyRent')}
               className="sm:col-span-2"
             >
               <MoneyInput id="rent" value={rent} onValueChange={setRent} />
             </Field>
-            <Field label="Tiền cọc (VND)" htmlFor="deposit" error={fieldError('depositAmount') ?? warnBig(deposit)}>
+            <Field label="Tiền cọc (VND)" htmlFor="deposit" error={fieldError('depositAmount')}>
               <MoneyInput id="deposit" value={deposit} onValueChange={setDeposit} />
             </Field>
             <Field
@@ -733,7 +783,7 @@ export function LeaseWizard({
                 </Button>
               </div>
             ) : (
-              <Button className="w-full" disabled={pending || !!createdId} onClick={submit}>
+              <Button className="w-full" disabled={pending || !!createdId || hasLiveError} onClick={submit}>
                 {pending ? 'Đang tạo…' : 'Tạo hợp đồng thuê'}
               </Button>
             )}

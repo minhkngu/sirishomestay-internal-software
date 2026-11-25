@@ -14,14 +14,17 @@ export function InvoiceFeeQuantities({ invoiceId, fees }: { invoiceId: string; f
   const [error, setError] = useState('')
   const [pending, start] = useTransition()
   if (!fees.length) return null
+  const invalidQty = fees.some((f) => {
+    const raw = values[f.id]?.trim() ?? ''
+    if (raw === '') return false
+    const n = Number(raw)
+    return !Number.isSafeInteger(n) || n < 0
+  })
   function save() {
+    if (invalidQty) return
     const items = fees
       .filter((f) => values[f.id]?.trim() !== '')
       .map((f) => ({ leaseFeeId: f.id, quantity: Number(values[f.id]) }))
-    if (items.some((item) => !Number.isSafeInteger(item.quantity) || item.quantity < 0)) {
-      setError('Nhập số lượng nguyên không âm')
-      return
-    }
     start(async () => {
       const result = await saveInvoiceFeeQuantitiesAction(invoiceId, items)
       if (!result.ok) setError(result.error)
@@ -48,12 +51,12 @@ export function InvoiceFeeQuantities({ invoiceId, fees }: { invoiceId: string; f
           />
         </label>
       ))}
-      {error && (
+      {(invalidQty ? 'Nhập số lượng nguyên không âm' : error) && (
         <p role="alert" className="text-sm text-destructive">
-          {error}
+          {invalidQty ? 'Nhập số lượng nguyên không âm' : error}
         </p>
       )}
-      <Button type="button" disabled={pending} onClick={save}>
+      <Button type="button" disabled={pending || invalidQty} onClick={save}>
         Lưu số lượng
       </Button>
     </section>

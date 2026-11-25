@@ -53,6 +53,7 @@ export async function updateLease(
     const tx = raw as unknown as DB
     const [before] = await tx.select().from(leases).where(eq(leases.id, id)).for('update')
     if (!before) throw new NotFoundError()
+    if (before.status === 'ended') throw new ValidationError('Hợp đồng đã thanh lý, không thể sửa')
     await loadRoom(tx, ctx, before.roomId)
     const target = await loadRoom(tx, ctx, input.roomId)
     await loadTenant(tx, ctx, input.tenantId)

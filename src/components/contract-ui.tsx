@@ -114,7 +114,7 @@ export function Stat({
   children?: React.ReactNode
 }) {
   return (
-    <div className="min-w-0 px-4 py-4 sm:px-5">
+    <div className="min-w-0 px-3 py-2.5 sm:px-4 sm:py-3.5">
       <p className="text-xs text-muted-foreground">{label}</p>
       {value !== undefined && (
         <p

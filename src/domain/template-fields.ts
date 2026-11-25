@@ -76,6 +76,7 @@ const SERVICE_FEES = loop('phi_dich_vu', 'Danh sách phí dịch vụ', [
   { key: 'don_vi', label: 'Đơn vị', example: 'người' },
   { key: 'so_luong', label: 'Số lượng', example: '2' },
   { key: 'don_gia', label: 'Đơn giá', example: '200.000' },
+  { key: 'chi_so_dau', label: 'Chỉ số đầu', example: '1.200 (15/10/2026)' },
 ])
 const OCCUPANTS = loop('nguoi_o', 'Danh sách người ở', [
   { key: 'ho_ten', label: 'Họ tên', example: 'John Miller' },
@@ -87,6 +88,20 @@ const INVOICE_LINES = loop('dong', 'Các dòng hoá đơn', [
   { key: 'don_gia', label: 'Đơn giá', example: '9.000.000' },
   { key: 'thanh_tien', label: 'Thành tiền', example: '9.000.000' },
 ])
+const HANDOVER_CHECK_IN: Field[] = [
+  f('ma_hop_dong', 'Mã hợp đồng', 'TD-HĐ-2026-0001'),
+  f('ngay_ban_giao', 'Ngày bàn giao', '15/10/2026'),
+  loop('tai_san', 'Danh sách tài sản', [
+    { key: 'ma', label: 'Mã tài sản', example: 'TS-0101' },
+    { key: 'ten', label: 'Tên tài sản', example: 'Máy lạnh' },
+    { key: 'tinh_trang', label: 'Tình trạng', example: ASSET_CONDITION.good },
+  ]),
+  loop('chi_so', 'Chỉ số điện nước', [
+    { key: 'loai', label: 'Loại (điện/nước)', example: 'Điện' },
+    { key: 'so_dong_ho', label: 'Số đồng hồ', example: 'E-301' },
+    { key: 'chi_so', label: 'Chỉ số', example: '1200' },
+  ]),
+]
 const HANDOVER: Field[] = [
   f('ma_hop_dong', 'Mã hợp đồng', 'TD-HĐ-2026-0001'),
   f('ngay_ban_giao', 'Ngày bàn giao', '15/10/2026'),
@@ -174,7 +189,7 @@ export const TEMPLATE_FIELDS: Record<DocType, Field[]> = {
     f('tien_hoan_khach', 'Số tiền hoàn cho khách', '11.080.000'),
     f('tien_khach_tra_them', 'Số tiền khách trả thêm', '0'),
   ],
-  handover_check_in: [...PERSON, ...SITE, ...HANDOVER],
+  handover_check_in: [...PERSON, ...SITE, ...HANDOVER_CHECK_IN],
   handover_check_out: [...PERSON, ...SITE, ...HANDOVER],
   invoice_monthly: [...PERSON, ...SITE.filter((x) => x.key !== 'ngay_lap'), ...INVOICE],
   invoice_termination: [
@@ -231,7 +246,7 @@ export type DocEntities = {
     newDepositAmount?: number | null
     newRoomCode?: string | null
   }
-  fees?: { name: string; unit: string; quantity: number; unitPrice: number }[]
+  fees?: { name: string; unit: string; quantity: number; unitPrice: number; initialReading?: string }[]
   invoice?: {
     code: string
     periodStart: string
@@ -286,6 +301,7 @@ export function buildTemplateData(docType: DocType, e: DocEntities): Record<stri
       don_vi: x.unit,
       so_luong: x.quantity,
       don_gia: formatVND(x.unitPrice),
+      chi_so_dau: x.initialReading ?? '',
     })),
     nguoi_o: (e.occupants ?? []).map((x) => ({ ho_ten: x.fullName, giay_to: x.idDocument ?? '' })),
     // phụ lục

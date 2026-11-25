@@ -77,8 +77,21 @@ export function ReadingHistory({
     setReadOn(row.readOn)
     setError('')
   }
+  const liveEditError = (() => {
+    if (!editing) return ''
+    if (value.trim() !== '' && !/^\d+$/.test(value.trim())) return 'Nhập số cuối kỳ là số nguyên không âm'
+    const handover = editing.kind === 'handover'
+    if (!handover && openValue.trim() !== '' && !/^\d+$/.test(openValue.trim())) {
+      return 'Nhập số đầu kỳ là số nguyên không âm'
+    }
+    if (!handover && value.trim() !== '' && openValue.trim() !== '' && Number(value) < Number(openValue)) {
+      return 'Số cuối kỳ không được nhỏ hơn số đầu kỳ'
+    }
+    return ''
+  })()
+
   const save = () => {
-    if (!editing) return
+    if (!editing || liveEditError) return
     if (!/^\d+$/.test(value.trim())) {
       setError('Nhập số cuối kỳ là số nguyên không âm')
       return
@@ -86,10 +99,6 @@ export function ReadingHistory({
     const handover = editing.kind === 'handover'
     if (!handover && !/^\d+$/.test(openValue.trim())) {
       setError('Nhập số đầu kỳ là số nguyên không âm')
-      return
-    }
-    if (!handover && Number(value) < Number(openValue)) {
-      setError('Số cuối kỳ không được nhỏ hơn số đầu kỳ')
       return
     }
     start(async () => {
@@ -318,16 +327,16 @@ export function ReadingHistory({
               />
             </div>
             <DateField id="history-read-on" label="Ngày chốt" value={readOn} onValueChange={setReadOn} />
-            {error && (
+            {(liveEditError || error) && (
               <p role="alert" className="text-sm text-destructive">
-                {error}
+                {liveEditError || error}
               </p>
             )}
             <div className="flex justify-end gap-2">
               <Button type="button" variant="ghost" onClick={() => setEditing(null)}>
                 Huỷ
               </Button>
-              <Button type="button" disabled={pending} onClick={save}>
+              <Button type="button" disabled={pending || !!liveEditError} onClick={save}>
                 {pending ? 'Đang lưu…' : 'Lưu'}
               </Button>
             </div>

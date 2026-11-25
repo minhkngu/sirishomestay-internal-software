@@ -8,6 +8,7 @@ import {
   incidents,
   invoiceLines,
   invoices,
+  leaseOccupants,
   leases,
   meterReadings,
   meters,
@@ -33,7 +34,35 @@ function daysBetween(fromIso: string, toIso: string): number {
   return Math.round((Date.parse(toIso + 'T00:00:00Z') - Date.parse(fromIso + 'T00:00:00Z')) / 86400000)
 }
 
-/** Khách nước ngoài có visa hết hạn trong ngưỡng cảnh báo (kể cả đã hết hạn), sắp xếp tăng dần. */
+/** Ánh xạ tenantId -> facilityId cho khách đang ở (đứng tên hoặc ở cùng hợp đồng thuê hiệu lực). */
+async function activeStayingFacilityByTenant(
+  db: DB,
+  activeLeaseRows: { leaseId: string; tenantId: string; facilityId: string }[],
+): Promise<Map<string, string>> {
+  const byTenant = new Map<string, string>()
+  if (activeLeaseRows.length === 0) return byTenant
+  const facilityByLease = new Map<string, string>()
+  for (const row of activeLeaseRows) {
+    facilityByLease.set(row.leaseId, row.facilityId)
+    if (!byTenant.has(row.tenantId)) byTenant.set(row.tenantId, row.facilityId)
+  }
+  const occupants = await db
+    .select({ leaseId: leaseOccupants.leaseId, tenantId: leaseOccupants.tenantId })
+    .from(leaseOccupants)
+    .where(
+      inArray(
+        leaseOccupants.leaseId,
+        activeLeaseRows.map((x) => x.leaseId),
+      ),
+    )
+  for (const occ of occupants) {
+    const fid = facilityByLease.get(occ.leaseId)
+    if (fid && !byTenant.has(occ.tenantId)) byTenant.set(occ.tenantId, fid)
+  }
+  return byTenant
+}
+
+/** Khách nước ngoài đang ở có visa hết hạn trong ngưỡng cảnh báo (kể cả đã hết hạn), sắp xếp tăng dần. */
 export async function getExpiringVisas(
   db: DB,
   ctx: AccessContext,
@@ -41,28 +70,37 @@ export async function getExpiringVisas(
   now?: Date,
 ): Promise<ExpiringVisa[]> {
   if (!can(ctx, 'tenants_contracts')) return []
-  const base = today ?? todayVN(now)
-  const { visaWarningDays } = await getSettings(db)
-  const conds = [
-    eq(tenants.kind, 'foreign'),
-    isNotNull(tenants.visaExpiry),
-    lte(tenants.visaExpiry, addDays(base, visaWarningDays)),
-  ]
   const scope = facilityScope(ctx)
-  if (scope !== 'all') {
-    if (scope.length === 0) return []
-    conds.push(inArray(tenants.homeFacilityId, scope))
-  }
+  if (scope !== 'all' && scope.length === 0) return []
+  const base = today ?? todayVN(now)
+  const [{ visaWarningDays }, activeLeaseRows, facilityRows] = await Promise.all([
+    getSettings(db),
+    db
+      .select({ leaseId: leases.id, tenantId: leases.tenantId, facilityId: rooms.facilityId })
+      .from(leases)
+      .innerJoin(rooms, eq(rooms.id, leases.roomId))
+      .where(and(eq(leases.status, 'active'), scope === 'all' ? undefined : inArray(rooms.facilityId, scope))),
+    db.select({ id: facilities.id, name: facilities.name }).from(facilities),
+  ])
+  const stayingMap = await activeStayingFacilityByTenant(db, activeLeaseRows)
+  if (stayingMap.size === 0) return []
+  const facilityNameById = new Map(facilityRows.map((f) => [f.id, f.name]))
   const rows = await db
-    .select({ id: tenants.id, name: tenants.fullName, facilityName: facilities.name, visaExpiry: tenants.visaExpiry })
+    .select({ id: tenants.id, name: tenants.fullName, visaExpiry: tenants.visaExpiry })
     .from(tenants)
-    .innerJoin(facilities, eq(facilities.id, tenants.homeFacilityId))
-    .where(and(...conds))
+    .where(
+      and(
+        inArray(tenants.id, [...stayingMap.keys()]),
+        eq(tenants.kind, 'foreign'),
+        isNotNull(tenants.visaExpiry),
+        lte(tenants.visaExpiry, addDays(base, visaWarningDays)),
+      ),
+    )
     .orderBy(asc(tenants.visaExpiry), asc(tenants.fullName))
   return rows.map((r) => ({
     tenantId: r.id,
     name: r.name ?? '',
-    facilityName: r.facilityName,
+    facilityName: facilityNameById.get(stayingMap.get(r.id) ?? '') ?? '',
     visaExpiry: r.visaExpiry!,
     daysLeft: daysBetween(base, r.visaExpiry!),
   }))
@@ -163,21 +201,33 @@ export async function getDashboard(
       .filter((i) => i.dueDate && i.dueDate < today && i.total > i.paid)
       .reduce((n, i) => n + i.total - i.paid, 0)
   }
-  const visas = wantTenants
-    ? (
-        await db
-          .select({ id: tenants.id, name: tenants.fullName, f: tenants.homeFacilityId, v: tenants.visaExpiry })
-          .from(tenants)
-          .where(
-            and(
-              eq(tenants.kind, 'foreign'),
-              isNotNull(tenants.visaExpiry),
-              lte(tenants.visaExpiry, addDays(today, settings.visaWarningDays)),
-              inScope(tenants.homeFacilityId),
-            ),
-          )
-      ).map((r) => ({ tenantId: r.id, name: r.name ?? '', facilityId: r.f ?? '', visaExpiry: r.v! }))
-    : []
+  const stayingMap = wantTenants
+    ? await activeStayingFacilityByTenant(
+        db,
+        activeLeases.map((x) => ({ leaseId: x.l.id, tenantId: x.l.tenantId, facilityId: x.facilityId })),
+      )
+    : new Map<string, string>()
+  const visas =
+    wantTenants && stayingMap.size > 0
+      ? (
+          await db
+            .select({ id: tenants.id, name: tenants.fullName, v: tenants.visaExpiry })
+            .from(tenants)
+            .where(
+              and(
+                inArray(tenants.id, [...stayingMap.keys()]),
+                eq(tenants.kind, 'foreign'),
+                isNotNull(tenants.visaExpiry),
+                lte(tenants.visaExpiry, addDays(today, settings.visaWarningDays)),
+              ),
+            )
+        ).map((r) => ({
+          tenantId: r.id,
+          name: r.name ?? '',
+          facilityId: stayingMap.get(r.id) ?? '',
+          visaExpiry: r.v!,
+        }))
+      : []
 
   let metersMissing: Snapshot['metersMissing'] = []
   if (can(ctx, 'meters')) {

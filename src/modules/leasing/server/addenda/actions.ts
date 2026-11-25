@@ -28,6 +28,7 @@ const summary = (r: Awaited<ReturnType<typeof createExtension>>) => ({
   adjustments: r.adjustments,
   depositEntry: r.depositEntry,
   invoice: r.invoice,
+  handoverItems: r.handoverItems ?? [],
 })
 export async function previewAddendumAction(kind: AddendumKind, leaseId: string, input: unknown) {
   const ctx = await getAccessContext()
