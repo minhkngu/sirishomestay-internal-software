@@ -25,7 +25,7 @@
 - Kỳ trả trước bắt đầu sau ngày trả: hoàn trọn kỳ (tiền phòng và phí cố định).
 - Phí đồng hồ (dòng `fee` không có `meta.from`) và hoá đơn nháp không bị hoàn.
 - Hoàn một phần: bằng đúng mức tối đa thì được; vượt 1 đồng thì báo lỗi; không có gì để hoàn mà nhập số > 0 thì báo lỗi; số 0 coi như không hoàn.
-- "Không hoàn" nhưng không có kỳ nào vượt ngày trả: không thêm dòng ghi chú.
+- Hoá đơn thanh lý luôn có dòng hoàn: không có gì để hoàn (không kỳ nào vượt ngày trả, hoặc chọn không hoàn) thì dòng đó là 0 đồng, không bao giờ vắng dòng.
 - Client cũ không gửi `rentRefund`: kết quả y như trước.
 
 ## Cấu trúc file
@@ -59,7 +59,8 @@
   - `'không hoàn: không có dòng hoàn, có một dòng ghi chú 0 đồng'`: `rentRefund: { mode: 'none' }` → không dòng nào `amount < 0` loại `refund`; có đúng một dòng `refund` `amount: 0` mô tả bắt đầu bằng `Không hoàn`; `total === -8_080_000`; `maxRefund === 3_000_000`.
   - `'hoàn một phần: một dòng gộp'`: `{ mode: 'partial', amount: 1_000_000 }` → đúng một dòng `refund` `amount: -1_000_000`, `total === -9_080_000`.
   - `'hoàn một phần vượt mức tối đa thì cắt về mức tối đa'`: `amount: 5_000_000` → dòng `-3_000_000`.
-  - `'không có kỳ nào vượt ngày trả → chọn không hoàn không thêm dòng'`: `endDate: '2026-11-30'`, `rentRefund: { mode: 'none' }` → không dòng `refund`, `maxRefund === 0`.
+  - `'không có kỳ nào vượt ngày trả → vẫn có một dòng hoàn 0 đồng'`: `endDate: '2026-11-30'`, với cả ba chế độ → đúng một dòng `refund` `amount: 0`, `maxRefund === 0`, `total` không đổi so với không có dòng đó.
+  - `'hoàn một phần nhập 0 → dòng hoàn 0 đồng'`: `{ mode: 'partial', amount: 0 }` → đúng một dòng `refund` `amount: 0`.
   - `'không truyền rentRefund = hoàn theo ngày'`: kết quả bằng với `{ mode: 'by_days' }`.
 
 - [ ] **Step 2: Chạy riêng để thấy lỗi**
@@ -69,7 +70,7 @@ Expected: các test mới FAIL (thiếu `maxRefund`/dòng hoàn phí).
 
 - [ ] **Step 3: Thêm `RentRefundInput`** vào `src/domain/types.ts` ngay dưới `ForfeitInput`, và `RENT_REFUND_MODES` (`as const`) vào `liquidation.ts`.
 
-- [ ] **Step 4: Cài đặt** trong `liquidation.ts`: thay khối hoàn hiện tại (dòng 38-59) bằng việc gom `candidates: InvoiceLineInput[]` rồi áp lựa chọn. Chữ ký không đổi ngoài `rentRefund?` và `maxRefund` trả về. Giữ nguyên cách tính dòng hoàn tiền phòng hiện tại. Với mỗi hoá đơn tiền phòng đã duyệt có `periodEnd > endDate`, thêm dòng hoàn cho mỗi dòng `type === 'fee'` có `meta.from` và `meta.to` là chuỗi ngày và `meta.to > endDate`: `from' = max(endDate + 1, meta.from)`, `amount = -Math.round(line.quantity * line.unitPrice * prorateFraction(from', meta.to, proration))`, `description = Hoàn ${line.description} đã trả trước dd/mm–dd/mm`, `type: 'refund'`, bỏ qua nếu `amount === 0`. Áp lựa chọn: `by_days` → thêm mọi `candidates`; `none` → nếu `candidates` không rỗng thì thêm một dòng `refund` `quantity: 1, unitPrice: 0, amount: 0` mô tả `Không hoàn tiền phòng và phí dịch vụ đã trả trước dd/mm–dd/mm` (từ ngày nhỏ nhất đến lớn nhất của các khoảng hoàn); `partial` → nếu `min(amount, maxRefund) > 0` thì một dòng `refund` `quantity: 1`, `unitPrice = amount = -min(amount, maxRefund)`, mô tả `Hoàn một phần tiền phòng và phí dịch vụ đã trả trước`; ngược lại xử lý như `none`.
+- [ ] **Step 4: Cài đặt** trong `liquidation.ts`: thay khối hoàn hiện tại (dòng 38-59) bằng việc gom `candidates: InvoiceLineInput[]` rồi áp lựa chọn. Chữ ký không đổi ngoài `rentRefund?` và `maxRefund` trả về. Giữ nguyên cách tính dòng hoàn tiền phòng hiện tại. Với mỗi hoá đơn tiền phòng đã duyệt có `periodEnd > endDate`, thêm dòng hoàn cho mỗi dòng `type === 'fee'` có `meta.from` và `meta.to` là chuỗi ngày và `meta.to > endDate`: `from' = max(endDate + 1, meta.from)`, `amount = -Math.round(line.quantity * line.unitPrice * prorateFraction(from', meta.to, proration))`, `description = Hoàn ${line.description} đã trả trước dd/mm–dd/mm`, `type: 'refund'`, bỏ qua nếu `amount === 0`. Áp lựa chọn: `by_days` → thêm mọi `candidates`; `none` → một dòng `refund` `quantity: 1, unitPrice: 0, amount: 0`, mô tả `Không hoàn tiền phòng và phí dịch vụ đã trả trước dd/mm–dd/mm` (từ ngày nhỏ nhất đến lớn nhất của các khoảng `candidates`; không có `candidates` thì `Không hoàn tiền phòng đã trả trước`); `partial` → nếu `min(amount, maxRefund) > 0` thì một dòng `refund` `quantity: 1`, `unitPrice = amount = -min(amount, maxRefund)`, mô tả `Hoàn một phần tiền phòng và phí dịch vụ đã trả trước`; ngược lại xử lý như `none`. Quy tắc chung: sau khi áp lựa chọn mà chưa có dòng `refund` nào (kể cả `by_days` không có `candidates`) thì thêm dòng 0 đồng `Hoàn tiền phòng đã trả trước: 0`; hoá đơn thanh lý luôn có ít nhất một dòng `refund`.
 
 - [ ] **Step 5: Chạy lại cho PASS**
 
@@ -99,6 +100,7 @@ git commit -m "feat: chọn cách hoàn tiền phòng đã trả trước khi th
   - `'thanh lý không hoàn: hoá đơn không có dòng hoàn âm'` → `rentRefund: { mode: 'none' }` và `r.invoice!.lines` không có dòng `refund` có `amount < 0`.
   - `'thanh lý hoàn một phần vượt mức tối đa bị từ chối'` → `rejects.toMatchObject({ fieldErrors: { rentRefund: expect.any(String) } })`.
   - `'thanh lý không gửi rentRefund vẫn hoàn theo ngày'`.
+  - Rà các test thanh lý hiện có trong file này và `tests/e2e`: test nào đếm số dòng hoặc so sánh nguyên danh sách dòng của hoá đơn thanh lý thì cập nhật cho có thêm dòng hoàn 0 đồng (không sửa kỳ vọng tiền).
   - `'hoá đơn thanh lý không hoàn vẫn duyệt được'`: duyệt hoá đơn có dòng ghi chú 0 đồng bằng hàm duyệt đang dùng ở test `finalize` trong file này, hợp đồng chuyển `ended`.
 
 - [ ] **Step 2: Chạy riêng để thấy lỗi**
