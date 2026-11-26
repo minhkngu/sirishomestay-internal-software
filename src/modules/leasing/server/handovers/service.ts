@@ -1,6 +1,17 @@
 import { and, asc, desc, eq, inArray, isNotNull, ne } from 'drizzle-orm'
 import { ASSET_CONDITION } from '@/domain/asset-labels'
-import { assets, facilities, files, handoverItems, handovers, leases, rooms, tenants } from '@/db'
+import {
+  assets,
+  facilities,
+  files,
+  handoverItems,
+  handovers,
+  leases,
+  meterReadings,
+  meters,
+  rooms,
+  tenants,
+} from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
@@ -247,6 +258,13 @@ for (const docType of ['handover_check_in', 'handover_check_out'] as const) {
     const [tenant] = await db.select().from(tenants).where(eq(tenants.id, lease.tenantId))
     const [room] = await db.select().from(rooms).where(eq(rooms.id, h.roomId))
     const [fac] = await db.select().from(facilities).where(eq(facilities.id, room.facilityId))
+    // Chỉ số chốt trong ngày bàn giao (thanh lý ghi chỉ số cuối ở ngày này)
+    const handoverReadings = await db
+      .select({ utility: meters.utility, serial: meters.serial, value: meterReadings.value })
+      .from(meterReadings)
+      .innerJoin(meters, eq(meters.id, meterReadings.meterId))
+      .where(and(eq(meters.roomId, h.roomId), eq(meterReadings.readOn, h.date), eq(meterReadings.kind, 'handover')))
+      .orderBy(asc(meters.utility), asc(meters.serial))
     return {
       facilityId: room.facilityId,
       baseName: `${h.kind === 'check_in' ? 'check-in' : 'check-out'}-${room.code}-${h.date}`,
@@ -281,6 +299,16 @@ for (const docType of ['handover_check_in', 'handover_check_out'] as const) {
                 ? `${ASSET_CONDITION.damaged} — ${i.condition}`
                 : i.condition,
             penalty: i.penalty,
+          })),
+          readings: handoverReadings.map((r) => ({
+            kind:
+              r.utility === 'electric'
+                ? ('electric' as const)
+                : r.utility === 'water'
+                  ? ('water' as const)
+                  : ('fee' as const),
+            serial: r.serial ?? '',
+            value: r.value,
           })),
         },
       },

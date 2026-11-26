@@ -181,7 +181,10 @@ describe('phụ lục hợp đồng', () => {
         forfeit: { mode: 'none' },
         readings: [{ meterId: m.id, value: 2140 }],
       })
-      expect(r.invoice!.lines.find((l) => l.description.startsWith('Điện'))).toMatchObject({ quantity: 7 })
+      expect(r.invoice!.lines.find((l) => l.description.startsWith('Điện'))).toMatchObject({
+        quantity: 7,
+        meta: { segments: [{ meterId: m.id, start: 2133, end: 2140 }] },
+      })
       const kept = await db.select().from(meterReadings).where(eq(meterReadings.meterId, m.id))
       expect(kept).toHaveLength(1)
       expect(kept[0].value).toBe(2133)

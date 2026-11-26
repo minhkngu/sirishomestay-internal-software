@@ -1079,7 +1079,26 @@ export function InvoiceEditor(p: Props) {
                             }
                           />
                         ) : (
-                          <span className="text-muted-foreground/60">—</span>
+                          (() => {
+                            // Hoá đơn thanh lý không có bảng chốt theo tháng: hiện chỉ số đầu, cuối đã lưu trên dòng
+                            const segs = Array.isArray(l.meta?.segments)
+                              ? (l.meta.segments as { start?: unknown; end?: unknown }[]).filter(
+                                  (x) => typeof x.start === 'number' && typeof x.end === 'number',
+                                )
+                              : []
+                            return segs.length ? (
+                              <span className="tabular-nums text-foreground">
+                                {segs
+                                  .map(
+                                    (x) =>
+                                      `${(x.start as number).toLocaleString('vi-VN')} → ${(x.end as number).toLocaleString('vi-VN')}`,
+                                  )
+                                  .join('; ')}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground/60">—</span>
+                            )
+                          })()
                         )
                       })()}
                     </td>

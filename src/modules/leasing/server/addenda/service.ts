@@ -806,7 +806,7 @@ export async function createTermination(
           )
       : []
     // Phí tính theo đồng hồ: mức dùng theo từng đoạn phòng, chỉ từ ngày bắt đầu hợp đồng, qua mọi đồng hồ cùng loại của phòng
-    const meterFees: { leaseFeeId: string; name: string; unit: string; usage: number; unitPrice: number }[] = []
+    const meterFees: NonNullable<Parameters<typeof buildTerminationInvoice>[0]['meterFees']> = []
     for (const f of terms.fees.filter((x) => x.quantitySource === 'meter' && x.leaseFeeId)) {
       const linked = ms.find((m) => m.id === feeLinks.find((x) => x.leaseFeeId === f.leaseFeeId)?.meterId)
       if (!linked) throw new ValidationError(`Chưa có đồng hồ ${f.name} để tính tiền`)
@@ -822,6 +822,7 @@ export async function createTermination(
       })
       if (u.missing.length) throw new ValidationError(`Chưa có chỉ số ${f.name} để tính tiền`)
       let usage = u.usage
+      let segments = u.segments
       // Thanh lý trong ngày bắt đầu: không còn ngày nào sau ngày bắt đầu nên tính thẳng từ chỉ số đầu đến chỉ số chốt
       const startReading = keepStartReadings.has(linked.id)
         ? startReadings.find((r) => r.meterId === linked.id)
@@ -831,8 +832,9 @@ export async function createTermination(
         if (endValue < startReading.value)
           throw new ValidationError('Chỉ số mới nhỏ hơn chỉ số cũ', { value: 'Chỉ số mới nhỏ hơn chỉ số cũ' })
         usage = endValue - startReading.value
+        segments = [{ meterId: linked.id, start: startReading.value, end: endValue }]
       }
-      meterFees.push({ leaseFeeId: f.leaseFeeId!, name: f.name, unit: f.unit, usage, unitPrice: f.unitPrice })
+      meterFees.push({ leaseFeeId: f.leaseFeeId!, name: f.name, unit: f.unit, usage, unitPrice: f.unitPrice, segments })
     }
     const built = buildTerminationInvoice({
       terms,

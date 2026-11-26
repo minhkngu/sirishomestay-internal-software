@@ -262,6 +262,7 @@ const CONTENT: Record<TemplateDocType, Content> = {
     ],
     articles: [
       { t: 'Tài sản khi trả phòng', p: ['@bang:tai_san'] },
+      { t: 'Chỉ số điện nước chốt khi trả phòng', p: ['@bang:chi_so'] },
       { t: 'Tiền phạt', p: ['Tổng tiền phạt do hư hỏng hoặc mất tài sản: [tong_phat].'] },
       {
         t: 'Xác nhận',

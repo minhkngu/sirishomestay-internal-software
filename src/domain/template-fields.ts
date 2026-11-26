@@ -257,7 +257,7 @@ export type DocEntities = {
     bank?: { bankName: string; accountNumber: string; accountName: string } | null
     lines: { description: string; quantity: number; unitPrice: number; amount: number }[]
   }
-  /** `readings` không còn dùng: biên bản bàn giao đã bỏ chỉ số; mẫu cũ vẫn nhận mảng rỗng. */
+  /** `readings`: chỉ số chốt trong ngày bàn giao (thanh lý); rỗng khi ngày đó không chốt chỉ số. */
   handover?: {
     date: string
     items: { code: string; name: string; condition: string; penalty?: number }[]

@@ -2222,12 +2222,11 @@ export async function getInvoiceDetail(db: DB, ctx: AccessContext, id: string) {
 }
 function pdfLine(line: typeof invoiceLines.$inferSelect) {
   const meta = line.meta as { unit?: unknown; segments?: { start?: unknown; end?: unknown }[] } | null
-  const segments =
-    (line.type === 'electric' || line.type === 'water') && Array.isArray(meta?.segments)
-      ? meta.segments
-          .filter((segment) => typeof segment.start === 'number' && typeof segment.end === 'number')
-          .map((segment) => `${segment.start} đến ${segment.end}`)
-      : []
+  const segments = Array.isArray(meta?.segments)
+    ? meta.segments
+        .filter((segment) => typeof segment.start === 'number' && typeof segment.end === 'number')
+        .map((segment) => `${segment.start} đến ${segment.end}`)
+    : []
   return {
     description: segments.length ? `${line.description} (${segments.join('; ')})` : line.description,
     quantity: line.quantity,

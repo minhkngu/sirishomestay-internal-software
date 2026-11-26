@@ -1,3 +1,4 @@
+import type { MeterSegment } from '@/domain/meters'
 import { addDays, daysInMonth, formatDateVN } from '@/domain/dates'
 import { prorateFraction } from './proration'
 import type {
@@ -21,7 +22,14 @@ export type TerminationInput = {
   endDate: ISODate
   approvedInvoices: Invoice[]
   /** phí tính theo đồng hồ (điện, nước, phí khác) từ đầu tháng tới ngày trả phòng, mức dùng đã tính bằng meterUsage, đơn giá của dòng phí hợp đồng */
-  meterFees: { leaseFeeId: string; name: string; unit: string; usage: number; unitPrice: number }[]
+  meterFees: {
+    leaseFeeId: string
+    name: string
+    unit: string
+    usage: number
+    unitPrice: number
+    /** chỉ số đầu, cuối của từng đồng hồ, in trên hoá đơn */ segments?: MeterSegment[]
+  }[]
   oneOffs: OneOffCharge[]
   pending: PendingAdjustment[]
   penalties: { description: string; amount: number }[]
@@ -151,7 +159,7 @@ export function buildTerminationInvoice(input: TerminationInput): {
       quantity: f.usage,
       unitPrice: f.unitPrice,
       amount: Math.round(f.usage * f.unitPrice),
-      meta: { leaseFeeId: f.leaseFeeId, unit: f.unit },
+      meta: { leaseFeeId: f.leaseFeeId, unit: f.unit, ...(f.segments?.length && { segments: f.segments }) },
     })
   }
   for (const o of input.oneOffs.filter((x) => !x.invoicedInId)) {
