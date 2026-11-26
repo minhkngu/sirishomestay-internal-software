@@ -3,7 +3,7 @@ import postgres from 'postgres'
 import { eq, sql } from 'drizzle-orm'
 import * as schema from '../src/db'
 import type { DB } from '../src/db/client'
-import { syncDepositWithInvoice } from '../src/modules/leasing/server/invoices/service'
+import { syncDepositWithInvoice } from '../src/modules/leasing/server/invoices/deposit-sync'
 
 try {
   process.loadEnvFile('.env.local')
