@@ -1082,12 +1082,19 @@ export async function exportAddendum(
   storage: StorageAdapter,
   id: string,
   templateId?: string,
+  /** Xem trước: ra PDF để mở xem ngay, không đổi trạng thái ký. */
+  preview = false,
 ) {
   const { a } = await loadAddendum(db, ctx, id)
   const docType = DOC[a.type as keyof typeof DOC]
   if (!docType) throw new ValidationError('Loại phụ lục này chưa có mẫu giấy tờ')
-  const r = await exportDocument(db, ctx, storage, { docType, entityId: id, templateId })
-  if (a.signStatus === 'draft') await setAddendumSignStatus(db, ctx, id, 'exported')
+  const r = await exportDocument(db, ctx, storage, {
+    docType,
+    entityId: id,
+    templateId,
+    ...(preview && { format: 'pdf' as const }),
+  })
+  if (!preview && a.signStatus === 'draft') await setAddendumSignStatus(db, ctx, id, 'exported')
   return r
 }
 for (const docType of Object.values(DOC)) {

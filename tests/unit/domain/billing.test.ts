@@ -727,11 +727,9 @@ describe('buildTerminationInvoice', () => {
       const r = buildTerminationInvoice({ ...input(), approvedInvoices: [{ ...paidNov, status: 'draft' }] })
       expect(r.maxRefund).toBe(0)
     })
-    it('không hoàn: một dòng hoàn 0 đồng kèm chú thích', () => {
+    it('không hoàn: không có dòng hoàn', () => {
       const r = buildTerminationInvoice({ ...input(), approvedInvoices: [paidNovFee], rentRefund: { mode: 'none' } })
-      expect(refunds(r)).toHaveLength(1)
-      expect(refunds(r)[0]).toMatchObject({ amount: 0 })
-      expect(refunds(r)[0].description).toMatch(/^Không hoàn/)
+      expect(refunds(r)).toHaveLength(0)
       expect(r.total).toBe(-8_080_000)
       expect(r.maxRefund).toBe(3_100_000)
     })
@@ -744,11 +742,11 @@ describe('buildTerminationInvoice', () => {
       const r = buildTerminationInvoice({ ...input(), rentRefund: { mode: 'partial', amount: 5_000_000 } })
       expect(refunds(r).map((l) => l.amount)).toEqual([-3_000_000])
     })
-    it('hoàn một phần nhập 0 → dòng hoàn 0 đồng', () => {
+    it('hoàn một phần nhập 0 → không có dòng hoàn', () => {
       const r = buildTerminationInvoice({ ...input(), rentRefund: { mode: 'partial', amount: 0 } })
-      expect(refunds(r).map((l) => l.amount)).toEqual([0])
+      expect(refunds(r)).toHaveLength(0)
     })
-    it('không có kỳ nào vượt ngày trả → vẫn có một dòng hoàn 0 đồng ở cả ba chế độ', () => {
+    it('không có kỳ nào vượt ngày trả → không có dòng hoàn ở cả ba chế độ', () => {
       const base = buildTerminationInvoice({ ...input(), endDate: '2026-11-30' })
       for (const rentRefund of [
         { mode: 'by_days' as const },
@@ -756,7 +754,7 @@ describe('buildTerminationInvoice', () => {
         { mode: 'none' as const },
       ]) {
         const r = buildTerminationInvoice({ ...input(), endDate: '2026-11-30', rentRefund })
-        expect(refunds(r).map((l) => l.amount)).toEqual([0])
+        expect(refunds(r)).toHaveLength(0)
         expect(r.maxRefund).toBe(0)
         expect(r.total).toBe(base.total)
       }

@@ -132,6 +132,9 @@ const INVOICE: Field[] = [
   f('ghi_chu', 'Ghi chú của hoá đơn', 'Chuyển khoản trước hạn để được giữ giá'),
   f('da_thanh_toan', 'Đã thanh toán', '0'),
   f('con_lai', 'Còn phải trả', '9.380.000'),
+  f('ket_luan', 'Kết luận thanh toán (ai trả ai)', 'Khách phải thanh toán: 9.380.000 ₫'),
+  f('ket_luan_bang_chu', 'Kết luận bằng chữ', 'Chín triệu ba trăm tám mươi nghìn đồng'),
+  f('tom_tat_thanh_toan', 'Tóm tắt đã thanh toán, còn lại', 'Đã thanh toán: 0 ₫ · Còn phải trả: 9.380.000 ₫'),
   INVOICE_LINES,
 ]
 
@@ -329,6 +332,22 @@ export function buildTemplateData(docType: DocType, e: DocEntities): Record<stri
     so_tai_khoan: e.invoice?.bank?.accountNumber ?? '',
     chu_tai_khoan: e.invoice?.bank?.accountName ?? '',
     noi_dung_ck: e.invoice?.code ?? '',
+    // Tổng dương: khách trả Siris; tổng âm: Siris hoàn trả khách (đã hoàn thì paid âm)
+    ket_luan:
+      invoiceTotal == null
+        ? ''
+        : invoiceTotal < 0
+          ? `Siris hoàn trả khách: ${m(-invoiceTotal)} ₫`
+          : invoiceTotal > 0
+            ? `Khách phải thanh toán: ${m(invoiceTotal)} ₫`
+            : 'Không phát sinh khoản phải thanh toán',
+    ket_luan_bang_chu: invoiceTotal == null ? '' : w(Math.abs(invoiceTotal)),
+    tom_tat_thanh_toan:
+      invoiceTotal == null
+        ? ''
+        : invoiceTotal < 0
+          ? `Đã hoàn: ${m(-(e.invoice?.paid ?? 0))} ₫ · Còn phải hoàn: ${m(Math.max((e.invoice?.paid ?? 0) - invoiceTotal, 0))} ₫`
+          : `Đã thanh toán: ${m(e.invoice?.paid ?? 0)} ₫ · Còn phải trả: ${m(Math.max(invoiceTotal - (e.invoice?.paid ?? 0), 0))} ₫`,
     da_thanh_toan: m(e.invoice?.paid ?? 0),
     con_lai: m(invoiceTotal == null ? null : invoiceTotal - (e.invoice?.paid ?? 0)),
     tien_hoan_khach: m(refund),

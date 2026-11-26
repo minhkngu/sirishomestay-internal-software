@@ -10,7 +10,7 @@ Khi thanh lý, khách có thể đã đóng trước tiền phòng cho các kỳ
 - *Hoàn theo ngày* hoàn mọi kỳ đã duyệt kết thúc sau ngày trả, gồm cả tiền phòng và phí cố định hằng tháng đã thu trước (theo phòng, theo đầu người) của các ngày không ở. Mỗi khoản một dòng riêng trên hoá đơn thanh lý.
 - *Hoàn một phần*: nhân viên nhập tổng số tiền hoàn, không vượt tổng tính theo ngày.
 - *Không hoàn*: tiền hoàn bằng 0; hoá đơn vẫn có dòng hoàn 0 đồng kèm chú thích khoản đã trả trước không hoàn để đối chiếu.
-- Hoá đơn thanh lý luôn có dòng hoàn: không có gì để hoàn thì dòng đó là 0 đồng (Lucas chốt 2026-11-25).
+- Không có tiền hoàn thì hoá đơn thanh lý không có dòng hoàn (không để dòng 0 đồng) đồng (Lucas chốt 2026-11-25).
 
 ## Không làm
 - Không tự áp quy tắc báo trước (spec gốc đã quy định: nhân viên quyết).

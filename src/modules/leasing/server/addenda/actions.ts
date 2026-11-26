@@ -86,10 +86,10 @@ export async function setAddendumSignStatusAction(
     return {}
   })
 }
-export async function exportAddendumAction(id: string, templateId?: string) {
+export async function exportAddendumAction(id: string, templateId?: string, preview = false) {
   const ctx = await getAccessContext()
   return toActionResult(async () => {
-    const r = await exportAddendum(db, ctx, getStorage(), id, templateId)
+    const r = await exportAddendum(db, ctx, getStorage(), id, templateId, preview)
     refresh()
     return r
   })

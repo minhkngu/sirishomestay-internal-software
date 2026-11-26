@@ -550,10 +550,10 @@ describe('phụ lục hợp đồng', () => {
     it('thanh lý 20/11, mất cọc toàn bộ → −2.080.000', async () => {
       expect((await terminate({ mode: 'all' })).invoice!.total).toBe(-2080000)
     })
-    it('thanh lý không hoàn tiền phòng: dòng hoàn 0 đồng, hoá đơn vẫn duyệt được', async () => {
+    it('thanh lý không hoàn tiền phòng: không có dòng hoàn, hoá đơn vẫn duyệt được', async () => {
       const r = await terminate({ mode: 'none' }, { mode: 'none' })
       const refunds = r.invoice!.lines.filter((l) => l.type === 'refund')
-      expect(refunds.map((l) => l.amount)).toEqual([0])
+      expect(refunds).toHaveLength(0)
       expect(r.invoice!.total).toBe(-8080000)
       await approveInvoice(db, ctx(), r.invoice!.id, { dueDate: '2026-11-30' })
       expect((await db.select().from(leases).where(eq(leases.id, leaseId)))[0].status).toBe('ended')

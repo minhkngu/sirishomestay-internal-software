@@ -43,6 +43,22 @@ export function AddendaList({
                 disabled={pending}
                 onClick={() =>
                   start(async () => {
+                    const r = await exportAddendumAction(a.id, undefined, true)
+                    if (!r.ok) toast.error(r.error)
+                    else window.open(`/api/files/${r.data.fileId}?inline=1`, '_blank', 'noopener')
+                  })
+                }
+              >
+                Xem trước
+              </Button>
+            )}
+            {a.type !== 'occupants' && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={pending}
+                onClick={() =>
+                  start(async () => {
                     const r = await exportAddendumAction(a.id)
                     if (!r.ok) toast.error(r.error)
                     else {

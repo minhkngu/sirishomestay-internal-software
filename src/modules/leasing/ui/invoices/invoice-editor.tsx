@@ -1310,8 +1310,10 @@ export function InvoiceEditor(p: Props) {
             <dd className="font-medium tabular-nums">{formatVND(tax)}</dd>
           </div>
           <div className="flex justify-between gap-3 border-t border-border/70 pt-2">
-            <dt className="font-semibold text-foreground">Tổng tiền</dt>
-            <dd className="text-base font-bold tabular-nums text-primary">{formatVND(total)}</dd>
+            <dt className="font-semibold text-foreground">
+              {total < 0 ? 'Siris hoàn trả khách' : total > 0 ? 'Khách phải thanh toán' : 'Tổng tiền'}
+            </dt>
+            <dd className="text-base font-bold tabular-nums text-primary">{formatVND(Math.abs(total))}</dd>
           </div>
         </dl>
       </section>

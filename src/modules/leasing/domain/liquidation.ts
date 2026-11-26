@@ -61,7 +61,6 @@ export function buildTerminationInvoice(input: TerminationInput): {
     (i) => i.status === 'approved' && i.lines.some((l) => l.type === 'rent'),
   )
   const refundCandidates: InvoiceLineInput[] = []
-  const refundSpans: [ISODate, ISODate][] = []
   const dayAfterEnd = addDays(endDate, 1)
   let covered: ISODate | null = null
   for (const inv of rentInvoices) {
@@ -78,7 +77,6 @@ export function buildTerminationInvoice(input: TerminationInput): {
           unitPrice: terms.monthlyRent,
           amount,
         })
-        refundSpans.push([from, inv.periodEnd])
       }
       // phí cố định hằng tháng thu trước (dòng `fee` có meta.from/to); phí theo đồng hồ thu sau nên không có meta này
       for (const l of inv.lines) {
@@ -97,7 +95,6 @@ export function buildTerminationInvoice(input: TerminationInput): {
           unitPrice: l.quantity * l.unitPrice,
           amount: feeAmount,
         })
-        refundSpans.push([feeFrom, metaTo])
       }
     }
   }
@@ -106,6 +103,7 @@ export function buildTerminationInvoice(input: TerminationInput): {
   if (refund.mode === 'by_days') {
     lines.push(...refundCandidates)
   } else {
+    // Không hoàn (hoặc hoàn một phần nhập 0): không có tiền hoàn thì không có dòng hoàn
     const kept = refund.mode === 'partial' ? Math.min(refund.amount ?? 0, maxRefund) : 0
     if (kept > 0) {
       lines.push({
@@ -115,27 +113,8 @@ export function buildTerminationInvoice(input: TerminationInput): {
         unitPrice: -kept,
         amount: -kept,
       })
-    } else {
-      const from = refundSpans.map((s) => s[0]).sort()[0]
-      const to = refundSpans
-        .map((s) => s[1])
-        .sort()
-        .at(-1)
-      lines.push({
-        type: 'refund',
-        description:
-          from && to
-            ? `Không hoàn tiền phòng và phí dịch vụ đã trả trước ${rangeLabel(from, to)}`
-            : 'Không hoàn tiền phòng đã trả trước',
-        quantity: 1,
-        unitPrice: 0,
-        amount: 0,
-      })
     }
   }
-  // hoá đơn thanh lý luôn có dòng hoàn: không có gì để hoàn thì 0 đồng
-  if (!lines.some((l) => l.type === 'refund'))
-    lines.push({ type: 'refund', description: 'Hoàn tiền phòng đã trả trước: 0', quantity: 1, unitPrice: 0, amount: 0 })
   if (!covered || covered < endDate) {
     const monthStart = `${endDate.slice(0, 7)}-01`
     const base = covered ? addDays(covered, 1) : monthStart
@@ -202,13 +181,24 @@ export function buildTerminationInvoice(input: TerminationInput): {
         ? Math.min(input.forfeit.amount ?? 0, input.depositBalance)
         : 0
   const offset = input.depositBalance - forfeited
+  // Cọc hiện rõ: phần hoàn cho khách (trừ vào hoá đơn) và phần mất (Siris giữ, không hoàn)
   if (offset !== 0) {
     lines.push({
       type: 'deposit_offset',
-      description: forfeited ? `Trừ tiền cọc (mất cọc ${forfeited.toLocaleString('vi-VN')})` : 'Trừ tiền cọc',
+      description: `Hoàn cọc cho khách (trừ vào hoá đơn): ${offset.toLocaleString('vi-VN')}`,
       quantity: 1,
       unitPrice: -offset,
       amount: -offset,
+    })
+  }
+  if (forfeited > 0) {
+    lines.push({
+      type: 'deposit_offset',
+      description: `Mất cọc (Siris giữ, không hoàn khách): ${forfeited.toLocaleString('vi-VN')}`,
+      quantity: 1,
+      unitPrice: 0,
+      amount: 0,
+      meta: { forfeit: forfeited },
     })
   }
   return { lines, total: lines.reduce((s, l) => s + l.amount, 0), maxRefund }

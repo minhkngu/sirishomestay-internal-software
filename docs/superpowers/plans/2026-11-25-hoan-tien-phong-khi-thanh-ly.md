@@ -25,7 +25,7 @@
 - Kỳ trả trước bắt đầu sau ngày trả: hoàn trọn kỳ (tiền phòng và phí cố định).
 - Phí đồng hồ (dòng `fee` không có `meta.from`) và hoá đơn nháp không bị hoàn.
 - Hoàn một phần: bằng đúng mức tối đa thì được; vượt 1 đồng thì báo lỗi; không có gì để hoàn mà nhập số > 0 thì báo lỗi; số 0 coi như không hoàn.
-- Hoá đơn thanh lý luôn có dòng hoàn: không có gì để hoàn (không kỳ nào vượt ngày trả, hoặc chọn không hoàn) thì dòng đó là 0 đồng, không bao giờ vắng dòng.
+- Không có gì để hoàn (không kỳ nào vượt ngày trả, hoặc chọn không hoàn) thì hoá đơn thanh lý không có dòng hoàn (đã đổi: không để dòng 0 đồng).
 - Client cũ không gửi `rentRefund`: kết quả y như trước.
 
 ## Cấu trúc file
