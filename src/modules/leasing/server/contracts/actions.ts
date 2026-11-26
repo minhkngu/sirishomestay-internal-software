@@ -125,6 +125,16 @@ export async function updateLeaseAction(
     return {}
   })
 }
+export async function updateLeaseOccupantsAction(id: string, occupantIds: string[]) {
+  const ctx = await getAccessContext()
+  const { updateLeaseOccupants } = await import('./service')
+  return toActionResult(async () => {
+    await updateLeaseOccupants(db, ctx, id, occupantIds)
+    refresh()
+    revalidatePath(`/contracts/${id}`)
+    return {}
+  })
+}
 export async function updateLeaseAssetsAction(id: string, changes: import('./service').LeaseAssetChanges) {
   const ctx = await getAccessContext()
   const { updateLeaseAssets } = await import('./service')

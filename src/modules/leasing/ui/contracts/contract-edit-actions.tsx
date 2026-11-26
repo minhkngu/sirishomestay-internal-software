@@ -11,9 +11,8 @@ import { previewInvoiceTemplateByIdAction, previewTemplateByIdAction } from '@/m
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { FormDialog } from '@/components/form-dialog'
 import { formatVND } from '@/domain/money'
-import { formatDateVN, todayVN } from '@/domain/dates'
+import { formatDateVN } from '@/domain/dates'
 import { formatPhoneDisplay } from '@/domain/phone'
-import { createOccupantChangeAction } from '../../server/addenda/actions'
 import { createFeeTypeAction } from '@/modules/facilities/actions'
 import { createTenantAction } from '@/modules/tenants/actions'
 import { uploadOne } from '@/modules/platform/ui'
@@ -27,6 +26,7 @@ import {
   updateDepositContractAction,
   updateLeaseAction,
   updateLeaseAssetsAction,
+  updateLeaseOccupantsAction,
   refreshContractDocumentsAction,
 } from '../../server/contracts/actions'
 import { FormSelect, BareSelect } from './contract-form-ui'
@@ -344,11 +344,7 @@ export function ContractEditActions({
         return
       }
       if (editOccupants && [...finalOccIds].sort().join(',') !== initialIds) {
-        const r2 = await createOccupantChangeAction(contract.id, {
-          effectiveDate: todayVN(),
-          occupantIds: finalOccIds,
-          adjustmentTarget: 'next',
-        })
+        const r2 = await updateLeaseOccupantsAction(contract.id, finalOccIds)
         if (!r2.ok) {
           setError(r2.error)
           return

@@ -34,6 +34,7 @@ import {
   createTransfer,
   previewAddendum,
 } from '@/modules/leasing/server/addenda/service'
+import { updateLeaseOccupants } from '@/modules/leasing/server/contracts/service'
 import { saveHandover, startHandover } from '@/modules/leasing/server/handovers/service'
 import { approveInvoice, getInvoiceDetail, updateLines } from '@/modules/leasing/server/invoices/service'
 import { createTestDb } from '../helpers/db'
@@ -352,6 +353,24 @@ describe('phụ lục hợp đồng', () => {
     ).rejects.toThrow('Người ở phải là khách cá nhân')
     await createOccupantChange(db, ctx(), leaseId, { effectiveDate: '2026-11-16', occupantIds: [tenantId, person.id] })
     expect(await db.select().from(leaseOccupants).where(eq(leaseOccupants.leaseId, leaseId))).toHaveLength(2)
+  })
+  it('sửa người ở trong hợp đồng: không tạo phụ lục, không tạo điều chỉnh', async () => {
+    const [person] = await db
+      .insert(tenants)
+      .values({
+        kind: 'vietnamese',
+        homeFacilityId: facilityId,
+        fullName: 'Bạn',
+        phone: '+84901234001',
+        idNumber: '012345678998',
+      })
+      .returning()
+    const before = (await db.select().from(addenda)).length
+    await updateLeaseOccupants(db, ctx(), leaseId, [tenantId, person.id])
+    expect(await db.select().from(leaseOccupants).where(eq(leaseOccupants.leaseId, leaseId))).toHaveLength(2)
+    expect(await db.select().from(addenda)).toHaveLength(before)
+    expect(await db.select().from(pendingAdjustments)).toHaveLength(0)
+    await expect(updateLeaseOccupants(db, ctx(), leaseId, [])).rejects.toThrow('Chọn ít nhất một người ở')
   })
   it('chuyển phòng: cần chỉ số hai phòng, đổi phòng của hợp đồng, tạo biên bản và chặn phòng không trống', async () => {
     const [m1] = await db

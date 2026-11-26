@@ -17,6 +17,7 @@ export {
   getLease,
   updateLease,
   updateLeaseAssets,
+  updateLeaseOccupants,
 } from './leases'
 export type {
   LeaseFeeInput,

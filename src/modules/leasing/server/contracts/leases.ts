@@ -1,5 +1,5 @@
 import { and, eq, inArray, ne } from 'drizzle-orm'
-import { assets, depositContracts, docTemplates, invoiceTemplates, leaseOccupants, leases, rooms } from '@/db'
+import { assets, depositContracts, docTemplates, invoiceTemplates, leaseOccupants, leases, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
@@ -124,6 +124,48 @@ export type LeaseAssetChanges = {
   create: { code: string; name: string; model: string; category: string; value: number; condition: string }[]
   /** Tài sản đang trong phòng: thanh lý hoặc chuyển về kho của cơ sở. */
   remove: { assetId: string; action: 'dispose' | 'warehouse' }[]
+}
+
+/**
+ * Đổi danh sách người ở của hợp đồng thuê, không tạo phụ lục và không tạo khoản điều chỉnh.
+ * Hoá đơn lập sau đó tính phí theo số người ở mới; hoá đơn đã có (nháp hay đã duyệt) không đổi.
+ */
+export async function updateLeaseOccupants(
+  db: DB,
+  ctx: AccessContext,
+  leaseId: string,
+  occupantIds: string[],
+): Promise<void> {
+  await db.transaction(async (raw) => {
+    const tx = raw as unknown as DB
+    const [lease] = await tx.select().from(leases).where(eq(leases.id, leaseId)).for('update')
+    if (!lease) throw new NotFoundError()
+    if (lease.status === 'ended') throw new ValidationError('Hợp đồng đã thanh lý, không thể sửa')
+    const room = await loadRoom(tx, ctx, lease.roomId)
+    assertCan(ctx, 'tenants_contracts', room.facilityId)
+    const ids = [...new Set(occupantIds)]
+    if (ids.length === 0)
+      throw new ValidationError('Chọn ít nhất một người ở', { occupantIds: 'Chọn ít nhất một người ở' })
+    const people = await tx.select().from(tenants).where(inArray(tenants.id, ids))
+    if (people.length !== ids.length) throw new NotFoundError()
+    if (people.some((p) => p.kind === 'company'))
+      throw new ValidationError('Người ở phải là khách cá nhân', { occupantIds: 'Người ở phải là khách cá nhân' })
+    const old = (await tx.select().from(leaseOccupants).where(eq(leaseOccupants.leaseId, leaseId))).map(
+      (o) => o.tenantId,
+    )
+    if ([...old].sort().join(',') === [...ids].sort().join(',')) return
+    await tx.delete(leaseOccupants).where(eq(leaseOccupants.leaseId, leaseId))
+    await tx.insert(leaseOccupants).values(ids.map((tenantId) => ({ leaseId, tenantId })))
+    await recordAudit(tx, ctx, {
+      action: 'update',
+      entity: 'lease',
+      entityId: leaseId,
+      facilityId: room.facilityId,
+      summary: `Đổi người ở ${lease.code}`,
+      before: { occupantIds: old },
+      after: { occupantIds: ids },
+    })
+  })
 }
 
 /** Cập nhật tài sản trong phòng của hợp đồng thuê (một giao dịch). Biên bản bàn giao lấy danh sách theo tài sản trong phòng nên tự cập nhật theo. */
