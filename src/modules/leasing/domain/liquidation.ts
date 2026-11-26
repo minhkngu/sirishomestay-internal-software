@@ -123,10 +123,12 @@ export function buildTerminationInvoice(input: TerminationInput): {
     if (sum > 0) {
       lines.push({
         type: 'rent',
-        description: `Tiền phòng ${formatDateVN(from).slice(0, 5)}–${formatDateVN(endDate).slice(0, 5)}`,
+        description: 'Tiền phòng',
         quantity: Math.round(sum * 10000) / 10000,
         unitPrice: terms.monthlyRent,
         amount: Math.round(terms.monthlyRent * sum),
+        // Thời gian nằm ở cột thời gian của dòng, không ghi trong mô tả
+        meta: { from, to: endDate, coefficient: Math.round(sum * 10000) / 10000 },
       })
     }
   }

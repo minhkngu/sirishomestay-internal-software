@@ -557,6 +557,16 @@ describe('buildMonthlyInvoice', () => {
     expect(run('2026-12-27')).toBe(9_290_323)
     expect(run('2026-12-26')).toBe(9_000_000)
   })
+  it('mô tả dòng tiền phòng không ghi thời gian, thời gian nằm ở meta', () => {
+    const rent = buildMonthlyInvoice({
+      ...base,
+      period: '2026-12',
+      lease: lease({ ...terms(), occupantIds: ['t1', 't2'] }),
+      overridePeriod: { start: '2026-12-01', end: '2027-02-28' },
+    }).lines.find((l) => l.type === 'rent')
+    expect(rent?.description).toBe('Tiền phòng')
+    expect(rent?.meta).toMatchObject({ from: '2026-12-01', to: '2027-02-28' })
+  })
   it('hệ số sửa tay được dùng thay hệ số tính ra', () => {
     const r = buildMonthlyInvoice({
       ...base,

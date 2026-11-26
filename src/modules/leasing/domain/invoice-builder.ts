@@ -24,14 +24,6 @@ const prevMonth = (ym: string) => {
 }
 const mmYYYY = (ym: string) => `${ym.slice(5)}/${ym.slice(0, 4)}`
 
-function rangeLabel(start: ISODate, end: ISODate): string {
-  const sameFullMonth =
-    start.endsWith('-01') && end === lastDayOf(end.slice(0, 7)) && start.slice(0, 7) === end.slice(0, 7)
-  return sameFullMonth
-    ? `tháng ${mmYYYY(start.slice(0, 7))}`
-    : `${formatDateVN(start).slice(0, 5)}–${formatDateVN(end).slice(0, 5)}`
-}
-
 /** Tiền phòng + phí cố định cho khoảng [from, to] với hệ số `sum` (số tháng, có lẻ). */
 function rentAndFixedLines(
   terms: LeaseTerms,
@@ -40,11 +32,10 @@ function rentAndFixedLines(
   sum: number,
   occupantsCount: number,
 ): InvoiceLineInput[] {
-  const label = rangeLabel(from, to)
   const lines: InvoiceLineInput[] = [
     {
       type: 'rent',
-      description: `Tiền phòng ${label}`,
+      description: 'Tiền phòng',
       quantity: round4(sum),
       unitPrice: terms.monthlyRent,
       amount: Math.round(terms.monthlyRent * sum),
