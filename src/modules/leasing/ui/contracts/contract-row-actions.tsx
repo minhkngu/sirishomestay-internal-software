@@ -267,7 +267,6 @@ export function ContractRowActions({
             <TerminationWizard
               leaseId={id}
               meters={data.form.terminationMeters}
-              startDate={data.form.startDate}
               today={data.form.today}
               assets={data.form.checkoutAssets}
               depositBalance={data.form.depositBalance}

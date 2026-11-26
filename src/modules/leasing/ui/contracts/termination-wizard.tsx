@@ -51,7 +51,6 @@ type PenaltyDraft = {
 export function TerminationWizard({
   leaseId,
   meters,
-  startDate,
   today,
   assets = [],
   depositBalance = 0,
@@ -59,7 +58,6 @@ export function TerminationWizard({
 }: {
   leaseId: string
   meters: MeterOption[]
-  startDate?: string
   today: string
   assets?: CheckoutAssetOption[]
   depositBalance?: number
@@ -121,11 +119,7 @@ export function TerminationWizard({
   const forfeitedPreview =
     mode === 'all' ? depositBalance : mode === 'partial' ? Math.min(Number(forfeitAmount) || 0, depositBalance) : 0
 
-  const endDateError = !endDate
-    ? 'Chọn ngày trả phòng'
-    : startDate && endDate < startDate
-      ? 'Ngày thanh lý phải sau ngày bắt đầu hợp đồng'
-      : null
+  const endDateError = !endDate ? 'Chọn ngày trả phòng' : null
   const readingError = (() => {
     for (const m of meters) {
       const raw = (readings[m.meterId] ?? '').trim()

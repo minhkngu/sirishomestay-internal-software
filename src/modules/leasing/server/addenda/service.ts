@@ -629,10 +629,6 @@ export async function createTermination(
   return db.transaction(async (tx0) => {
     const tx = tx0 as unknown as DB
     const { l, facilityId, facilityCode } = await lockLease(tx, ctx, leaseId)
-    if (data.endDate < l.startDate)
-      throw new ValidationError('Ngày thanh lý phải sau ngày bắt đầu hợp đồng', {
-        endDate: 'Ngày thanh lý phải sau ngày bắt đầu hợp đồng',
-      })
     const [dup] = await tx
       .select({ id: addenda.id })
       .from(addenda)
