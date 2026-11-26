@@ -1,4 +1,4 @@
-import { and, asc, eq, getTableColumns, isNotNull, ne, sql } from 'drizzle-orm'
+import { and, asc, eq, getTableColumns, isNotNull, ne } from 'drizzle-orm'
 import { docTemplates, files, leases } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
@@ -444,8 +444,8 @@ export async function exportDocument(
       and(
         eq(files.ownerType, 'export'),
         eq(files.ownerId, input.entityId),
-        eq(files.contentType, mime),
-        sql`${files.meta}->>'docType' = ${input.docType}`,
+        // Cùng tên tệp (mã giấy tờ + định dạng) là cùng một giấy tờ, kể cả bản xuất cũ chưa ghi loại giấy tờ
+        eq(files.name, `${baseName}.${ext}`),
         ne(files.id, id),
       ),
     )
