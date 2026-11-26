@@ -1327,6 +1327,64 @@ export async function unapproveInvoice(db: DB, ctx: AccessContext, id: string): 
     })
   })
 }
+/**
+ * Dòng "Tiền cọc còn thiếu" của hoá đơn đã thu đủ tiền thì dòng thu cọc đang chờ trong sổ cọc được hoàn tất (thu cùng hoá đơn);
+ * hoá đơn không còn thu đủ (gỡ hoặc sửa khoản thu) thì trả các dòng đó về chờ. Dòng hoàn tất ở đây đánh dấu bằng ghi chú.
+ */
+async function syncDepositWithInvoice(tx: DB, ctx: AccessContext, invoiceId: string): Promise<void> {
+  const [inv] = await tx.select().from(invoices).where(eq(invoices.id, invoiceId))
+  if (!inv) return
+  const [lines, pays] = await Promise.all([
+    tx.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, invoiceId)),
+    tx.select().from(payments).where(eq(payments.invoiceId, invoiceId)).orderBy(asc(payments.paidOn)),
+  ])
+  const marker = `Thu cùng hoá đơn ${inv.code}`
+  const depositDue = lines.filter((l) => l.type === 'deposit').reduce((n, l) => n + l.amount, 0)
+  const total = lines.reduce((n, l) => n + l.amount, 0)
+  const paid = pays.reduce((n, p) => n + p.amount, 0)
+  const entries = await tx.select().from(depositEntries).where(eq(depositEntries.leaseId, inv.leaseId))
+  const strip = (note: string) => note.replace(` · ${marker}`, '').replace(marker, '').trim()
+  const fullyPaid = inv.status === 'approved' && depositDue > 0 && total > 0 && paid >= total
+  if (!fullyPaid) {
+    for (const e of entries.filter((x) => x.status === 'done' && x.note.includes(marker)))
+      await tx
+        .update(depositEntries)
+        .set({ status: 'pending', method: null, note: strip(e.note), updatedAt: new Date() })
+        .where(eq(depositEntries.id, e.id))
+    return
+  }
+  const last = pays.at(-1)!
+  let remaining =
+    depositDue - entries.filter((x) => x.status === 'done' && x.note.includes(marker)).reduce((n, x) => n + x.amount, 0)
+  const pending = entries
+    .filter((x) => x.status === 'pending' && (x.type === 'collect' || x.type === 'topup'))
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.createdAt.getTime() - b.createdAt.getTime()))
+  for (const e of pending) {
+    if (e.amount > remaining) continue
+    remaining -= e.amount
+    const [after] = await tx
+      .update(depositEntries)
+      .set({
+        status: 'done',
+        date: last.paidOn,
+        method: last.method,
+        note: e.note ? `${e.note} · ${marker}` : marker,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(depositEntries.id, e.id), eq(depositEntries.status, 'pending')))
+      .returning()
+    if (after)
+      await recordAudit(tx, ctx, {
+        action: 'update',
+        entity: 'deposit_entry',
+        entityId: e.id,
+        facilityId: inv.facilityId,
+        summary: `Hoàn tất dòng sổ cọc (${marker})`,
+        before: e,
+        after,
+      })
+  }
+}
 export async function addPayment(
   db: DB,
   ctx: AccessContext,
@@ -1354,6 +1412,7 @@ export async function addPayment(
       summary: 'Ghi nhận thanh toán',
       after: row,
     })
+    await syncDepositWithInvoice(tx, ctx, id)
     return row
   })
 }
@@ -1794,6 +1853,7 @@ export async function recordLeasePayment(
         .returning()
       created.push(row)
       left -= part
+      await syncDepositWithInvoice(tx, ctx, inv.id)
     }
     await recordAuditBatch(
       tx,
@@ -1871,6 +1931,7 @@ export async function updatePayment(db: DB, ctx: AccessContext, id: string, inpu
       before,
       after,
     })
+    await syncDepositWithInvoice(tx, ctx, inv.id)
   })
 }
 export async function removePayment(db: DB, ctx: AccessContext, paymentId: string): Promise<void> {
@@ -1888,6 +1949,7 @@ export async function removePayment(db: DB, ctx: AccessContext, paymentId: strin
       summary: `Gỡ khoản thu của ${inv.code}`,
       before: row,
     })
+    await syncDepositWithInvoice(tx, ctx, row.invoiceId)
   })
 }
 export async function listInvoices(

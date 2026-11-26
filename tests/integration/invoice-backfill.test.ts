@@ -5,6 +5,9 @@ import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
 import {
+  addPayment,
+  approveInvoice,
+  removePayment,
   createDraftForLease,
   createDrafts,
   createInvoiceFromEditor,
@@ -180,6 +183,30 @@ describe('tiền cọc còn thiếu trên hoá đơn', () => {
       .values({ leaseId, type: 'collect', status: 'done', amount: 6000000, date: '2026-12-01', method: 'cash' })
     const inv = await createDraftForLease(db, ctx(), { leaseId, period: '2026-12' })
     expect(await depositOf(inv.id)).toMatchObject([{ amount: 3000000 }])
+  })
+  it('thu đủ hoá đơn có dòng cọc thì dòng thu cọc chờ trong sổ cọc hoàn tất; gỡ khoản thu thì trả về chờ', async () => {
+    await db
+      .insert(depositEntries)
+      .values({ leaseId, type: 'collect', status: 'done', amount: 3000000, date: '2026-12-01', method: 'cash' })
+    const [pendingEntry] = await db
+      .insert(depositEntries)
+      .values({ leaseId, type: 'collect', status: 'pending', amount: 6000000, date: '2026-12-01' })
+      .returning()
+    const inv = await createDraftForLease(db, ctx(), { leaseId, period: '2026-12' })
+    await approveInvoice(db, ctx(), inv.id, { dueDate: '2026-12-10' })
+    const total = (await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, inv.id))).reduce(
+      (n, l) => n + l.amount,
+      0,
+    )
+    const entry = async () => (await db.select().from(depositEntries).where(eq(depositEntries.id, pendingEntry.id)))[0]
+    const part = await addPayment(db, ctx(), inv.id, { paidOn: '2026-12-02', amount: 1000, method: 'cash' })
+    expect((await entry()).status).toBe('pending')
+    await removePayment(db, ctx(), part.id)
+    const full = await addPayment(db, ctx(), inv.id, { paidOn: '2026-12-03', amount: total, method: 'transfer' })
+    expect(await entry()).toMatchObject({ status: 'done', date: '2026-12-03', method: 'transfer' })
+    expect((await entry()).note).toContain(inv.code)
+    await removePayment(db, ctx(), full.id)
+    expect(await entry()).toMatchObject({ status: 'pending', method: null, note: '' })
   })
 })
 
