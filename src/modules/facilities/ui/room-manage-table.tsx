@@ -14,11 +14,7 @@ import { ROOM_STATUS_LABELS, type RoomStatus } from '@/domain/room-status'
 import { formatVND } from '@/domain/money'
 import { cn } from '@/lib/utils'
 import { hasTenant } from '../domain/room-occupancy'
-import {
-  deleteRoomsBulkAction,
-  setRoomsActiveBulkAction,
-  updateRoomsBulkAction,
-} from '../server/rooms/actions'
+import { deleteRoomsBulkAction, setRoomsActiveBulkAction, updateRoomsBulkAction } from '../server/rooms/actions'
 import type { CellRoom } from './room-cell'
 import { RoomQuickActions } from './room-quick-actions'
 
@@ -90,8 +86,7 @@ export function RoomManageTable({
   const toggle = (id: string) =>
     setChecked((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
 
-  const toggleAll = () =>
-    setChecked(allSelected ? [] : manageableIds)
+  const toggleAll = () => setChecked(allSelected ? [] : manageableIds)
 
   const runBulk = (
     fn: () => Promise<{ ok: boolean; error?: string; data?: { count: number } }>,

@@ -92,9 +92,7 @@ export function DepositForm({
   const defaultFees = (facId?: string) =>
     feeTypes.filter((f) => (feeDefaults[facId ?? ''] ?? []).includes(f.id)).map((f) => makeFee(f, facId))
 
-  const [fees, setFees] = useState<FeeDraft[]>(() =>
-    defaultFees(rooms.find((r) => r.id === initialRoomId)?.facilityId),
-  )
+  const [fees, setFees] = useState<FeeDraft[]>(() => defaultFees(rooms.find((r) => r.id === initialRoomId)?.facilityId))
 
   const room = rooms.find((r) => r.id === roomId)
   const tenant = tenants.find((t) => t.id === tenantId)

@@ -30,9 +30,7 @@ export function AddMeterButton({
   const [error, setError] = useState<string | null>(null)
 
   const invalidStartReading =
-    startReading.trim() !== '' && !/^\d+$/.test(startReading.trim())
-      ? 'Nhập chỉ số đầu là số nguyên không âm'
-      : null
+    startReading.trim() !== '' && !/^\d+$/.test(startReading.trim()) ? 'Nhập chỉ số đầu là số nguyên không âm' : null
 
   function submit(e: React.FormEvent) {
     e.preventDefault()

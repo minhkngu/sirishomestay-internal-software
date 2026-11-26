@@ -261,7 +261,12 @@ export async function updateRoomsBulk(db: DB, ctx: AccessContext, input: BulkRoo
     const after = await tx
       .update(rooms)
       .set({ ...patch, updatedAt: new Date() })
-      .where(inArray(rooms.id, found.map((r) => r.id)))
+      .where(
+        inArray(
+          rooms.id,
+          found.map((r) => r.id),
+        ),
+      )
       .returning()
     for (const r of after) {
       await recordAudit(tx, ctx, {

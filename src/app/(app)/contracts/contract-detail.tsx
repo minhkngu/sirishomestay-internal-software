@@ -12,13 +12,7 @@ import {
   listInvoices,
   listAddenda,
 } from '@/modules/leasing'
-import {
-  OneOffDialog,
-  DepositLedger,
-  ExportMenu,
-  SignStatus,
-  AddendaList,
-} from '@/modules/leasing/ui'
+import { OneOffDialog, DepositLedger, ExportMenu, SignStatus, AddendaList } from '@/modules/leasing/ui'
 import { buttonVariants } from '@/components/ui/button'
 import { db } from '@/db/client'
 import { NotFoundError } from '@/domain/errors'
@@ -706,8 +700,9 @@ export default async function ContractDetail({ id }: { id: string }) {
                         </li>
                       )
                     })}
-                  {handoverFiles.filter(({ h }) => h.kind === 'check_in' || lease.status === 'ended' || h.status === 'done')
-                    .length === 0 && <li className="py-2 text-sm text-muted-foreground">Chưa có biên bản PDF.</li>}
+                  {handoverFiles.filter(
+                    ({ h }) => h.kind === 'check_in' || lease.status === 'ended' || h.status === 'done',
+                  ).length === 0 && <li className="py-2 text-sm text-muted-foreground">Chưa có biên bản PDF.</li>}
                 </ul>
               </div>
             </div>

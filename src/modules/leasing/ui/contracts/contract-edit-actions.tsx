@@ -1025,9 +1025,7 @@ export function ContractEditActions({
       />
       {(() => {
         const repError =
-          editOccupants && !occ.some((o) => o.id === tenantId)
-            ? 'Người đại diện phải nằm trong danh sách người ở'
-            : ''
+          editOccupants && !occ.some((o) => o.id === tenantId) ? 'Người đại diện phải nằm trong danh sách người ở' : ''
         const shownError = repError || error
         return (
           <>

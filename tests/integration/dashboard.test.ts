@@ -42,7 +42,10 @@ describe('getExpiringVisas', () => {
       ...over,
     })
     if (opts.withLease !== false) {
-      const [room] = await db.insert(rooms).values({ facilityId: fid, code: `R${n}` }).returning()
+      const [room] = await db
+        .insert(rooms)
+        .values({ facilityId: fid, code: `R${n}` })
+        .returning()
       await db.insert(leases).values({
         code: `HD-${n}`,
         roomId: room.id,

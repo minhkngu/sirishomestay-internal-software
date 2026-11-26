@@ -270,9 +270,7 @@ export async function deleteTenants(db: DB, ctx: AccessContext, ids: string[]): 
       throw new ValidationError(`Không thể xoá khách ${names} vì đang gắn với hợp đồng, cọc hoặc phụ lục`)
     }
 
-    await tx
-      .delete(files)
-      .where(and(eq(files.ownerType, 'tenant_document'), inArray(files.ownerId, foundIds)))
+    await tx.delete(files).where(and(eq(files.ownerType, 'tenant_document'), inArray(files.ownerId, foundIds)))
     await tx.delete(tenants).where(inArray(tenants.id, foundIds))
 
     for (const t of found) {
