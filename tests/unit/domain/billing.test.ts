@@ -544,6 +544,19 @@ describe('buildMonthlyInvoice', () => {
     expect(r.periodStart).toBe('2026-12-01')
     expect(r.lines.find((l) => l.type === 'rent')).toMatchObject({ quantity: 3, amount: 27_000_000 })
   })
+  it('kỳ chọn từ ngày bắt đầu giữa tháng: 27/11–26/12 là đúng 1 tháng, cùng công thức với ô chọn ngày', () => {
+    const run = (end: string) =>
+      buildMonthlyInvoice({
+        ...base,
+        period: '2026-11',
+        proration: 'actual_days',
+        lease: lease({ ...terms(), startDate: '2026-11-27', occupantIds: ['t1', 't2'] }),
+        overridePeriod: { start: '2026-11-27', end },
+      }).lines.find((l) => l.type === 'rent')?.amount
+    expect(run('2026-12-26')).toBe(9_000_000)
+    expect(run('2026-12-27')).toBe(9_290_323)
+    expect(run('2026-12-26')).toBe(9_000_000)
+  })
   it('hệ số sửa tay được dùng thay hệ số tính ra', () => {
     const r = buildMonthlyInvoice({
       ...base,
