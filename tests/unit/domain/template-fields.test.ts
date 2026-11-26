@@ -56,6 +56,7 @@ describe('TEMPLATE_FIELDS', () => {
       'don_vi',
       'so_luong',
       'don_gia',
+      'chi_so_dau',
     ])
     expect(TEMPLATE_FIELDS.lease.find((f) => f.key === 'nguoi_o')?.loop?.fields.map((f) => f.key)).toEqual([
       'ho_ten',
@@ -111,7 +112,9 @@ describe('buildTemplateData', () => {
     expect(d.ngay_lap).toBe('14/10/2026')
     expect(d.ten_khach).toBe('John Miller')
     expect(d.so_phong).toBe('301')
-    expect(d.phi_dich_vu).toEqual([{ ten: 'Phí dịch vụ', don_vi: 'người', so_luong: 2, don_gia: '200.000' }])
+    expect(d.phi_dich_vu).toEqual([
+      { ten: 'Phí dịch vụ', don_vi: 'người', so_luong: 2, don_gia: '200.000', chi_so_dau: '' },
+    ])
     expect(d.nguoi_o).toEqual([{ ho_ten: 'John Miller', giay_to: 'P1234567' }])
   })
   it('hoá đơn: tổng tiền và bằng chữ, dòng hoá đơn', () => {

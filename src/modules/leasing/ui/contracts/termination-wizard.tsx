@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { MoneyInput } from '@/components/ui/money-input'
 import { formatVND } from '@/domain/money'
+import { ASSET_CONDITION } from '@/domain/asset-labels'
 import { uploadOne } from '@/modules/platform/ui'
 import { RENT_REFUND_MODES } from '../../domain/liquidation'
 import { createTerminationAction } from '../../server/addenda/actions'
@@ -81,7 +82,7 @@ export function TerminationWizard({
   const [assetRows, setAssetRows] = useState<AssetDraft[]>(() =>
     assets.map((a) => ({
       ...a,
-      condition: a.checkInCondition ?? 'Tốt',
+      condition: a.checkInCondition ?? ASSET_CONDITION.good,
       damaged: false,
       missing: false,
       penalty: '',

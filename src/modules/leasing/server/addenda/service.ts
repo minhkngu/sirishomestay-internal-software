@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
+import { ASSET_CONDITION } from '@/domain/asset-labels'
 import {
   addenda,
   assets,
@@ -124,7 +125,7 @@ const transferSchema = z.object({
 const assignmentSchema = z.object({ effectiveDate: date, newTenantId: z.uuid() })
 const terminationHandoverItemSchema = z.object({
   assetId: z.uuid(),
-  condition: z.string().trim().default('Tốt'),
+  condition: z.string().trim().default(ASSET_CONDITION.good),
   note: z.string().trim().default(''),
   damaged: z.boolean().default(false),
   missing: z.boolean().default(false),
@@ -661,7 +662,7 @@ export async function createTermination(
             data.handoverItems.map((it) => ({
               handoverId: checkout.id,
               assetId: it.assetId,
-              condition: it.condition || 'Tốt',
+              condition: it.condition || ASSET_CONDITION.good,
               note: it.note,
               damaged: it.damaged,
               missing: it.missing,
