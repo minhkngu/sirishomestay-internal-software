@@ -16,7 +16,6 @@ import { formatPhoneDisplay } from '@/domain/phone'
 import { createOccupantChangeAction } from '../../server/addenda/actions'
 import { createFeeTypeAction } from '@/modules/facilities/actions'
 import { createTenantAction } from '@/modules/tenants/actions'
-import { addDepositEntryAction, markDepositDoneAction } from '../../server/charges/actions'
 import { uploadOne } from '@/modules/platform/ui'
 import { PdfBlobDialog } from '@/components/pdf-blob-dialog'
 import { EditAssets, assetsDraftChanged, emptyAssetsDraft, type AssetRow } from './edit-assets'
@@ -148,7 +147,6 @@ export function ContractEditActions({
   /** Giấy tờ, sổ cọc của hợp đồng; chỉnh dạng nháp, lưu cùng nút "Lưu thay đổi". */ documents?: {
     signedFileId: string | null
     entries: DepositRow[]
-    canEditDeposit: boolean
   }
   mode?: 'edit' | 'delete'
   onCompleted?: () => void
@@ -390,25 +388,6 @@ export function ContractEditActions({
         } catch (e) {
           setError(e instanceof Error ? e.message : 'Không tải được tệp')
           return
-        }
-        for (const entry of docs.newEntries) {
-          const r = await addDepositEntryAction(contract.id, {
-            date: entry.date,
-            type: entry.type,
-            amount: entry.amount,
-            status: 'pending',
-          })
-          if (!r.ok) {
-            setError(r.error)
-            return
-          }
-        }
-        for (const [id, done] of Object.entries(docs.doneEntries)) {
-          const r = await markDepositDoneAction(id, done)
-          if (!r.ok) {
-            setError(r.error)
-            return
-          }
         }
         setDocs(emptyDocsDraft)
       }
@@ -838,7 +817,6 @@ export function ContractEditActions({
               signed={signed}
               signedFileId={documents.signedFileId}
               entries={documents.entries}
-              canEditDeposit={documents.canEditDeposit}
               draft={docs}
               onChange={setDocs}
             />

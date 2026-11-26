@@ -214,7 +214,6 @@ export function ContractRowActions({
               documents={{
                 signedFileId: data.extras?.signedFileId ?? null,
                 entries: data.extras?.depositEntries ?? [],
-                canEditDeposit: data.extras?.billing ?? false,
               }}
               facility={data.facility}
               renderCreatePerson={renderCreatePerson}

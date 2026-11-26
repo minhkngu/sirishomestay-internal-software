@@ -1,14 +1,11 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { formatDateVN, todayVN } from '@/domain/dates'
+import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { DEPOSIT_ENTRY_LABELS, runningDepositBalances } from '@/domain/deposit'
-import { PAYMENT_METHOD_LABELS } from '@/domain/payment-labels'
 import type { DepositEntry } from '@/domain/types'
-import { BareSelect } from './contract-form-ui'
 
 export type DepositRow = {
   id: string
@@ -20,25 +17,16 @@ export type DepositRow = {
 export type DocsDraft = {
   signedFile: File | null
   photos: File[]
-  newEntries: {
-    key: string
-    date: string
-    type: 'collect' | 'topup' | 'deduct' | 'refund' | 'forfeit'
-    amount: number
-  }[]
-  doneEntries: Record<string, { date: string; method: 'cash' | 'transfer' | 'other' }>
 }
-export const emptyDocsDraft: DocsDraft = { signedFile: null, photos: [], newEntries: [], doneEntries: {} }
-export const docsDraftChanged = (d: DocsDraft) =>
-  !!d.signedFile || d.photos.length > 0 || d.newEntries.length > 0 || Object.keys(d.doneEntries).length > 0
+export const emptyDocsDraft: DocsDraft = { signedFile: null, photos: [] }
+export const docsDraftChanged = (d: DocsDraft) => !!d.signedFile || d.photos.length > 0
 
-/** Giấy tờ, sổ cọc và bàn giao trong popup "Sửa hợp đồng": chỉ ghi nháp, mọi thứ được lưu khi bấm "Lưu thay đổi". */
+/** Giấy tờ, sổ cọc và bàn giao trong popup "Sửa hợp đồng": giấy tờ chỉ ghi nháp, lưu khi bấm "Lưu thay đổi"; sổ cọc chỉ xem. */
 export function EditDocuments({
   kind,
   signed,
   signedFileId,
   entries,
-  canEditDeposit,
   draft,
   onChange,
 }: {
@@ -46,7 +34,6 @@ export function EditDocuments({
   signed: boolean
   signedFileId?: string | null
   entries: DepositRow[]
-  canEditDeposit: boolean
   draft: DocsDraft
   onChange: (draft: DocsDraft) => void
 }) {
@@ -145,105 +132,21 @@ export function EditDocuments({
                   <th className="py-1 pr-3 font-medium">Số tiền</th>
                   <th className="py-1 pr-3 font-medium">Trạng thái</th>
                   <th className="py-1 pr-3 font-medium">Số dư</th>
-                  <th />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {entries.map((e, i) => {
-                  const done = draft.doneEntries[e.id]
-                  return (
-                    <tr key={e.id}>
-                      <td className="py-1.5 pr-3">{formatDateVN(e.date)}</td>
-                      <td className="py-1.5 pr-3">{DEPOSIT_ENTRY_LABELS[e.type] ?? e.type}</td>
-                      <td className="py-1.5 pr-3">{formatVND(e.amount)}</td>
-                      <td className="py-1.5 pr-3">{done ? 'Sẽ hoàn tất' : e.status === 'done' ? 'Đã xong' : 'Chờ'}</td>
-                      <td className="py-1.5 pr-3">{formatVND(balances[i])}</td>
-                      <td className="py-1.5">
-                        {canEditDeposit &&
-                          e.status === 'pending' &&
-                          (done ? (
-                            <div className="flex items-center gap-1">
-                              <Input
-                                aria-label="Ngày hoàn tất"
-                                type="date"
-                                className="h-7 w-36"
-                                value={done.date}
-                                onChange={(ev) =>
-                                  set({
-                                    doneEntries: { ...draft.doneEntries, [e.id]: { ...done, date: ev.target.value } },
-                                  })
-                                }
-                              />
-                              <BareSelect
-                                ariaLabel="Hình thức"
-                                value={done.method}
-                                onValueChange={(method) =>
-                                  set({
-                                    doneEntries: {
-                                      ...draft.doneEntries,
-                                      [e.id]: { ...done, method: method as 'cash' },
-                                    },
-                                  })
-                                }
-                                options={Object.entries(PAYMENT_METHOD_LABELS).map(([k, v]) => ({
-                                  value: k,
-                                  label: v,
-                                }))}
-                                className="h-7 w-36 rounded-lg px-2 py-0 text-xs"
-                              />
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  const rest = { ...draft.doneEntries }
-                                  delete rest[e.id]
-                                  set({ doneEntries: rest })
-                                }}
-                              >
-                                Bỏ
-                              </Button>
-                            </div>
-                          ) : (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                set({
-                                  doneEntries: { ...draft.doneEntries, [e.id]: { date: todayVN(), method: 'cash' } },
-                                })
-                              }
-                            >
-                              Hoàn tất
-                            </Button>
-                          ))}
-                      </td>
-                    </tr>
-                  )
-                })}
-                {draft.newEntries.map((n) => (
-                  <tr key={n.key} className="bg-muted/40">
-                    <td className="py-1.5 pr-3">{formatDateVN(n.date)}</td>
-                    <td className="py-1.5 pr-3">{DEPOSIT_ENTRY_LABELS[n.type]}</td>
-                    <td className="py-1.5 pr-3">{formatVND(n.amount)}</td>
-                    <td className="py-1.5 pr-3">Dòng mới (chờ)</td>
-                    <td />
-                    <td className="py-1.5">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => set({ newEntries: draft.newEntries.filter((x) => x.key !== n.key) })}
-                      >
-                        Bỏ
-                      </Button>
-                    </td>
+                {entries.map((e, i) => (
+                  <tr key={e.id}>
+                    <td className="py-1.5 pr-3">{formatDateVN(e.date)}</td>
+                    <td className="py-1.5 pr-3">{DEPOSIT_ENTRY_LABELS[e.type] ?? e.type}</td>
+                    <td className="py-1.5 pr-3">{formatVND(e.amount)}</td>
+                    <td className="py-1.5 pr-3">{e.status === 'done' ? 'Đã xong' : 'Chờ'}</td>
+                    <td className="py-1.5 pr-3">{formatVND(balances[i])}</td>
                   </tr>
                 ))}
-                {entries.length + draft.newEntries.length === 0 && (
+                {entries.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-2 text-muted-foreground">
+                    <td colSpan={5} className="py-2 text-muted-foreground">
                       Chưa có dòng ghi sổ cọc nào.
                     </td>
                   </tr>
@@ -251,53 +154,9 @@ export function EditDocuments({
               </tbody>
             </table>
           </div>
-          {canEditDeposit && <NewEntry onAdd={(entry) => set({ newEntries: [...draft.newEntries, entry] })} />}
+          <p className="text-xs text-muted-foreground">Sổ cọc chỉ để xem, không sửa được ở đây.</p>
         </div>
       )}
-    </div>
-  )
-}
-
-function NewEntry({ onAdd }: { onAdd: (entry: DocsDraft['newEntries'][number]) => void }) {
-  const dateRef = useRef<HTMLInputElement>(null)
-  const amountRef = useRef<HTMLInputElement>(null)
-  const [type, setType] = useState<'topup' | 'collect' | 'deduct' | 'refund' | 'forfeit'>('topup')
-  return (
-    <div className="flex flex-wrap items-end gap-2 text-sm">
-      <label className="grid gap-0.5 text-xs">
-        Ngày
-        <Input ref={dateRef} type="date" className="h-8" defaultValue={todayVN()} />
-      </label>
-      <div className="grid gap-0.5 text-xs">
-        <span>Loại</span>
-        <BareSelect
-          ariaLabel="Loại"
-          value={type}
-          onValueChange={(value) => setType(value as 'topup' | 'collect' | 'deduct' | 'refund' | 'forfeit')}
-          options={(['topup', 'collect', 'deduct', 'refund', 'forfeit'] as const).map((k) => ({
-            value: k,
-            label: DEPOSIT_ENTRY_LABELS[k],
-          }))}
-          className="h-8 w-28 rounded-lg px-2 py-0 text-xs"
-        />
-      </div>
-      <label className="grid gap-0.5 text-xs">
-        Số tiền
-        <Input ref={amountRef} type="number" min="1" step="1" className="h-8 w-32" />
-      </label>
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        onClick={() => {
-          const amount = Number(amountRef.current?.value)
-          if (!dateRef.current?.value || !Number.isSafeInteger(amount) || amount < 1) return
-          onAdd({ key: crypto.randomUUID(), date: dateRef.current.value, type, amount })
-          if (amountRef.current) amountRef.current.value = ''
-        }}
-      >
-        Thêm dòng
-      </Button>
     </div>
   )
 }
