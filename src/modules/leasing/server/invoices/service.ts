@@ -702,7 +702,8 @@ export async function createInvoiceFromEditor(
       .flatMap((l) => {
         const key = keyOf(l.type, l.meta)
         const match =
-          key !== `${l.type}|||`
+          // Tiền phòng không có khoá riêng (mỗi hoá đơn một dòng): ghép theo loại
+          key !== `${l.type}|||` || l.type === 'rent'
             ? made.find((m) => !used.has(m.id) && keyOf(m.type, m.meta as Record<string, unknown> | null) === key)
             : undefined
         if (match) used.add(match.id)

@@ -74,6 +74,31 @@ describe('lập hoá đơn tháng cũ', () => {
   it('tháng trước ngày bắt đầu hợp đồng thì từ chối', async () => {
     await expect(createDraftForLease(db, ctx(), { leaseId, period: '2025-11' })).rejects.toThrow(ValidationError)
   })
+  it('lưu hoá đơn lẻ giữ kỳ tiền phòng đã đổi ở bản xem trước', async () => {
+    const preview = await previewNewInvoice(db, ctx(), { leaseId, period: '2026-10' })
+    const rent = preview.lines.find((l) => l.type === 'rent')!
+    expect(rent.meta).toMatchObject({ from: '2026-10-01', to: '2026-10-31' })
+    const lines = preview.lines.map((l) => {
+      const meta = (l.meta ?? null) as Record<string, unknown> | null
+      if (l.type === 'rent')
+        return {
+          type: l.type,
+          description: l.description,
+          quantity: 0.5161,
+          unitPrice: l.unitPrice,
+          meta: { ...meta, from: '2026-10-01', to: '2026-10-16', coefficient: 0.5161, coefficientOverride: false },
+        }
+      return { type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta }
+    })
+    const { id } = await createInvoiceFromEditor(db, ctx(), { leaseId, period: '2026-10', lines })
+    const saved = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, id))
+    expect(saved.find((l) => l.type === 'rent')).toMatchObject({
+      quantity: 0.5161,
+      amount: 4_644_900,
+      meta: { from: '2026-10-01', to: '2026-10-16', coefficient: 0.5161 },
+    })
+    expect((await db.select().from(invoices).where(eq(invoices.id, id)))[0].periodEnd).toBe('2026-10-16')
+  })
   it('xem trước không tạo hoá đơn; chỉ khi lưu từ giao diện sửa mới tạo, kèm thay đổi', async () => {
     const preview = await previewNewInvoice(db, ctx(), { leaseId, period: '2026-10' })
     expect(preview.lines.some((l) => l.type === 'rent')).toBe(true)
