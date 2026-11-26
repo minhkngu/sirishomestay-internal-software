@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation'
 import { ArrowLeft, Calendar, FileText } from 'lucide-react'
 import { can } from '@/domain/access'
 import {
-  listOneOffs,
   INVOICE_STATUS_LABELS,
   listHandovers,
   getDepositContract,
@@ -12,14 +11,7 @@ import {
   listInvoices,
   listAddenda,
 } from '@/modules/leasing'
-import {
-  OneOffDialog,
-  DepositLedger,
-  ExportMenu,
-  SignStatus,
-  AddendaList,
-  StartHandoverButtons,
-} from '@/modules/leasing/ui'
+import { DepositLedger, ExportMenu, SignStatus, AddendaList } from '@/modules/leasing/ui'
 import { buttonVariants } from '@/components/ui/button'
 import { db } from '@/db/client'
 import { NotFoundError } from '@/domain/errors'
@@ -248,9 +240,12 @@ export default async function ContractDetail({ id }: { id: string }) {
               )}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-px border-t border-border/60 bg-border/50 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-px border-t border-border/60 bg-border/50 lg:grid-cols-5">
             <div className="bg-card">
               <Stat label="Tiền cọc giữ chỗ" value={formatVND(deposit.depositAmount)} lead />
+            </div>
+            <div className="bg-card">
+              <Stat label="Tiền cọc thoả thuận" value={formatVND(deposit.agreedDeposit ?? deposit.depositAmount)} />
             </div>
             <div className="bg-card">
               <Stat label="Đã thu cọc" value={formatVND(collected)} />
@@ -289,6 +284,21 @@ export default async function ContractDetail({ id }: { id: string }) {
                 </div>
               </div>
             </Panel>
+
+            {deposit.agreedFees && deposit.agreedFees.length > 0 && (
+              <Panel title="Các phí thoả thuận" count={`${deposit.agreedFees.length} khoản`}>
+                <ul className="divide-y divide-border/60 text-[13px]">
+                  {deposit.agreedFees.map((f, i) => (
+                    <li key={i} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
+                      <span className="font-medium text-foreground">
+                        {f.name} <span className="font-normal text-muted-foreground">· {f.unit}</span>
+                      </span>
+                      <span className="font-medium tabular-nums text-foreground">{formatVND(f.unitPrice)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Panel>
+            )}
 
             <Panel title="Sổ cọc" count={deposit.entries.length > 0 ? `${deposit.entries.length} dòng` : undefined}>
               <DepositLedger entries={deposit.entries} canEdit={false} leaseId={deposit.id} />
@@ -344,7 +354,6 @@ export default async function ContractDetail({ id }: { id: string }) {
   const contractInvoices = billing
     ? (await listInvoices(db, ctx, { facilityId: lease.facilityId })).filter((invoice) => invoice.leaseId === lease.id)
     : []
-  const charges = billing ? await listOneOffs(db, ctx, lease.id) : []
   const handoverList = await listHandovers(db, ctx, lease.id)
   const addendaList = await listAddenda(db, ctx, lease.id)
   const [templates, exports, photos, meterInitials] = await Promise.all([
@@ -574,11 +583,6 @@ export default async function ContractDetail({ id }: { id: string }) {
             ) : (
               <p className="py-2 text-sm text-muted-foreground">Không có phụ phí dịch vụ riêng.</p>
             )}
-            {billing && charges.length > 0 && (
-              <div className="mt-3 border-t border-border/60 pt-3">
-                <OneOffDialog leaseId={lease.id} charges={charges} readOnly />
-              </div>
-            )}
           </Panel>
 
           {lease.note && (
@@ -660,46 +664,38 @@ export default async function ContractDetail({ id }: { id: string }) {
                 </div>
               )}
               <div>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs text-muted-foreground">Biên bản bàn giao tài sản</p>
-                  <StartHandoverButtons leaseId={lease.id} />
-                </div>
+                <p className="text-xs text-muted-foreground">Biên bản bàn giao tài sản</p>
                 <ul className="mt-1 divide-y divide-border/60">
-                  {handoverFiles.map(({ h, files }) => {
-                    const savedPdf = files.find((f) => f.contentType === 'application/pdf')
-                    const title = h.kind === 'check_in' ? 'Biên bản check-in' : 'Biên bản check-out'
-                    const href = savedPdf
-                      ? `/api/files/${savedPdf.id}?inline=1`
-                      : `/api/documents/preview?docType=${h.kind === 'check_in' ? 'handover_check_in' : 'handover_check_out'}&id=${h.id}`
-                    return (
-                      <li key={h.id} className="flex flex-wrap items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-                        <FileText className="size-4 shrink-0 text-muted-foreground" />
-                        <div className="min-w-0 flex-1">
-                          <Link
-                            href={`/handovers/${h.id}`}
-                            className="text-[13px] font-medium text-foreground hover:text-primary hover:underline hover:underline-offset-2"
+                  {handoverFiles
+                    .filter(({ h }) => h.kind === 'check_in' || lease.status === 'ended' || h.status === 'done')
+                    .map(({ h, files }) => {
+                      const savedPdf = files.find((f) => f.contentType === 'application/pdf')
+                      const title = h.kind === 'check_in' ? 'Biên bản check-in' : 'Biên bản check-out'
+                      const href = savedPdf
+                        ? `/api/files/${savedPdf.id}?inline=1`
+                        : `/api/documents/preview?docType=${h.kind === 'check_in' ? 'handover_check_in' : 'handover_check_out'}&id=${h.id}`
+                      return (
+                        <li key={h.id} className="flex flex-wrap items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+                          <FileText className="size-4 shrink-0 text-muted-foreground" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[13px] font-medium text-foreground">{title}</p>
+                            <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
+                              {formatDateVN(h.date)} · {h.status === 'done' ? 'Đã hoàn tất' : 'Nháp'}
+                            </p>
+                          </div>
+                          <PdfViewButton
+                            href={href}
+                            title={title}
+                            className="text-[13px] font-medium text-primary hover:underline hover:underline-offset-2"
                           >
-                            {title}
-                          </Link>
-                          <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
-                            {formatDateVN(h.date)} · {h.status === 'done' ? 'Đã hoàn tất' : 'Nháp'}
-                          </p>
-                        </div>
-                        <PdfViewButton
-                          href={href}
-                          title={title}
-                          className="text-[13px] font-medium text-primary hover:underline hover:underline-offset-2"
-                        >
-                          Xem PDF
-                        </PdfViewButton>
-                      </li>
-                    )
-                  })}
-                  {handoverFiles.length === 0 && (
-                    <li className="py-2 text-sm text-muted-foreground">
-                      Chưa có biên bản nào. Bấm Check-in hoặc Check-out để tạo.
-                    </li>
-                  )}
+                            Xem PDF
+                          </PdfViewButton>
+                        </li>
+                      )
+                    })}
+                  {handoverFiles.filter(
+                    ({ h }) => h.kind === 'check_in' || lease.status === 'ended' || h.status === 'done',
+                  ).length === 0 && <li className="py-2 text-sm text-muted-foreground">Chưa có biên bản PDF.</li>}
                 </ul>
               </div>
             </div>

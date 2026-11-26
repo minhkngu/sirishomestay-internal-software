@@ -15,6 +15,8 @@ import {
   restoreFeeType,
   createFeeType,
   createFeeUnit,
+  updateFeeUnit,
+  deleteFeeUnit,
   updateFeeType,
   saveFeeFacilities,
 } from './service'
@@ -25,6 +27,22 @@ export async function createFeeUnitAction(input: unknown) {
     const u = await createFeeUnit(db, ctx, input)
     revalidatePath('/settings')
     return { id: u.id }
+  })
+}
+export async function updateFeeUnitAction(id: string, input: unknown) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => {
+    const u = await updateFeeUnit(db, ctx, id, input)
+    revalidatePath('/settings')
+    return { id: u.id }
+  })
+}
+export async function deleteFeeUnitAction(id: string) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => {
+    await deleteFeeUnit(db, ctx, id)
+    revalidatePath('/settings')
+    return {}
   })
 }
 export async function createFeeTypeAction(input: unknown) {

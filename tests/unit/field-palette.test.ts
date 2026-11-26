@@ -12,6 +12,7 @@ describe('fieldGroups', () => {
       'don_vi',
       'so_luong',
       'don_gia',
+      'chi_so_dau',
     ])
   })
   it('chỗ điền thường không chứa khoá của vòng lặp', () => {

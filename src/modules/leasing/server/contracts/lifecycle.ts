@@ -20,12 +20,13 @@ import {
 import type { DB } from '@/db/client'
 import { assertCan, can, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
-import { todayVN } from '@/domain/dates'
+import { formatDateVN, todayVN } from '@/domain/dates'
 import { recordAudit, registerExportOwnerResolver, registerOwnerResolver } from '@/modules/platform'
 import type { ExportFormat } from '@/modules/documents'
 import { exportDocument, registerDocLoader } from '@/modules/documents'
 import type { StorageAdapter } from '@/modules/platform'
 import { getLease } from './leases'
+import { listLeaseMeterInitials } from '@/modules/meters'
 import { SIGN_RANK } from '../../domain/sign-status'
 import { loadRoom, type SignStatus } from './shared'
 
@@ -348,7 +349,7 @@ async function tenantEntity(db: DB, tenantId: string) {
 }
 
 registerDocLoader('lease', async (db, ctx, id) => {
-  const l = await getLease(db, ctx, id)
+  const [l, meterInitials] = await Promise.all([getLease(db, ctx, id), listLeaseMeterInitials(db, ctx, id)])
   const [room] = await db.select().from(rooms).where(eq(rooms.id, l.roomId))
   const [fac] = await db.select().from(facilities).where(eq(facilities.id, room.facilityId))
   const occ = await Promise.all(
@@ -373,12 +374,18 @@ registerDocLoader('lease', async (db, ctx, id) => {
         monthlyRent: l.monthlyRent,
         depositAmount: l.depositAmount,
       },
-      fees: l.fees.map((f) => ({
-        name: f.name,
-        unit: f.unit,
-        quantity: f.quantityFrom === 'occupants' ? l.occupantCount : f.quantity,
-        unitPrice: f.unitPrice,
-      })),
+      fees: l.fees.map((f) => {
+        const init = f.leaseFeeId ? meterInitials[f.leaseFeeId] : undefined
+        return {
+          name: f.name,
+          unit: f.unit,
+          quantity: f.quantityFrom === 'occupants' ? l.occupantCount : f.quantity,
+          unitPrice: f.unitPrice,
+          initialReading: init
+            ? `${init.value.toLocaleString('vi-VN')} (${formatDateVN(init.readOn)}${init.meterCode ? ` · ${init.meterCode}` : ''})`
+            : undefined,
+        }
+      }),
     },
   }
 })

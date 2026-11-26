@@ -13,7 +13,11 @@ Công nghệ: Next.js 16 (App Router), React 19, TypeScript, Tailwind v4 + shadc
 - Hoá đơn tháng cũ và hoá đơn thêm cho kỳ đã có (không cộng tiền phòng); dòng tiền cọc còn thiếu ở hoá đơn đầu.
 - Kỳ hoá đơn đồng bộ theo thời gian dòng tiền phòng đã chỉnh, nên hoá đơn kế tiếp nối đúng. Hệ số theo ngày hiện rõ ở từng dòng và tính lại khi đổi kỳ.
 - Thêm phí ngoài từ hộp thoại chọn phí dùng chung với form hợp đồng; thuế theo %; hạn thanh toán theo quy tắc ("ngày X của tháng hoá đơn" mặc định ngày 5) và sửa được.
-- Dòng tiền phòng, phí hợp đồng không sửa mô tả, đơn giá hoặc xoá tại hoá đơn; chỉ sửa hệ số, chỉ số hoặc số lượng theo kỳ.
+- Dòng tiền phòng, phí hợp đồng không sửa mô tả, đơn giá hoặc xoá tại hoá đơn; chỉ sửa hệ số, chỉ số hoặc số lượng theo kỳ. Mô tả dòng tiền phòng chỉ ghi "Tiền phòng", thời gian nằm ở cột Thời gian. Kỳ từ–đến chọn tay tính theo tháng tròn từ ngày bắt đầu, cùng công thức ở bản xem trước và khi lưu.
+- Tổng hoá đơn ghi rõ ai trả ai: dương là "Khách phải thanh toán", âm là "Siris hoàn trả khách" (ô đầu trang hoá đơn, ô tổng và PDF; mẫu mặc định có thêm các trường kết luận thanh toán).
+- Phí theo số người ở thêm vào hoá đơn lấy số người ở hiện có của hợp đồng làm số lượng ban đầu; hoá đơn đã có không tự đổi khi hợp đồng đổi người ở.
+- **Hoá đơn thanh lý**: mã dạng `<cơ sở>-TL-<YYYYMM>-<số>`. Dòng hoàn tiền phòng và phí đã trả trước chỉ có khi thật sự có tiền hoàn. Cọc ghi rõ "Hoàn cọc cho khách (trừ vào hoá đơn)" và "Mất cọc (Siris giữ, không hoàn khách)". Dòng phạt do thanh lý tạo chỉ thuộc hoá đơn đó (bỏ dòng hoặc hoàn tác thì xoá luôn). Dòng điện nước ghi số đầu, số cuối và in vào mô tả trên PDF.
+- Thu tiền hoá đơn có dòng tiền cọc: tiền thu trả cọc trước, phần cọc thu đủ thì dòng thu cọc chờ trong sổ cọc chuyển Đã xong. Hoá đơn đã thu từ trước khi có cách này chạy `npm run db:sync-invoice-deposits` một lần.
 - Xem PDF, tải ảnh hoá đơn ngay trong popup; mẫu hoá đơn HTML.
 
 **Chỉ số điện nước**
@@ -28,10 +32,12 @@ Công nghệ: Next.js 16 (App Router), React 19, TypeScript, Tailwind v4 + shadc
 2. Ràng buộc duy nhất: số đầu không lớn hơn số cuối của cùng lần ghi.
 3. Chỉ số ban đầu ở hợp đồng bắt buộc cho phí theo đồng hồ, chỉ là số gợi ý lúc tạo hoá đơn đầu; không ràng buộc với lần chốt trước, sau hay ngày lắp.
 4. Ngày lắp đồng hồ chỉ dùng khi thay đồng hồ hoặc chuyển phòng giữa kỳ.
+5. Một đồng hồ có thể có nhiều lần chốt; số đầu của lần sau lấy số cuối của lần chốt gần nhất theo ngày (cùng ngày thì số lớn hơn). Chỉ số ban đầu khi tạo hợp đồng mới không bị so với các lần chốt trước.
+6. **Chốt thanh lý** là một lần chốt loại riêng, có nhãn "chốt thanh lý" ở trang Chỉ số; số đầu mặc định là lần chốt gần nhất và sửa được, hiện 3 lần chốt gần nhất để tham khảo (số đầu đổi thì tô đỏ). Không ghi đè chỉ số đầu hợp đồng, hoàn tác thanh lý xoá lần chốt này.
 
-**Hợp đồng:** form tạo và popup sửa dùng chung khối phí; phí theo đồng hồ chọn đồng hồ của phòng và điền chỉ số ban đầu, sửa được; biên bản bàn giao không còn chỉ số đồng hồ. Loại phí: bỏ "Nhập tay", xoá được khi chưa dùng.
+**Hợp đồng:** sửa người ở ngay trong popup sửa hợp đồng, không tạo phụ lục; sổ cọc trong popup sửa chỉ xem; phụ lục có nút Xem trước (popup PDF); ngày thanh lý không bị ràng buộc với ngày bắt đầu; form tạo và popup sửa dùng chung khối phí; phí theo đồng hồ chọn đồng hồ của phòng và điền chỉ số ban đầu, sửa được; biên bản bàn giao không còn chỉ số đồng hồ. Loại phí: bỏ "Nhập tay"; xoá được trừ khi đang dùng trong hợp đồng còn hiệu lực (hoặc gắn đồng hồ), đơn vị tính sửa tên, xoá được ở Cài đặt, phí đã lưu trữ xoá được.
 
-**Thu chi** (`/cashbook`): sổ chung các khoản thực thu, thực chi (thu tiền thuê, thu và hoàn cọc, chi sửa chữa, điện nước, lương, khác) với dải tổng quan Thu, Chi, Chênh lệch, Cọc đang giữ; lọc theo tháng, cơ sở. Mọi khoản đều sửa, xoá được và có nhật ký; sửa thu tiền thuê không vượt phần còn nợ. Khoản chờ thu không hiện; trừ cọc, mất cọc không tính vào thu chi.
+**Thu chi** (`/cashbook`): sổ chung các khoản thực thu, thực chi (thu tiền thuê, thu và hoàn cọc, chi sửa chữa, điện nước, lương, khác) với dải tổng quan Thu, Chi, Chênh lệch, Cọc đang giữ; lọc theo tháng, cơ sở. Mọi khoản đều sửa, xoá được và có nhật ký; sửa thu tiền thuê không vượt phần còn nợ. Khoản thu hoá đơn có dòng cọc hiện thành hai dòng riêng: Thu cọc và Thu tiền thuê. Khoản chờ thu không hiện; trừ cọc, mất cọc không tính vào thu chi.
 
 ## Yêu cầu
 
@@ -117,6 +123,7 @@ Quy tắc (ESLint và `tests/unit/architecture` kiểm, CI chặn PR vi phạm):
 | `npm run build` | build production |
 | `npm run db:generate` / `db:migrate` | sinh / chạy migration |
 | `npm run db:seed` | nạp dữ liệu mẫu |
+| `npm run db:sync-invoice-deposits` | đồng bộ sổ cọc với các hoá đơn đã thu có dòng cọc (chạy lại an toàn) |
 
 ## Kiểm thử
 

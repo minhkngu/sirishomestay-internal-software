@@ -94,6 +94,21 @@ describe('sổ quỹ thu chi', () => {
     expect(summarize(rows)).toEqual({ income: 13000000, expense: 500000, net: 12500000 })
     expect(depositHeld).toBe(8700000)
   })
+  it('hoá đơn có dòng cọc: tiền thu trả cọc trước, sổ quỹ tách dòng thu cọc và thu tiền thuê, không tính hai lần', async () => {
+    await db
+      .insert(depositEntries)
+      .values({ leaseId, date: '2026-08-01', type: 'collect', amount: 9000000, status: 'pending' })
+    const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-08' })
+    await approveInvoice(db, ctx(), inv.id, {})
+    await recordLeasePayment(db, ctx(), leaseId, { paidOn: '2026-08-10', amount: 10000000, method: 'cash' })
+    const { rows, depositHeld } = await listCashbook(db, ctx(), { month: '2026-08' })
+    expect(rows.map((r) => [r.kind, r.label, r.amount]).sort()).toEqual([
+      ['deposit', 'Thu cọc', 9000000],
+      ['rent', 'Thu tiền thuê', 1000000],
+    ])
+    expect(summarize(rows).income).toBe(10000000)
+    expect(depositHeld).toBe(9000000)
+  })
   it('người chỉ có quyền cơ sở A không thấy cơ sở B', async () => {
     await addExpense(db, context(['billing'], [otherId]), expense({ facilityId: otherId }))
     expect((await listCashbook(db, ctx(), {})).rows).toHaveLength(0)

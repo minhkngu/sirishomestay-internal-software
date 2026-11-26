@@ -166,6 +166,11 @@ export function ExpenseDialog({
               onValueChange={setAmount}
               className="h-9 w-full rounded-xl border border-border/80 bg-background px-3 text-right text-sm font-medium tabular-nums"
             />
+            {amount !== '' && value <= 0 && (
+              <p role="alert" className="text-xs text-destructive">
+                Số tiền phải lớn hơn 0
+              </p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label>Hình thức</Label>

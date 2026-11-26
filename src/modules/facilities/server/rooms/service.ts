@@ -7,7 +7,16 @@ import { todayVN } from '@/domain/dates'
 import { recordAudit } from '@/modules/platform'
 import { deleteCascade } from '../cascade-delete'
 import { getFacility } from '../facilities/service'
-import { bulkInput, roomInput, roomUpdateInput, type BulkInput, type RoomInput } from './schemas'
+import {
+  bulkInput,
+  bulkRoomIdsInput,
+  bulkRoomUpdateInput,
+  roomInput,
+  roomUpdateInput,
+  type BulkInput,
+  type BulkRoomUpdateInput,
+  type RoomInput,
+} from './schemas'
 
 export type Room = typeof rooms.$inferSelect
 
@@ -231,6 +240,118 @@ export async function deleteRoom(db: DB, ctx: AccessContext, id: string): Promis
       facilityId: before.facilityId,
       before,
     })
+  })
+}
+
+/** Sửa nhanh hàng loạt các thuộc tính chung cho nhiều phòng. */
+export async function updateRoomsBulk(db: DB, ctx: AccessContext, input: BulkRoomUpdateInput): Promise<number> {
+  assertCan(ctx, 'settings')
+  const { ids, areaM2, ...rest } = bulkRoomUpdateInput.parse(input)
+  const uniqueIds = [...new Set(ids)]
+  const patch: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(rest)) {
+    if (v !== undefined) patch[k] = v
+  }
+  if (areaM2 !== undefined) patch.areaM2 = areaM2?.toString() ?? null
+  if (Object.keys(patch).length === 0) throw new ValidationError('Nhập ít nhất một thông tin cần sửa')
+
+  return db.transaction(async (tx) => {
+    const found = await tx.select().from(rooms).where(inArray(rooms.id, uniqueIds))
+    if (!found.length) throw new NotFoundError()
+    const after = await tx
+      .update(rooms)
+      .set({ ...patch, updatedAt: new Date() })
+      .where(
+        inArray(
+          rooms.id,
+          found.map((r) => r.id),
+        ),
+      )
+      .returning()
+    for (const r of after) {
+      await recordAudit(tx, ctx, {
+        action: 'update',
+        entity: 'room',
+        summary: 'Sửa hàng loạt phòng',
+        entityId: r.id,
+        facilityId: r.facilityId,
+        after: r,
+      })
+    }
+    return after.length
+  })
+}
+
+/** Ngừng sử dụng hoặc dùng lại nhiều phòng cùng lúc. */
+export async function setRoomsActiveBulk(
+  db: DB,
+  ctx: AccessContext,
+  ids: string[],
+  isActive: boolean,
+): Promise<number> {
+  assertCan(ctx, 'settings')
+  const parsed = bulkRoomIdsInput.parse({ ids })
+  const uniqueIds = [...new Set(parsed.ids)]
+
+  return db.transaction(async (tx) => {
+    const found = await tx.select().from(rooms).where(inArray(rooms.id, uniqueIds))
+    if (!found.length) throw new NotFoundError()
+    const foundIds = found.map((r) => r.id)
+    if (!isActive) {
+      const busy = await tx
+        .select({ roomId: leases.roomId })
+        .from(leases)
+        .where(and(inArray(leases.roomId, foundIds), eq(leases.status, 'active')))
+      if (busy.length > 0) {
+        const busySet = new Set(busy.map((b) => b.roomId))
+        const codes = found
+          .filter((r) => busySet.has(r.id))
+          .map((r) => r.code)
+          .join(', ')
+        throw new ValidationError(`Phòng ${codes} đang có hợp đồng thuê hiệu lực, không ngừng sử dụng được`)
+      }
+    }
+    const updated = await tx
+      .update(rooms)
+      .set({ isActive, updatedAt: new Date() })
+      .where(inArray(rooms.id, foundIds))
+      .returning()
+    for (const r of updated) {
+      await recordAudit(tx, ctx, {
+        action: 'update',
+        entity: 'room',
+        summary: isActive ? 'Dùng lại hàng loạt phòng' : 'Ngừng sử dụng hàng loạt phòng',
+        entityId: r.id,
+        facilityId: r.facilityId,
+        after: { isActive },
+      })
+    }
+    return updated.length
+  })
+}
+
+/** Xoá hẳn nhiều phòng và toàn bộ dữ liệu đi kèm trong một transaction. */
+export async function deleteRoomsBulk(db: DB, ctx: AccessContext, ids: string[]): Promise<number> {
+  assertCan(ctx, 'settings')
+  const parsed = bulkRoomIdsInput.parse({ ids })
+  const uniqueIds = [...new Set(parsed.ids)]
+
+  return db.transaction(async (tx) => {
+    const found = await tx.select().from(rooms).where(inArray(rooms.id, uniqueIds))
+    if (!found.length) throw new NotFoundError()
+    const foundIds = found.map((r) => r.id)
+    await deleteCascade(tx, 'rooms', 'id', foundIds)
+    for (const r of found) {
+      await recordAudit(tx, ctx, {
+        action: 'delete',
+        entity: 'room',
+        summary: 'Xoá hàng loạt phòng và dữ liệu đi kèm',
+        entityId: r.id,
+        facilityId: r.facilityId,
+        before: r,
+      })
+    }
+    return foundIds.length
   })
 }
 

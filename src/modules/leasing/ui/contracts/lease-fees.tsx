@@ -42,6 +42,7 @@ export function LeaseFees({
   renderCreateFee,
   onCreated,
   facilityId,
+  hideMeterInputs = false,
 }: {
   facilityId?: string
   renderCreateFee?: (p: { onCreated: (fee: FeeOption) => void }) => ReactNode
@@ -52,6 +53,7 @@ export function LeaseFees({
   fees: FeeDraft[]
   onChange: (fees: FeeDraft[]) => void
   onAddCommon: (id: string) => void
+  hideMeterInputs?: boolean
 }) {
   const [adding, setAdding] = useState(false)
   const resolved = resolveMeterIds({ roomMeters, roomId, fees })
@@ -101,7 +103,7 @@ export function LeaseFees({
                   />
                 </label>
               )}
-              {f.quantitySource === 'meter' && (
+              {!hideMeterInputs && f.quantitySource === 'meter' && (
                 <>
                   <div className="space-y-1.5 text-xs text-muted-foreground">
                     <span>Đồng hồ</span>

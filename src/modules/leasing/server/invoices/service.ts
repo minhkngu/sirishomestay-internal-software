@@ -22,6 +22,7 @@ import {
 } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
+import { syncDepositWithInvoice } from './deposit-sync'
 import { computeDueDate } from '../../domain/due-date'
 import { depositHeld } from '@/domain/cashbook'
 import { daysInMonth, todayVN } from '@/domain/dates'
@@ -454,9 +455,17 @@ async function previewCore(db: DB, facilityId: string, period: string, onlyLease
     }
   })
 }
-/** Mã tiếp theo `<mã cơ sở>-HD-<YYYYMM>-<số thứ tự>`. Gọi trong transaction đã khoá cơ sở, hoặc chấp nhận retry khi trùng. */
-export async function nextInvoiceCode(tx: Pick<DB, 'select'>, facilityCode: string, ym: string): Promise<string> {
-  const prefix = `${facilityCode}-HD-${ym.replace('-', '')}-`
+/**
+ * Mã tiếp theo `<mã cơ sở>-HD-<YYYYMM>-<số thứ tự>`; hoá đơn thanh lý dùng `TL` thay `HD` và đếm số thứ tự riêng.
+ * Gọi trong transaction đã khoá cơ sở, hoặc chấp nhận retry khi trùng.
+ */
+export async function nextInvoiceCode(
+  tx: Pick<DB, 'select'>,
+  facilityCode: string,
+  ym: string,
+  tag: 'HD' | 'TL' = 'HD',
+): Promise<string> {
+  const prefix = `${facilityCode}-${tag}-${ym.replace('-', '')}-`
   const codes = await tx
     .select({ code: invoices.code })
     .from(invoices)
@@ -655,6 +664,7 @@ export async function previewNewInvoice(db: DB, ctx: AccessContext, input: { lea
     facilityId: info.facilityId,
     tenantName: displayName(info),
     fixedQtyFeeIds: fixedQty.map((f) => f.id),
+    occupantsCount: await occupantsCountOf(db, input.leaseId),
     meterPanels,
   }
 }
@@ -701,7 +711,8 @@ export async function createInvoiceFromEditor(
       .flatMap((l) => {
         const key = keyOf(l.type, l.meta)
         const match =
-          key !== `${l.type}|||`
+          // Tiền phòng không có khoá riêng (mỗi hoá đơn một dòng): ghép theo loại
+          key !== `${l.type}|||` || l.type === 'rent'
             ? made.find((m) => !used.has(m.id) && keyOf(m.type, m.meta as Record<string, unknown> | null) === key)
             : undefined
         if (match) used.add(match.id)
@@ -1352,6 +1363,7 @@ export async function addPayment(
       summary: 'Ghi nhận thanh toán',
       after: row,
     })
+    await syncDepositWithInvoice(tx, ctx, id)
     return row
   })
 }
@@ -1361,6 +1373,8 @@ export async function deleteInvoice(db: DB, ctx: AccessContext, id: string): Pro
     const inv = await getInvoice(tx, ctx, id)
     if ((await tx.select({ id: payments.id }).from(payments).where(eq(payments.invoiceId, id))).length)
       throw new ValidationError('Gỡ các khoản đã thu trước khi xoá')
+    if (inv.kind === 'termination')
+      await tx.delete(oneOffCharges).where(and(eq(oneOffCharges.invoiceId, id), eq(oneOffCharges.kind, 'penalty')))
     await tx.update(oneOffCharges).set({ invoiceId: null }).where(eq(oneOffCharges.invoiceId, id))
     await tx.update(pendingAdjustments).set({ invoiceId: null }).where(eq(pendingAdjustments.invoiceId, id))
     await tx.delete(invoices).where(eq(invoices.id, id))
@@ -1671,11 +1685,19 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
     for (const l of old) {
       const m = (l.meta ?? {}) as Record<string, unknown>
       if (keep.has(JSON.stringify(m))) continue
-      if (typeof m.oneOffId === 'string')
+      if (typeof m.oneOffId === 'string') {
+        // Phạt của hoá đơn thanh lý chỉ thuộc hoá đơn đó: bỏ dòng thì xoá luôn, không để dồn sang hoá đơn khác
+        if (inv.kind === 'termination')
+          await tx
+            .delete(oneOffCharges)
+            .where(
+              and(eq(oneOffCharges.id, m.oneOffId), eq(oneOffCharges.invoiceId, id), eq(oneOffCharges.kind, 'penalty')),
+            )
         await tx
           .update(oneOffCharges)
           .set({ invoiceId: null })
           .where(and(eq(oneOffCharges.id, m.oneOffId), eq(oneOffCharges.invoiceId, id)))
+      }
       if (typeof m.pendingId === 'string')
         await tx
           .update(pendingAdjustments)
@@ -1782,6 +1804,7 @@ export async function recordLeasePayment(
         .returning()
       created.push(row)
       left -= part
+      await syncDepositWithInvoice(tx, ctx, inv.id)
     }
     await recordAuditBatch(
       tx,
@@ -1859,6 +1882,7 @@ export async function updatePayment(db: DB, ctx: AccessContext, id: string, inpu
       before,
       after,
     })
+    await syncDepositWithInvoice(tx, ctx, inv.id)
   })
 }
 export async function removePayment(db: DB, ctx: AccessContext, paymentId: string): Promise<void> {
@@ -1876,6 +1900,7 @@ export async function removePayment(db: DB, ctx: AccessContext, paymentId: strin
       summary: `Gỡ khoản thu của ${inv.code}`,
       before: row,
     })
+    await syncDepositWithInvoice(tx, ctx, row.invoiceId)
   })
 }
 export async function listInvoices(
@@ -2161,6 +2186,14 @@ async function buildMeterPanels(db: DB, leaseId: string, periodStart: string, mo
   }))
   return meterPanels
 }
+/** Số người ở của hợp đồng, tối thiểu 1 (cùng cách hoá đơn tính phí theo số người ở). */
+async function occupantsCountOf(db: DB, leaseId: string): Promise<number> {
+  const rows = await db
+    .select({ tenantId: leaseOccupants.tenantId })
+    .from(leaseOccupants)
+    .where(eq(leaseOccupants.leaseId, leaseId))
+  return Math.max(1, rows.length)
+}
 export async function getInvoiceDetail(db: DB, ctx: AccessContext, id: string) {
   const inv = await getInvoice(db, ctx, id)
   const [lines, pays, [row], periodFees, quantities, leaseFees] = await Promise.all([
@@ -2189,10 +2222,12 @@ export async function getInvoiceDetail(db: DB, ctx: AccessContext, id: string) {
   ])
   // Chỉ số đã chốt của đồng hồ gắn với từng phí tính theo đồng hồ, 3 tháng liền trước tháng hoá đơn (thiếu thì để trống)
   const meterPanels = await buildMeterPanels(db, inv.leaseId, inv.periodStart, inv.kind === 'monthly')
+  const occupantsCount = await occupantsCountOf(db, inv.leaseId)
   const total = lines.reduce((n, l) => n + l.amount, 0),
     paid = pays.reduce((n, p) => n + p.amount, 0)
   return {
     invoice: inv,
+    occupantsCount,
     meterPanels,
     leaseFeeTypeIds: leaseFees.flatMap((f) => (f.feeTypeId ? [f.feeTypeId] : [])),
     lines,
@@ -2212,12 +2247,11 @@ export async function getInvoiceDetail(db: DB, ctx: AccessContext, id: string) {
 }
 function pdfLine(line: typeof invoiceLines.$inferSelect) {
   const meta = line.meta as { unit?: unknown; segments?: { start?: unknown; end?: unknown }[] } | null
-  const segments =
-    (line.type === 'electric' || line.type === 'water') && Array.isArray(meta?.segments)
-      ? meta.segments
-          .filter((segment) => typeof segment.start === 'number' && typeof segment.end === 'number')
-          .map((segment) => `${segment.start} đến ${segment.end}`)
-      : []
+  const segments = Array.isArray(meta?.segments)
+    ? meta.segments
+        .filter((segment) => typeof segment.start === 'number' && typeof segment.end === 'number')
+        .map((segment) => `${segment.start} đến ${segment.end}`)
+    : []
   return {
     description: segments.length ? `${line.description} (${segments.join('; ')})` : line.description,
     quantity: line.quantity,

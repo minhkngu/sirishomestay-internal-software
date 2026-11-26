@@ -80,7 +80,8 @@ export type MeterReading = {
   period: string
   readOn: ISODate
   value: number
-  kind?: 'monthly' | 'handover'
+  /** `termination`: chỉ số chốt khi thanh lý, tính như một lần chốt trong tháng (có nhãn để phân biệt). */
+  kind?: 'monthly' | 'handover' | 'termination'
   /** Số đầu kỳ riêng của lần ghi; không có thì lấy theo lần ghi liền trước. */ opening?: number | null
 }
 
@@ -146,6 +147,9 @@ export type DepositEntry = {
 }
 
 export type ForfeitInput = { mode: 'all' | 'partial' | 'none'; amount?: number }
+
+/** Cách xử lý tiền phòng, phí cố định đã trả trước cho các ngày sau ngày trả phòng khi thanh lý. */
+export type RentRefundInput = { mode: 'by_days' | 'partial' | 'none'; amount?: number }
 
 export type BankAccount = {
   bankBin: string

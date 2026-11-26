@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm'
 import { MAX_MONEY } from '@/domain/money'
 import { depositContracts, depositEntries, leases, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
-import { assertCan, facilityKey, type AccessContext } from '@/domain/access'
+import { assertCan, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import type { DepositEntry } from '@/domain/types'
 
@@ -22,7 +22,7 @@ export async function loadRoom(db: Pick<DB, 'select'>, ctx: AccessContext, roomI
 export async function loadTenant(db: Pick<DB, 'select'>, ctx: AccessContext, tenantId: string) {
   const [t] = await db.select().from(tenants).where(eq(tenants.id, tenantId))
   if (!t) throw new NotFoundError()
-  assertCan(ctx, 'tenants_contracts', facilityKey(t.homeFacilityId))
+  assertCan(ctx, 'tenants_contracts', t.homeFacilityId ?? undefined)
   return t
 }
 

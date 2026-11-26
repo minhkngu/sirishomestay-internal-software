@@ -38,6 +38,7 @@ type Snapshot = {
   terminationHandoverId?: string | null
   terminationReadings?: { before: typeof meterReadings.$inferSelect | null; after: typeof meterReadings.$inferSelect }[]
   terminationFinalized?: boolean
+  terminationOneOffIds?: string[]
   retention?: { id: string; before: string | null; after: string; name: string; facilityId: string | null }[]
 }
 export type RestorePreview = {
@@ -202,6 +203,16 @@ export async function previewContractRestore(
     if (item.facilityId) assertCan(ctx, 'tenants_contracts', item.facilityId)
     items.push({ type: 'file_retention', id: item.id, label: `${item.name || 'Tệp'} · khôi phục hạn lưu` })
   }
+  const oneOffIds = snapshot.terminationOneOffIds ?? []
+  const oneOffRows = oneOffIds.length
+    ? await db.select().from(oneOffCharges).where(inArray(oneOffCharges.id, oneOffIds))
+    : []
+  for (const row of oneOffRows)
+    items.push({
+      type: 'one_off',
+      id: row.id,
+      label: `${row.description || 'Khoản phát sinh'} · khoản do thanh lý tạo`,
+    })
   items.sort((a, b) => a.type.localeCompare(b.type) || a.id.localeCompare(b.id))
   let blockedReason: string | null = null
   if (version.operation !== 'termination' && contract.status !== snapshot.contract.status)
@@ -346,6 +357,7 @@ export async function restoreContract(
           .where(inArray(pendingAdjustments.invoiceId, invoiceIds))
         await tx.delete(invoices).where(inArray(invoices.id, invoiceIds))
       }
+      if (ids('one_off').length) await tx.delete(oneOffCharges).where(inArray(oneOffCharges.id, ids('one_off')))
       if (entryIds.length) await tx.delete(depositEntries).where(inArray(depositEntries.id, entryIds))
       if (addonIds.length) await tx.delete(addenda).where(inArray(addenda.id, addonIds))
       if (handoverIds.length) await tx.delete(handovers).where(inArray(handovers.id, handoverIds))

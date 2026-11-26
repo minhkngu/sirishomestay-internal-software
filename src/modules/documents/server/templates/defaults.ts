@@ -230,7 +230,6 @@ const CONTENT: Record<TemplateDocType, Content> = {
       ['Phòng', '[so_phong]'],
       ['Bên nhận', '[ten_khach]'],
       ['Ngày bàn giao', '[ngay_ban_giao]'],
-      ['Tiền phạt', '[tong_phat]'],
     ],
     intro: [
       'Hôm nay, ngày [ngay_ban_giao], Bên A bàn giao phòng [so_phong] tại cơ sở [co_so] cho Bên B theo hợp đồng [ma_hop_dong].',
@@ -263,6 +262,7 @@ const CONTENT: Record<TemplateDocType, Content> = {
     ],
     articles: [
       { t: 'Tài sản khi trả phòng', p: ['@bang:tai_san'] },
+      { t: 'Chỉ số điện nước chốt khi trả phòng', p: ['@bang:chi_so'] },
       { t: 'Tiền phạt', p: ['Tổng tiền phạt do hư hỏng hoặc mất tài sản: [tong_phat].'] },
       {
         t: 'Xác nhận',

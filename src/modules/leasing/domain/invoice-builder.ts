@@ -2,7 +2,7 @@ import { contractTermsAt, termSegments } from './contract-terms'
 import { addDays, daysInMonth, formatDateVN } from '@/domain/dates'
 import { ValidationError } from '@/domain/errors'
 import { meterFeeUsage } from './meter-fee-usage'
-import { fullMonthCoefficient, prorateFraction } from './proration'
+import { fullMonthCoefficient, monthsCoefficient, prorateFraction } from './proration'
 import type {
   ISODate,
   InvoiceLineInput,
@@ -24,14 +24,6 @@ const prevMonth = (ym: string) => {
 }
 const mmYYYY = (ym: string) => `${ym.slice(5)}/${ym.slice(0, 4)}`
 
-function rangeLabel(start: ISODate, end: ISODate): string {
-  const sameFullMonth =
-    start.endsWith('-01') && end === lastDayOf(end.slice(0, 7)) && start.slice(0, 7) === end.slice(0, 7)
-  return sameFullMonth
-    ? `tháng ${mmYYYY(start.slice(0, 7))}`
-    : `${formatDateVN(start).slice(0, 5)}–${formatDateVN(end).slice(0, 5)}`
-}
-
 /** Tiền phòng + phí cố định cho khoảng [from, to] với hệ số `sum` (số tháng, có lẻ). */
 function rentAndFixedLines(
   terms: LeaseTerms,
@@ -40,11 +32,10 @@ function rentAndFixedLines(
   sum: number,
   occupantsCount: number,
 ): InvoiceLineInput[] {
-  const label = rangeLabel(from, to)
   const lines: InvoiceLineInput[] = [
     {
       type: 'rent',
-      description: `Tiền phòng ${label}`,
+      description: 'Tiền phòng',
       quantity: round4(sum),
       unitPrice: terms.monthlyRent,
       amount: Math.round(terms.monthlyRent * sum),
@@ -128,12 +119,14 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): {
   let from: ISODate
   let to: ISODate
   let sum: number
+  // Kỳ do người dùng chọn (từ–đến): hệ số tính theo tháng tròn từ ngày bắt đầu, cùng công thức với ô chọn ngày trên màn hình hoá đơn;
+  // kỳ theo tháng dương lịch thì tính lẻ ngày trong từng tháng
+  const fraction = (f: ISODate, t: ISODate) =>
+    input.overridePeriod ? monthsCoefficient(f, t, input.proration) : prorateFraction(f, t, input.proration)
   if (input.overridePeriod) {
     from = input.overridePeriod.start
     to = input.overridePeriod.end
-    sum =
-      input.overridePeriod.coefficient ??
-      (input.fullMonth ? fullMonthCoefficient(from, to) : prorateFraction(from, to, input.proration))
+    sum = input.overridePeriod.coefficient ?? (input.fullMonth ? fullMonthCoefficient(from, to) : fraction(from, to))
   } else {
     from = terms.startDate > monthStart ? terms.startDate : monthStart
     const endDate = contractTermsAt(input.lease, input.addenda, monthEnd).endDate
@@ -143,14 +136,13 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): {
   if (sum > 0) {
     {
       const segments = termSegments(input.lease, input.addenda ?? [], from, to)
-      const totalFraction = segments.reduce(
-        (n, segment) => n + prorateFraction(segment.from, segment.to, input.proration),
-        0,
-      )
+      const totalFraction = segments.reduce((n, segment) => n + fraction(segment.from, segment.to), 0)
       for (const segment of segments) {
-        const fraction = prorateFraction(segment.from, segment.to, input.proration)
+        const segmentFraction = fraction(segment.from, segment.to)
         const coefficient =
-          input.overridePeriod?.coefficient != null || input.fullMonth ? (sum * fraction) / totalFraction : fraction
+          input.overridePeriod?.coefficient != null || input.fullMonth
+            ? (sum * segmentFraction) / totalFraction
+            : segmentFraction
         const segmentLines = rentAndFixedLines(
           segment.terms,
           segment.from,

@@ -76,6 +76,7 @@ const SERVICE_FEES = loop('phi_dich_vu', 'Danh sách phí dịch vụ', [
   { key: 'don_vi', label: 'Đơn vị', example: 'người' },
   { key: 'so_luong', label: 'Số lượng', example: '2' },
   { key: 'don_gia', label: 'Đơn giá', example: '200.000' },
+  { key: 'chi_so_dau', label: 'Chỉ số đầu', example: '1.200 (15/10/2026)' },
 ])
 const OCCUPANTS = loop('nguoi_o', 'Danh sách người ở', [
   { key: 'ho_ten', label: 'Họ tên', example: 'John Miller' },
@@ -87,6 +88,20 @@ const INVOICE_LINES = loop('dong', 'Các dòng hoá đơn', [
   { key: 'don_gia', label: 'Đơn giá', example: '9.000.000' },
   { key: 'thanh_tien', label: 'Thành tiền', example: '9.000.000' },
 ])
+const HANDOVER_CHECK_IN: Field[] = [
+  f('ma_hop_dong', 'Mã hợp đồng', 'TD-HĐ-2026-0001'),
+  f('ngay_ban_giao', 'Ngày bàn giao', '15/10/2026'),
+  loop('tai_san', 'Danh sách tài sản', [
+    { key: 'ma', label: 'Mã tài sản', example: 'TS-0101' },
+    { key: 'ten', label: 'Tên tài sản', example: 'Máy lạnh' },
+    { key: 'tinh_trang', label: 'Tình trạng', example: ASSET_CONDITION.good },
+  ]),
+  loop('chi_so', 'Chỉ số điện nước', [
+    { key: 'loai', label: 'Loại (điện/nước)', example: 'Điện' },
+    { key: 'so_dong_ho', label: 'Số đồng hồ', example: 'E-301' },
+    { key: 'chi_so', label: 'Chỉ số', example: '1200' },
+  ]),
+]
 const HANDOVER: Field[] = [
   f('ma_hop_dong', 'Mã hợp đồng', 'TD-HĐ-2026-0001'),
   f('ngay_ban_giao', 'Ngày bàn giao', '15/10/2026'),
@@ -117,6 +132,9 @@ const INVOICE: Field[] = [
   f('ghi_chu', 'Ghi chú của hoá đơn', 'Chuyển khoản trước hạn để được giữ giá'),
   f('da_thanh_toan', 'Đã thanh toán', '0'),
   f('con_lai', 'Còn phải trả', '9.380.000'),
+  f('ket_luan', 'Kết luận thanh toán (ai trả ai)', 'Khách phải thanh toán: 9.380.000 ₫'),
+  f('ket_luan_bang_chu', 'Kết luận bằng chữ', 'Chín triệu ba trăm tám mươi nghìn đồng'),
+  f('tom_tat_thanh_toan', 'Tóm tắt đã thanh toán, còn lại', 'Đã thanh toán: 0 ₫ · Còn phải trả: 9.380.000 ₫'),
   INVOICE_LINES,
 ]
 
@@ -174,7 +192,7 @@ export const TEMPLATE_FIELDS: Record<DocType, Field[]> = {
     f('tien_hoan_khach', 'Số tiền hoàn cho khách', '11.080.000'),
     f('tien_khach_tra_them', 'Số tiền khách trả thêm', '0'),
   ],
-  handover_check_in: [...PERSON, ...SITE, ...HANDOVER],
+  handover_check_in: [...PERSON, ...SITE, ...HANDOVER_CHECK_IN],
   handover_check_out: [...PERSON, ...SITE, ...HANDOVER],
   invoice_monthly: [...PERSON, ...SITE.filter((x) => x.key !== 'ngay_lap'), ...INVOICE],
   invoice_termination: [
@@ -231,7 +249,7 @@ export type DocEntities = {
     newDepositAmount?: number | null
     newRoomCode?: string | null
   }
-  fees?: { name: string; unit: string; quantity: number; unitPrice: number }[]
+  fees?: { name: string; unit: string; quantity: number; unitPrice: number; initialReading?: string }[]
   invoice?: {
     code: string
     periodStart: string
@@ -242,7 +260,7 @@ export type DocEntities = {
     bank?: { bankName: string; accountNumber: string; accountName: string } | null
     lines: { description: string; quantity: number; unitPrice: number; amount: number }[]
   }
-  /** `readings` không còn dùng: biên bản bàn giao đã bỏ chỉ số; mẫu cũ vẫn nhận mảng rỗng. */
+  /** `readings`: chỉ số chốt trong ngày bàn giao (thanh lý); rỗng khi ngày đó không chốt chỉ số. */
   handover?: {
     date: string
     items: { code: string; name: string; condition: string; penalty?: number }[]
@@ -286,6 +304,7 @@ export function buildTemplateData(docType: DocType, e: DocEntities): Record<stri
       don_vi: x.unit,
       so_luong: x.quantity,
       don_gia: formatVND(x.unitPrice),
+      chi_so_dau: x.initialReading ?? '',
     })),
     nguoi_o: (e.occupants ?? []).map((x) => ({ ho_ten: x.fullName, giay_to: x.idDocument ?? '' })),
     // phụ lục
@@ -313,6 +332,22 @@ export function buildTemplateData(docType: DocType, e: DocEntities): Record<stri
     so_tai_khoan: e.invoice?.bank?.accountNumber ?? '',
     chu_tai_khoan: e.invoice?.bank?.accountName ?? '',
     noi_dung_ck: e.invoice?.code ?? '',
+    // Tổng dương: khách trả Siris; tổng âm: Siris hoàn trả khách (đã hoàn thì paid âm)
+    ket_luan:
+      invoiceTotal == null
+        ? ''
+        : invoiceTotal < 0
+          ? `Siris hoàn trả khách: ${m(-invoiceTotal)} ₫`
+          : invoiceTotal > 0
+            ? `Khách phải thanh toán: ${m(invoiceTotal)} ₫`
+            : 'Không phát sinh khoản phải thanh toán',
+    ket_luan_bang_chu: invoiceTotal == null ? '' : w(Math.abs(invoiceTotal)),
+    tom_tat_thanh_toan:
+      invoiceTotal == null
+        ? ''
+        : invoiceTotal < 0
+          ? `Đã hoàn: ${m(-(e.invoice?.paid ?? 0))} ₫ · Còn phải hoàn: ${m(Math.max((e.invoice?.paid ?? 0) - invoiceTotal, 0))} ₫`
+          : `Đã thanh toán: ${m(e.invoice?.paid ?? 0)} ₫ · Còn phải trả: ${m(Math.max(invoiceTotal - (e.invoice?.paid ?? 0), 0))} ₫`,
     da_thanh_toan: m(e.invoice?.paid ?? 0),
     con_lai: m(invoiceTotal == null ? null : invoiceTotal - (e.invoice?.paid ?? 0)),
     tien_hoan_khach: m(refund),

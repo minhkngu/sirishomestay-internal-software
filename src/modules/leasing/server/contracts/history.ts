@@ -91,7 +91,7 @@ export async function recordTerminationReadings(
     ? await tx.select().from(meterReadings).where(inArray(meterReadings.meterId, meterIds))
     : []
   const changes = after
-    .filter((row) => row.kind === 'handover' && row.readOn === date)
+    .filter((row) => row.kind === 'termination' && row.readOn === date)
     .map((row) => ({ after: row, before: snapshot.meterReadings.find((old) => old.id === row.id) ?? null }))
   await tx
     .update(contractVersions)
@@ -108,5 +108,14 @@ export async function recordTerminationHandover(
   await tx
     .update(contractVersions)
     .set({ snapshot: { ...(version.snapshot as object), terminationHandoverId: createdHandoverId } })
+    .where(eq(contractVersions.id, versionId))
+}
+
+/** Ghi các khoản phát sinh (phạt…) do thanh lý tạo ra để hoàn tác xoá đúng chúng. */
+export async function recordTerminationOneOffs(tx: DB, versionId: string, oneOffIds: string[]): Promise<void> {
+  const [version] = await tx.select().from(contractVersions).where(eq(contractVersions.id, versionId))
+  await tx
+    .update(contractVersions)
+    .set({ snapshot: { ...(version.snapshot as object), terminationOneOffIds: oneOffIds } })
     .where(eq(contractVersions.id, versionId))
 }

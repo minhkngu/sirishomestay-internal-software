@@ -38,6 +38,12 @@ export function CollectPaymentDialog({
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
   const value = amount === '' ? 0 : Number(amount)
+  const amountError =
+    amount !== '' && value <= 0
+      ? 'Số tiền thu phải lớn hơn 0'
+      : value > debt
+        ? `Số tiền thu không được vượt quá dư nợ (${formatVND(debt)})`
+        : ''
   const submit = () =>
     start(async () => {
       const r = await recordLeasePaymentAction(leaseId, { paidOn, amount: value, method: method as 'cash', note })
@@ -69,6 +75,11 @@ export function CollectPaymentDialog({
             onValueChange={setAmount}
             className="h-9 w-full rounded-xl border border-border/80 bg-background px-3 text-right text-sm font-medium tabular-nums"
           />
+          {amountError && (
+            <p role="alert" className="text-xs text-destructive">
+              {amountError}
+            </p>
+          )}
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">

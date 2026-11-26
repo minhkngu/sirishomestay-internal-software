@@ -117,14 +117,16 @@ export function ContractRowActions({
   const available = ACTIONS.filter(
     (item) =>
       (item.key !== 'delete' || canDelete) &&
+      (item.key !== 'edit' || kind !== 'lease' || active) &&
       (!['termination', 'assignment', 'extension', 'transfer'].includes(item.key) || (kind === 'lease' && active)),
   )
   const rest = available.filter((item) => item.key !== 'edit')
+  const canEdit = kind !== 'lease' || active
   return (
     <>
       {presentation === 'row' ? (
         <IconTipGroup>
-          <div className="flex flex-wrap items-center justify-end gap-0.5">
+          <div className="flex flex-nowrap items-center justify-start gap-0.5">
             {available.map((item) => (
               <IconTip key={item.key} label={item.label}>
                 <Button
@@ -145,17 +147,19 @@ export function ContractRowActions({
         </IconTipGroup>
       ) : (
         <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant={kind === 'lease' ? 'default' : 'outline'}
-            onPointerEnter={prefetch}
-            onFocus={prefetch}
-            onClick={() => open('edit')}
-          >
-            <FilePenLine className="size-3.5" />
-            Sửa hợp đồng
-          </Button>
+          {canEdit && (
+            <Button
+              type="button"
+              size="sm"
+              variant={kind === 'lease' ? 'default' : 'outline'}
+              onPointerEnter={prefetch}
+              onFocus={prefetch}
+              onClick={() => open('edit')}
+            >
+              <FilePenLine className="size-3.5" />
+              Sửa hợp đồng
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger
               aria-label="Thao tác khác"
@@ -186,7 +190,7 @@ export function ContractRowActions({
         }}
       >
         <DialogContent
-          className={`max-h-[94vh] overflow-y-auto ${action === 'edit' ? 'sm:max-w-3xl' : 'sm:max-w-2xl'}`}
+          className={`max-h-[94vh] overflow-y-auto ${action === 'edit' || action === 'termination' ? 'sm:max-w-3xl' : 'sm:max-w-2xl'}`}
         >
           <DialogHeader>
             <DialogTitle>{label}</DialogTitle>
@@ -210,7 +214,6 @@ export function ContractRowActions({
               documents={{
                 signedFileId: data.extras?.signedFileId ?? null,
                 entries: data.extras?.depositEntries ?? [],
-                canEditDeposit: data.extras?.billing ?? false,
               }}
               facility={data.facility}
               renderCreatePerson={renderCreatePerson}
@@ -262,8 +265,10 @@ export function ContractRowActions({
           {data?.form && action === 'termination' && (
             <TerminationWizard
               leaseId={id}
-              meters={data.form.meters.filter((m) => m.roomId === data.form!.currentRoomId)}
+              meters={data.form.terminationMeters}
               today={data.form.today}
+              assets={data.form.checkoutAssets}
+              depositBalance={data.form.depositBalance}
               defaultOpen
               onCompleted={close}
             />

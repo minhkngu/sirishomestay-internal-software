@@ -309,6 +309,13 @@
       "when": 1795407175638,
       "tag": "0043_chi_so_so_dau_rieng",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1795590128694,
+      "tag": "0044_big_gideon",
+      "breakpoints": true
     }
   ]
 }

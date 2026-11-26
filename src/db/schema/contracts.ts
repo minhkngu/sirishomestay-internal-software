@@ -25,6 +25,16 @@ import { feeTypes } from './fees'
 import { tenants } from './tenants'
 import { docTemplates, invoiceTemplates } from './templates'
 
+export type AgreedFee = {
+  feeTypeId: string | null
+  name: string
+  unit: string
+  quantitySource: 'occupants' | 'room' | 'meter' | 'period_input'
+  unitPrice: number
+  quantity: number
+  legacyFixed?: boolean
+}
+
 export const depositContracts = pgTable(
   'deposit_contracts',
   {
@@ -36,7 +46,9 @@ export const depositContracts = pgTable(
       .notNull()
       .references(() => tenants.id),
     depositAmount: integer('deposit_amount').notNull(),
+    agreedDeposit: integer('agreed_deposit'),
     agreedRent: integer('agreed_rent').notNull(),
+    agreedFees: jsonb('agreed_fees').$type<AgreedFee[]>(),
     expectedMoveIn: date('expected_move_in', { mode: 'string' }).notNull(),
     status: text('status').$type<DepositContractStatus>().notNull().default('pending'),
     cancelOutcome: text('cancel_outcome').$type<CancelOutcome>(),

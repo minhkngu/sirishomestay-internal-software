@@ -38,3 +38,21 @@ export function depositDiffEntry(oldAmount: number, newAmount: number, date: ISO
         note: 'Hoàn cọc chênh lệch theo phụ lục',
       }
 }
+
+/**
+ * Chia các khoản thu của một hoá đơn có dòng cọc thành phần cọc và phần tiền thuê: tiền thu trước hết trả hết cọc, phần còn lại là tiền thuê.
+ * `payments` đã xếp theo thứ tự thu; khoản âm (hoàn tiền) không chia, tính hết vào tiền thuê.
+ */
+export function splitPaymentsDepositFirst(
+  payments: { id: string; amount: number }[],
+  depositDue: number,
+): Map<string, { deposit: number; rent: number }> {
+  let remaining = Math.max(depositDue, 0)
+  const out = new Map<string, { deposit: number; rent: number }>()
+  for (const p of payments) {
+    const deposit = p.amount > 0 ? Math.min(p.amount, remaining) : 0
+    remaining -= deposit
+    out.set(p.id, { deposit, rent: p.amount - deposit })
+  }
+  return out
+}

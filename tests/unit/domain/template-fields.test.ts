@@ -56,6 +56,7 @@ describe('TEMPLATE_FIELDS', () => {
       'don_vi',
       'so_luong',
       'don_gia',
+      'chi_so_dau',
     ])
     expect(TEMPLATE_FIELDS.lease.find((f) => f.key === 'nguoi_o')?.loop?.fields.map((f) => f.key)).toEqual([
       'ho_ten',
@@ -111,7 +112,9 @@ describe('buildTemplateData', () => {
     expect(d.ngay_lap).toBe('14/10/2026')
     expect(d.ten_khach).toBe('John Miller')
     expect(d.so_phong).toBe('301')
-    expect(d.phi_dich_vu).toEqual([{ ten: 'Phí dịch vụ', don_vi: 'người', so_luong: 2, don_gia: '200.000' }])
+    expect(d.phi_dich_vu).toEqual([
+      { ten: 'Phí dịch vụ', don_vi: 'người', so_luong: 2, don_gia: '200.000', chi_so_dau: '' },
+    ])
     expect(d.nguoi_o).toEqual([{ ho_ten: 'John Miller', giay_to: 'P1234567' }])
   })
   it('hoá đơn: tổng tiền và bằng chữ, dòng hoá đơn', () => {
@@ -133,6 +136,8 @@ describe('buildTemplateData', () => {
     })
     expect(d.tong_tien).toBe('9.380.000')
     expect(d.tong_tien_bang_chu).toBe('Chín triệu ba trăm tám mươi nghìn đồng')
+    expect(d.ket_luan).toBe('Khách phải thanh toán: 9.380.000 ₫')
+    expect(d.tom_tat_thanh_toan).toBe('Đã thanh toán: 0 ₫ · Còn phải trả: 9.380.000 ₫')
     expect(d.han_thanh_toan).toBe('08/12/2026')
     expect(d.ky).toBe('01/12/2026 – 31/12/2026')
     expect(d.dong).toHaveLength(2)
@@ -140,6 +145,20 @@ describe('buildTemplateData', () => {
       { mo_ta: 'Tiền phòng tháng 12/2026', so_luong: 1, don_gia: '9.000.000', thanh_tien: '9.000.000' },
       {},
     ])
+  })
+  it('hoá đơn âm: kết luận Siris hoàn trả khách, còn phải hoàn theo số đã hoàn', () => {
+    const base = {
+      tenant: entities.tenant,
+      facility: entities.facility,
+      room: entities.room,
+    }
+    const line = [{ description: 'Hoàn cọc', quantity: 1, unitPrice: -2_000_000, amount: -2_000_000 }]
+    const d = buildTemplateData('invoice_termination', {
+      ...base,
+      invoice: { code: 'X', periodStart: '2026-12-01', periodEnd: '2026-12-01', lines: line, paid: -500_000 },
+    })
+    expect(d.ket_luan).toBe('Siris hoàn trả khách: 2.000.000 ₫')
+    expect(d.tom_tat_thanh_toan).toBe('Đã hoàn: 500.000 ₫ · Còn phải hoàn: 1.500.000 ₫')
   })
   it('thiếu dữ liệu → chuỗi rỗng, không ném lỗi', () => {
     expect(buildTemplateData('lease', { now: '2026-10-14' }).ten_khach).toBe('')

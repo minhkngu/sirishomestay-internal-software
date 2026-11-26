@@ -19,7 +19,10 @@ export function meterUsage(
   const missing: string[] = []
 
   for (const m of meters) {
-    const mine = readings.filter((r) => r.meterId === m.id).sort((a, b) => (a.readOn < b.readOn ? -1 : 1))
+    // Cùng ngày: số lớn hơn là lần chốt sau (chỉ số đồng hồ không giảm), vd. chốt thanh lý và chỉ số đầu của khách mới
+    const mine = readings
+      .filter((r) => r.meterId === m.id)
+      .sort((a, b) => (a.readOn < b.readOn ? -1 : a.readOn > b.readOn ? 1 : a.value - b.value))
     if (m.installedOn > periodEnd) continue
     if (m.removedOn && m.removedOn < periodStart) continue
 

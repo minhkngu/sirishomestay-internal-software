@@ -21,6 +21,8 @@ export type LedgerRow = {
   note: string
   /** Ghi chú riêng của khoản thu (không kèm mã hoá đơn khi trống), để điền vào popup sửa. */
   rawNote?: string
+  /** Khoản thu bị chia thành dòng cọc và dòng tiền thuê: số tiền cả khoản (dùng khi sửa). */
+  fullAmount?: number
   status: 'done' | 'pending'
   /** Thời điểm ghi nhận khoản này (giờ Việt Nam, HH:mm); dòng cũ không rõ thì rỗng. */
   time: string

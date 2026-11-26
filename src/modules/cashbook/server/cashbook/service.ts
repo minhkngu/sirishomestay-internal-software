@@ -3,6 +3,7 @@ import { depositEntries, expenses, invoiceLines, invoices, leases, payments, roo
 import type { DB } from '@/db/client'
 import { assertCan, can, type AccessContext } from '@/domain/access'
 import { depositHeld, depositMovement, expenseLabel, type LedgerRow } from '@/domain/cashbook'
+import { splitPaymentsDepositFirst } from '@/domain/deposit'
 import { VN_TIME_ZONE } from '@/domain/dates'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { displayName } from '@/modules/tenants'
@@ -86,16 +87,37 @@ export async function listCashbook(
       .innerJoin(rooms, eq(rooms.id, leases.roomId))
       .where(inScope(rooms.facilityId, scope)),
   ])
-  const rows: LedgerRow[] = [
-    ...pay.map((r): LedgerRow => ({
-      key: `payment:${r.p.id}`,
-      source: 'payment',
+  // Hoá đơn có dòng "Tiền cọc còn thiếu": tiền thu trả cọc trước, phần cọc và phần tiền thuê ghi thành hai dòng riêng
+  const depositInvoiceIds = [...new Set(pay.map((r) => r.p.invoiceId))]
+  const depositLines = depositInvoiceIds.length
+    ? await db
+        .select({ invoiceId: invoiceLines.invoiceId, amount: sql<number>`sum(${invoiceLines.amount})::float8` })
+        .from(invoiceLines)
+        .where(and(inArray(invoiceLines.invoiceId, depositInvoiceIds), eq(invoiceLines.type, 'deposit')))
+        .groupBy(invoiceLines.invoiceId)
+    : []
+  const depositDueOf = new Map(depositLines.map((l) => [l.invoiceId, l.amount]))
+  const splitOf = new Map<string, { deposit: number; rent: number }>()
+  if (depositDueOf.size) {
+    const allPays = await db
+      .select({ id: payments.id, invoiceId: payments.invoiceId, amount: payments.amount })
+      .from(payments)
+      .where(inArray(payments.invoiceId, [...depositDueOf.keys()]))
+      .orderBy(asc(payments.paidOn), asc(payments.createdAt))
+    for (const invoiceId of depositDueOf.keys())
+      for (const [id, split] of splitPaymentsDepositFirst(
+        allPays.filter((p) => p.invoiceId === invoiceId),
+        depositDueOf.get(invoiceId)!,
+      ))
+        splitOf.set(id, split)
+  }
+  const paymentRows = pay.flatMap((r): LedgerRow[] => {
+    const split = splitOf.get(r.p.id)
+    const base = {
+      source: 'payment' as const,
       id: r.p.id,
       date: r.p.paidOn,
-      direction: 'in',
-      kind: 'rent',
-      label: 'Thu tiền thuê',
-      amount: r.p.amount,
+      direction: 'in' as const,
       counted: true,
       facilityId: r.facilityId,
       roomCode: r.roomCode,
@@ -103,12 +125,30 @@ export async function listCashbook(
       method: r.p.method,
       note: r.p.note || r.code,
       rawNote: r.p.note,
-      status: 'done',
+      status: 'done' as const,
+      fullAmount: r.p.amount,
       ...when(r.p.createdAt),
-    })),
+    }
+    if (!split || split.deposit === 0)
+      return [{ ...base, key: `payment:${r.p.id}`, kind: 'rent', label: 'Thu tiền thuê', amount: r.p.amount }]
+    return [
+      { ...base, key: `payment-deposit:${r.p.id}`, kind: 'deposit', label: 'Thu cọc', amount: split.deposit },
+      ...(split.rent !== 0
+        ? [{ ...base, key: `payment:${r.p.id}`, kind: 'rent', label: 'Thu tiền thuê', amount: split.rent }]
+        : []),
+    ]
+  })
+  const rows: LedgerRow[] = [
+    ...paymentRows,
     // Sổ quỹ chỉ ghi khi tiền đã thực nhận hoặc đã chi: bỏ cọc chờ thu/hoàn và bù trừ, mất cọc (không có tiền đi qua)
     ...dep
-      .filter((r) => r.e.status === 'done' && depositMovement(r.e.type, r.e.status).counted)
+      // Cọc thu cùng hoá đơn đã hiện ở dòng thu cọc của khoản thu, không ghi lần nữa
+      .filter(
+        (r) =>
+          r.e.status === 'done' &&
+          depositMovement(r.e.type, r.e.status).counted &&
+          !r.e.note.includes('Thu cùng hoá đơn'),
+      )
       .map((r): LedgerRow => {
         const m = depositMovement(r.e.type, r.e.status)
         return {

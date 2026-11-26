@@ -5,6 +5,7 @@ import { useState, useTransition, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { FormDialog } from '@/components/form-dialog'
 import { Button } from '@/components/ui/button'
+import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { previewAddendumAction } from '../../server/addenda/actions'
 
@@ -14,7 +15,15 @@ type Preview = {
   invoice: { code: string; lines: { description: string; amount: number }[]; total: number } | null
 }
 type Result = { ok: true; data: unknown } | { ok: false; error: string }
-export type MeterOption = { meterId: string; roomId: string; utility: 'electric' | 'water'; serial: string | null }
+export type MeterOption = {
+  meterId: string
+  roomId: string
+  utility: 'electric' | 'water'
+  serial: string | null
+  latestReading?: { value: number; readOn: string | null }
+  /** 3 lần chốt gần nhất, mới nhất trước; `opening` là số đầu của lần đó (đã lưu hoặc số cuối lần liền trước). */
+  recent?: { value: number; readOn: string | null; opening: number | null }[]
+}
 
 /** Khung dùng chung của các wizard phụ lục: nhập → "Xem trước tiền" → lưu. Đổi dữ liệu nhập thì phải xem trước lại. */
 export function AddendumShell({
@@ -167,31 +176,92 @@ export function ReadingInputs({
   values,
   onChange,
   title,
+  openings,
+  onOpeningsChange,
 }: {
   meters: MeterOption[]
   values: Record<string, string>
   onChange: (v: Record<string, string>) => void
   title: string
+  /** Có thì cho sửa cả số đầu (các chỉ số chỉ là tương đối); số đầu khác lần chốt gần nhất được tô đỏ. */
+  openings?: Record<string, string>
+  onOpeningsChange?: (v: Record<string, string>) => void
 }) {
   if (!meters.length) return null
   return (
-    <div className="grid gap-1">
+    <div className="grid gap-2">
       <span className="font-medium">{title}</span>
-      {meters.map((m) => (
-        <label key={m.meterId} className="flex items-center gap-2">
-          {m.utility === 'electric' ? 'Điện' : 'Nước'} {m.serial ?? ''}
-          <input
-            type="number"
-            className={`${inputCls} w-32`}
-            value={values[m.meterId] ?? ''}
-            onChange={(e) => onChange({ ...values, [m.meterId]: e.target.value })}
-          />
-        </label>
-      ))}
+      {meters.map((m) => {
+        const opening = openings?.[m.meterId]
+        const changed = opening !== undefined && m.latestReading != null && opening !== String(m.latestReading.value)
+        return (
+          <div key={m.meterId} className="grid gap-1">
+            <label className="flex flex-wrap items-center gap-2">
+              <span>
+                {m.utility === 'electric' ? 'Điện' : 'Nước'} {m.serial ?? ''}
+              </span>
+              {onOpeningsChange && (
+                <>
+                  <span className="text-xs text-muted-foreground">Số đầu</span>
+                  <input
+                    type="number"
+                    aria-label={`Số đầu ${m.serial ?? ''}`}
+                    className={`${inputCls} w-28 ${changed ? 'border-destructive text-destructive' : ''}`}
+                    value={opening ?? ''}
+                    onChange={(e) => onOpeningsChange({ ...openings, [m.meterId]: e.target.value })}
+                  />
+                  <span className="text-xs text-muted-foreground">Số cuối</span>
+                </>
+              )}
+              <input
+                type="number"
+                aria-label={`Số cuối ${m.serial ?? ''}`}
+                className={`${inputCls} w-28`}
+                value={values[m.meterId] ?? ''}
+                onChange={(e) => onChange({ ...values, [m.meterId]: e.target.value })}
+              />
+              {changed && (
+                <span role="status" className="text-xs text-destructive">
+                  Số đầu khác lần chốt gần nhất ({m.latestReading!.value.toLocaleString('vi-VN')})
+                </span>
+              )}
+            </label>
+            {m.recent && m.recent.length > 0 ? (
+              <div className="text-xs text-muted-foreground tabular-nums">
+                {m.recent.length} lần chốt gần nhất:{' '}
+                {m.recent.map((r, i) => {
+                  // Số đầu của lần này đã bị đổi so với số cuối lần chốt trước nó thì tô đỏ
+                  const older = m.recent![i + 1]
+                  const edited = r.opening != null && older != null && r.opening !== older.value
+                  return (
+                    <span key={i} className={edited ? 'text-destructive' : undefined}>
+                      {i > 0 ? ' · ' : ''}
+                      {r.opening != null ? `${r.opening.toLocaleString('vi-VN')} → ` : ''}
+                      {r.value.toLocaleString('vi-VN')}
+                      {r.readOn ? ` (${formatDateVN(r.readOn)})` : ''}
+                    </span>
+                  )
+                })}
+              </div>
+            ) : (
+              m.latestReading && (
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  (Chốt gần nhất: {m.latestReading.value.toLocaleString('vi-VN')}
+                  {m.latestReading.readOn ? ` · ${formatDateVN(m.latestReading.readOn)}` : ''})
+                </span>
+              )
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
-export const toReadings = (values: Record<string, string>) =>
+export const toReadings = (values: Record<string, string>, openings?: Record<string, string>) =>
   Object.entries(values)
     .filter(([, v]) => v !== '')
-    .map(([meterId, v]) => ({ meterId, value: Number(v) }))
+    .map(([meterId, v]) => ({
+      meterId,
+      value: Number(v),
+      ...(openings && (openings[meterId] ?? '') !== '' ? { opening: Number(openings[meterId]) } : {}),
+    }))

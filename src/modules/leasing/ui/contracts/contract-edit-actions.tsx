@@ -11,12 +11,10 @@ import { previewInvoiceTemplateByIdAction, previewTemplateByIdAction } from '@/m
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { FormDialog } from '@/components/form-dialog'
 import { formatVND } from '@/domain/money'
-import { formatDateVN, todayVN } from '@/domain/dates'
+import { formatDateVN } from '@/domain/dates'
 import { formatPhoneDisplay } from '@/domain/phone'
-import { createOccupantChangeAction } from '../../server/addenda/actions'
 import { createFeeTypeAction } from '@/modules/facilities/actions'
 import { createTenantAction } from '@/modules/tenants/actions'
-import { addDepositEntryAction, markDepositDoneAction } from '../../server/charges/actions'
 import { uploadOne } from '@/modules/platform/ui'
 import { PdfBlobDialog } from '@/components/pdf-blob-dialog'
 import { EditAssets, assetsDraftChanged, emptyAssetsDraft, type AssetRow } from './edit-assets'
@@ -28,6 +26,7 @@ import {
   updateDepositContractAction,
   updateLeaseAction,
   updateLeaseAssetsAction,
+  updateLeaseOccupantsAction,
   refreshContractDocumentsAction,
 } from '../../server/contracts/actions'
 import { FormSelect, BareSelect } from './contract-form-ui'
@@ -148,7 +147,6 @@ export function ContractEditActions({
   /** Giấy tờ, sổ cọc của hợp đồng; chỉnh dạng nháp, lưu cùng nút "Lưu thay đổi". */ documents?: {
     signedFileId: string | null
     entries: DepositRow[]
-    canEditDeposit: boolean
   }
   mode?: 'edit' | 'delete'
   onCompleted?: () => void
@@ -346,11 +344,7 @@ export function ContractEditActions({
         return
       }
       if (editOccupants && [...finalOccIds].sort().join(',') !== initialIds) {
-        const r2 = await createOccupantChangeAction(contract.id, {
-          effectiveDate: todayVN(),
-          occupantIds: finalOccIds,
-          adjustmentTarget: 'next',
-        })
+        const r2 = await updateLeaseOccupantsAction(contract.id, finalOccIds)
         if (!r2.ok) {
           setError(r2.error)
           return
@@ -390,25 +384,6 @@ export function ContractEditActions({
         } catch (e) {
           setError(e instanceof Error ? e.message : 'Không tải được tệp')
           return
-        }
-        for (const entry of docs.newEntries) {
-          const r = await addDepositEntryAction(contract.id, {
-            date: entry.date,
-            type: entry.type,
-            amount: entry.amount,
-            status: 'pending',
-          })
-          if (!r.ok) {
-            setError(r.error)
-            return
-          }
-        }
-        for (const [id, done] of Object.entries(docs.doneEntries)) {
-          const r = await markDepositDoneAction(id, done)
-          if (!r.ok) {
-            setError(r.error)
-            return
-          }
         }
         setDocs(emptyDocsDraft)
       }
@@ -838,7 +813,6 @@ export function ContractEditActions({
               signed={signed}
               signedFileId={documents.signedFileId}
               entries={documents.entries}
-              canEditDeposit={documents.canEditDeposit}
               draft={docs}
               onChange={setDocs}
             />
@@ -1023,22 +997,31 @@ export function ContractEditActions({
         confirmLabel="Lưu thay đổi"
         onConfirm={doSave}
       />
-      {error && (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      )}
-      {editing && (
-        <div className="sticky bottom-0 -mx-1 flex flex-wrap items-center gap-3 border-t bg-background px-1 pt-3">
-          <Button type="submit" form="edit-contract-form" disabled={pending}>
-            Lưu thay đổi
-          </Button>
-          <p className="text-xs text-muted-foreground">
-            Mọi thay đổi trong cửa sổ này (thông tin, người ở, phí, mẫu, tài sản, giấy tờ, sổ cọc) chỉ được lưu khi bấm
-            nút này.
-          </p>
-        </div>
-      )}
+      {(() => {
+        const repError =
+          editOccupants && !occ.some((o) => o.id === tenantId) ? 'Người đại diện phải nằm trong danh sách người ở' : ''
+        const shownError = repError || error
+        return (
+          <>
+            {shownError && (
+              <p role="alert" className="text-sm text-destructive">
+                {shownError}
+              </p>
+            )}
+            {editing && (
+              <div className="sticky bottom-0 -mx-1 flex flex-wrap items-center gap-3 border-t bg-background px-1 pt-3">
+                <Button type="submit" form="edit-contract-form" disabled={pending || !!repError}>
+                  Lưu thay đổi
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Mọi thay đổi trong cửa sổ này (thông tin, người ở, phí, mẫu, tài sản, giấy tờ, sổ cọc) chỉ được lưu
+                  khi bấm nút này.
+                </p>
+              </div>
+            )}
+          </>
+        )
+      })()}
       <FormDialog
         open={meterFee !== null}
         onOpenChange={(o) => {
@@ -1073,6 +1056,11 @@ export function ContractEditActions({
                 value={meterReading}
                 onChange={(e) => setMeterReading(e.target.value)}
               />
+              {meterReading.trim() !== '' && !/^\d+$/.test(meterReading.trim()) && (
+                <p role="alert" className="text-xs text-destructive">
+                  Chỉ số phải là số nguyên không âm
+                </p>
+              )}
             </div>
             <Button
               type="button"

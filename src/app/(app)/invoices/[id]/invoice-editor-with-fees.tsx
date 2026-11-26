@@ -8,6 +8,7 @@ type Props = Omit<ComponentProps<typeof InvoiceEditor>, 'addFee'> & {
   addFee: {
     feeTypes: NonNullable<ComponentProps<typeof InvoiceEditor>['addFee']>['feeTypes']
     usedTypeIds: string[]
+    occupantsCount?: number
     facilityId: string
     units: { id: string; name: string }[]
   }

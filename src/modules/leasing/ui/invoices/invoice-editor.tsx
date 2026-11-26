@@ -64,6 +64,8 @@ type AddFee = {
   feeTypes: FeeOption[]
   usedTypeIds: string[]
   facilityId: string
+  /** Số người ở của hợp đồng: phí theo số người ở thêm vào hoá đơn lấy số này làm số lượng. */
+  occupantsCount?: number
   renderCreateFee?: (p: { onCreated: (fee: FeeOption) => void }) => React.ReactNode
 }
 
@@ -229,14 +231,12 @@ function FirstInvoiceReadings({
   editable,
   consumption,
   onSave,
-  initial,
 }: {
   snap: { opening: number; closing: number }
   unit: string
   editable: boolean
   consumption: number
   onSave: (opening: number, closing: number) => void
-  initial?: { value: number; readOn: string } | null
 }) {
   const [open, setOpen] = useState(false)
   const [o, setO] = useState(''),
@@ -252,15 +252,6 @@ function FirstInvoiceReadings({
         Số đầu kỳ <span className="font-medium text-foreground">{fmtN(snap.opening)}</span> · Số cuối kỳ{' '}
         <span className="font-medium text-foreground">{fmtN(snap.closing)}</span>
       </p>
-      {initial && (
-        <p className="mt-0.5 tabular-nums">
-          Chốt lúc ký hợp đồng {formatDateVN(initial.readOn)}:{' '}
-          <span className="font-medium text-foreground">
-            {fmtN(initial.value)} {unit}
-          </span>{' '}
-          <span className="text-muted-foreground/80">(số hiện tại của hợp đồng)</span>
-        </p>
-      )}
       <p className="mt-0.5">
         Tiêu thụ:{' '}
         <span className="font-medium tabular-nums text-foreground">
@@ -473,7 +464,6 @@ function MeterReadingsPanel({
         editable={editable && !!onSnapshot}
         consumption={consumption}
         onSave={(o, c) => onSnapshot?.(o, c)}
-        initial={panel.initial}
       />
     )
   }
@@ -553,6 +543,11 @@ function MeterReadingsPanel({
                 onChange={(e) => setInitialEdit({ ...initialEdit, text: e.target.value })}
                 className="h-9 text-right tabular-nums"
               />
+              {initialEdit.text.trim() !== '' && !/^\d+$/.test(initialEdit.text.trim()) && (
+                <p role="alert" className="text-xs text-destructive">
+                  Chỉ số phải là số nguyên không âm
+                </p>
+              )}
             </div>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="ghost" onClick={() => setInitialEdit(null)}>
@@ -1086,7 +1081,26 @@ export function InvoiceEditor(p: Props) {
                             }
                           />
                         ) : (
-                          <span className="text-muted-foreground/60">—</span>
+                          (() => {
+                            // Hoá đơn thanh lý không có bảng chốt theo tháng: hiện chỉ số đầu, cuối đã lưu trên dòng
+                            const segs = Array.isArray(l.meta?.segments)
+                              ? (l.meta.segments as { start?: unknown; end?: unknown }[]).filter(
+                                  (x) => typeof x.start === 'number' && typeof x.end === 'number',
+                                )
+                              : []
+                            return segs.length ? (
+                              <span className="tabular-nums text-foreground">
+                                {segs
+                                  .map(
+                                    (x) =>
+                                      `${(x.start as number).toLocaleString('vi-VN')} → ${(x.end as number).toLocaleString('vi-VN')}`,
+                                  )
+                                  .join('; ')}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground/60">—</span>
+                            )
+                          })()
                         )
                       })()}
                     </td>
@@ -1153,7 +1167,7 @@ export function InvoiceEditor(p: Props) {
             onPick={(feeId) => {
               const fee = [...p.addFee!.feeTypes, ...createdFees].find((f) => f.id === feeId)
               if (!fee) return
-              const line = feeLineFromType(fee, p.addFee!.facilityId)
+              const line = feeLineFromType(fee, p.addFee!.facilityId, p.addFee!.occupantsCount)
               setLines((cur) => [...cur, { ...line, unitPriceText: String(line.unitPrice) }])
             }}
             renderCreateFee={
@@ -1298,8 +1312,10 @@ export function InvoiceEditor(p: Props) {
             <dd className="font-medium tabular-nums">{formatVND(tax)}</dd>
           </div>
           <div className="flex justify-between gap-3 border-t border-border/70 pt-2">
-            <dt className="font-semibold text-foreground">Tổng tiền</dt>
-            <dd className="text-base font-bold tabular-nums text-primary">{formatVND(total)}</dd>
+            <dt className="font-semibold text-foreground">
+              {total < 0 ? 'Siris hoàn trả khách' : total > 0 ? 'Khách phải thanh toán' : 'Tổng tiền'}
+            </dt>
+            <dd className="text-base font-bold tabular-nums text-primary">{formatVND(Math.abs(total))}</dd>
           </div>
         </dl>
       </section>

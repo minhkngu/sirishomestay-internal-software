@@ -26,7 +26,7 @@ export function EditEntryDialog({
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
-  const [amount, setAmount] = useState(String(row.amount))
+  const [amount, setAmount] = useState(String(row.fullAmount ?? row.amount))
   const [date, setDate] = useState(row.date)
   const [method, setMethod] = useState(row.method ?? 'cash')
   const [note, setNote] = useState(row.rawNote ?? row.note)
@@ -71,6 +71,11 @@ export function EditEntryDialog({
               }}
               className="h-9 w-full rounded-xl border border-border/80 bg-background px-3 text-right text-sm font-medium tabular-nums"
             />
+            {amount !== '' && value <= 0 && (
+              <p role="alert" className="text-xs text-destructive">
+                Số tiền phải lớn hơn 0
+              </p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="entry-date">Ngày</Label>

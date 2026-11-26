@@ -22,6 +22,8 @@ import {
   removeFeeTypePrice,
   listFeeTypePrices,
   createFeeUnit,
+  updateFeeUnit,
+  deleteFeeUnit,
   listFeeUnits,
   createFeeType,
   updateFeeType,
@@ -96,6 +98,25 @@ describe('fees & rates', () => {
       sql`select relrowsecurity from pg_class where oid = 'lease_fee_snapshots'::regclass`,
     )
     expect((result as unknown as { rows: { relrowsecurity: boolean }[] }).rows[0].relrowsecurity).toBe(true)
+  })
+
+  it('đổi tên và xoá đơn vị tính: trùng tên bị từ chối, đơn vị đang dùng không xoá được', async () => {
+    const a = await createFeeUnit(db, admin, { name: 'người' })
+    const b = await createFeeUnit(db, admin, { name: 'phòng' })
+    await updateFeeUnit(db, admin, a.id, { name: 'khách' })
+    expect((await listFeeUnits(db)).map((u) => u.name).sort()).toEqual(['khách', 'phòng'])
+    await expect(updateFeeUnit(db, admin, a.id, { name: 'phòng' })).rejects.toThrow('Đơn vị đã tồn tại')
+    await expect(updateFeeUnit(db, ctxOf(['billing'], [fa]), a.id, { name: 'x' })).rejects.toThrow(ForbiddenError)
+    await createFeeType(db, admin, {
+      name: 'Dịch vụ',
+      unitId: a.id,
+      defaultPrice: 1,
+      billing: 'monthly_fixed',
+      quantityFrom: 'period_input',
+    })
+    await expect(deleteFeeUnit(db, admin, a.id)).rejects.toThrow(ValidationError)
+    await deleteFeeUnit(db, admin, b.id)
+    expect((await listFeeUnits(db)).map((u) => u.name)).toEqual(['khách'])
   })
 
   it('bảng giá theo toà bật RLS', async () => {
@@ -428,7 +449,7 @@ describe('fees & rates', () => {
         true,
       )
     })
-    it('từ chối khi phí đã gắn vào hợp đồng', async () => {
+    it('từ chối khi phí đang dùng trong hợp đồng còn hiệu lực', async () => {
       const fee = await newFee()
       const { lease } = await leaseOn()
       await db.insert(leaseFeeSnapshots).values({
@@ -442,7 +463,7 @@ describe('fees & rates', () => {
       await expect(deleteFeeType(db, admin, fee.id)).rejects.toThrow(ValidationError)
       expect(await listFeeTypes(db, admin, { includeArchived: true })).toHaveLength(1)
     })
-    it('từ chối khi phí đã dùng cho phí phát sinh', async () => {
+    it('từ chối khi phí đã dùng cho phí phát sinh của hợp đồng còn hiệu lực', async () => {
       const fee = await newFee()
       const { lease } = await leaseOn()
       await db.insert(oneOffCharges).values({
@@ -456,6 +477,33 @@ describe('fees & rates', () => {
       })
       await expect(deleteFeeType(db, admin, fee.id)).rejects.toThrow(ValidationError)
       expect(await listFeeTypes(db, admin, { includeArchived: true })).toHaveLength(1)
+    })
+    it('hợp đồng đã kết thúc thì xoá được phí, hợp đồng giữ tên và giá đã chụp', async () => {
+      const fee = await newFee()
+      const { lease } = await leaseOn()
+      await db.update(leases).set({ status: 'ended' }).where(eq(leases.id, lease.id))
+      await db.insert(leaseFeeSnapshots).values({
+        leaseId: lease.id,
+        feeTypeId: fee.id,
+        name: 'Phí cũ',
+        unit: 'x',
+        quantitySource: 'period_input',
+        unitPrice: 5,
+      })
+      await db.insert(oneOffCharges).values({
+        leaseId: lease.id,
+        feeTypeId: fee.id,
+        kind: 'service',
+        description: 'x',
+        date: '2026-02-01',
+        quantity: 1,
+        unitPrice: 1,
+      })
+      await deleteFeeType(db, admin, fee.id)
+      expect(await listFeeTypes(db, admin, { includeArchived: true })).toHaveLength(0)
+      const snaps = await db.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, lease.id))
+      expect(snaps).toMatchObject([{ name: 'Phí cũ', unitPrice: 5, feeTypeId: null }])
+      expect((await db.select().from(oneOffCharges))[0].feeTypeId).toBeNull()
     })
     it('từ chối khi phí đã gắn vào đồng hồ', async () => {
       const fee = await newFee()

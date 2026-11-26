@@ -28,6 +28,7 @@ const summary = (r: Awaited<ReturnType<typeof createExtension>>) => ({
   adjustments: r.adjustments,
   depositEntry: r.depositEntry,
   invoice: r.invoice,
+  handoverItems: r.handoverItems ?? [],
 })
 export async function previewAddendumAction(kind: AddendumKind, leaseId: string, input: unknown) {
   const ctx = await getAccessContext()
@@ -85,10 +86,10 @@ export async function setAddendumSignStatusAction(
     return {}
   })
 }
-export async function exportAddendumAction(id: string, templateId?: string) {
+export async function exportAddendumAction(id: string, templateId?: string, preview = false) {
   const ctx = await getAccessContext()
   return toActionResult(async () => {
-    const r = await exportAddendum(db, ctx, getStorage(), id, templateId)
+    const r = await exportAddendum(db, ctx, getStorage(), id, templateId, preview)
     refresh()
     return r
   })

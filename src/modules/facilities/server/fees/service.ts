@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from 'drizzle-orm'
+import { and, asc, eq, inArray, ne } from 'drizzle-orm'
 import { MAX_MONEY } from '@/domain/money'
 import { z } from 'zod'
 import {
@@ -8,6 +8,7 @@ import {
   feeDefaults,
   facilities,
   leaseFeeSnapshots,
+  leases,
   meters,
   oneOffCharges,
 } from '@/db'
@@ -67,6 +68,50 @@ export async function createFeeUnit(db: DB, ctx: AccessContext, input: unknown):
       after: u,
     })
     return u
+  })
+}
+
+/** Đổi tên đơn vị tính; loại phí dùng đơn vị này hiện tên mới, giá đã chụp trong hợp đồng giữ tên cũ. */
+export async function updateFeeUnit(db: DB, ctx: AccessContext, id: string, input: unknown): Promise<FeeUnit> {
+  assertCan(ctx, 'settings')
+  const data = parse(unitInput, input)
+  return db.transaction(async (tx) => {
+    const [before] = await tx.select().from(feeUnits).where(eq(feeUnits.id, id))
+    if (!before) throw new NotFoundError()
+    const [dup] = await tx
+      .select()
+      .from(feeUnits)
+      .where(and(eq(feeUnits.name, data.name), ne(feeUnits.id, id)))
+    if (dup) throw new ValidationError('Đơn vị đã tồn tại', { name: 'Đơn vị đã tồn tại' })
+    const [u] = await tx.update(feeUnits).set({ name: data.name }).where(eq(feeUnits.id, id)).returning()
+    await recordAudit(tx, ctx, {
+      action: 'update',
+      entity: 'fee_unit',
+      entityId: id,
+      summary: `Đổi tên đơn vị ${before.name} → ${u.name}`,
+      before,
+      after: u,
+    })
+    return u
+  })
+}
+
+/** Xoá đơn vị tính chưa loại phí nào dùng. */
+export async function deleteFeeUnit(db: DB, ctx: AccessContext, id: string): Promise<void> {
+  assertCan(ctx, 'settings')
+  await db.transaction(async (tx) => {
+    const [before] = await tx.select().from(feeUnits).where(eq(feeUnits.id, id))
+    if (!before) throw new NotFoundError()
+    const [used] = await tx.select({ id: feeTypes.id }).from(feeTypes).where(eq(feeTypes.unitId, id)).limit(1)
+    if (used) throw new ValidationError('Đơn vị đang được loại phí dùng, hãy đổi đơn vị của loại phí trước')
+    await tx.delete(feeUnits).where(eq(feeUnits.id, id))
+    await recordAudit(tx, ctx, {
+      action: 'delete',
+      entity: 'fee_unit',
+      entityId: id,
+      summary: `Xoá đơn vị ${before.name}`,
+      before,
+    })
   })
 }
 
@@ -162,7 +207,10 @@ export async function archiveFeeType(db: DB, ctx: AccessContext, id: string): Pr
   })
 }
 
-/** Xoá hẳn loại phí chưa từng dùng; phí đã gắn hợp đồng, phí phát sinh hoặc đồng hồ thì phải lưu trữ thay vì xoá. */
+/**
+ * Xoá hẳn loại phí. Chỉ phí đang dùng trong hợp đồng còn hiệu lực (phí hợp đồng hoặc phí phát sinh của hợp đồng đó) hoặc gắn đồng hồ thì không xoá được.
+ * Hợp đồng đã kết thúc giữ tên, đơn vị, giá đã chụp; chỉ bỏ liên kết tới loại phí.
+ */
 export async function deleteFeeType(db: DB, ctx: AccessContext, id: string): Promise<void> {
   assertCan(ctx, 'settings')
   await db.transaction(async (tx) => {
@@ -172,15 +220,22 @@ export async function deleteFeeType(db: DB, ctx: AccessContext, id: string): Pro
       tx
         .select({ id: leaseFeeSnapshots.id })
         .from(leaseFeeSnapshots)
-        .where(eq(leaseFeeSnapshots.feeTypeId, id))
+        .innerJoin(leases, eq(leases.id, leaseFeeSnapshots.leaseId))
+        .where(and(eq(leaseFeeSnapshots.feeTypeId, id), eq(leases.status, 'active')))
         .limit(1),
-      tx.select({ id: oneOffCharges.id }).from(oneOffCharges).where(eq(oneOffCharges.feeTypeId, id)).limit(1),
+      tx
+        .select({ id: oneOffCharges.id })
+        .from(oneOffCharges)
+        .innerJoin(leases, eq(leases.id, oneOffCharges.leaseId))
+        .where(and(eq(oneOffCharges.feeTypeId, id), eq(leases.status, 'active')))
+        .limit(1),
       tx.select({ id: meters.id }).from(meters).where(eq(meters.feeTypeId, id)).limit(1),
     ])
-    if (lease.length || charge.length || meter.length)
-      throw new ValidationError(
-        'Loại phí đã được dùng trong hợp đồng, phí phát sinh hoặc đồng hồ, hãy lưu trữ thay vì xoá',
-      )
+    if (lease.length || charge.length)
+      throw new ValidationError('Loại phí đang dùng trong hợp đồng còn hiệu lực, hãy lưu trữ thay vì xoá')
+    if (meter.length) throw new ValidationError('Loại phí đang gắn với đồng hồ, hãy lưu trữ thay vì xoá')
+    await tx.update(leaseFeeSnapshots).set({ feeTypeId: null }).where(eq(leaseFeeSnapshots.feeTypeId, id))
+    await tx.update(oneOffCharges).set({ feeTypeId: null }).where(eq(oneOffCharges.feeTypeId, id))
     await tx.delete(feeTypes).where(eq(feeTypes.id, id))
     await recordAudit(tx, ctx, {
       action: 'delete',

@@ -18,6 +18,7 @@ import {
   leases,
   meterReadings,
   meters,
+  oneOffCharges,
   pendingAdjustments,
   rooms,
   tenants,
@@ -33,6 +34,7 @@ import {
   createTransfer,
   previewAddendum,
 } from '@/modules/leasing/server/addenda/service'
+import { updateLeaseOccupants } from '@/modules/leasing/server/contracts/service'
 import { saveHandover, startHandover } from '@/modules/leasing/server/handovers/service'
 import { approveInvoice, getInvoiceDetail, updateLines } from '@/modules/leasing/server/invoices/service'
 import { createTestDb } from '../helpers/db'
@@ -165,6 +167,63 @@ describe('phụ lục hợp đồng', () => {
       expect(r.invoice!.lines.find((l) => l.description.startsWith('Điện'))).toMatchObject({ quantity: 50 })
     })
 
+    it('thanh lý ngay ngày bắt đầu: giữ chỉ số đầu hợp đồng và tính điện từ chỉ số đầu đến chỉ số chốt', async () => {
+      await db.update(leases).set({ startDate: '2026-11-28' }).where(eq(leases.id, leaseId))
+      const [m] = await db
+        .insert(meters)
+        .values({ roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 })
+        .returning()
+      await db
+        .insert(meterReadings)
+        .values({ meterId: m.id, period: '2026-11', kind: 'handover', readOn: '2026-11-28', value: 2133 })
+      await electricFee(m.id)
+      const r = await createTermination(db, ctx(), leaseId, {
+        endDate: '2026-11-28',
+        forfeit: { mode: 'none' },
+        readings: [{ meterId: m.id, value: 2140 }],
+      })
+      expect(r.invoice!.lines.find((l) => l.description.startsWith('Điện'))).toMatchObject({
+        quantity: 7,
+        meta: { segments: [{ meterId: m.id, start: 2133, end: 2140 }] },
+      })
+      const kept = await db.select().from(meterReadings).where(eq(meterReadings.meterId, m.id))
+      // Chỉ số đầu giữ nguyên; chỉ số chốt thanh lý là một lần chốt riêng cùng ngày
+      expect(kept.map((x) => [x.kind, x.value]).sort()).toEqual([
+        ['handover', 2133],
+        ['termination', 2140],
+      ])
+    })
+
+    it('chốt thanh lý đổi được số đầu: tính điện từ số đầu đã nhập, số cuối không nhỏ hơn số đầu', async () => {
+      const [m] = await db
+        .insert(meters)
+        .values({ roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 })
+        .returning()
+      await db.insert(meterReadings).values({ meterId: m.id, period: '2026-10', readOn: '2026-10-31', value: 100 })
+      await electricFee(m.id)
+      await expect(
+        createTermination(db, ctx(), leaseId, {
+          endDate: '2026-11-10',
+          forfeit: { mode: 'none' },
+          readings: [{ meterId: m.id, value: 90, opening: 95 }],
+        }),
+      ).rejects.toThrow(/không được nhỏ hơn số đầu/)
+      // Số đầu 80 (thấp hơn lần chốt gần nhất 100) vẫn nhận, cuối 130 → dùng 50
+      const r = await createTermination(db, ctx(), leaseId, {
+        endDate: '2026-11-10',
+        forfeit: { mode: 'none' },
+        readings: [{ meterId: m.id, value: 130, opening: 80 }],
+      })
+      expect(r.invoice!.lines.find((l) => l.description.startsWith('Điện'))).toMatchObject({
+        quantity: 50,
+        meta: { segments: [{ meterId: m.id, start: 80, end: 130 }] },
+      })
+      const row = (await db.select().from(meterReadings).where(eq(meterReadings.meterId, m.id))).find(
+        (x) => x.kind === 'termination',
+      )
+      expect(row).toMatchObject({ value: 130, opening: 80 })
+    })
+
     it('dòng phí đồng hồ của hoá đơn thanh lý nháp sửa được (hoá đơn tháng thì bị khoá)', async () => {
       const [m] = await db
         .insert(meters)
@@ -193,6 +252,29 @@ describe('phụ lục hợp đồng', () => {
         ),
       ).toMatchObject({ quantity: 50, amount: 175000 })
     })
+  })
+
+  it('bỏ dòng phạt khỏi hoá đơn thanh lý nháp thì xoá luôn khoản phạt, không dồn sang hoá đơn khác', async () => {
+    const r = await createTermination(db, ctx(), leaseId, {
+      endDate: '2026-12-10',
+      forfeit: { mode: 'none' },
+      readings: [],
+      penalties: [{ description: 'Phạt thử', amount: 100000 }],
+    })
+    expect(await db.select().from(oneOffCharges).where(eq(oneOffCharges.leaseId, leaseId))).toHaveLength(1)
+    const rows = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, r.invoice!.id))
+    const kept = rows
+      .filter((l) => typeof (l.meta as { oneOffId?: unknown } | null)?.oneOffId !== 'string')
+      .map((l) => ({
+        id: l.id,
+        type: l.type,
+        description: l.description,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+        meta: l.meta,
+      }))
+    await updateLines(db, ctx(), r.invoice!.id, kept)
+    expect(await db.select().from(oneOffCharges).where(eq(oneOffCharges.leaseId, leaseId))).toHaveLength(0)
   })
 
   it('ngữ cảnh phụ lục dùng giá phí riêng theo toà hợp đồng', async () => {
@@ -272,6 +354,32 @@ describe('phụ lục hợp đồng', () => {
     await createOccupantChange(db, ctx(), leaseId, { effectiveDate: '2026-11-16', occupantIds: [tenantId, person.id] })
     expect(await db.select().from(leaseOccupants).where(eq(leaseOccupants.leaseId, leaseId))).toHaveLength(2)
   })
+  it('hoá đơn thanh lý có mã riêng dạng <cơ sở>-TL-<YYYYMM>-<số>, đếm số thứ tự riêng', async () => {
+    const r = await createTermination(db, ctx(), leaseId, {
+      endDate: '2026-11-20',
+      forfeit: { mode: 'none' },
+      readings: [],
+    })
+    expect(r.invoice!.code).toBe('TD-TL-202611-0001')
+  })
+  it('sửa người ở trong hợp đồng: không tạo phụ lục, không tạo điều chỉnh', async () => {
+    const [person] = await db
+      .insert(tenants)
+      .values({
+        kind: 'vietnamese',
+        homeFacilityId: facilityId,
+        fullName: 'Bạn',
+        phone: '+84901234001',
+        idNumber: '012345678998',
+      })
+      .returning()
+    const before = (await db.select().from(addenda)).length
+    await updateLeaseOccupants(db, ctx(), leaseId, [tenantId, person.id])
+    expect(await db.select().from(leaseOccupants).where(eq(leaseOccupants.leaseId, leaseId))).toHaveLength(2)
+    expect(await db.select().from(addenda)).toHaveLength(before)
+    expect(await db.select().from(pendingAdjustments)).toHaveLength(0)
+    await expect(updateLeaseOccupants(db, ctx(), leaseId, [])).rejects.toThrow('Chọn ít nhất một người ở')
+  })
   it('chuyển phòng: cần chỉ số hai phòng, đổi phòng của hợp đồng, tạo biên bản và chặn phòng không trống', async () => {
     const [m1] = await db
       .insert(meters)
@@ -317,7 +425,7 @@ describe('phụ lục hợp đồng', () => {
       createTransfer(db, ctx(), other.id, { effectiveDate: '2026-12-05', newRoomId: room2Id }),
     ).rejects.toThrow(/Phòng đích/)
   })
-  it('thanh lý: dựng hoá đơn nháp, duyệt thì kết thúc hợp đồng, ghi sổ cọc và đặt hạn xoá ảnh', async () => {
+  it('thanh lý: dựng hoá đơn nháp, kết thúc hợp đồng ngay, duyệt thì ghi sổ cọc, đặt hạn xoá ảnh', async () => {
     const [m] = await db
       .insert(meters)
       .values({ roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 })
@@ -345,18 +453,18 @@ describe('phụ lục hợp đồng', () => {
       amount: 210000,
     })
     expect(r.invoice!.lines.find((l) => l.type === 'deposit_offset')!.amount).toBe(-7000000)
-    await expect(
-      createTermination(db, ctx(), leaseId, { endDate: '2026-12-11', readings: [{ meterId: m.id, value: 170 }] }),
-    ).rejects.toThrow('đã có phụ lục thanh lý')
-    await approveInvoice(db, ctx(), r.invoice!.id, { dueDate: '2026-12-20' })
     expect((await db.select().from(leases).where(eq(leases.id, leaseId)))[0]).toMatchObject({
       status: 'ended',
       endDate: '2026-12-10',
     })
+    expect((await db.select().from(files).where(eq(files.id, photo.id)))[0].deleteAfter).toBe('2027-01-09')
+    await expect(
+      createTermination(db, ctx(), leaseId, { endDate: '2026-12-11', readings: [{ meterId: m.id, value: 170 }] }),
+    ).rejects.toThrow(/hiệu lực|kết thúc|phụ lục thanh lý/)
+    await approveInvoice(db, ctx(), r.invoice!.id, { dueDate: '2026-12-20' })
     const done = (await db.select().from(depositEntries)).filter((e) => e.status === 'done')
     expect(done.filter((e) => e.type === 'forfeit').map((e) => e.amount)).toEqual([2000000])
     expect(done.filter((e) => e.type === 'deduct').map((e) => e.amount)).toEqual([7000000])
-    expect((await db.select().from(files).where(eq(files.id, photo.id)))[0].deleteAfter).toBe('2027-01-09')
   })
   it('sai cơ sở hoặc thiếu quyền → Không tìm thấy', async () => {
     const [other] = await db.insert(facilities).values({ code: 'BT', name: 'Bình Thạnh' }).returning()
@@ -435,7 +543,7 @@ describe('phụ lục hợp đồng', () => {
       })
       expect(r.adjustments.map((x) => x.amount)).toEqual([100000])
     })
-    async function terminate(forfeit: { mode: 'none' | 'all' }) {
+    async function terminate(forfeit: { mode: 'none' | 'all' }, rentRefund?: { mode: string; amount?: number }) {
       await db
         .insert(payments)
         .values({ invoiceId, paidOn: '2026-11-05', amount: 9000000, method: 'cash', receivedBy: crypto.randomUUID() })
@@ -454,6 +562,7 @@ describe('phụ lục hợp đồng', () => {
       return createTermination(db, ctx(), leaseId, {
         endDate: '2026-11-20',
         forfeit,
+        ...(rentRefund ? { rentRefund } : {}),
         readings: [{ meterId: m.id, value: 220 }],
       })
     }
@@ -467,6 +576,23 @@ describe('phụ lục hợp đồng', () => {
     })
     it('thanh lý 20/11, mất cọc toàn bộ → −2.080.000', async () => {
       expect((await terminate({ mode: 'all' })).invoice!.total).toBe(-2080000)
+    })
+    it('thanh lý không hoàn tiền phòng: không có dòng hoàn, hoá đơn vẫn duyệt được', async () => {
+      const r = await terminate({ mode: 'none' }, { mode: 'none' })
+      const refunds = r.invoice!.lines.filter((l) => l.type === 'refund')
+      expect(refunds).toHaveLength(0)
+      expect(r.invoice!.total).toBe(-8080000)
+      await approveInvoice(db, ctx(), r.invoice!.id, { dueDate: '2026-11-30' })
+      expect((await db.select().from(leases).where(eq(leases.id, leaseId)))[0].status).toBe('ended')
+    })
+    it('thanh lý hoàn một phần đúng mức tối đa → như hoàn theo ngày', async () => {
+      const r = await terminate({ mode: 'none' }, { mode: 'partial', amount: 3000000 })
+      expect(r.invoice!.total).toBe(-11080000)
+    })
+    it('thanh lý hoàn một phần vượt mức tối đa 1 đồng bị từ chối', async () => {
+      await expect(terminate({ mode: 'none' }, { mode: 'partial', amount: 3000001 })).rejects.toThrow(
+        'Số tiền hoàn vượt mức tính theo ngày',
+      )
     })
   })
   it('khách còn hợp đồng khác đang hiệu lực → ảnh giấy tờ không bị đặt delete_after', async () => {
@@ -499,7 +625,7 @@ describe('phụ lục hợp đồng', () => {
       }),
     ).rejects.toThrow(ForbiddenError)
   })
-  it('sau khi duyệt thanh lý: phòng về Trống, hoặc Đã cọc nếu có cọc chờ', async () => {
+  it('sau khi thanh lý: phòng về Trống, hoặc Đã cọc nếu có cọc chờ', async () => {
     const { getRoomDetail } = await import('@/modules/leasing/server/contracts/room-view')
     const { depositContracts } = await import('@/db')
     const r = await createTermination(db, ctx(), leaseId, {
@@ -507,7 +633,8 @@ describe('phụ lục hợp đồng', () => {
       forfeit: { mode: 'none' },
       readings: [],
     })
-    expect((await getRoomDetail(db, ctx(), roomId)).status).not.toBe('vacant')
+    // Hợp đồng kết thúc ngay khi tạo phụ lục thanh lý nên phòng đã trống; duyệt hoá đơn không đổi
+    expect((await getRoomDetail(db, ctx(), roomId)).status).toBe('vacant')
     await approveInvoice(db, ctx(), r.invoice!.id, { dueDate: '2026-12-20' })
     expect((await getRoomDetail(db, ctx(), roomId)).status).toBe('vacant')
     const [other] = await db

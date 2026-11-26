@@ -7,7 +7,9 @@ import { CreateFeeTypeNow } from './create-fee-type-now'
 import { TenantForm, type CreatedTenant } from '@/modules/tenants/ui'
 
 type LeaseProps = Omit<ComponentProps<typeof LeaseWizard>, 'onCreatePerson'>
-type DepositProps = Omit<ComponentProps<typeof DepositForm>, 'onCreatePerson'>
+type DepositProps = Omit<ComponentProps<typeof DepositForm>, 'onCreatePerson' | 'renderCreateFee'> & {
+  feeUnits: { id: string; name: string }[]
+}
 
 /** Bọc form thuê/cọc để nối nút "Tạo người mới" của ô chọn người với form khách thuê. */
 export function NewContractForm({
@@ -64,6 +66,7 @@ export function NewContractForm({
       ) : depositProps ? (
         <DepositForm
           {...depositProps}
+          renderCreateFee={({ onCreated }) => <CreateFeeTypeNow units={depositProps.feeUnits} onCreated={onCreated} />}
           embedded={embedded}
           tenants={[...depositProps.tenants, ...createdPeople]}
           onCreatePerson={openCreatePerson}

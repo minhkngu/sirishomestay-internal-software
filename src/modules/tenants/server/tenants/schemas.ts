@@ -49,7 +49,12 @@ const email = z
   .refine((v) => v === null || z.string().email().safeParse(v).success, 'Email không hợp lệ')
 
 const common = {
-  homeFacilityId: z.string({ error: 'Chọn cơ sở' }).uuid('Chọn cơ sở'),
+  homeFacilityId: z
+    .string()
+    .trim()
+    .nullish()
+    .transform((v) => (v ? v : null))
+    .refine((v) => v === null || z.string().uuid().safeParse(v).success, 'Cơ sở không hợp lệ'),
   email,
   note: z
     .string()
@@ -113,3 +118,7 @@ export const companySchema = z.object({
 export const tenantInput = z.discriminatedUnion('kind', [foreignSchema, vietnameseSchema, companySchema])
 
 export type TenantInput = z.output<typeof tenantInput>
+
+export const deleteTenantsInput = z.object({
+  ids: z.array(z.string().uuid('Khách không hợp lệ')).min(1, 'Chọn ít nhất một khách'),
+})

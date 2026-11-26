@@ -27,6 +27,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       : [[], [], {} as Record<string, Record<string, number>>]
   const unitName = new Map(feeUnits.map((u) => [u.id, u.name]))
   const remaining = d.total - d.paid
+  // Tổng âm: Siris hoàn trả khách (tiền hoàn ghi là khoản thu âm)
+  const isRefund = d.total < 0
   const settings = await getSettings(db)
   const dueRule = settings.dueRule
   const dueDefaultLabel =
@@ -90,16 +92,28 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               {/* Financial Highlights */}
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:flex md:items-center md:gap-2.5">
                 <div className="flex flex-col justify-between rounded-xl border border-border/70 bg-card p-3 min-w-[125px] text-left md:text-right shadow-2xs">
-                  <div className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">Tổng hoá đơn</div>
-                  <div className="mt-1 text-sm font-bold text-foreground tabular-nums">{formatVND(d.total)}</div>
+                  <div className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">
+                    {isRefund ? 'Hoàn trả cho khách' : 'Khách phải thanh toán'}
+                  </div>
+                  <div className="mt-1 text-sm font-bold text-foreground tabular-nums">
+                    {formatVND(Math.abs(d.total))}
+                  </div>
                 </div>
                 <div className="flex flex-col justify-between rounded-xl border border-emerald-200/70 bg-emerald-50/40 p-3 min-w-[125px] text-left md:text-right shadow-2xs">
-                  <div className="text-[11px] font-medium text-emerald-800 whitespace-nowrap">Đã thanh toán</div>
-                  <div className="mt-1 text-sm font-bold text-emerald-700 tabular-nums">{formatVND(d.paid)}</div>
+                  <div className="text-[11px] font-medium text-emerald-800 whitespace-nowrap">
+                    {isRefund ? 'Đã hoàn cho khách' : 'Khách đã thanh toán'}
+                  </div>
+                  <div className="mt-1 text-sm font-bold text-emerald-700 tabular-nums">
+                    {formatVND(Math.abs(d.paid))}
+                  </div>
                 </div>
                 <div className="flex flex-col justify-between rounded-xl border border-amber-200/70 bg-amber-50/40 p-3 min-w-[125px] text-left md:text-right shadow-2xs">
-                  <div className="text-[11px] font-medium text-amber-800 whitespace-nowrap">Còn lại</div>
-                  <div className="mt-1 text-sm font-bold text-amber-700 tabular-nums">{formatVND(remaining)}</div>
+                  <div className="text-[11px] font-medium text-amber-800 whitespace-nowrap">
+                    {isRefund ? 'Còn phải hoàn khách' : 'Khách còn phải trả'}
+                  </div>
+                  <div className="mt-1 text-sm font-bold text-amber-700 tabular-nums">
+                    {formatVND(Math.abs(remaining))}
+                  </div>
                 </div>
                 <div className="flex flex-col justify-between rounded-xl border border-border/70 bg-card p-3 min-w-[125px] text-left md:text-right shadow-2xs">
                   <div className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">Công nợ khách</div>
@@ -132,6 +146,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             })),
           usedTypeIds: d.leaseFeeTypeIds,
           facilityId: inv.facilityId,
+          occupantsCount: d.occupantsCount,
           units: feeUnits.map((u) => ({ id: u.id, name: u.name })),
         }}
         key={inv.updatedAt.toISOString()}

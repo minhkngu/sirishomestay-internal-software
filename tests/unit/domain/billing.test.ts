@@ -544,6 +544,29 @@ describe('buildMonthlyInvoice', () => {
     expect(r.periodStart).toBe('2026-12-01')
     expect(r.lines.find((l) => l.type === 'rent')).toMatchObject({ quantity: 3, amount: 27_000_000 })
   })
+  it('kỳ chọn từ ngày bắt đầu giữa tháng: 27/11–26/12 là đúng 1 tháng, cùng công thức với ô chọn ngày', () => {
+    const run = (end: string) =>
+      buildMonthlyInvoice({
+        ...base,
+        period: '2026-11',
+        proration: 'actual_days',
+        lease: lease({ ...terms(), startDate: '2026-11-27', occupantIds: ['t1', 't2'] }),
+        overridePeriod: { start: '2026-11-27', end },
+      }).lines.find((l) => l.type === 'rent')?.amount
+    expect(run('2026-12-26')).toBe(9_000_000)
+    expect(run('2026-12-27')).toBe(9_290_323)
+    expect(run('2026-12-26')).toBe(9_000_000)
+  })
+  it('mô tả dòng tiền phòng không ghi thời gian, thời gian nằm ở meta', () => {
+    const rent = buildMonthlyInvoice({
+      ...base,
+      period: '2026-12',
+      lease: lease({ ...terms(), occupantIds: ['t1', 't2'] }),
+      overridePeriod: { start: '2026-12-01', end: '2027-02-28' },
+    }).lines.find((l) => l.type === 'rent')
+    expect(rent?.description).toBe('Tiền phòng')
+    expect(rent?.meta).toMatchObject({ from: '2026-12-01', to: '2027-02-28' })
+  })
   it('hệ số sửa tay được dùng thay hệ số tính ra', () => {
     const r = buildMonthlyInvoice({
       ...base,
@@ -677,6 +700,93 @@ describe('buildTerminationInvoice', () => {
     const r = buildTerminationInvoice({ ...input(), approvedInvoices: [] })
     expect(r.lines.find((l) => l.type === 'rent')?.amount).toBe(6_000_000)
     expect(r.total).toBe(-9_000_000 + 6_000_000 + 920_000)
+  })
+
+  describe('hoàn tiền phòng đã trả trước', () => {
+    const rentLine = {
+      type: 'rent' as const,
+      description: 'Tiền phòng tháng 11',
+      quantity: 1,
+      unitPrice: 9_000_000,
+      amount: 9_000_000,
+    }
+    const paidNovFee = invoice({
+      lines: [
+        rentLine,
+        {
+          type: 'fee',
+          description: 'Wifi',
+          quantity: 1,
+          unitPrice: 300_000,
+          amount: 300_000,
+          meta: { leaseFeeId: 'f1', from: '2026-11-01', to: '2026-11-30', coefficient: 1 },
+        },
+        // phí theo đồng hồ thu sau: không có meta.from nên không hoàn
+        {
+          type: 'fee',
+          description: 'Điện',
+          quantity: 100,
+          unitPrice: 3500,
+          amount: 350_000,
+          meta: { leaseFeeId: 'e1', unit: 'kWh' },
+        },
+      ],
+    })
+    const refunds = (r: ReturnType<typeof buildTerminationInvoice>) => r.lines.filter((l) => l.type === 'refund')
+
+    it('hoàn theo ngày: hoàn cả phí cố định, không hoàn phí đồng hồ', () => {
+      const r = buildTerminationInvoice({ ...input(), approvedInvoices: [paidNovFee] })
+      expect(refunds(r).map((l) => l.amount)).toEqual([-3_000_000, -100_000])
+      expect(refunds(r)[1].description).toMatch(/^Hoàn Wifi/)
+      expect(r.maxRefund).toBe(3_100_000)
+      expect(r.total).toBe(-11_180_000)
+    })
+    it('hoàn theo ngày: hoàn mọi kỳ trả trước', () => {
+      const dec = invoice({ id: 'I2', periodStart: '2026-12-01', periodEnd: '2026-12-31', lines: [rentLine] })
+      const r = buildTerminationInvoice({ ...input(), approvedInvoices: [paidNov, dec] })
+      expect(refunds(r).reduce((s, l) => s + l.amount, 0)).toBe(-12_000_000)
+    })
+    it('hoá đơn nháp không bị hoàn', () => {
+      const r = buildTerminationInvoice({ ...input(), approvedInvoices: [{ ...paidNov, status: 'draft' }] })
+      expect(r.maxRefund).toBe(0)
+    })
+    it('không hoàn: không có dòng hoàn', () => {
+      const r = buildTerminationInvoice({ ...input(), approvedInvoices: [paidNovFee], rentRefund: { mode: 'none' } })
+      expect(refunds(r)).toHaveLength(0)
+      expect(r.total).toBe(-8_080_000)
+      expect(r.maxRefund).toBe(3_100_000)
+    })
+    it('hoàn một phần: một dòng gộp', () => {
+      const r = buildTerminationInvoice({ ...input(), rentRefund: { mode: 'partial', amount: 1_000_000 } })
+      expect(refunds(r).map((l) => l.amount)).toEqual([-1_000_000])
+      expect(r.total).toBe(-9_080_000)
+    })
+    it('hoàn một phần vượt mức tối đa thì cắt về mức tối đa', () => {
+      const r = buildTerminationInvoice({ ...input(), rentRefund: { mode: 'partial', amount: 5_000_000 } })
+      expect(refunds(r).map((l) => l.amount)).toEqual([-3_000_000])
+    })
+    it('hoàn một phần nhập 0 → không có dòng hoàn', () => {
+      const r = buildTerminationInvoice({ ...input(), rentRefund: { mode: 'partial', amount: 0 } })
+      expect(refunds(r)).toHaveLength(0)
+    })
+    it('không có kỳ nào vượt ngày trả → không có dòng hoàn ở cả ba chế độ', () => {
+      const base = buildTerminationInvoice({ ...input(), endDate: '2026-11-30' })
+      for (const rentRefund of [
+        { mode: 'by_days' as const },
+        { mode: 'partial' as const, amount: 100 },
+        { mode: 'none' as const },
+      ]) {
+        const r = buildTerminationInvoice({ ...input(), endDate: '2026-11-30', rentRefund })
+        expect(refunds(r)).toHaveLength(0)
+        expect(r.maxRefund).toBe(0)
+        expect(r.total).toBe(base.total)
+      }
+    })
+    it('không truyền rentRefund = hoàn theo ngày', () => {
+      const a = buildTerminationInvoice(input())
+      const b = buildTerminationInvoice({ ...input(), rentRefund: { mode: 'by_days' } })
+      expect(a).toEqual(b)
+    })
   })
 })
 

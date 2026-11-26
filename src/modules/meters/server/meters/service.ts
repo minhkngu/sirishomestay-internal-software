@@ -39,7 +39,7 @@ const toReading = (r: typeof meterReadings.$inferSelect): MeterReading => ({
   period: r.period,
   readOn: r.readOn,
   value: r.value,
-  kind: r.kind as 'monthly' | 'handover',
+  kind: r.kind as 'monthly' | 'handover' | 'termination',
   opening: r.opening,
 })
 
@@ -128,7 +128,9 @@ export async function listReadingSheet(db: DB, ctx: AccessContext, facilityId: s
     if (ms.length === 0) return null
     const rs = allReadings.map(toReading)
     const active = ms.find((m) => !m.removedOn) ?? ms[ms.length - 1]
-    const mine = rs.filter((r) => r.meterId === active.id).sort((a, b) => (a.readOn < b.readOn ? -1 : 1))
+    const mine = rs
+      .filter((r) => r.meterId === active.id)
+      .sort((a, b) => (a.readOn < b.readOn ? -1 : a.readOn > b.readOn ? 1 : a.value - b.value))
     // Số đầu kỳ là lần chốt gần nhất trước cuối kỳ, trừ dòng chốt tháng của chính kỳ đang ghi
     const checkpoints = mine.filter((r) => r.readOn <= end && !(r.period === period && r.kind === 'monthly'))
     const latest = checkpoints[checkpoints.length - 1]
@@ -136,7 +138,8 @@ export async function listReadingSheet(db: DB, ctx: AccessContext, facilityId: s
     // Số đầu riêng của lần ghi kỳ này (đã tự điền hoặc sửa) thay cho số liền trước
     const previous = currentReading?.opening ?? latest?.value ?? active.startReading
     const previousReadOn = latest?.readOn ?? active.installedOn
-    const previousKind: MeterCell['previousKind'] = latest?.kind ?? 'start'
+    const previousKind: MeterCell['previousKind'] =
+      latest?.kind === 'termination' ? 'monthly' : (latest?.kind ?? 'start')
     const { usage: replacedUsage } = safeUsage(ms, rs, start, end)
     const history: number[] = []
     for (let i = 1; i <= 3; i++) {
@@ -590,11 +593,7 @@ export async function ensureFeeMeter(
     .where(and(eq(leaseFeeMeters.meterId, meter.id), eq(leases.status, 'active')))
   if (busy) throw new ValidationError('Đồng hồ đang gắn với phí của hợp đồng khác')
   const readings = await tx.select().from(meterReadings).where(eq(meterReadings.meterId, meter.id))
-  const latest = readings.reduce((max, r) => Math.max(max, r.value), meter.startReading)
-  if (input.initialReading! < latest)
-    throw new ValidationError(`Chỉ số ban đầu không được nhỏ hơn chỉ số gần nhất (${latest})`, {
-      initialReading: `Không nhỏ hơn ${latest}`,
-    })
+  // Chỉ số ban đầu độc lập với mọi lần chốt khác: không ràng buộc với số trước hay số sau (cùng nguyên tắc với updateLeaseFeeMeter)
   // Chỉ số bàn giao cùng ngày (vd. chốt khi thanh lý hợp đồng trước) được nhận lại nếu trùng giá trị
   const sameDay = readings.find((r) => r.kind === 'handover' && r.readOn === input.installedOn)
   if (sameDay && sameDay.value !== input.initialReading)
@@ -828,7 +827,7 @@ export type MeterOverviewRow = {
   readings: {
     id: string
     period: string
-    kind: 'monthly' | 'handover'
+    kind: 'monthly' | 'handover' | 'termination'
     readOn: string
     value: number
     opening: number | null
@@ -912,7 +911,7 @@ export async function listMeterOverview(db: DB, ctx: AccessContext, facilityId: 
       readings: (readingsByMeter.get(meter.id) ?? []).map((r) => ({
         id: r.id,
         period: r.period,
-        kind: r.kind as 'monthly' | 'handover',
+        kind: r.kind as 'monthly' | 'handover' | 'termination',
         readOn: r.readOn,
         value: r.value,
         opening: r.opening,
@@ -938,7 +937,8 @@ export type ReadingHistoryRow = {
   meterName: string
   meterCode: string | null
   unit: string | null
-  kind: 'monthly' | 'handover'
+  /** `termination`: chốt khi thanh lý, tính như một lần chốt trong tháng. */
+  kind: 'monthly' | 'handover' | 'termination'
   period: string
   readOn: string
   /** Số đầu của lần chốt: số chốt liền trước; dòng bàn giao đầu hợp đồng lấy bằng số cuối. */
@@ -963,7 +963,7 @@ export async function listReadingHistory(
   const overview = await listMeterOverview(db, ctx, facilityId)
   const rows: ReadingHistoryRow[] = []
   for (const m of overview) {
-    const asc = [...m.readings].sort((a, b) => (a.readOn < b.readOn ? -1 : a.readOn > b.readOn ? 1 : 0))
+    const asc = [...m.readings].sort((a, b) => (a.readOn < b.readOn ? -1 : a.readOn > b.readOn ? 1 : a.value - b.value))
     let prev = m.startReading
     for (const r of asc) {
       // Chỉ số ban đầu của hợp đồng hiện cùng danh sách (số đầu = số cuối), để thấy số đã sửa từ hoá đơn đầu
@@ -1028,17 +1028,20 @@ export async function updateMeterReading(
     // Chỉ số bàn giao đứng riêng, độc lập với chuỗi chỉ số tháng: chỉ kiểm giá trị và ngày
     if (!Number.isInteger(input.value) || input.value < 0) throw new ValidationError('Chỉ số không hợp lệ')
     if (!/^\d{4}-\d{2}-\d{2}$/.test(input.readOn)) throw new ValidationError('Ngày chốt không hợp lệ')
-    const [clash] = await tx
-      .select({ id: meterReadings.id })
-      .from(meterReadings)
-      .where(
-        and(
-          eq(meterReadings.meterId, f.m.id),
-          eq(meterReadings.kind, 'handover'),
-          eq(meterReadings.readOn, input.readOn),
-          sql`${meterReadings.id} <> ${id}`,
-        ),
-      )
+    const [clash] =
+      f.r.kind !== 'handover'
+        ? []
+        : await tx
+            .select({ id: meterReadings.id })
+            .from(meterReadings)
+            .where(
+              and(
+                eq(meterReadings.meterId, f.m.id),
+                eq(meterReadings.kind, f.r.kind),
+                eq(meterReadings.readOn, input.readOn),
+                sql`${meterReadings.id} <> ${id}`,
+              ),
+            )
     if (clash) throw new ValidationError('Đồng hồ đã có chỉ số bàn giao vào ngày này')
     await tx
       .update(meterReadings)

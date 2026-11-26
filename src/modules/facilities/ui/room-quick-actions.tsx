@@ -38,17 +38,19 @@ const FIELDS = [
   ['capacity', 'Sức chứa'],
 ] as const
 
-/** Menu ⋯ trên ô phòng: sửa nhanh (popup), ngừng/dùng lại, xoá. Tiện ích giữ nguyên khi sửa nhanh. */
+/** Menu ⋯ trên ô phòng (mặc định) hoặc hàng nút thao tác nhanh trên bảng. Tiện ích giữ nguyên khi sửa nhanh. */
 export function RoomQuickActions({
   id,
   code,
   isActive,
   manage,
+  presentation = 'menu',
 }: {
   id: string
   code: string
   isActive: boolean
   manage: RoomManage
+  presentation?: 'menu' | 'row'
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -66,6 +68,12 @@ export function RoomQuickActions({
   })
   const [v, setV] = useState(initial)
 
+  const openEdit = () => {
+    setV(initial())
+    setErr(null)
+    setOpen(true)
+  }
+
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) =>
     start(async () => {
       const r = await fn()
@@ -78,35 +86,46 @@ export function RoomQuickActions({
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          aria-label={`Thao tác nhanh phòng ${code}`}
-          className="absolute right-1 top-1 flex size-6 items-center justify-center rounded-md text-base leading-none text-current opacity-0 transition-opacity hover:bg-black/10 focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100 data-[popup-open]:opacity-100"
-        >
-          ⋯
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            onClick={() => {
-              setV(initial())
-              setErr(null)
-              setOpen(true)
-            }}
-          >
-            Sửa nhanh
-          </DropdownMenuItem>
-          <DropdownMenuItem
+      {presentation === 'row' ? (
+        <div className="flex flex-nowrap items-center justify-end gap-1.5">
+          <Button variant="outline" size="xs" disabled={pending} onClick={openEdit}>
+            Sửa
+          </Button>
+          <Button
+            variant="outline"
+            size="xs"
             disabled={pending}
             onClick={() => (isActive ? setAsk('stop') : run(() => setRoomActiveAction(id, true)))}
           >
-            {isActive ? 'Ngừng sử dụng' : 'Dùng lại'}
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive" disabled={pending} onClick={() => setAsk('delete')}>
-            Xoá phòng
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+            {isActive ? 'Ngừng' : 'Dùng lại'}
+          </Button>
+          <Button variant="destructive" size="xs" disabled={pending} onClick={() => setAsk('delete')}>
+            Xoá
+          </Button>
+        </div>
+      ) : (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            aria-label={`Thao tác nhanh phòng ${code}`}
+            className="absolute right-1 top-1 flex size-6 items-center justify-center rounded-md text-base leading-none text-current opacity-70 transition-opacity hover:bg-black/10 focus-visible:opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100 data-[popup-open]:opacity-100"
+          >
+            ⋯
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={openEdit}>Sửa nhanh</DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={pending}
+              onClick={() => (isActive ? setAsk('stop') : run(() => setRoomActiveAction(id, true)))}
+            >
+              {isActive ? 'Ngừng sử dụng' : 'Dùng lại'}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive" disabled={pending} onClick={() => setAsk('delete')}>
+              Xoá phòng
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
       <ConfirmDialog
         open={ask === 'stop'}
         onOpenChange={(o) => !o && setAsk(null)}

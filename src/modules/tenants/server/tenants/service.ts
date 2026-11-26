@@ -1,13 +1,14 @@
-import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm'
-import { tenants } from '@/db'
+import { and, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm'
+import { addenda, depositContracts, files, leaseOccupants, leases, tenants } from '@/db'
 import type { DB } from '@/db/client'
-import { assertCan, facilityKey, facilityScope, NotFoundError, type AccessContext } from '@/domain/access'
+import { assertCan, facilityScope, NotFoundError, type AccessContext } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
 import { recordAudit } from '@/modules/platform'
 import { normalizePhone } from '@/domain/phone'
 import { buildSearchText, removeDiacritics } from '@/domain/text'
 import { fieldErrorsOf } from '@/lib/zod-errors'
-import { tenantInput, type TenantInput } from './schemas'
+import { displayName } from '../../domain/tenant-name'
+import { deleteTenantsInput, tenantInput, type TenantInput } from './schemas'
 
 export type Tenant = typeof tenants.$inferSelect
 export { maskTenant } from './mask'
@@ -123,7 +124,7 @@ function dupError(field: keyof typeof DUP_MESSAGES) {
 
 export async function createTenant(db: DB, ctx: AccessContext, input: unknown): Promise<Tenant> {
   const data = parseTenantInput(input)
-  assertCan(ctx, 'tenants_contracts', data.homeFacilityId)
+  assertCan(ctx, 'tenants_contracts', data.homeFacilityId ?? undefined)
   const row = toTenantRow(data)
   return db.transaction(async (tx) => {
     const dup = await findDuplicateField(tx, row)
@@ -146,8 +147,8 @@ export async function updateTenant(db: DB, ctx: AccessContext, id: string, input
   return db.transaction(async (tx) => {
     const [before] = await tx.select().from(tenants).where(eq(tenants.id, id))
     if (!before) throw new NotFoundError()
-    assertCan(ctx, 'tenants_contracts', facilityKey(before.homeFacilityId))
-    assertCan(ctx, 'tenants_contracts', data.homeFacilityId)
+    assertCan(ctx, 'tenants_contracts', before.homeFacilityId ?? undefined)
+    assertCan(ctx, 'tenants_contracts', data.homeFacilityId ?? undefined)
     const row = toTenantRow(data)
     const dup = await findDuplicateField(tx, row, id)
     if (dup) throw dupError(dup)
@@ -172,7 +173,7 @@ export async function updateTenant(db: DB, ctx: AccessContext, id: string, input
 export async function getTenant(db: DB, ctx: AccessContext, id: string): Promise<Tenant> {
   const [t] = await db.select().from(tenants).where(eq(tenants.id, id))
   if (!t) throw new NotFoundError()
-  assertCan(ctx, 'tenants_contracts', facilityKey(t.homeFacilityId))
+  assertCan(ctx, 'tenants_contracts', t.homeFacilityId ?? undefined)
   return t
 }
 
@@ -193,7 +194,7 @@ export async function searchTenants(
   const scope = facilityScope(ctx)
   if (scope !== 'all') {
     if (scope.length === 0) return []
-    conds.push(inArray(tenants.homeFacilityId, scope))
+    conds.push(or(inArray(tenants.homeFacilityId, scope), isNull(tenants.homeFacilityId))!)
   }
   if (opts.facilityId) conds.push(eq(tenants.homeFacilityId, opts.facilityId))
   if (opts.facilityIds?.length)
@@ -222,4 +223,66 @@ export async function searchTenants(
   // limit: null = lấy hết (trang danh sách lọc và phân trang tại chỗ)
   if (opts.limit === null) return query
   return query.limit(opts.limit ?? 50).offset(opts.offset ?? 0)
+}
+
+/** Xoá một hoặc nhiều khách thuê (chặn nếu khách đang gắn hợp đồng, cọc chờ hoặc phụ lục). */
+export async function deleteTenants(db: DB, ctx: AccessContext, ids: string[]): Promise<number> {
+  assertCan(ctx, 'tenants_contracts')
+  const parsed = deleteTenantsInput.safeParse({ ids })
+  if (!parsed.success) throw new ValidationError(parsed.error.issues[0]?.message ?? 'Dữ liệu không hợp lệ')
+  const uniqueIds = [...new Set(parsed.data.ids)]
+
+  return db.transaction(async (tx) => {
+    const found = await tx.select().from(tenants).where(inArray(tenants.id, uniqueIds))
+    if (found.length === 0) throw new NotFoundError()
+    for (const t of found) {
+      assertCan(ctx, 'tenants_contracts', t.homeFacilityId ?? undefined)
+    }
+    const foundIds = found.map((t) => t.id)
+
+    const [usedLease, usedDeposit, usedOcc, usedAddendum] = await Promise.all([
+      tx.select({ tenantId: leases.tenantId }).from(leases).where(inArray(leases.tenantId, foundIds)),
+      tx
+        .select({ tenantId: depositContracts.tenantId })
+        .from(depositContracts)
+        .where(inArray(depositContracts.tenantId, foundIds)),
+      tx
+        .select({ tenantId: leaseOccupants.tenantId })
+        .from(leaseOccupants)
+        .where(inArray(leaseOccupants.tenantId, foundIds)),
+      tx
+        .select({ oldId: addenda.oldTenantId, newId: addenda.newTenantId })
+        .from(addenda)
+        .where(or(inArray(addenda.oldTenantId, foundIds), inArray(addenda.newTenantId, foundIds))),
+    ])
+
+    const blockedIds = new Set<string>([
+      ...usedLease.map((r) => r.tenantId),
+      ...usedDeposit.map((r) => r.tenantId),
+      ...usedOcc.map((r) => r.tenantId),
+      ...usedAddendum.flatMap((r) => [r.oldId, r.newId].filter((x): x is string => Boolean(x))),
+    ])
+    if (blockedIds.size > 0) {
+      const names = found
+        .filter((t) => blockedIds.has(t.id))
+        .map((t) => displayName(t))
+        .join(', ')
+      throw new ValidationError(`Không thể xoá khách ${names} vì đang gắn với hợp đồng, cọc hoặc phụ lục`)
+    }
+
+    await tx.delete(files).where(and(eq(files.ownerType, 'tenant_document'), inArray(files.ownerId, foundIds)))
+    await tx.delete(tenants).where(inArray(tenants.id, foundIds))
+
+    for (const t of found) {
+      await recordAudit(tx, ctx, {
+        action: 'delete',
+        entity: 'tenant',
+        summary: 'Xoá khách thuê',
+        entityId: t.id,
+        facilityId: t.homeFacilityId ?? undefined,
+        before: t,
+      })
+    }
+    return foundIds.length
+  })
 }

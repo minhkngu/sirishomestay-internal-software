@@ -169,17 +169,19 @@ describe('templates', () => {
         templateId: a.id,
         format: 'pdf',
       })
+      const [rowA] = await db.select().from(files).where(eq(files.id, pdfA.fileId))
+      const bytesA = new Uint8Array(await storage.read(rowA.storageKey))
       const pdfB = await exportDocument(db, admin, storage, {
         docType: 'lease',
         entityId: id,
         templateId: b.id,
         format: 'pdf',
       })
-      const [rowA] = await db.select().from(files).where(eq(files.id, pdfA.fileId))
       const [rowB] = await db.select().from(files).where(eq(files.id, pdfB.fileId))
       expect(rowA).toMatchObject({ contentType: 'application/pdf', name: 'hop-dong-301.pdf' })
-      const bytesA = new Uint8Array(await storage.read(rowA.storageKey)),
-        bytesB = new Uint8Array(await storage.read(rowB.storageKey))
+      const bytesB = new Uint8Array(await storage.read(rowB.storageKey))
+      // Xuất lại cùng giấy tờ, cùng định dạng chỉ giữ bản mới nhất
+      expect(await db.select().from(files).where(eq(files.id, pdfA.fileId))).toHaveLength(0)
       expect(new TextDecoder().decode(bytesA.slice(0, 5))).toBe('%PDF-')
       expect(Buffer.from(bytesA).equals(Buffer.from(bytesB))).toBe(false)
       const word = await exportDocument(db, admin, storage, { docType: 'lease', entityId: id, templateId: a.id })

@@ -1,3 +1,4 @@
+import type { MeterSegment } from '@/domain/meters'
 import { addDays, daysInMonth, formatDateVN } from '@/domain/dates'
 import { prorateFraction } from './proration'
 import type {
@@ -9,14 +10,26 @@ import type {
   OneOffCharge,
   PendingAdjustment,
   Proration,
+  RentRefundInput,
 } from '@/domain/types'
+
+export const RENT_REFUND_MODES = ['by_days', 'partial', 'none'] as const
+
+const rangeLabel = (from: ISODate, to: ISODate) => `${formatDateVN(from).slice(0, 5)}–${formatDateVN(to).slice(0, 5)}`
 
 export type TerminationInput = {
   terms: LeaseTerms
   endDate: ISODate
   approvedInvoices: Invoice[]
   /** phí tính theo đồng hồ (điện, nước, phí khác) từ đầu tháng tới ngày trả phòng, mức dùng đã tính bằng meterUsage, đơn giá của dòng phí hợp đồng */
-  meterFees: { leaseFeeId: string; name: string; unit: string; usage: number; unitPrice: number }[]
+  meterFees: {
+    leaseFeeId: string
+    name: string
+    unit: string
+    usage: number
+    unitPrice: number
+    /** chỉ số đầu, cuối của từng đồng hồ, in trên hoá đơn */ segments?: MeterSegment[]
+  }[]
   oneOffs: OneOffCharge[]
   pending: PendingAdjustment[]
   penalties: { description: string; amount: number }[]
@@ -24,6 +37,8 @@ export type TerminationInput = {
   unpaidTotal: number
   depositBalance: number
   forfeit: ForfeitInput
+  /** thiếu = hoàn theo ngày */
+  rentRefund?: RentRefundInput
   proration: Proration
 }
 
@@ -31,30 +46,73 @@ export type TerminationInput = {
  * Hoá đơn thanh lý. total > 0: khách phải trả thêm; total < 0: hoàn cho khách.
  * Tiền phòng đã trả trước vượt `endDate` → dòng hoàn (âm); dòng trừ cọc = −(số dư cọc − phần mất cọc).
  */
-export function buildTerminationInvoice(input: TerminationInput): { lines: InvoiceLineInput[]; total: number } {
+export function buildTerminationInvoice(input: TerminationInput): {
+  lines: InvoiceLineInput[]
+  total: number
+  /** tổng tiền hoàn theo ngày (tiền phòng + phí cố định), tính cả khi chọn không hoàn hoặc hoàn một phần */
+  maxRefund: number
+} {
   const { terms, endDate } = input
   const lines: InvoiceLineInput[] = []
 
-  // tiền phòng đã trả trước vượt ngày trả → hoàn; chưa có hoá đơn tiền phòng đến ngày trả → tính phần còn thiếu
+  // tiền phòng và phí cố định đã trả trước vượt ngày trả → các dòng hoàn theo ngày (ứng viên), áp lựa chọn rentRefund bên dưới;
+  // chưa có hoá đơn tiền phòng đến ngày trả → tính phần còn thiếu
   const rentInvoices = input.approvedInvoices.filter(
     (i) => i.status === 'approved' && i.lines.some((l) => l.type === 'rent'),
   )
+  const refundCandidates: InvoiceLineInput[] = []
+  const dayAfterEnd = addDays(endDate, 1)
   let covered: ISODate | null = null
   for (const inv of rentInvoices) {
     if (!covered || inv.periodEnd > covered) covered = inv.periodEnd
     if (inv.periodEnd > endDate) {
-      const from = addDays(endDate, 1) > inv.periodStart ? addDays(endDate, 1) : inv.periodStart
+      const from = dayAfterEnd > inv.periodStart ? dayAfterEnd : inv.periodStart
       const sum = prorateFraction(from, inv.periodEnd, input.proration)
       const amount = -Math.round(terms.monthlyRent * sum)
       if (amount !== 0) {
-        lines.push({
+        refundCandidates.push({
           type: 'refund',
-          description: `Hoàn tiền phòng đã trả trước ${formatDateVN(from).slice(0, 5)}–${formatDateVN(inv.periodEnd).slice(0, 5)}`,
+          description: `Hoàn tiền phòng đã trả trước ${rangeLabel(from, inv.periodEnd)}`,
           quantity: Math.round(sum * 10000) / 10000,
           unitPrice: terms.monthlyRent,
           amount,
         })
       }
+      // phí cố định hằng tháng thu trước (dòng `fee` có meta.from/to); phí theo đồng hồ thu sau nên không có meta này
+      for (const l of inv.lines) {
+        const metaFrom = l.meta?.from
+        const metaTo = l.meta?.to
+        if (l.type !== 'fee' || typeof metaFrom !== 'string' || typeof metaTo !== 'string' || metaTo <= endDate)
+          continue
+        const feeFrom = dayAfterEnd > metaFrom ? dayAfterEnd : metaFrom
+        const feeSum = prorateFraction(feeFrom, metaTo, input.proration)
+        const feeAmount = -Math.round(l.quantity * l.unitPrice * feeSum)
+        if (feeAmount === 0) continue
+        refundCandidates.push({
+          type: 'refund',
+          description: `Hoàn ${l.description} đã trả trước ${rangeLabel(feeFrom, metaTo)}`,
+          quantity: Math.round(feeSum * 10000) / 10000,
+          unitPrice: l.quantity * l.unitPrice,
+          amount: feeAmount,
+        })
+      }
+    }
+  }
+  const maxRefund = 0 - refundCandidates.reduce((s, l) => s + l.amount, 0)
+  const refund = input.rentRefund ?? { mode: 'by_days' as const }
+  if (refund.mode === 'by_days') {
+    lines.push(...refundCandidates)
+  } else {
+    // Không hoàn (hoặc hoàn một phần nhập 0): không có tiền hoàn thì không có dòng hoàn
+    const kept = refund.mode === 'partial' ? Math.min(refund.amount ?? 0, maxRefund) : 0
+    if (kept > 0) {
+      lines.push({
+        type: 'refund',
+        description: 'Hoàn một phần tiền phòng và phí dịch vụ đã trả trước',
+        quantity: 1,
+        unitPrice: -kept,
+        amount: -kept,
+      })
     }
   }
   if (!covered || covered < endDate) {
@@ -65,10 +123,12 @@ export function buildTerminationInvoice(input: TerminationInput): { lines: Invoi
     if (sum > 0) {
       lines.push({
         type: 'rent',
-        description: `Tiền phòng ${formatDateVN(from).slice(0, 5)}–${formatDateVN(endDate).slice(0, 5)}`,
+        description: 'Tiền phòng',
         quantity: Math.round(sum * 10000) / 10000,
         unitPrice: terms.monthlyRent,
         amount: Math.round(terms.monthlyRent * sum),
+        // Thời gian nằm ở cột thời gian của dòng, không ghi trong mô tả
+        meta: { from, to: endDate, coefficient: Math.round(sum * 10000) / 10000 },
       })
     }
   }
@@ -80,7 +140,7 @@ export function buildTerminationInvoice(input: TerminationInput): { lines: Invoi
       quantity: f.usage,
       unitPrice: f.unitPrice,
       amount: Math.round(f.usage * f.unitPrice),
-      meta: { leaseFeeId: f.leaseFeeId, unit: f.unit },
+      meta: { leaseFeeId: f.leaseFeeId, unit: f.unit, ...(f.segments?.length && { segments: f.segments }) },
     })
   }
   for (const o of input.oneOffs.filter((x) => !x.invoicedInId)) {
@@ -123,16 +183,27 @@ export function buildTerminationInvoice(input: TerminationInput): { lines: Invoi
         ? Math.min(input.forfeit.amount ?? 0, input.depositBalance)
         : 0
   const offset = input.depositBalance - forfeited
+  // Cọc hiện rõ: phần hoàn cho khách (trừ vào hoá đơn) và phần mất (Siris giữ, không hoàn)
   if (offset !== 0) {
     lines.push({
       type: 'deposit_offset',
-      description: forfeited ? `Trừ tiền cọc (mất cọc ${forfeited.toLocaleString('vi-VN')})` : 'Trừ tiền cọc',
+      description: `Hoàn cọc cho khách (trừ vào hoá đơn): ${offset.toLocaleString('vi-VN')}`,
       quantity: 1,
       unitPrice: -offset,
       amount: -offset,
     })
   }
-  return { lines, total: lines.reduce((s, l) => s + l.amount, 0) }
+  if (forfeited > 0) {
+    lines.push({
+      type: 'deposit_offset',
+      description: `Mất cọc (Siris giữ, không hoàn khách): ${forfeited.toLocaleString('vi-VN')}`,
+      quantity: 1,
+      unitPrice: 0,
+      amount: 0,
+      meta: { forfeit: forfeited },
+    })
+  }
+  return { lines, total: lines.reduce((s, l) => s + l.amount, 0), maxRefund }
 }
 
 export { daysInMonth }

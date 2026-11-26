@@ -5,6 +5,9 @@ import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
 import {
+  addPayment,
+  approveInvoice,
+  removePayment,
   createDraftForLease,
   createDrafts,
   createInvoiceFromEditor,
@@ -73,6 +76,31 @@ describe('lập hoá đơn tháng cũ', () => {
   })
   it('tháng trước ngày bắt đầu hợp đồng thì từ chối', async () => {
     await expect(createDraftForLease(db, ctx(), { leaseId, period: '2025-11' })).rejects.toThrow(ValidationError)
+  })
+  it('lưu hoá đơn lẻ giữ kỳ tiền phòng đã đổi ở bản xem trước', async () => {
+    const preview = await previewNewInvoice(db, ctx(), { leaseId, period: '2026-10' })
+    const rent = preview.lines.find((l) => l.type === 'rent')!
+    expect(rent.meta).toMatchObject({ from: '2026-10-01', to: '2026-10-31' })
+    const lines = preview.lines.map((l) => {
+      const meta = (l.meta ?? null) as Record<string, unknown> | null
+      if (l.type === 'rent')
+        return {
+          type: l.type,
+          description: l.description,
+          quantity: 0.5161,
+          unitPrice: l.unitPrice,
+          meta: { ...meta, from: '2026-10-01', to: '2026-10-16', coefficient: 0.5161, coefficientOverride: false },
+        }
+      return { type: l.type, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, meta }
+    })
+    const { id } = await createInvoiceFromEditor(db, ctx(), { leaseId, period: '2026-10', lines })
+    const saved = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, id))
+    expect(saved.find((l) => l.type === 'rent')).toMatchObject({
+      quantity: 0.5161,
+      amount: 4_644_900,
+      meta: { from: '2026-10-01', to: '2026-10-16', coefficient: 0.5161 },
+    })
+    expect((await db.select().from(invoices).where(eq(invoices.id, id)))[0].periodEnd).toBe('2026-10-16')
   })
   it('xem trước không tạo hoá đơn; chỉ khi lưu từ giao diện sửa mới tạo, kèm thay đổi', async () => {
     const preview = await previewNewInvoice(db, ctx(), { leaseId, period: '2026-10' })
@@ -155,6 +183,35 @@ describe('tiền cọc còn thiếu trên hoá đơn', () => {
       .values({ leaseId, type: 'collect', status: 'done', amount: 6000000, date: '2026-12-01', method: 'cash' })
     const inv = await createDraftForLease(db, ctx(), { leaseId, period: '2026-12' })
     expect(await depositOf(inv.id)).toMatchObject([{ amount: 3000000 }])
+  })
+  it('thu đủ hoá đơn có dòng cọc thì dòng thu cọc chờ trong sổ cọc hoàn tất; gỡ khoản thu thì trả về chờ', async () => {
+    await db
+      .insert(depositEntries)
+      .values({ leaseId, type: 'collect', status: 'done', amount: 3000000, date: '2026-12-01', method: 'cash' })
+    const [pendingEntry] = await db
+      .insert(depositEntries)
+      .values({ leaseId, type: 'collect', status: 'pending', amount: 6000000, date: '2026-12-01' })
+      .returning()
+    const inv = await createDraftForLease(db, ctx(), { leaseId, period: '2026-12' })
+    await approveInvoice(db, ctx(), inv.id, { dueDate: '2026-12-10' })
+    const total = (await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, inv.id))).reduce(
+      (n, l) => n + l.amount,
+      0,
+    )
+    const entry = async () => (await db.select().from(depositEntries).where(eq(depositEntries.id, pendingEntry.id)))[0]
+    const part = await addPayment(db, ctx(), inv.id, { paidOn: '2026-12-02', amount: 1000, method: 'cash' })
+    expect((await entry()).status).toBe('pending')
+    await removePayment(db, ctx(), part.id)
+    // Thu đúng phần cọc (chưa thu đủ hoá đơn) cũng hoàn tất dòng thu cọc: tiền thu trả cọc trước
+    const depositOnly = await addPayment(db, ctx(), inv.id, { paidOn: '2026-12-02', amount: 6000000, method: 'cash' })
+    expect(await entry()).toMatchObject({ status: 'done', date: '2026-12-02', method: 'cash' })
+    await removePayment(db, ctx(), depositOnly.id)
+    expect((await entry()).status).toBe('pending')
+    const full = await addPayment(db, ctx(), inv.id, { paidOn: '2026-12-03', amount: total, method: 'transfer' })
+    expect(await entry()).toMatchObject({ status: 'done', date: '2026-12-03', method: 'transfer' })
+    expect((await entry()).note).toContain(inv.code)
+    await removePayment(db, ctx(), full.id)
+    expect(await entry()).toMatchObject({ status: 'pending', method: null, note: '' })
   })
 })
 

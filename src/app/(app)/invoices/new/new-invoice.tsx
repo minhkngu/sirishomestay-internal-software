@@ -118,6 +118,7 @@ export async function NewInvoice({ sp }: { sp: NewInvoiceParams }) {
               })),
             usedTypeIds: [],
             facilityId: preview.facilityId,
+            occupantsCount: preview.occupantsCount,
             units: feeUnits.map((u) => ({ id: u.id, name: u.name })),
           }}
           status="draft"
