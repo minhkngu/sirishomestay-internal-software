@@ -655,6 +655,7 @@ export async function previewNewInvoice(db: DB, ctx: AccessContext, input: { lea
     facilityId: info.facilityId,
     tenantName: displayName(info),
     fixedQtyFeeIds: fixedQty.map((f) => f.id),
+    occupantsCount: await occupantsCountOf(db, input.leaseId),
     meterPanels,
   }
 }
@@ -2171,6 +2172,14 @@ async function buildMeterPanels(db: DB, leaseId: string, periodStart: string, mo
   }))
   return meterPanels
 }
+/** Số người ở của hợp đồng, tối thiểu 1 (cùng cách hoá đơn tính phí theo số người ở). */
+async function occupantsCountOf(db: DB, leaseId: string): Promise<number> {
+  const rows = await db
+    .select({ tenantId: leaseOccupants.tenantId })
+    .from(leaseOccupants)
+    .where(eq(leaseOccupants.leaseId, leaseId))
+  return Math.max(1, rows.length)
+}
 export async function getInvoiceDetail(db: DB, ctx: AccessContext, id: string) {
   const inv = await getInvoice(db, ctx, id)
   const [lines, pays, [row], periodFees, quantities, leaseFees] = await Promise.all([
@@ -2199,10 +2208,12 @@ export async function getInvoiceDetail(db: DB, ctx: AccessContext, id: string) {
   ])
   // Chỉ số đã chốt của đồng hồ gắn với từng phí tính theo đồng hồ, 3 tháng liền trước tháng hoá đơn (thiếu thì để trống)
   const meterPanels = await buildMeterPanels(db, inv.leaseId, inv.periodStart, inv.kind === 'monthly')
+  const occupantsCount = await occupantsCountOf(db, inv.leaseId)
   const total = lines.reduce((n, l) => n + l.amount, 0),
     paid = pays.reduce((n, p) => n + p.amount, 0)
   return {
     invoice: inv,
+    occupantsCount,
     meterPanels,
     leaseFeeTypeIds: leaseFees.flatMap((f) => (f.feeTypeId ? [f.feeTypeId] : [])),
     lines,

@@ -64,6 +64,8 @@ type AddFee = {
   feeTypes: FeeOption[]
   usedTypeIds: string[]
   facilityId: string
+  /** Số người ở của hợp đồng: phí theo số người ở thêm vào hoá đơn lấy số này làm số lượng. */
+  occupantsCount?: number
   renderCreateFee?: (p: { onCreated: (fee: FeeOption) => void }) => React.ReactNode
 }
 
@@ -1165,7 +1167,7 @@ export function InvoiceEditor(p: Props) {
             onPick={(feeId) => {
               const fee = [...p.addFee!.feeTypes, ...createdFees].find((f) => f.id === feeId)
               if (!fee) return
-              const line = feeLineFromType(fee, p.addFee!.facilityId)
+              const line = feeLineFromType(fee, p.addFee!.facilityId, p.addFee!.occupantsCount)
               setLines((cur) => [...cur, { ...line, unitPriceText: String(line.unitPrice) }])
             }}
             renderCreateFee={

@@ -146,6 +146,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             })),
           usedTypeIds: d.leaseFeeTypeIds,
           facilityId: inv.facilityId,
+          occupantsCount: d.occupantsCount,
           units: feeUnits.map((u) => ({ id: u.id, name: u.name })),
         }}
         key={inv.updatedAt.toISOString()}
