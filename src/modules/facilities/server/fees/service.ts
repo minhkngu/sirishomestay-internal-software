@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from 'drizzle-orm'
+import { and, asc, eq, inArray, ne } from 'drizzle-orm'
 import { MAX_MONEY } from '@/domain/money'
 import { z } from 'zod'
 import {
@@ -67,6 +67,50 @@ export async function createFeeUnit(db: DB, ctx: AccessContext, input: unknown):
       after: u,
     })
     return u
+  })
+}
+
+/** Đổi tên đơn vị tính; loại phí dùng đơn vị này hiện tên mới, giá đã chụp trong hợp đồng giữ tên cũ. */
+export async function updateFeeUnit(db: DB, ctx: AccessContext, id: string, input: unknown): Promise<FeeUnit> {
+  assertCan(ctx, 'settings')
+  const data = parse(unitInput, input)
+  return db.transaction(async (tx) => {
+    const [before] = await tx.select().from(feeUnits).where(eq(feeUnits.id, id))
+    if (!before) throw new NotFoundError()
+    const [dup] = await tx
+      .select()
+      .from(feeUnits)
+      .where(and(eq(feeUnits.name, data.name), ne(feeUnits.id, id)))
+    if (dup) throw new ValidationError('Đơn vị đã tồn tại', { name: 'Đơn vị đã tồn tại' })
+    const [u] = await tx.update(feeUnits).set({ name: data.name }).where(eq(feeUnits.id, id)).returning()
+    await recordAudit(tx, ctx, {
+      action: 'update',
+      entity: 'fee_unit',
+      entityId: id,
+      summary: `Đổi tên đơn vị ${before.name} → ${u.name}`,
+      before,
+      after: u,
+    })
+    return u
+  })
+}
+
+/** Xoá đơn vị tính chưa loại phí nào dùng. */
+export async function deleteFeeUnit(db: DB, ctx: AccessContext, id: string): Promise<void> {
+  assertCan(ctx, 'settings')
+  await db.transaction(async (tx) => {
+    const [before] = await tx.select().from(feeUnits).where(eq(feeUnits.id, id))
+    if (!before) throw new NotFoundError()
+    const [used] = await tx.select({ id: feeTypes.id }).from(feeTypes).where(eq(feeTypes.unitId, id)).limit(1)
+    if (used) throw new ValidationError('Đơn vị đang được loại phí dùng, hãy đổi đơn vị của loại phí trước')
+    await tx.delete(feeUnits).where(eq(feeUnits.id, id))
+    await recordAudit(tx, ctx, {
+      action: 'delete',
+      entity: 'fee_unit',
+      entityId: id,
+      summary: `Xoá đơn vị ${before.name}`,
+      before,
+    })
   })
 }
 

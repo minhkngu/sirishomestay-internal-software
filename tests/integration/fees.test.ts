@@ -22,6 +22,8 @@ import {
   removeFeeTypePrice,
   listFeeTypePrices,
   createFeeUnit,
+  updateFeeUnit,
+  deleteFeeUnit,
   listFeeUnits,
   createFeeType,
   updateFeeType,
@@ -96,6 +98,25 @@ describe('fees & rates', () => {
       sql`select relrowsecurity from pg_class where oid = 'lease_fee_snapshots'::regclass`,
     )
     expect((result as unknown as { rows: { relrowsecurity: boolean }[] }).rows[0].relrowsecurity).toBe(true)
+  })
+
+  it('đổi tên và xoá đơn vị tính: trùng tên bị từ chối, đơn vị đang dùng không xoá được', async () => {
+    const a = await createFeeUnit(db, admin, { name: 'người' })
+    const b = await createFeeUnit(db, admin, { name: 'phòng' })
+    await updateFeeUnit(db, admin, a.id, { name: 'khách' })
+    expect((await listFeeUnits(db)).map((u) => u.name).sort()).toEqual(['khách', 'phòng'])
+    await expect(updateFeeUnit(db, admin, a.id, { name: 'phòng' })).rejects.toThrow('Đơn vị đã tồn tại')
+    await expect(updateFeeUnit(db, ctxOf(['billing'], [fa]), a.id, { name: 'x' })).rejects.toThrow(ForbiddenError)
+    await createFeeType(db, admin, {
+      name: 'Dịch vụ',
+      unitId: a.id,
+      defaultPrice: 1,
+      billing: 'monthly_fixed',
+      quantityFrom: 'period_input',
+    })
+    await expect(deleteFeeUnit(db, admin, a.id)).rejects.toThrow(ValidationError)
+    await deleteFeeUnit(db, admin, b.id)
+    expect((await listFeeUnits(db)).map((u) => u.name)).toEqual(['khách'])
   })
 
   it('bảng giá theo toà bật RLS', async () => {

@@ -7,7 +7,14 @@ import { Input } from '@/components/ui/input'
 import { FeeTypeCard } from './fee-type-card'
 import { FeeTypeForm } from './fee-type-form'
 import { Msg, useRun } from '@/components/use-run'
-import { createFeeTypeAction, createFeeUnitAction, restoreFeeTypeAction } from '../server/fees/actions'
+import {
+  createFeeTypeAction,
+  createFeeUnitAction,
+  deleteFeeTypeAction,
+  deleteFeeUnitAction,
+  restoreFeeTypeAction,
+  updateFeeUnitAction,
+} from '../server/fees/actions'
 
 type FacilityOption = { id: string; name: string }
 type UnitOption = { id: string; name: string }
@@ -36,6 +43,10 @@ export function FeeSettings({ facilities, units, feeTypes, prices, defaults }: P
   const [adding, setAdding] = useState(false)
   const [showUnit, setShowUnit] = useState(false)
   const [unitName, setUnitName] = useState('')
+  const [editingUnit, setEditingUnit] = useState<UnitOption | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const unitEditRun = useRun()
+  const deleteRun = useRun()
   const unitNameById = new Map(units.map((u) => [u.id, u.name]))
   const active = feeTypes.filter((f) => f.isActive)
   const archived = feeTypes.filter((f) => !f.isActive)
@@ -48,8 +59,37 @@ export function FeeSettings({ facilities, units, feeTypes, prices, defaults }: P
           <span className="text-sm text-muted-foreground">Đơn vị tính:</span>
           <div className="flex flex-wrap items-center gap-1">
             {units.map((u) => (
-              <span key={u.id} className="rounded-full border px-2 py-0.5 text-xs">
+              <span
+                key={u.id}
+                className="inline-flex items-center gap-0.5 rounded-full border py-0.5 pl-2 pr-1 text-xs"
+              >
                 {u.name}
+                <button
+                  type="button"
+                  aria-label={`Sửa đơn vị ${u.name}`}
+                  title="Sửa tên"
+                  className="rounded px-1 text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setEditingUnit(u)
+                    setRenameValue(u.name)
+                  }}
+                >
+                  ✎
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Xoá đơn vị ${u.name}`}
+                  title="Xoá"
+                  disabled={unitEditRun.pending}
+                  className="rounded px-1 text-muted-foreground hover:text-destructive"
+                  onClick={() => {
+                    if (!window.confirm(`Xoá đơn vị ${u.name}? Đơn vị đang được loại phí dùng thì không xoá được.`))
+                      return
+                    unitEditRun.run(() => deleteFeeUnitAction(u.id), 'Đã xoá đơn vị')
+                  }}
+                >
+                  ×
+                </button>
               </span>
             ))}
             {units.length === 0 && <span className="text-sm text-muted-foreground">chưa có</span>}
@@ -67,7 +107,34 @@ export function FeeSettings({ facilities, units, feeTypes, prices, defaults }: P
             + Thêm loại phí
           </Button>
         </div>
-        <Msg error={null} ok={unitRun.ok} />
+        <Msg error={unitEditRun.error} ok={unitRun.ok ?? unitEditRun.ok} />
+        <FormDialog
+          open={!!editingUnit}
+          onOpenChange={(o) => {
+            if (!o) setEditingUnit(null)
+          }}
+          title="Sửa đơn vị tính"
+          size="sm"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <Input value={renameValue} onChange={(e) => setRenameValue(e.target.value)} />
+            <Button
+              type="button"
+              size="sm"
+              disabled={unitEditRun.pending || renameValue.trim() === ''}
+              onClick={() =>
+                unitEditRun.run(async () => {
+                  const result = await updateFeeUnitAction(editingUnit!.id, { name: renameValue })
+                  if (result.ok) setEditingUnit(null)
+                  return result
+                }, 'Đã đổi tên đơn vị')
+              }
+            >
+              Lưu
+            </Button>
+            <Msg error={unitEditRun.error} ok={null} />
+          </div>
+        </FormDialog>
         <FormDialog
           open={showUnit}
           onOpenChange={(o) => {
@@ -143,17 +210,36 @@ export function FeeSettings({ facilities, units, feeTypes, prices, defaults }: P
                 <span className="text-sm">
                   {fee.name} <span className="text-muted-foreground">({unitNameById.get(fee.unitId) ?? '—'})</span>
                 </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={archiveRun.pending}
-                  onClick={() => archiveRun.run(() => restoreFeeTypeAction(fee.id), 'Đã khôi phục')}
-                >
-                  Khôi phục
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={archiveRun.pending}
+                    onClick={() => archiveRun.run(() => restoreFeeTypeAction(fee.id), 'Đã khôi phục')}
+                  >
+                    Khôi phục
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={deleteRun.pending}
+                    aria-label={`Xoá phí ${fee.name}`}
+                    onClick={() => {
+                      if (
+                        !window.confirm(
+                          `Xoá hẳn phí ${fee.name}? Không thể hoàn tác. Phí đã dùng trong hợp đồng thì chỉ có thể lưu trữ.`,
+                        )
+                      )
+                        return
+                      deleteRun.run(() => deleteFeeTypeAction(fee.id), 'Đã xoá')
+                    }}
+                  >
+                    Xoá
+                  </Button>
+                </div>
               </div>
             ))}
-            <Msg error={archiveRun.error} ok={archiveRun.ok} />
+            <Msg error={archiveRun.error ?? deleteRun.error} ok={archiveRun.ok ?? deleteRun.ok} />
           </div>
         </details>
       )}
