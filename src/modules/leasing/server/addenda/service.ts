@@ -882,7 +882,7 @@ export async function createTermination(
     const [inv] = await tx
       .insert(invoices)
       .values({
-        code: await nextInvoiceCode(tx, facilityCode, month),
+        code: await nextInvoiceCode(tx, facilityCode, month, 'TL'),
         leaseId,
         facilityId,
         kind: 'termination',

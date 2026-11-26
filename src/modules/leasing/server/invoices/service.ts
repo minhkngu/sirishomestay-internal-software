@@ -455,9 +455,17 @@ async function previewCore(db: DB, facilityId: string, period: string, onlyLease
     }
   })
 }
-/** Mã tiếp theo `<mã cơ sở>-HD-<YYYYMM>-<số thứ tự>`. Gọi trong transaction đã khoá cơ sở, hoặc chấp nhận retry khi trùng. */
-export async function nextInvoiceCode(tx: Pick<DB, 'select'>, facilityCode: string, ym: string): Promise<string> {
-  const prefix = `${facilityCode}-HD-${ym.replace('-', '')}-`
+/**
+ * Mã tiếp theo `<mã cơ sở>-HD-<YYYYMM>-<số thứ tự>`; hoá đơn thanh lý dùng `TL` thay `HD` và đếm số thứ tự riêng.
+ * Gọi trong transaction đã khoá cơ sở, hoặc chấp nhận retry khi trùng.
+ */
+export async function nextInvoiceCode(
+  tx: Pick<DB, 'select'>,
+  facilityCode: string,
+  ym: string,
+  tag: 'HD' | 'TL' = 'HD',
+): Promise<string> {
+  const prefix = `${facilityCode}-${tag}-${ym.replace('-', '')}-`
   const codes = await tx
     .select({ code: invoices.code })
     .from(invoices)

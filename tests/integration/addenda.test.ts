@@ -354,6 +354,14 @@ describe('phụ lục hợp đồng', () => {
     await createOccupantChange(db, ctx(), leaseId, { effectiveDate: '2026-11-16', occupantIds: [tenantId, person.id] })
     expect(await db.select().from(leaseOccupants).where(eq(leaseOccupants.leaseId, leaseId))).toHaveLength(2)
   })
+  it('hoá đơn thanh lý có mã riêng dạng <cơ sở>-TL-<YYYYMM>-<số>, đếm số thứ tự riêng', async () => {
+    const r = await createTermination(db, ctx(), leaseId, {
+      endDate: '2026-11-20',
+      forfeit: { mode: 'none' },
+      readings: [],
+    })
+    expect(r.invoice!.code).toBe('TD-TL-202611-0001')
+  })
   it('sửa người ở trong hợp đồng: không tạo phụ lục, không tạo điều chỉnh', async () => {
     const [person] = await db
       .insert(tenants)
