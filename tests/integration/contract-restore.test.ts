@@ -10,6 +10,8 @@ import {
   handovers,
   invoiceLines,
   invoices,
+  leaseFeeMeters,
+  leaseFeeSnapshots,
   leases,
   meterReadings,
   meters,
@@ -247,6 +249,19 @@ describe('khôi phục hợp đồng', () => {
       .insert(meters)
       .values({ roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 })
       .returning()
+    // Chỉ đồng hồ gắn với phí điện của hợp đồng mới được chốt khi thanh lý
+    const [fee] = await db
+      .insert(leaseFeeSnapshots)
+      .values({
+        leaseId: lease.id,
+        name: 'Điện',
+        unit: 'kWh',
+        quantitySource: 'meter',
+        billing: 'per_occurrence',
+        unitPrice: 3500,
+      })
+      .returning()
+    await db.insert(leaseFeeMeters).values({ leaseFeeId: fee.id, meterId: meter.id })
     const [old] = await db
       .insert(meterReadings)
       .values({ meterId: meter.id, period: '2026-08', readOn: '2026-08-31', value: 100 })
@@ -271,6 +286,19 @@ describe('khôi phục hợp đồng', () => {
       .insert(meters)
       .values({ roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 })
       .returning()
+    // Chỉ đồng hồ gắn với phí điện của hợp đồng mới được chốt khi thanh lý
+    const [fee] = await db
+      .insert(leaseFeeSnapshots)
+      .values({
+        leaseId: lease.id,
+        name: 'Điện',
+        unit: 'kWh',
+        quantitySource: 'meter',
+        billing: 'per_occurrence',
+        unitPrice: 3500,
+      })
+      .returning()
+    await db.insert(leaseFeeMeters).values({ leaseFeeId: fee.id, meterId: meter.id })
     await db.insert(meterReadings).values({ meterId: meter.id, period: '2026-08', readOn: '2026-08-31', value: 100 })
     const [existing] = await db
       .insert(meterReadings)
@@ -384,7 +412,7 @@ describe('khôi phục hợp đồng', () => {
     await restoreContract(db, ctx, 'lease', lease.id, preview.token, new MemoryStorage())
     expect(await db.select().from(oneOffCharges).where(eq(oneOffCharges.leaseId, lease.id))).toHaveLength(0)
   })
-  it('không hoàn tác sửa sau khi hợp đồng đã được thanh lý và duyệt', async () => {
+  it('hợp đồng đã thanh lý thì không sửa được, duyệt hoá đơn không đổi trạng thái đã kết thúc', async () => {
     const input = {
       roomId,
       tenantId,
@@ -395,11 +423,11 @@ describe('khôi phục hợp đồng', () => {
     }
     const { lease } = await createLease(db, ctx, input)
     const termination = await createTermination(db, ctx, lease.id, { endDate: '2026-10-01', readings: [] })
-    await updateLease(db, ctx, lease.id, { ...input, monthlyRent: 2000 }, false)
+    // Hợp đồng kết thúc ngay khi tạo phụ lục thanh lý nên không sửa được nữa
+    await expect(updateLease(db, ctx, lease.id, { ...input, monthlyRent: 2000 }, false)).rejects.toThrow(
+      'Hợp đồng đã thanh lý',
+    )
     await approveInvoice(db, ctx, termination.invoice!.id, { dueDate: '2026-10-15' })
-    const preview = await previewContractRestore(db, ctx, 'lease', lease.id)
-    expect(preview.blockedReason).toBeTruthy()
-    await expect(restoreContract(db, ctx, 'lease', lease.id, preview.token, new MemoryStorage())).rejects.toThrow()
     expect((await db.select().from(leases).where(eq(leases.id, lease.id)))[0].status).toBe('ended')
   })
   it('không hoàn tác sửa sau khi hợp đồng cọc bị hủy', async () => {

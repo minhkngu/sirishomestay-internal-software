@@ -425,7 +425,7 @@ describe('phụ lục hợp đồng', () => {
       createTransfer(db, ctx(), other.id, { effectiveDate: '2026-12-05', newRoomId: room2Id }),
     ).rejects.toThrow(/Phòng đích/)
   })
-  it('thanh lý: dựng hoá đơn nháp, duyệt thì kết thúc hợp đồng, ghi sổ cọc và đặt hạn xoá ảnh', async () => {
+  it('thanh lý: dựng hoá đơn nháp, kết thúc hợp đồng ngay, duyệt thì ghi sổ cọc, đặt hạn xoá ảnh', async () => {
     const [m] = await db
       .insert(meters)
       .values({ roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 })
@@ -460,7 +460,7 @@ describe('phụ lục hợp đồng', () => {
     expect((await db.select().from(files).where(eq(files.id, photo.id)))[0].deleteAfter).toBe('2027-01-09')
     await expect(
       createTermination(db, ctx(), leaseId, { endDate: '2026-12-11', readings: [{ meterId: m.id, value: 170 }] }),
-    ).rejects.toThrow(/hiệu lực|phụ lục thanh lý/)
+    ).rejects.toThrow(/hiệu lực|kết thúc|phụ lục thanh lý/)
     await approveInvoice(db, ctx(), r.invoice!.id, { dueDate: '2026-12-20' })
     const done = (await db.select().from(depositEntries)).filter((e) => e.status === 'done')
     expect(done.filter((e) => e.type === 'forfeit').map((e) => e.amount)).toEqual([2000000])
@@ -625,7 +625,7 @@ describe('phụ lục hợp đồng', () => {
       }),
     ).rejects.toThrow(ForbiddenError)
   })
-  it('sau khi duyệt thanh lý: phòng về Trống, hoặc Đã cọc nếu có cọc chờ', async () => {
+  it('sau khi thanh lý: phòng về Trống, hoặc Đã cọc nếu có cọc chờ', async () => {
     const { getRoomDetail } = await import('@/modules/leasing/server/contracts/room-view')
     const { depositContracts } = await import('@/db')
     const r = await createTermination(db, ctx(), leaseId, {
@@ -633,7 +633,8 @@ describe('phụ lục hợp đồng', () => {
       forfeit: { mode: 'none' },
       readings: [],
     })
-    expect((await getRoomDetail(db, ctx(), roomId)).status).not.toBe('vacant')
+    // Hợp đồng kết thúc ngay khi tạo phụ lục thanh lý nên phòng đã trống; duyệt hoá đơn không đổi
+    expect((await getRoomDetail(db, ctx(), roomId)).status).toBe('vacant')
     await approveInvoice(db, ctx(), r.invoice!.id, { dueDate: '2026-12-20' })
     expect((await getRoomDetail(db, ctx(), roomId)).status).toBe('vacant')
     const [other] = await db
