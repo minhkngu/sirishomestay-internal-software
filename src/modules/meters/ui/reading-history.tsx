@@ -138,7 +138,7 @@ export function ReadingHistory({
         {r.meterName}
         {r.kind === 'handover' && (
           <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
-            chỉ số ban đầu
+            chỉ số bàn giao
           </span>
         )}
       </div>
