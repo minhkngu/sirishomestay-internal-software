@@ -938,7 +938,8 @@ export type ReadingHistoryRow = {
   meterName: string
   meterCode: string | null
   unit: string | null
-  kind: 'monthly' | 'handover'
+  /** `termination`: bản ghi chỉ số chốt khi thanh lý (chỉ để xem, không phải chỉ số tính tiền). */
+  kind: 'monthly' | 'handover' | 'termination'
   period: string
   readOn: string
   /** Số đầu của lần chốt: số chốt liền trước; dòng bàn giao đầu hợp đồng lấy bằng số cuối. */
@@ -994,6 +995,44 @@ export async function listReadingHistory(
       a.roomCode.localeCompare(b.roomCode, 'vi', { numeric: true }) ||
       a.meterName.localeCompare(b.meterName, 'vi'),
   )
+}
+
+/** Chỉ số đầu, cuối chốt khi thanh lý do module hợp đồng cung cấp; chỉ để ghi nhận, không dùng tính tiền. */
+export type TerminationReadingRecord = { id: string; meterId: string; readOn: string; opening: number; closing: number }
+
+/** Biến bản ghi thanh lý thành dòng của danh sách chốt chỉ số (thêm tên đồng hồ, phòng). Đồng hồ không thuộc toà thì bỏ qua. */
+export async function terminationHistoryRows(
+  db: DB,
+  ctx: AccessContext,
+  facilityId: string,
+  records: TerminationReadingRecord[],
+): Promise<ReadingHistoryRow[]> {
+  assertCan(ctx, 'meters', facilityId)
+  if (!records.length) return []
+  const overview = await listMeterOverview(db, ctx, facilityId)
+  const byMeter = new Map(overview.map((m) => [m.meterId, m]))
+  return records.flatMap((r) => {
+    const m = byMeter.get(r.meterId)
+    if (!m) return []
+    return [
+      {
+        id: r.id,
+        meterId: m.meterId,
+        roomId: m.roomId,
+        roomCode: m.roomCode,
+        floor: m.floor,
+        meterName: typeName(m.meterName),
+        meterCode: m.meterCode,
+        unit: m.unit,
+        kind: 'termination' as const,
+        period: r.readOn.slice(0, 7),
+        readOn: r.readOn,
+        opening: r.opening,
+        closing: r.closing,
+        usage: Math.max(r.closing - r.opening, 0),
+      },
+    ]
+  })
 }
 
 async function readingForEdit(tx: DB, ctx: AccessContext, id: string) {

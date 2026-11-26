@@ -9,7 +9,9 @@ import {
   listReadingSheet,
   readingMeterTypes,
   sortMeterTypes,
+  terminationHistoryRows,
 } from '@/modules/meters'
+import { listTerminationReadingRecords } from '@/modules/leasing'
 import { AddMeterButton, CloseReadingsButton, MeterFilters, ReadingHistory } from '@/modules/meters/ui'
 
 /** Kỳ ghi gần đây: 3 tháng tới và 24 tháng trước, mới nhất trước. */
@@ -75,7 +77,14 @@ async function Meters({
   ])
 
   const readingRows = sheet?.rows ?? []
-  const historyAll = historyRows ?? []
+  // Chỉ số chốt khi thanh lý lấy từ hoá đơn thanh lý, hiện chung danh sách để ghi nhận (không dùng tính tiền)
+  const terminationRows =
+    facilityId && historyRows
+      ? await terminationHistoryRows(db, ctx, facilityId, await listTerminationReadingRecords(db, ctx, facilityId))
+      : []
+  const historyAll = [...(historyRows ?? []), ...terminationRows].sort((a, b) =>
+    a.readOn < b.readOn ? 1 : a.readOn > b.readOn ? -1 : 0,
+  )
   const roomOptions = uniqueRooms(historyAll)
   const roomId = roomOptions.some((room) => room.value === sp.room) ? sp.room! : ''
 
