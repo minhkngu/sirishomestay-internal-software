@@ -76,6 +76,10 @@ export function TerminationWizard({
   const [readings, setReadings] = useState<Record<string, string>>(() =>
     Object.fromEntries(meters.map((m) => [m.meterId, m.latestReading ? String(m.latestReading.value) : ''])),
   )
+  // Số đầu mặc định là lần chốt gần nhất, sửa được
+  const [openings, setOpenings] = useState<Record<string, string>>(() =>
+    Object.fromEntries(meters.map((m) => [m.meterId, m.latestReading ? String(m.latestReading.value) : ''])),
+  )
   const [assetRows, setAssetRows] = useState<AssetDraft[]>(() =>
     assets.map((a) => ({
       ...a,
@@ -100,7 +104,7 @@ export function TerminationWizard({
     endDate,
     forfeit: { mode, ...(mode === 'partial' ? { amount: Number(forfeitAmount) || 0 } : {}) },
     rentRefund: { mode: refundMode, ...(refundMode === 'partial' ? { amount: Number(refundAmount) || 0 } : {}) },
-    readings: toReadings(readings),
+    readings: toReadings(readings, openings),
     handoverItems: assetRows.map((a) => ({
       assetId: a.assetId,
       condition: a.condition,
@@ -128,8 +132,10 @@ export function TerminationWizard({
       const label = `${m.utility === 'electric' ? 'điện' : 'nước'}${m.serial ? ` (${m.serial})` : ''}`
       if (raw === '') return `Nhập chỉ số ${label} tại ngày trả phòng`
       if (!/^\d+$/.test(raw)) return `Chỉ số ${label} phải là số nguyên không âm`
-      if (m.latestReading && Number(raw) < m.latestReading.value) {
-        return `Chỉ số ${label} không được nhỏ hơn chốt gần nhất (${m.latestReading.value.toLocaleString('vi-VN')})`
+      const open = (openings[m.meterId] ?? '').trim()
+      if (open !== '' && !/^\d+$/.test(open)) return `Số đầu ${label} phải là số nguyên không âm`
+      if (open !== '' && Number(raw) < Number(open)) {
+        return `Số cuối ${label} không được nhỏ hơn số đầu (${Number(open).toLocaleString('vi-VN')})`
       }
     }
     return null
@@ -197,7 +203,14 @@ export function TerminationWizard({
             )}
           </Field>
         </div>
-        <ReadingInputs title="Chỉ số tại ngày trả phòng" meters={meters} values={readings} onChange={setReadings} />
+        <ReadingInputs
+          title="Chỉ số tại ngày trả phòng"
+          meters={meters}
+          values={readings}
+          onChange={setReadings}
+          openings={openings}
+          onOpeningsChange={setOpenings}
+        />
         {readingError && (
           <p role="alert" className="text-xs text-destructive">
             {readingError}

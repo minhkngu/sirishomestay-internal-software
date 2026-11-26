@@ -81,6 +81,16 @@ export type AddendumResult = {
 const date = z.iso.date()
 const target = z.enum(['next', 'current']).default('next')
 const readingsSchema = z.array(z.object({ meterId: z.uuid(), value: z.number().int().nonnegative() })).default([])
+/** Chốt thanh lý: số đầu sửa được (các chỉ số chỉ là tương đối), mặc định là lần chốt gần nhất. */
+const terminationReadingsSchema = z
+  .array(
+    z.object({
+      meterId: z.uuid(),
+      value: z.number().int().nonnegative(),
+      opening: z.number().int().nonnegative().optional(),
+    }),
+  )
+  .default([])
 const feesSchema = z
   .array(
     z.object({
@@ -132,7 +142,7 @@ const terminationSchema = z.object({
   rentRefund: z
     .object({ mode: z.enum(RENT_REFUND_MODES), amount: z.number().int().nonnegative().optional() })
     .default({ mode: 'by_days' }),
-  readings: readingsSchema,
+  readings: terminationReadingsSchema,
   handoverItems: z.array(terminationHandoverItemSchema).optional(),
   penalties: z.array(terminationPenaltySchema).optional(),
 })
@@ -295,11 +305,13 @@ async function recordReadings(
   tx: DB,
   roomIds: string[],
   date: string,
-  input: { meterId: string; value: number }[],
+  input: { meterId: string; value: number; opening?: number }[],
   onlyMeterIds?: Set<string>,
   /** `termination`: chốt thanh lý, thêm một lần chốt riêng, không ghi đè chỉ số bàn giao cùng ngày. */
   kind: 'handover' | 'termination' = 'handover',
-) {
+): Promise<Map<string, number>> {
+  /** Số đầu đã dùng cho từng đồng hồ khi chốt thanh lý. */
+  const openings = new Map<string, number>()
   const needed = (await Promise.all(roomIds.map((r) => activeMeters(tx, r))))
     .flat()
     .filter((m) => !onlyMeterIds || onlyMeterIds.has(m.id))
@@ -312,17 +324,27 @@ async function recordReadings(
   for (const r of input) {
     const m = needed.find((x) => x.id === r.meterId)
     if (!m) throw new ValidationError('Đồng hồ không thuộc phòng liên quan', { readings: 'Đồng hồ không hợp lệ' })
-    const prior = (await tx.select().from(meterReadings).where(eq(meterReadings.meterId, m.id)))
-      .filter((x) => x.readOn < date)
-      .sort((a, b) => (a.readOn < b.readOn ? 1 : -1))[0]
-    if (r.value < (prior?.value ?? m.startReading))
-      throw new ValidationError('Chỉ số mới nhỏ hơn chỉ số cũ', { value: 'Chỉ số mới nhỏ hơn chỉ số cũ' })
+    const all = await tx.select().from(meterReadings).where(eq(meterReadings.meterId, m.id))
     if (kind === 'termination') {
+      // Các chỉ số chỉ là tương đối: số đầu mặc định là lần chốt gần nhất (cùng ngày thì số lớn hơn), sửa được; chỉ cần số cuối không nhỏ hơn số đầu
+      const latest = all
+        .filter((x) => x.readOn <= date)
+        .sort((a, b) => (a.readOn < b.readOn ? 1 : a.readOn > b.readOn ? -1 : b.value - a.value))[0]
+      const opening = r.opening ?? latest?.value ?? m.startReading
+      if (r.value < opening)
+        throw new ValidationError(
+          `Số cuối kỳ ${r.value.toLocaleString('vi-VN')} không được nhỏ hơn số đầu kỳ ${opening.toLocaleString('vi-VN')}`,
+          { readings: 'Số cuối nhỏ hơn số đầu' },
+        )
       await tx
         .insert(meterReadings)
-        .values({ meterId: m.id, period: date.slice(0, 7), readOn: date, value: r.value, kind })
+        .values({ meterId: m.id, period: date.slice(0, 7), readOn: date, value: r.value, kind, opening })
+      openings.set(m.id, opening)
       continue
     }
+    const prior = all.filter((x) => x.readOn < date).sort((a, b) => (a.readOn < b.readOn ? 1 : -1))[0]
+    if (r.value < (prior?.value ?? m.startReading))
+      throw new ValidationError('Chỉ số mới nhỏ hơn chỉ số cũ', { value: 'Chỉ số mới nhỏ hơn chỉ số cũ' })
     await tx
       .insert(meterReadings)
       .values({ meterId: m.id, period: date.slice(0, 7), readOn: date, value: r.value, kind: 'handover' })
@@ -332,6 +354,7 @@ async function recordReadings(
         set: { value: r.value, updatedAt: new Date() },
       })
   }
+  return openings
 }
 async function newHandover(tx: DB, leaseId: string, roomId: string, kind: 'check_in' | 'check_out', date: string) {
   const [h] = await tx.insert(handovers).values({ leaseId, roomId, kind, date }).returning()
@@ -617,22 +640,9 @@ export async function createTermination(
       .limit(1)
     if (dup) throw new ValidationError('Hợp đồng đã có phụ lục thanh lý')
     const versionId = await captureContractVersion(tx, ctx, 'lease', leaseId, 'termination')
-    // Thanh lý ngay ngày bắt đầu: tiền điện nước tính từ chỉ số đầu hợp đồng (cùng ngày) đến chỉ số chốt
     const linkedIds = await linkedMeterIdsForLease(tx, leaseId)
-    const startReadings =
-      l.startDate === data.endDate && linkedIds.size
-        ? await tx
-            .select()
-            .from(meterReadings)
-            .where(
-              and(
-                inArray(meterReadings.meterId, [...linkedIds]),
-                eq(meterReadings.readOn, data.endDate),
-                eq(meterReadings.kind, 'handover'),
-              ),
-            )
-        : []
-    await recordReadings(tx, [l.roomId], data.endDate, data.readings, linkedIds, 'termination')
+    // Số đầu đã dùng cho từng đồng hồ (người nhập sửa được; mặc định là lần chốt gần nhất)
+    const openings = await recordReadings(tx, [l.roomId], data.endDate, data.readings, linkedIds, 'termination')
     await recordTerminationReadings(
       tx,
       versionId,
@@ -825,17 +835,19 @@ export async function createTermination(
         startDate: base.startDate,
       })
       if (u.missing.length) throw new ValidationError(`Chưa có chỉ số ${f.name} để tính tiền`)
-      let usage = u.usage
+      // Số đầu người nhập thay cho số đầu tự lấy ở đoạn cuối của đồng hồ đó; chưa có đoạn nào (vd. thanh lý ngay ngày bắt đầu) thì tính thẳng từ số đầu đến số cuối
       let segments = u.segments
-      // Thanh lý trong ngày bắt đầu: không còn ngày nào sau ngày bắt đầu nên tính thẳng từ chỉ số đầu đến chỉ số chốt
-      const startReading = startReadings.find((r) => r.meterId === linked.id)
-      const endValue = data.readings.find((r) => r.meterId === linked.id)?.value
-      if (startReading && endValue !== undefined) {
-        if (endValue < startReading.value)
-          throw new ValidationError('Chỉ số mới nhỏ hơn chỉ số cũ', { value: 'Chỉ số mới nhỏ hơn chỉ số cũ' })
-        usage = endValue - startReading.value
-        segments = [{ meterId: linked.id, start: startReading.value, end: endValue }]
+      for (const r of data.readings) {
+        const opening = openings.get(r.meterId)
+        if (opening === undefined || (r.meterId !== linked.id && !segments.some((x) => x.meterId === r.meterId)))
+          continue
+        const last = segments.map((x) => x.meterId).lastIndexOf(r.meterId)
+        segments =
+          last >= 0
+            ? segments.map((x, i) => (i === last ? { ...x, start: opening } : x))
+            : [...segments, { meterId: r.meterId, start: opening, end: r.value }]
       }
+      const usage = segments.reduce((n, x) => n + Math.max(x.end - x.start, 0), 0)
       meterFees.push({ leaseFeeId: f.leaseFeeId!, name: f.name, unit: f.unit, usage, unitPrice: f.unitPrice, segments })
     }
     const built = buildTerminationInvoice({
@@ -1186,7 +1198,12 @@ export async function addendumFormData(db: DB, ctx: AccessContext, leaseId: stri
     .where(and(inArray(meters.roomId, ids), isNull(meters.removedOn)))
   const readingRows = meterRows.length
     ? await db
-        .select({ meterId: meterReadings.meterId, value: meterReadings.value, readOn: meterReadings.readOn })
+        .select({
+          meterId: meterReadings.meterId,
+          value: meterReadings.value,
+          readOn: meterReadings.readOn,
+          opening: meterReadings.opening,
+        })
         .from(meterReadings)
         .where(
           inArray(
@@ -1196,11 +1213,24 @@ export async function addendumFormData(db: DB, ctx: AccessContext, leaseId: stri
         )
     : []
   const latestByMeter = new Map<string, { value: number; readOn: string | null }>()
-  for (const r of readingRows) {
-    const prev = latestByMeter.get(r.meterId)
-    if (!prev || (prev.readOn ?? '') < r.readOn) {
-      latestByMeter.set(r.meterId, { value: r.value, readOn: r.readOn })
-    }
+  // 3 lần chốt gần nhất (mới nhất trước) để tham khảo; cùng ngày thì số lớn hơn là lần sau
+  const recentByMeter = new Map<string, { value: number; readOn: string | null; opening: number | null }[]>()
+  const byMeter = new Map<string, typeof readingRows>()
+  for (const r of readingRows) byMeter.set(r.meterId, [...(byMeter.get(r.meterId) ?? []), r])
+  for (const [meterId, rows] of byMeter) {
+    const newestFirst = [...rows].sort((a, b) =>
+      a.readOn < b.readOn ? 1 : a.readOn > b.readOn ? -1 : b.value - a.value,
+    )
+    latestByMeter.set(meterId, { value: newestFirst[0].value, readOn: newestFirst[0].readOn })
+    recentByMeter.set(
+      meterId,
+      newestFirst.slice(0, 3).map((r, i) => ({
+        value: r.value,
+        readOn: r.readOn,
+        // Số đầu đã lưu, hoặc số cuối của lần chốt liền trước nó
+        opening: r.opening ?? newestFirst[i + 1]?.value ?? null,
+      })),
+    )
   }
   const ms = meterRows.map((m) => ({
     meterId: m.id,
@@ -1208,6 +1238,7 @@ export async function addendumFormData(db: DB, ctx: AccessContext, leaseId: stri
     utility: m.utility as 'electric' | 'water',
     serial: m.serial,
     latestReading: latestByMeter.get(m.id) ?? { value: m.startReading, readOn: null },
+    recent: recentByMeter.get(m.id) ?? [],
   }))
   const linkedMeterIds = await linkedMeterIdsForLease(db, leaseId)
   const terminationMeters = ms.filter((m) => m.roomId === row.l.roomId && linkedMeterIds.has(m.meterId))
