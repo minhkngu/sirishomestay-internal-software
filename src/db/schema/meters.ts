@@ -36,7 +36,7 @@ export const meterReadings = pgTable(
       .notNull()
       .references(() => meters.id, { onDelete: 'cascade' }),
     period: text('period').notNull(), // YYYY-MM
-    // monthly: chỉ số ghi hằng tháng (duy nhất theo kỳ); handover: chỉ số chốt giữa tháng khi bàn giao/chuyển phòng (duy nhất theo ngày)
+    // monthly: chỉ số ghi hằng tháng (duy nhất theo kỳ); handover: chỉ số chốt giữa tháng khi bàn giao/chuyển phòng (duy nhất theo ngày); termination: chỉ số chốt khi thanh lý, tính như một lần chốt trong tháng (không ràng buộc duy nhất)
     kind: text('kind').notNull().default('monthly'),
     readOn: date('read_on', { mode: 'string' }).notNull(),
     value: integer('value').notNull(),

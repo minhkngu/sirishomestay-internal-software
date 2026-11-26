@@ -260,11 +260,17 @@ for (const docType of ['handover_check_in', 'handover_check_out'] as const) {
     const [fac] = await db.select().from(facilities).where(eq(facilities.id, room.facilityId))
     // Chỉ số chốt trong ngày bàn giao (thanh lý ghi chỉ số cuối ở ngày này)
     const handoverReadings = await db
-      .select({ utility: meters.utility, serial: meters.serial, value: meterReadings.value })
+      .select({ meterId: meters.id, utility: meters.utility, serial: meters.serial, value: meterReadings.value })
       .from(meterReadings)
       .innerJoin(meters, eq(meters.id, meterReadings.meterId))
-      .where(and(eq(meters.roomId, h.roomId), eq(meterReadings.readOn, h.date), eq(meterReadings.kind, 'handover')))
-      .orderBy(asc(meters.utility), asc(meters.serial))
+      .where(
+        and(
+          eq(meters.roomId, h.roomId),
+          eq(meterReadings.readOn, h.date),
+          inArray(meterReadings.kind, ['handover', 'termination']),
+        ),
+      )
+      .orderBy(asc(meters.utility), asc(meters.serial), asc(meterReadings.value))
     return {
       facilityId: room.facilityId,
       baseName: `${h.kind === 'check_in' ? 'check-in' : 'check-out'}-${room.code}-${h.date}`,
@@ -300,7 +306,8 @@ for (const docType of ['handover_check_in', 'handover_check_out'] as const) {
                 : i.condition,
             penalty: i.penalty,
           })),
-          readings: handoverReadings.map((r) => ({
+          // Cùng đồng hồ có cả chỉ số đầu và chỉ số chốt trong ngày thì lấy số lớn hơn (lần chốt sau)
+          readings: [...new Map(handoverReadings.map((r) => [r.meterId, r])).values()].map((r) => ({
             kind:
               r.utility === 'electric'
                 ? ('electric' as const)

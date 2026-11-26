@@ -80,7 +80,7 @@ export function ReadingHistory({
   const liveEditError = (() => {
     if (!editing) return ''
     if (value.trim() !== '' && !/^\d+$/.test(value.trim())) return 'Nhập số cuối kỳ là số nguyên không âm'
-    const handover = editing.kind === 'handover'
+    const handover = editing.kind !== 'monthly'
     if (!handover && openValue.trim() !== '' && !/^\d+$/.test(openValue.trim())) {
       return 'Nhập số đầu kỳ là số nguyên không âm'
     }
@@ -96,7 +96,7 @@ export function ReadingHistory({
       setError('Nhập số cuối kỳ là số nguyên không âm')
       return
     }
-    const handover = editing.kind === 'handover'
+    const handover = editing.kind !== 'monthly'
     if (!handover && !/^\d+$/.test(openValue.trim())) {
       setError('Nhập số đầu kỳ là số nguyên không âm')
       return
@@ -106,7 +106,7 @@ export function ReadingHistory({
       const r = await updateMeterReadingAction(editing.id, {
         value: Number(value),
         readOn,
-        ...(editing.kind !== 'handover' && Number(openValue) !== editing.opening ? { opening: Number(openValue) } : {}),
+        ...(editing.kind === 'monthly' && Number(openValue) !== editing.opening ? { opening: Number(openValue) } : {}),
       })
       if (!r.ok) {
         setError(r.error)
@@ -139,6 +139,11 @@ export function ReadingHistory({
         {r.kind === 'handover' && (
           <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
             chỉ số bàn giao
+          </span>
+        )}
+        {r.kind === 'termination' && (
+          <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
+            chốt thanh lý
           </span>
         )}
       </div>
@@ -304,7 +309,7 @@ export function ReadingHistory({
           size="sm"
         >
           <div className="space-y-3">
-            {editing.kind !== 'handover' && (
+            {editing.kind === 'monthly' && (
               <div className="space-y-1.5">
                 <Label htmlFor="history-open">Số đầu kỳ</Label>
                 <Input
@@ -317,7 +322,7 @@ export function ReadingHistory({
               </div>
             )}
             <div className="space-y-1.5">
-              <Label htmlFor="history-value">{editing.kind === 'handover' ? 'Chỉ số ban đầu' : 'Số cuối kỳ'}</Label>
+              <Label htmlFor="history-value">{editing.kind !== 'monthly' ? 'Chỉ số ban đầu' : 'Số cuối kỳ'}</Label>
               <Input
                 id="history-value"
                 inputMode="numeric"

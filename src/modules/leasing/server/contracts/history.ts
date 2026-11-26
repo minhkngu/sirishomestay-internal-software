@@ -91,7 +91,7 @@ export async function recordTerminationReadings(
     ? await tx.select().from(meterReadings).where(inArray(meterReadings.meterId, meterIds))
     : []
   const changes = after
-    .filter((row) => row.kind === 'handover' && row.readOn === date)
+    .filter((row) => row.kind === 'termination' && row.readOn === date)
     .map((row) => ({ after: row, before: snapshot.meterReadings.find((old) => old.id === row.id) ?? null }))
   await tx
     .update(contractVersions)

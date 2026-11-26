@@ -80,7 +80,8 @@ export type MeterReading = {
   period: string
   readOn: ISODate
   value: number
-  kind?: 'monthly' | 'handover'
+  /** `termination`: chỉ số chốt khi thanh lý, tính như một lần chốt trong tháng (có nhãn để phân biệt). */
+  kind?: 'monthly' | 'handover' | 'termination'
   /** Số đầu kỳ riêng của lần ghi; không có thì lấy theo lần ghi liền trước. */ opening?: number | null
 }
 

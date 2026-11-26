@@ -297,8 +297,8 @@ async function recordReadings(
   date: string,
   input: { meterId: string; value: number }[],
   onlyMeterIds?: Set<string>,
-  /** Đồng hồ giữ nguyên chỉ số bàn giao đã có cùng ngày (vd. chỉ số đầu hợp đồng khi thanh lý trong ngày bắt đầu): vẫn kiểm tra, không ghi đè. */
-  keepExisting?: Set<string>,
+  /** `termination`: chốt thanh lý, thêm một lần chốt riêng, không ghi đè chỉ số bàn giao cùng ngày. */
+  kind: 'handover' | 'termination' = 'handover',
 ) {
   const needed = (await Promise.all(roomIds.map((r) => activeMeters(tx, r))))
     .flat()
@@ -317,7 +317,12 @@ async function recordReadings(
       .sort((a, b) => (a.readOn < b.readOn ? 1 : -1))[0]
     if (r.value < (prior?.value ?? m.startReading))
       throw new ValidationError('Chỉ số mới nhỏ hơn chỉ số cũ', { value: 'Chỉ số mới nhỏ hơn chỉ số cũ' })
-    if (keepExisting?.has(m.id)) continue
+    if (kind === 'termination') {
+      await tx
+        .insert(meterReadings)
+        .values({ meterId: m.id, period: date.slice(0, 7), readOn: date, value: r.value, kind })
+      continue
+    }
     await tx
       .insert(meterReadings)
       .values({ meterId: m.id, period: date.slice(0, 7), readOn: date, value: r.value, kind: 'handover' })
@@ -612,7 +617,7 @@ export async function createTermination(
       .limit(1)
     if (dup) throw new ValidationError('Hợp đồng đã có phụ lục thanh lý')
     const versionId = await captureContractVersion(tx, ctx, 'lease', leaseId, 'termination')
-    // Thanh lý ngay ngày bắt đầu: chỉ số đầu hợp đồng nằm đúng ngày này, giữ nguyên để làm chỉ số đầu khi tính điện nước
+    // Thanh lý ngay ngày bắt đầu: tiền điện nước tính từ chỉ số đầu hợp đồng (cùng ngày) đến chỉ số chốt
     const linkedIds = await linkedMeterIdsForLease(tx, leaseId)
     const startReadings =
       l.startDate === data.endDate && linkedIds.size
@@ -627,8 +632,7 @@ export async function createTermination(
               ),
             )
         : []
-    const keepStartReadings = new Set(startReadings.map((r) => r.meterId))
-    await recordReadings(tx, [l.roomId], data.endDate, data.readings, linkedIds, keepStartReadings)
+    await recordReadings(tx, [l.roomId], data.endDate, data.readings, linkedIds, 'termination')
     await recordTerminationReadings(
       tx,
       versionId,
@@ -824,9 +828,7 @@ export async function createTermination(
       let usage = u.usage
       let segments = u.segments
       // Thanh lý trong ngày bắt đầu: không còn ngày nào sau ngày bắt đầu nên tính thẳng từ chỉ số đầu đến chỉ số chốt
-      const startReading = keepStartReadings.has(linked.id)
-        ? startReadings.find((r) => r.meterId === linked.id)
-        : undefined
+      const startReading = startReadings.find((r) => r.meterId === linked.id)
       const endValue = data.readings.find((r) => r.meterId === linked.id)?.value
       if (startReading && endValue !== undefined) {
         if (endValue < startReading.value)

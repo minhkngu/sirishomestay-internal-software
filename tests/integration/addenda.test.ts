@@ -186,8 +186,11 @@ describe('phụ lục hợp đồng', () => {
         meta: { segments: [{ meterId: m.id, start: 2133, end: 2140 }] },
       })
       const kept = await db.select().from(meterReadings).where(eq(meterReadings.meterId, m.id))
-      expect(kept).toHaveLength(1)
-      expect(kept[0].value).toBe(2133)
+      // Chỉ số đầu giữ nguyên; chỉ số chốt thanh lý là một lần chốt riêng cùng ngày
+      expect(kept.map((x) => [x.kind, x.value]).sort()).toEqual([
+        ['handover', 2133],
+        ['termination', 2140],
+      ])
     })
 
     it('dòng phí đồng hồ của hoá đơn thanh lý nháp sửa được (hoá đơn tháng thì bị khoá)', async () => {
