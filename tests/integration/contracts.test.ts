@@ -738,16 +738,26 @@ describe('contracts', () => {
     expect(await db.select().from(leases)).toHaveLength(1)
   })
 
-  it('từ chối thiếu đồng hồ, thiếu chỉ số đầu hoặc chỉ số thấp hơn chỉ số gần nhất; hợp đồng được hoàn tác', async () => {
+  it('từ chối thiếu đồng hồ hoặc thiếu chỉ số đầu; hợp đồng được hoàn tác', async () => {
     await updateFeeType(db, admin, feePerson, { name: 'ABC', quantityFrom: 'meter' })
     const meter = await mkMeter(r301, 500)
     await expect(createLease(db, lan(), snapshot([meterFee(undefined)]))).rejects.toThrow('Chọn đồng hồ cho phí')
-    for (const initialReading of [undefined, -1, 1.5, 100])
+    for (const initialReading of [undefined, -1, 1.5])
       await expect(createLease(db, lan(), snapshot([meterFee(meter.id, { initialReading })]))).rejects.toThrow(
         ValidationError,
       )
     expect(await db.select().from(leases)).toHaveLength(0)
     expect(await db.select().from(meterReadings)).toHaveLength(0)
+  })
+
+  it('chỉ số đầu độc lập với các lần chốt trước: nhập thấp hơn chỉ số thanh lý cũ vẫn nhận', async () => {
+    await updateFeeType(db, admin, feePerson, { name: 'ABC', quantityFrom: 'meter' })
+    const meter = await mkMeter(r301)
+    await db
+      .insert(meterReadings)
+      .values({ meterId: meter.id, period: '2026-09', kind: 'termination', readOn: '2026-09-20', value: 2140 })
+    await createLease(db, lan(), snapshot([meterFee(meter.id, { initialReading: 2130 })]))
+    expect((await db.select().from(leases)).length).toBe(1)
   })
 
   it('ghi nhật ký khi gắn đồng hồ có sẵn cho phí hợp đồng', async () => {

@@ -593,11 +593,7 @@ export async function ensureFeeMeter(
     .where(and(eq(leaseFeeMeters.meterId, meter.id), eq(leases.status, 'active')))
   if (busy) throw new ValidationError('Đồng hồ đang gắn với phí của hợp đồng khác')
   const readings = await tx.select().from(meterReadings).where(eq(meterReadings.meterId, meter.id))
-  const latest = readings.reduce((max, r) => Math.max(max, r.value), meter.startReading)
-  if (input.initialReading! < latest)
-    throw new ValidationError(`Chỉ số ban đầu không được nhỏ hơn chỉ số gần nhất (${latest})`, {
-      initialReading: `Không nhỏ hơn ${latest}`,
-    })
+  // Chỉ số ban đầu độc lập với mọi lần chốt khác: không ràng buộc với số trước hay số sau (cùng nguyên tắc với updateLeaseFeeMeter)
   // Chỉ số bàn giao cùng ngày (vd. chốt khi thanh lý hợp đồng trước) được nhận lại nếu trùng giá trị
   const sameDay = readings.find((r) => r.kind === 'handover' && r.readOn === input.installedOn)
   if (sameDay && sameDay.value !== input.initialReading)
