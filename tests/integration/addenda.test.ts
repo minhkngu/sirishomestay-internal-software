@@ -18,6 +18,7 @@ import {
   leases,
   meterReadings,
   meters,
+  oneOffCharges,
   pendingAdjustments,
   rooms,
   tenants,
@@ -214,6 +215,29 @@ describe('phụ lục hợp đồng', () => {
         ),
       ).toMatchObject({ quantity: 50, amount: 175000 })
     })
+  })
+
+  it('bỏ dòng phạt khỏi hoá đơn thanh lý nháp thì xoá luôn khoản phạt, không dồn sang hoá đơn khác', async () => {
+    const r = await createTermination(db, ctx(), leaseId, {
+      endDate: '2026-12-10',
+      forfeit: { mode: 'none' },
+      readings: [],
+      penalties: [{ description: 'Phạt thử', amount: 100000 }],
+    })
+    expect(await db.select().from(oneOffCharges).where(eq(oneOffCharges.leaseId, leaseId))).toHaveLength(1)
+    const rows = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, r.invoice!.id))
+    const kept = rows
+      .filter((l) => typeof (l.meta as { oneOffId?: unknown } | null)?.oneOffId !== 'string')
+      .map((l) => ({
+        id: l.id,
+        type: l.type,
+        description: l.description,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+        meta: l.meta,
+      }))
+    await updateLines(db, ctx(), r.invoice!.id, kept)
+    expect(await db.select().from(oneOffCharges).where(eq(oneOffCharges.leaseId, leaseId))).toHaveLength(0)
   })
 
   it('ngữ cảnh phụ lục dùng giá phí riêng theo toà hợp đồng', async () => {

@@ -1361,6 +1361,8 @@ export async function deleteInvoice(db: DB, ctx: AccessContext, id: string): Pro
     const inv = await getInvoice(tx, ctx, id)
     if ((await tx.select({ id: payments.id }).from(payments).where(eq(payments.invoiceId, id))).length)
       throw new ValidationError('Gỡ các khoản đã thu trước khi xoá')
+    if (inv.kind === 'termination')
+      await tx.delete(oneOffCharges).where(and(eq(oneOffCharges.invoiceId, id), eq(oneOffCharges.kind, 'penalty')))
     await tx.update(oneOffCharges).set({ invoiceId: null }).where(eq(oneOffCharges.invoiceId, id))
     await tx.update(pendingAdjustments).set({ invoiceId: null }).where(eq(pendingAdjustments.invoiceId, id))
     await tx.delete(invoices).where(eq(invoices.id, id))
@@ -1671,11 +1673,19 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
     for (const l of old) {
       const m = (l.meta ?? {}) as Record<string, unknown>
       if (keep.has(JSON.stringify(m))) continue
-      if (typeof m.oneOffId === 'string')
+      if (typeof m.oneOffId === 'string') {
+        // Phạt của hoá đơn thanh lý chỉ thuộc hoá đơn đó: bỏ dòng thì xoá luôn, không để dồn sang hoá đơn khác
+        if (inv.kind === 'termination')
+          await tx
+            .delete(oneOffCharges)
+            .where(
+              and(eq(oneOffCharges.id, m.oneOffId), eq(oneOffCharges.invoiceId, id), eq(oneOffCharges.kind, 'penalty')),
+            )
         await tx
           .update(oneOffCharges)
           .set({ invoiceId: null })
           .where(and(eq(oneOffCharges.id, m.oneOffId), eq(oneOffCharges.invoiceId, id)))
+      }
       if (typeof m.pendingId === 'string')
         await tx
           .update(pendingAdjustments)

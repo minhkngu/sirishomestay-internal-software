@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation'
 import { ArrowLeft, Calendar, FileText } from 'lucide-react'
 import { can } from '@/domain/access'
 import {
-  listOneOffs,
   INVOICE_STATUS_LABELS,
   listHandovers,
   getDepositContract,
@@ -12,7 +11,7 @@ import {
   listInvoices,
   listAddenda,
 } from '@/modules/leasing'
-import { OneOffDialog, DepositLedger, ExportMenu, SignStatus, AddendaList } from '@/modules/leasing/ui'
+import { DepositLedger, ExportMenu, SignStatus, AddendaList } from '@/modules/leasing/ui'
 import { buttonVariants } from '@/components/ui/button'
 import { db } from '@/db/client'
 import { NotFoundError } from '@/domain/errors'
@@ -355,7 +354,6 @@ export default async function ContractDetail({ id }: { id: string }) {
   const contractInvoices = billing
     ? (await listInvoices(db, ctx, { facilityId: lease.facilityId })).filter((invoice) => invoice.leaseId === lease.id)
     : []
-  const charges = billing ? await listOneOffs(db, ctx, lease.id) : []
   const handoverList = await listHandovers(db, ctx, lease.id)
   const addendaList = await listAddenda(db, ctx, lease.id)
   const [templates, exports, photos, meterInitials] = await Promise.all([
@@ -584,11 +582,6 @@ export default async function ContractDetail({ id }: { id: string }) {
               </ul>
             ) : (
               <p className="py-2 text-sm text-muted-foreground">Không có phụ phí dịch vụ riêng.</p>
-            )}
-            {billing && charges.length > 0 && (
-              <div className="mt-3 border-t border-border/60 pt-3">
-                <OneOffDialog leaseId={lease.id} charges={charges} readOnly />
-              </div>
             )}
           </Panel>
 
