@@ -1,9 +1,8 @@
-import { and, eq, sql } from 'drizzle-orm'
-import { files, handovers, leases } from '@/db'
+import { eq } from 'drizzle-orm'
+import { handovers, leases } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
 import { NotFoundError } from '@/domain/errors'
-import { deleteFile } from '@/modules/platform'
 import type { StorageAdapter } from '@/modules/platform'
 import { exportDocument } from '@/modules/documents'
 
@@ -42,12 +41,6 @@ export async function syncContractDocuments(
   const warnings: string[] = []
   for (const job of jobs) {
     try {
-      const old = await db
-        .select({ id: files.id })
-        .from(files)
-        .where(
-          and(eq(files.ownerType, 'export'), eq(files.ownerId, job.entityId), sql`${files.meta}->>'auto' = 'true'`),
-        )
       await exportDocument(db, ctx, storage, {
         docType: job.docType,
         entityId: job.entityId,
@@ -55,7 +48,6 @@ export async function syncContractDocuments(
         format: 'pdf',
         auto: true,
       })
-      for (const f of old) await deleteFile(db, ctx, storage, f.id)
     } catch (e) {
       warnings.push(`Chưa tạo được bản PDF của ${job.label}: ${e instanceof Error ? e.message : 'lỗi không xác định'}`)
     }

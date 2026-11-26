@@ -1,4 +1,4 @@
-import { and, asc, eq, getTableColumns, isNotNull, ne } from 'drizzle-orm'
+import { and, asc, eq, getTableColumns, isNotNull, ne, sql } from 'drizzle-orm'
 import { docTemplates, files, leases } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
@@ -12,7 +12,7 @@ import {
   type DocType,
 } from '@/domain/template-fields'
 import { renderTemplate, type TemplateStyle } from '../../domain/doc-template'
-import { recordAudit, fileAccessPermission } from '@/modules/platform'
+import { deleteFile, recordAudit, fileAccessPermission } from '@/modules/platform'
 
 import { assertFormatAllowed, convertPdfToPng, FORMAT_EXT, type ExportFormat } from '../convert'
 import type { StorageAdapter } from '@/modules/platform'
@@ -436,5 +436,19 @@ export async function exportDocument(
       summary: `Xuất giấy tờ ${baseName}.${ext}`,
     })
   })
+  // Chỉ giữ bản xuất mới nhất của cùng giấy tờ, cùng định dạng; dọn lỗi thì bỏ qua để không làm hỏng lần xuất vừa thành công
+  const older = await db
+    .select({ id: files.id })
+    .from(files)
+    .where(
+      and(
+        eq(files.ownerType, 'export'),
+        eq(files.ownerId, input.entityId),
+        eq(files.contentType, mime),
+        sql`${files.meta}->>'docType' = ${input.docType}`,
+        ne(files.id, id),
+      ),
+    )
+  for (const f of older) await deleteFile(db, ctx, storage, f.id).catch(() => undefined)
   return { fileId: id, warnings }
 }
