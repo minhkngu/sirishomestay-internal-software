@@ -18,7 +18,6 @@ export { getIncident, incidentsForAsset, listAssignees, listIncidents } from './
 export {
   getInvoiceDetail,
   listInvoices,
-  listTerminationReadingRecords,
   nextInvoiceCode,
   previewNewInvoice,
   removePayment,

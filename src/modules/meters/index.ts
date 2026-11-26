@@ -12,8 +12,6 @@ export {
   applyReadings,
   setLeaseInitialReading,
   setOpeningValue,
-  terminationHistoryRows,
 } from './server/meters/service'
-export type { TerminationReadingRecord } from './server/meters/service'
 export { listMeterTypes } from './server/meter-types/service'
 export { readingMeterTypes, sortMeterTypes } from './domain/meter-types'

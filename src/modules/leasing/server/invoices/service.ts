@@ -54,7 +54,6 @@ import {
   resolveInvoiceTemplate,
 } from '@/modules/documents'
 import { applyReadings, setLeaseInitialReading, setOpeningValue } from '@/modules/meters'
-import type { TerminationReadingRecord } from '@/modules/meters'
 import { resolveBankAccount } from '@/domain/vietqr'
 import { PAYMENT_METHOD_LABELS, type PaymentMethod } from '@/domain/payment-labels'
 
@@ -2297,35 +2296,3 @@ registerExportOwnerResolver(async (db, id) => {
   if (!pay) throw new NotFoundError()
   return { facilityId: pay.f }
 })
-
-/** Chỉ số đầu, cuối đã lưu trên dòng điện nước của các hoá đơn thanh lý trong toà, để trang Chỉ số ghi nhận. Chỉ để xem, không đổi chỉ số tính tiền. */
-export async function listTerminationReadingRecords(
-  db: DB,
-  ctx: AccessContext,
-  facilityId: string,
-): Promise<TerminationReadingRecord[]> {
-  assertCan(ctx, 'meters', facilityId)
-  const rows = await db
-    .select({ id: invoiceLines.id, meta: invoiceLines.meta, readOn: invoices.periodEnd })
-    .from(invoiceLines)
-    .innerJoin(invoices, eq(invoices.id, invoiceLines.invoiceId))
-    .where(and(eq(invoices.facilityId, facilityId), eq(invoices.kind, 'termination')))
-  return rows.flatMap((row) => {
-    const segments = (row.meta as { segments?: { meterId?: unknown; start?: unknown; end?: unknown }[] } | null)
-      ?.segments
-    if (!Array.isArray(segments)) return []
-    return segments.flatMap((x, index) =>
-      typeof x.meterId === 'string' && typeof x.start === 'number' && typeof x.end === 'number'
-        ? [
-            {
-              id: `termination:${row.id}:${index}`,
-              meterId: x.meterId,
-              readOn: row.readOn,
-              opening: x.start,
-              closing: x.end,
-            },
-          ]
-        : [],
-    )
-  })
-}

@@ -35,12 +35,7 @@ import {
   previewAddendum,
 } from '@/modules/leasing/server/addenda/service'
 import { saveHandover, startHandover } from '@/modules/leasing/server/handovers/service'
-import {
-  approveInvoice,
-  getInvoiceDetail,
-  listTerminationReadingRecords,
-  updateLines,
-} from '@/modules/leasing/server/invoices/service'
+import { approveInvoice, getInvoiceDetail, updateLines } from '@/modules/leasing/server/invoices/service'
 import { createTestDb } from '../helpers/db'
 
 const context = (permissions: Permission[], facilityId: string): AccessContext => ({
@@ -193,10 +188,6 @@ describe('phụ lục hợp đồng', () => {
       const kept = await db.select().from(meterReadings).where(eq(meterReadings.meterId, m.id))
       expect(kept).toHaveLength(1)
       expect(kept[0].value).toBe(2133)
-      // Trang Chỉ số ghi nhận 2133 → 2140 (thanh lý) dù không lưu thêm chỉ số bàn giao
-      const records = await listTerminationReadingRecords(db, context(['meters'], facilityId), facilityId)
-      expect(records).toHaveLength(1)
-      expect(records[0]).toMatchObject({ meterId: m.id, readOn: '2026-11-28', opening: 2133, closing: 2140 })
     })
 
     it('dòng phí đồng hồ của hoá đơn thanh lý nháp sửa được (hoá đơn tháng thì bị khoá)', async () => {

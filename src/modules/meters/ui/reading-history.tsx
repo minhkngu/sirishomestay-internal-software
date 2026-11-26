@@ -42,7 +42,7 @@ export function ReadingHistory({
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
-  const selectable = rows.filter((r) => r.kind !== 'termination')
+  const selectable = rows
   const chosen = selectable.filter((r) => selected.has(r.id))
   const allChosen = selectable.length > 0 && chosen.length === selectable.length
   const toggle = (id: string) =>
@@ -141,35 +141,27 @@ export function ReadingHistory({
             chỉ số bàn giao
           </span>
         )}
-        {r.kind === 'termination' && (
-          <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
-            chốt thanh lý
-          </span>
-        )}
       </div>
       {r.meterCode && <div className="text-[11px] text-muted-foreground">{r.meterCode}</div>}
     </>
   )
   const roomCell = (r: ReadingHistoryRow) => `Phòng ${r.roomCode} · ${facilityName}`
-  const actions = (r: ReadingHistoryRow) =>
-    r.kind === 'termination' ? (
-      <div className="text-right text-[11px] text-muted-foreground">Ghi nhận thanh lý</div>
-    ) : (
-      <div className="flex justify-end gap-1.5">
-        <Button size="sm" variant="outline" disabled={pending} onClick={() => openEdit(r)}>
-          Sửa
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={pending}
-          className="border-rose-200/80 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
-          onClick={() => setDeleting(r)}
-        >
-          Xoá
-        </Button>
-      </div>
-    )
+  const actions = (r: ReadingHistoryRow) => (
+    <div className="flex justify-end gap-1.5">
+      <Button size="sm" variant="outline" disabled={pending} onClick={() => openEdit(r)}>
+        Sửa
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={pending}
+        className="border-rose-200/80 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
+        onClick={() => setDeleting(r)}
+      >
+        Xoá
+      </Button>
+    </div>
+  )
 
   if (rows.length === 0) {
     return (
@@ -222,7 +214,6 @@ export function ReadingHistory({
                     aria-label={`Chọn ${r.meterName} phòng ${r.roomCode} tháng ${monthLabel(r.period)}`}
                     className="size-3.5 rounded border-border text-primary focus:ring-primary/30"
                     checked={selected.has(r.id)}
-                    disabled={r.kind === 'termination'}
                     onChange={() => toggle(r.id)}
                   />
                 </td>
@@ -246,7 +237,6 @@ export function ReadingHistory({
                 aria-label={`Chọn ${r.meterName} phòng ${r.roomCode} tháng ${monthLabel(r.period)}`}
                 className="mt-1 size-3.5 rounded border-border text-primary focus:ring-primary/30"
                 checked={selected.has(r.id)}
-                disabled={r.kind === 'termination'}
                 onChange={() => toggle(r.id)}
               />
               <div className="min-w-0 flex-1">
