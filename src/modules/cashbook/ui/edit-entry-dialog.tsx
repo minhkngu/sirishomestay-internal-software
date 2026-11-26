@@ -26,7 +26,7 @@ export function EditEntryDialog({
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
-  const [amount, setAmount] = useState(String(row.amount))
+  const [amount, setAmount] = useState(String(row.fullAmount ?? row.amount))
   const [date, setDate] = useState(row.date)
   const [method, setMethod] = useState(row.method ?? 'cash')
   const [note, setNote] = useState(row.rawNote ?? row.note)

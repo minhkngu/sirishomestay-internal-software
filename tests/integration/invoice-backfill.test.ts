@@ -202,6 +202,11 @@ describe('tiền cọc còn thiếu trên hoá đơn', () => {
     const part = await addPayment(db, ctx(), inv.id, { paidOn: '2026-12-02', amount: 1000, method: 'cash' })
     expect((await entry()).status).toBe('pending')
     await removePayment(db, ctx(), part.id)
+    // Thu đúng phần cọc (chưa thu đủ hoá đơn) cũng hoàn tất dòng thu cọc: tiền thu trả cọc trước
+    const depositOnly = await addPayment(db, ctx(), inv.id, { paidOn: '2026-12-02', amount: 6000000, method: 'cash' })
+    expect(await entry()).toMatchObject({ status: 'done', date: '2026-12-02', method: 'cash' })
+    await removePayment(db, ctx(), depositOnly.id)
+    expect((await entry()).status).toBe('pending')
     const full = await addPayment(db, ctx(), inv.id, { paidOn: '2026-12-03', amount: total, method: 'transfer' })
     expect(await entry()).toMatchObject({ status: 'done', date: '2026-12-03', method: 'transfer' })
     expect((await entry()).note).toContain(inv.code)
