@@ -125,26 +125,52 @@ export function ContractRowActions({
   return (
     <>
       {presentation === 'row' ? (
-        <IconTipGroup>
-          <div className="flex flex-nowrap items-center justify-start gap-0.5">
-            {available.map((item) => (
-              <IconTip key={item.key} label={item.label}>
+        <div className="flex items-center gap-0.5">
+          {canEdit && (
+            <IconTipGroup>
+              <IconTip label="Sửa hợp đồng">
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon-xs"
-                  aria-label={item.label}
+                  aria-label="Sửa hợp đồng"
                   className="text-muted-foreground hover:text-foreground"
-                  onPointerEnter={item.key === 'edit' ? prefetch : undefined}
-                  onFocus={item.key === 'edit' ? prefetch : undefined}
+                  onPointerEnter={prefetch}
+                  onFocus={prefetch}
+                  onClick={() => open('edit')}
+                >
+                  <FilePenLine className="size-4" />
+                </Button>
+              </IconTip>
+            </IconTipGroup>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label="Thao tác khác"
+              className={cn(
+                buttonVariants({ variant: 'ghost', size: 'icon-xs' }),
+                'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <MoreHorizontal className="size-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-52">
+              {(canEdit ? rest : available).map((item) => (
+                <DropdownMenuItem
+                  key={item.key}
+                  variant={item.key === 'delete' ? 'destructive' : 'default'}
                   onClick={() => open(item.key)}
                 >
                   <item.icon className="size-4" />
-                </Button>
-              </IconTip>
-            ))}
-          </div>
-        </IconTipGroup>
+                  {item.label}
+                </DropdownMenuItem>
+              ))}
+              {(canEdit ? rest : available).length === 0 && (
+                <DropdownMenuItem disabled>Không có thao tác khác</DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       ) : (
         <div className="flex items-center gap-2">
           {canEdit && (
@@ -302,14 +328,14 @@ export function ContractRowActions({
                   placeholder="Chọn người nhận"
                 />
               </div>
-              <label className="grid gap-1">
+              <label className="grid gap-1.5 text-[13px] font-medium">
                 Ngày hiệu lực
                 <input
                   required
                   type="date"
                   value={date}
                   onChange={(event) => setDate(event.target.value)}
-                  className="h-9 rounded border px-2"
+                  className="h-9 rounded-lg border border-input bg-card px-2.5 text-[13px] font-normal"
                 />
               </label>
               <Button disabled={pending} type="submit">

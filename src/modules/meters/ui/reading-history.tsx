@@ -137,12 +137,12 @@ export function ReadingHistory({
       <div className="text-foreground">
         {r.meterName}
         {r.kind === 'handover' && (
-          <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
+          <span className="ml-1.5 rounded-full bg-muted px-2 py-0.5 text-[11px] font-normal text-muted-foreground">
             chỉ số bàn giao
           </span>
         )}
         {r.kind === 'termination' && (
-          <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
+          <span className="ml-1.5 rounded-full bg-muted px-2 py-0.5 text-[11px] font-normal text-muted-foreground">
             chốt thanh lý
           </span>
         )}

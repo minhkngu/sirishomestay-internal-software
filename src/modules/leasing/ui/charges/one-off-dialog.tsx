@@ -2,6 +2,9 @@
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { FormDialog } from '@/components/form-dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { addOneOffAction, removeOneOffAction } from '../../server/charges/actions'
 import { formatVND } from '@/domain/money'
 import { MoneyInput } from '@/components/ui/money-input'
@@ -23,12 +26,12 @@ export function OneOffDialog({
     <div className="space-y-3">
       {!readOnly && (
         <>
-          <button type="button" className="rounded border px-3 py-2 text-sm" onClick={() => setOpen(true)}>
+          <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
             Thêm phí phát sinh
-          </button>
+          </Button>
           <FormDialog open={open} onOpenChange={setOpen} title="Thêm phí phát sinh" size="sm">
             <form
-              className="grid gap-2"
+              className="space-y-3.5"
               onSubmit={(event) => {
                 event.preventDefault()
                 const form = new FormData(event.currentTarget)
@@ -49,45 +52,51 @@ export function OneOffDialog({
                 })
               }}
             >
-              <label>
-                Mô tả
-                <input name="description" required className="w-full rounded border p-2" />
-              </label>
-              <label>
-                Loại
-                <select name="kind" className="w-full rounded border p-2">
-                  <option value="service">Dịch vụ</option>
-                  <option value="penalty">Phạt</option>
-                </select>
-              </label>
-              <label>
-                Ngày
-                <input type="date" name="date" required className="w-full rounded border p-2" />
-              </label>
-              <label>
-                Số lượng
-                <input
-                  type="number"
-                  name="quantity"
-                  min="0.01"
-                  step="any"
-                  required
-                  className="w-full rounded border p-2"
-                />
-              </label>
-              <label>
-                Đơn giá
-                <MoneyInput
-                  name="unitPrice"
-                  required
-                  value={unitPrice}
-                  onValueChange={setUnitPrice}
-                  className="w-full rounded border p-2"
-                />
-              </label>
-              <button disabled={pending} className="rounded bg-primary px-3 py-2 text-primary-foreground">
-                Lưu
-              </button>
+              <div className="space-y-1.5">
+                <Label htmlFor="oneoff-desc" className="text-[13px] font-medium">
+                  Mô tả
+                </Label>
+                <Input id="oneoff-desc" name="description" required />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="oneoff-kind" className="text-[13px] font-medium">
+                    Loại
+                  </Label>
+                  <select id="oneoff-kind" name="kind" className="w-full">
+                    <option value="service">Dịch vụ</option>
+                    <option value="penalty">Phạt</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="oneoff-date" className="text-[13px] font-medium">
+                    Ngày
+                  </Label>
+                  <Input id="oneoff-date" type="date" name="date" required />
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="oneoff-qty" className="text-[13px] font-medium">
+                    Số lượng
+                  </Label>
+                  <Input id="oneoff-qty" type="number" name="quantity" min="0.01" step="any" required />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="oneoff-price" className="text-[13px] font-medium">
+                    Đơn giá
+                  </Label>
+                  <MoneyInput id="oneoff-price" name="unitPrice" required value={unitPrice} onValueChange={setUnitPrice} />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                  Huỷ
+                </Button>
+                <Button type="submit" disabled={pending}>
+                  Lưu
+                </Button>
+              </div>
             </form>
           </FormDialog>
         </>

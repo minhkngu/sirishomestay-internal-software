@@ -86,7 +86,7 @@ export function RoomIncidentList({ items }: { items: RoomIncidentRow[] }) {
         <Chips value={priority} onChange={setPriority} options={PRIORITY_FILTERS} />
       </div>
       {sorted.length === 0 && <p className="text-xs text-muted-foreground">Không có sự cố khớp bộ lọc.</p>}
-      <ul className="divide-y divide-border/60 rounded-2xl border border-border/80 bg-card shadow-2xs">
+      <ul className="divide-y divide-border/60 rounded-2xl border border-border/80 bg-card">
         {sorted.map((i) => {
           const st = STATUS[i.status] ?? STATUS.new
           return (

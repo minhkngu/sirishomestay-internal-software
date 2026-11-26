@@ -26,9 +26,9 @@ export function ParamChips({
             aria-pressed={on}
             onClick={() => setListParams({ [param]: item.value === defaultValue ? null : item.value })}
             className={cn(
-              'inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium whitespace-nowrap shrink-0 transition-all duration-150',
+              'inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-xs font-medium whitespace-nowrap shrink-0 transition-colors duration-150',
               on
-                ? 'border-primary/40 bg-primary/10 text-primary font-semibold shadow-2xs ring-1 ring-primary/25'
+                ? 'border-primary/40 bg-primary/10 text-primary font-semibold'
                 : 'border-border/80 bg-card text-foreground/80 hover:border-border hover:bg-muted/60 hover:text-foreground',
             )}
           >

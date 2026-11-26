@@ -45,7 +45,7 @@ export function InvoiceFeeQuantities({ invoiceId, fees }: { invoiceId: string; f
             type="number"
             min="0"
             step="1"
-            className="w-24 rounded border p-2"
+            className="h-9 w-24 rounded-lg border border-input bg-card px-2.5 text-right text-[13px] tabular-nums outline-none focus:border-ring focus:ring-2 focus:ring-ring/20"
             value={values[f.id]}
             onChange={(e) => setValues({ ...values, [f.id]: e.target.value })}
           />

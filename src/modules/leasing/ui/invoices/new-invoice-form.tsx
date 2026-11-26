@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { MonthField } from '@/components/month-field'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { listInvoiceableLeasesAction } from '../../server/invoices/actions'
@@ -112,12 +113,15 @@ export function NewInvoiceForm({
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="new-invoice-period">Tháng</Label>
-        <input
+        <MonthField
           id="new-invoice-period"
-          type="month"
+          ariaLabel="Tháng"
           value={period}
-          onChange={(e) => onMonth(e.target.value)}
-          className="h-9 w-full rounded-lg border border-border/80 bg-background px-2 text-sm"
+          onValueChange={onMonth}
+          clearable={false}
+          align="start"
+          placeholder="Chọn tháng"
+          className="w-full"
         />
       </div>
     </div>

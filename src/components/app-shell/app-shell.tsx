@@ -18,18 +18,19 @@ export function AppShell({ children, hrefs, userName, logoutAction }: Props) {
   return (
     <div className="flex min-h-screen flex-col">
       <Topbar onMenu={() => setOpen(true)}>
-        <div className="flex h-8 items-center gap-2 rounded-xl border border-border/80 bg-muted/40 px-2.5">
-          <div className="flex size-5.5 items-center justify-center rounded-lg bg-primary/15 text-[11px] font-bold text-primary">
+        <div className="flex items-center gap-2 text-[13px]">
+          <div className="flex size-6 items-center justify-center rounded-full bg-muted text-xs font-medium text-foreground">
             {(userName || 'U')[0].toUpperCase()}
           </div>
-          <span className="hidden text-xs font-medium text-foreground sm:inline">{userName}</span>
+          <span className="hidden font-medium text-foreground sm:inline">{userName}</span>
         </div>
+        <span className="h-3.5 w-px bg-border/80" aria-hidden="true" />
         <form action={logoutAction}>
           <button
             type="submit"
-            className="flex h-8 items-center gap-1.5 rounded-xl border border-border/80 bg-card px-3 text-xs font-medium text-muted-foreground transition-all hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive active:scale-95 shadow-2xs"
+            className="rounded-md px-2 py-1 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
           >
-            <span>Đăng xuất</span>
+            Đăng xuất
           </button>
         </form>
       </Topbar>
@@ -39,7 +40,7 @@ export function AppShell({ children, hrefs, userName, logoutAction }: Props) {
         </aside>
         {open && (
           <div className="fixed inset-0 z-40 md:hidden" onClick={() => setOpen(false)}>
-            <div className="absolute inset-0 bg-black/30 backdrop-blur-xs" />
+            <div className="absolute inset-0 bg-black/30" />
             <aside
               role="dialog"
               aria-label="Menu"

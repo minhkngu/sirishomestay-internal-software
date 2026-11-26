@@ -3,6 +3,7 @@
 import { EditorContent, useEditor, type Editor } from '@tiptap/react'
 import type { ResolvedPos } from '@tiptap/pm/model'
 import { useMemo, useRef, useState } from 'react'
+import { AlignCenter, AlignJustify, AlignLeft, AlignRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { DocType } from '@/domain/template-fields'
 import { editorExtensions } from './editor-extensions'
@@ -103,19 +104,19 @@ function Toolbar({ editor, groups, qr }: { editor: Editor; groups: FieldGroups; 
       <span className="mx-1 h-5 w-px bg-border" />
       {(
         [
-          ['left', 'Căn trái', '⇤'],
-          ['center', 'Căn giữa', '↔'],
-          ['right', 'Căn phải', '⇥'],
-          ['justify', 'Căn đều', '☰'],
+          ['left', 'Căn trái', AlignLeft],
+          ['center', 'Căn giữa', AlignCenter],
+          ['right', 'Căn phải', AlignRight],
+          ['justify', 'Căn đều', AlignJustify],
         ] as const
-      ).map(([a, label, icon]) => (
+      ).map(([a, label, Icon]) => (
         <Tool
           key={a}
           label={label}
           active={editor.isActive({ textAlign: a })}
           onClick={() => run().setTextAlign(a).run()}
         >
-          {icon}
+          <Icon className="size-3.5" />
         </Tool>
       ))}
       <span className="mx-1 h-5 w-px bg-border" />

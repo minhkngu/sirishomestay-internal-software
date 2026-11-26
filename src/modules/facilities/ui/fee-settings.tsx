@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Pencil, X } from 'lucide-react'
 import { FormDialog } from '@/components/form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -68,27 +69,27 @@ export function FeeSettings({ facilities, units, feeTypes, prices, defaults }: P
                   type="button"
                   aria-label={`Sửa đơn vị ${u.name}`}
                   title="Sửa tên"
-                  className="rounded px-1 text-muted-foreground hover:text-foreground"
+                  className="inline-flex items-center rounded p-0.5 text-muted-foreground hover:text-foreground"
                   onClick={() => {
                     setEditingUnit(u)
                     setRenameValue(u.name)
                   }}
                 >
-                  ✎
+                  <Pencil className="size-3" />
                 </button>
                 <button
                   type="button"
                   aria-label={`Xoá đơn vị ${u.name}`}
                   title="Xoá"
                   disabled={unitEditRun.pending}
-                  className="rounded px-1 text-muted-foreground hover:text-destructive"
+                  className="inline-flex items-center rounded p-0.5 text-muted-foreground hover:text-destructive"
                   onClick={() => {
                     if (!window.confirm(`Xoá đơn vị ${u.name}? Đơn vị đang được loại phí dùng thì không xoá được.`))
                       return
                     unitEditRun.run(() => deleteFeeUnitAction(u.id), 'Đã xoá đơn vị')
                   }}
                 >
-                  ×
+                  <X className="size-3" />
                 </button>
               </span>
             ))}

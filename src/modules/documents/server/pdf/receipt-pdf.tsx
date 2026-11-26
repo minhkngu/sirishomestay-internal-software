@@ -3,10 +3,10 @@ import { formatVND, numberToVietnameseWords } from '@/domain/money'
 import type { ReceiptPdfData } from './types'
 import './fonts'
 const styles = StyleSheet.create({
-  page: { padding: 40, fontFamily: 'BeVietnamPro', color: '#1C2B27', fontSize: 10 },
-  brand: { color: '#0E9F6E', fontWeight: 700, fontSize: 12 },
-  title: { fontWeight: 700, fontSize: 20, marginVertical: 18 },
-  body: { borderTopWidth: 2, borderColor: '#0E9F6E', paddingTop: 15, lineHeight: 2 },
+  page: { padding: 36, fontFamily: 'BeVietnamPro', color: '#161A18', fontSize: 9 },
+  brand: { color: '#0F7652', fontWeight: 700, fontSize: 10.5 },
+  title: { fontWeight: 700, fontSize: 15, marginVertical: 12 },
+  body: { borderTopWidth: 1.2, borderColor: '#0F7652', paddingTop: 12, lineHeight: 1.7 },
 })
 export function ReceiptDocument({ data }: { data: ReceiptPdfData }) {
   return (

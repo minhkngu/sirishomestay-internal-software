@@ -21,30 +21,38 @@ const toIso = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}
 export function DateField({
   id,
   label,
+  ariaLabel,
   value,
   onValueChange,
-  placeholder = 'Chọn ngày',
+  placeholder = 'dd/mm/yyyy',
   error,
   hint,
   className,
+  startYear = 1940,
+  endYear = 2040,
 }: {
   id: string
-  label: string
+  label?: string
+  ariaLabel?: string
   value: string
   onValueChange: (value: string) => void
   placeholder?: string
   error?: React.ReactNode
   hint?: React.ReactNode
   className?: string
+  startYear?: number
+  endYear?: number
 }) {
   const [open, setOpen] = useState(false)
   const selected = value ? fromIso(value) : undefined
 
   return (
     <div className={cn('space-y-1.5', className)}>
-      <Label htmlFor={id} className="text-[13px] font-medium text-foreground">
-        {label}
-      </Label>
+      {label && (
+        <Label htmlFor={id} className="text-[13px] font-medium text-foreground">
+          {label}
+        </Label>
+      )}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
           render={
@@ -52,12 +60,12 @@ export function DateField({
               type="button"
               id={id}
               variant="outline"
-              aria-label={label}
+              aria-label={ariaLabel ?? label}
               className="h-9 w-full justify-between bg-card px-3 text-[13px] font-normal"
             />
           }
         >
-          <span className={value ? 'text-foreground' : 'text-muted-foreground'}>
+          <span className={value ? 'text-foreground tabular-nums' : 'text-muted-foreground'}>
             {value ? formatDateVN(value) : placeholder}
           </span>
           <CalendarDays className="size-4 text-muted-foreground" />
@@ -72,9 +80,9 @@ export function DateField({
               onValueChange(toIso(date))
               setOpen(false)
             }}
-            captionLayout="label"
-            startMonth={new Date(2020, 0)}
-            endMonth={new Date(2036, 11)}
+            captionLayout="dropdown"
+            startMonth={new Date(startYear, 0)}
+            endMonth={new Date(endYear, 11)}
             locale={vi}
             labels={{ labelNext: () => 'Tháng sau', labelPrevious: () => 'Tháng trước' }}
             className="rounded-xl"

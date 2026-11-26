@@ -35,16 +35,21 @@ export function NewFacilityButton() {
         title="Thêm cơ sở"
         size="sm"
       >
-        <div className="space-y-3">
+        <div className="space-y-3.5">
           {(['code', 'name', 'address'] as const).map((k) => (
-            <div key={k} className="space-y-1">
-              <Label htmlFor={`f-${k}`}>{{ code: 'Mã cơ sở', name: 'Tên cơ sở', address: 'Địa chỉ' }[k]}</Label>
+            <div key={k} className="space-y-1.5">
+              <Label htmlFor={`f-${k}`} className="text-[13px] font-medium">
+                {{ code: 'Mã cơ sở', name: 'Tên cơ sở', address: 'Địa chỉ' }[k]}
+              </Label>
               <Input id={`f-${k}`} value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} />
-              {fe[k] && <p className="text-sm text-destructive">{fe[k]}</p>}
+              {fe[k] && <p className="text-xs text-destructive">{fe[k]}</p>}
             </div>
           ))}
           {err && <p className="text-sm text-destructive">{err}</p>}
-          <div className="flex gap-2">
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="outline" onClick={close}>
+              Huỷ
+            </Button>
             <Button
               disabled={pending}
               onClick={() =>
@@ -63,9 +68,6 @@ export function NewFacilityButton() {
               }
             >
               Lưu
-            </Button>
-            <Button variant="outline" onClick={close}>
-              Huỷ
             </Button>
           </div>
         </div>

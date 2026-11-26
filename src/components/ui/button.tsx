@@ -3,13 +3,13 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-xl border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all duration-150 outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40 active:not-aria-[haspopup]:scale-[0.985] disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-[color,background-color,border-color,transform] duration-150 outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40 active:not-aria-[haspopup]:scale-[0.985] disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground shadow-xs hover:bg-[var(--primary-strong)]',
+        default: 'bg-primary text-primary-foreground hover:bg-[var(--primary-strong)]',
         outline:
-          'border-border bg-card shadow-2xs hover:bg-muted/70 hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50',
+          'border-input bg-card hover:bg-muted/70 hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50',
         secondary:
           'bg-secondary text-secondary-foreground hover:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground',
         ghost:
@@ -19,14 +19,14 @@ const buttonVariants = cva(
         link: 'text-primary underline-offset-4 hover:underline hover:text-primary/90',
       },
       size: {
-        default: 'h-9 gap-2 px-4 py-2 text-xs font-medium rounded-xl',
+        default: 'h-9 gap-2 px-4 py-2 text-[13px] font-medium rounded-lg',
         xs: "h-7 gap-1 px-2.5 text-[11px] font-medium rounded-md [&_svg:not([class*='size-'])]:size-3",
         sm: "h-8 gap-1.5 px-3 text-xs font-medium rounded-lg [&_svg:not([class*='size-'])]:size-3.5",
-        lg: 'h-10 gap-2 px-5 text-sm font-medium rounded-xl',
-        icon: 'size-9 rounded-xl p-0',
+        lg: 'h-10 gap-2 px-5 text-sm font-medium rounded-lg',
+        icon: 'size-9 rounded-lg p-0',
         'icon-xs': "size-7 rounded-md p-0 [&_svg:not([class*='size-'])]:size-3",
         'icon-sm': "size-8 rounded-lg p-0 [&_svg:not([class*='size-'])]:size-3.5",
-        'icon-lg': 'size-10 rounded-xl p-0',
+        'icon-lg': 'size-10 rounded-lg p-0',
       },
     },
     defaultVariants: {

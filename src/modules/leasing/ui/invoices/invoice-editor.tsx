@@ -488,7 +488,7 @@ function MeterReadingsPanel({
               <span className="flex w-full items-center justify-between gap-3 whitespace-nowrap">
                 <span>{o.label}</span>
                 {o.latest && (
-                  <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
                     Mới nhất
                   </span>
                 )}
@@ -900,7 +900,7 @@ export function InvoiceEditor(p: Props) {
 
   return (
     <div className="space-y-4">
-      <section className="space-y-4 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
+      <section className="space-y-4 rounded-2xl border border-border/80 bg-card p-5">
         {p.header}
         <div className="flex flex-wrap items-end justify-between gap-3 border-t border-border/60 pt-4">
           <div className="space-y-1.5">
@@ -925,7 +925,7 @@ export function InvoiceEditor(p: Props) {
               size="sm"
               disabled={pending}
               onClick={() => saveAll()}
-              className="gap-1.5 rounded-xl text-xs font-medium shadow-2xs"
+              className="gap-1.5"
             >
               <Check className="size-3.5" />
               <span>Lưu thay đổi</span>
@@ -965,7 +965,7 @@ export function InvoiceEditor(p: Props) {
       {p.beforeLines}
 
       {/* 2. Các dòng */}
-      <section className="space-y-4 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
+      <section className="space-y-4 rounded-2xl border border-border/80 bg-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Layers className="size-4 text-primary" />
@@ -977,15 +977,15 @@ export function InvoiceEditor(p: Props) {
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-border/80 bg-card">
-          <table className="w-full min-w-[980px] text-xs">
-            <thead className="border-b border-border/70 bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <table className="w-full text-[13px]">
+            <thead className="border-b border-border/70 text-[13px] font-medium text-muted-foreground">
               <tr>
-                <th className="px-3.5 py-3 text-left min-w-44 whitespace-nowrap">Mô tả</th>
-                <th className="px-3.5 py-3 text-left w-64 whitespace-nowrap">Thời gian</th>
-                <th className="px-3.5 py-3 text-left w-56 whitespace-nowrap">Chỉ số</th>
-                <th className="px-3.5 py-3 text-right min-w-20 whitespace-nowrap">SL</th>
-                <th className="px-3.5 py-3 text-right w-36 whitespace-nowrap">Thành tiền</th>
-                <th className="px-2 py-3 w-12 text-center"></th>
+                <th className="px-3 py-3 text-left min-w-48 whitespace-nowrap">Mô tả</th>
+                <th className="px-3 py-3 text-left w-52 whitespace-nowrap">Thời gian</th>
+                <th className="px-3 py-3 text-left w-44 whitespace-nowrap">Chỉ số</th>
+                <th className="px-2.5 py-3 text-right w-16 whitespace-nowrap">SL</th>
+                <th className="px-3 py-3 text-right w-28 whitespace-nowrap">Thành tiền</th>
+                <th className="px-1.5 py-3 w-10 text-center"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
@@ -1186,7 +1186,7 @@ export function InvoiceEditor(p: Props) {
       </section>
 
       {/* Chi phí phát sinh và giảm giá: nhập tay, có mô tả */}
-      <section className="space-y-4 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
+      <section className="space-y-4 rounded-2xl border border-border/80 bg-card p-5">
         <h2 className="text-sm font-semibold tracking-tight text-foreground">Chi phí phát sinh & giảm giá</h2>
         <div className="grid gap-4 lg:grid-cols-2">
           {(['surcharge', 'discount'] as const).map((kind) => {
@@ -1219,8 +1219,8 @@ export function InvoiceEditor(p: Props) {
                   </Button>
                 </div>
                 <div className="overflow-hidden rounded-xl border border-border/80">
-                  <table className="w-full text-xs">
-                    <thead className="border-b border-border/70 bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <table className="w-full text-[13px]">
+                    <thead className="border-b border-border/70 text-[13px] font-medium text-muted-foreground">
                       <tr>
                         <th className="px-3 py-2 text-left">Mô tả</th>
                         <th className="w-36 px-3 py-2 text-right">Số tiền</th>
@@ -1282,7 +1282,7 @@ export function InvoiceEditor(p: Props) {
       </section>
 
       {/* Chi tiết: thành tiền, giảm giá, phát sinh, thuế, tổng */}
-      <section className="space-y-2 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
+      <section className="space-y-2 rounded-2xl border border-border/80 bg-card p-5">
         <h2 className="text-sm font-semibold tracking-tight text-foreground">Chi tiết hoá đơn</h2>
         <dl className="space-y-1.5 text-sm">
           <div className="flex justify-between gap-3">
@@ -1320,7 +1320,7 @@ export function InvoiceEditor(p: Props) {
         </dl>
       </section>
 
-      <section className="space-y-2 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
+      <section className="space-y-2 rounded-2xl border border-border/80 bg-card p-5">
         <label htmlFor="invoice-note" className="block text-sm font-semibold tracking-tight text-foreground">
           Ghi chú cho khách
         </label>

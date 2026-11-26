@@ -13,12 +13,12 @@ export type FacilityRow = {
 export function FacilityList({ facilities, canManage = false }: { facilities: FacilityRow[]; canManage?: boolean }) {
   if (facilities.length === 0) return <p className="text-sm text-muted-foreground">Chưa có cơ sở nào.</p>
   return (
-    <div className="overflow-x-auto rounded-2xl border border-border/80 bg-card shadow-2xs">
-      <table className="w-full text-left text-xs">
-        <thead className="border-b border-border/60 bg-muted/40">
+    <div className="overflow-x-auto rounded-2xl border border-border/80 bg-card">
+      <table className="w-full text-left text-[13px]">
+        <thead className="border-b border-border/70">
           <tr>
             {['Mã', 'Tên', 'Địa chỉ', 'Số phòng', ...(canManage ? ['Thao tác'] : [])].map((h) => (
-              <th key={h} className="p-3 font-semibold uppercase tracking-wider text-muted-foreground">
+              <th key={h} className="px-3.5 py-2.5 text-[13px] font-medium text-muted-foreground">
                 {h}
               </th>
             ))}
@@ -36,7 +36,7 @@ export function FacilityList({ facilities, canManage = false }: { facilities: Fa
                   {f.name}
                 </Link>
                 {!f.isActive && (
-                  <span className="ml-2 rounded-full border border-dashed px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  <span className="ml-2 rounded-full border border-dashed px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                     Ngừng sử dụng
                   </span>
                 )}

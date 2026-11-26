@@ -26,8 +26,8 @@ export default async function AuditPage({
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Nhật ký thao tác</h1>
-      <form className="flex flex-wrap gap-2" method="get">
-        <select name="user" defaultValue={sp.user ?? ''} className="h-8 rounded-lg border px-2 text-sm">
+      <form className="flex flex-wrap items-center gap-2" method="get">
+        <select name="user" defaultValue={sp.user ?? ''}>
           <option value="">Mọi người</option>
           {users.map((u) => (
             <option key={u.id} value={u.id}>
@@ -35,7 +35,7 @@ export default async function AuditPage({
             </option>
           ))}
         </select>
-        <select name="entity" defaultValue={sp.entity ?? ''} className="h-8 rounded-lg border px-2 text-sm">
+        <select name="entity" defaultValue={sp.entity ?? ''}>
           <option value="">Mọi đối tượng</option>
           {[...new Set([...entities, sp.entity].filter(Boolean) as string[])].map((e) => (
             <option key={e} value={e}>
@@ -43,29 +43,37 @@ export default async function AuditPage({
             </option>
           ))}
         </select>
-        <button className="h-8 rounded-lg border px-3 text-sm" type="submit">
+        <button className="h-9 rounded-lg border border-input bg-card px-3.5 text-[13px] font-medium hover:bg-muted/60" type="submit">
           Lọc
         </button>
       </form>
-      <div className="overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50 text-left">
+      <div className="overflow-x-auto rounded-2xl border border-border/80 bg-card">
+        <table className="w-full text-[13px]">
+          <thead className="border-b border-border/70 text-left">
             <tr>
-              <th className="p-2">Thời gian</th>
-              <th className="p-2">Người thực hiện</th>
-              <th className="p-2">Thao tác</th>
-              <th className="p-2">Đối tượng</th>
+              <th className="px-3.5 py-2.5 text-[13px] font-medium whitespace-nowrap text-muted-foreground">
+                Thời gian
+              </th>
+              <th className="px-3.5 py-2.5 text-[13px] font-medium whitespace-nowrap text-muted-foreground">
+                Người thực hiện
+              </th>
+              <th className="px-3.5 py-2.5 text-[13px] font-medium whitespace-nowrap text-muted-foreground">
+                Thao tác
+              </th>
+              <th className="px-3.5 py-2.5 text-[13px] font-medium whitespace-nowrap text-muted-foreground">
+                Đối tượng
+              </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-border/50">
             {logs.map((l) => (
-              <tr key={l.id} className="border-t">
-                <td className="p-2 whitespace-nowrap">
+              <tr key={l.id} className="transition-colors hover:bg-muted/30">
+                <td className="px-3.5 py-2.5 whitespace-nowrap tabular-nums">
                   {l.createdAt.toLocaleString('vi-VN', { timeZone: VN_TIME_ZONE })}
                 </td>
-                <td className="p-2">{l.userId ? (name.get(l.userId) ?? l.userId.slice(0, 8)) : '—'}</td>
-                <td className="p-2">{l.summary || l.action}</td>
-                <td className="p-2">{l.entity}</td>
+                <td className="px-3.5 py-2.5">{l.userId ? (name.get(l.userId) ?? l.userId.slice(0, 8)) : '—'}</td>
+                <td className="px-3.5 py-2.5">{l.summary || l.action}</td>
+                <td className="px-3.5 py-2.5 text-muted-foreground">{l.entity}</td>
               </tr>
             ))}
             {logs.length === 0 && (

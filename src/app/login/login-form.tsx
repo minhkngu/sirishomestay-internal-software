@@ -11,7 +11,7 @@ import { login } from './actions'
 export function LoginForm() {
   const [state, action, pending] = useActionState(login, null)
   return (
-    <Card className="card-taste border-border/80 shadow-sm">
+    <Card className="border-border/80">
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold tracking-tight">Siris — Đăng nhập</CardTitle>
       </CardHeader>
@@ -56,7 +56,7 @@ export function LoginForm() {
               {state.error}
             </div>
           )}
-          <Button type="submit" className="w-full h-9 rounded-xl font-medium shadow-xs" disabled={pending}>
+          <Button type="submit" className="w-full" disabled={pending}>
             {pending ? 'Đang đăng nhập…' : 'Đăng nhập'}
           </Button>
         </form>

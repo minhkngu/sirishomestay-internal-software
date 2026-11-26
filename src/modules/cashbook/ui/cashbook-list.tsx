@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react'
 import { Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import { MonthField } from '@/components/month-field'
 import { FacilityFilter } from '@/components/list/facility-filter'
 import { PageHeader } from '@/components/list/page-header'
 import { Pager } from '@/components/list/pager'
@@ -221,27 +222,27 @@ export function CashbookList({
             count: scoped.filter((r) => value === 'all' || r.kind === value).length,
           }))}
         />
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           <FacilityFilter facilities={facilities} align="right" />
-          <input
-            type="month"
+          <MonthField
+            ariaLabel="Tháng"
             value={month === 'all' ? '' : month}
-            onChange={(e) =>
+            onValueChange={(next) =>
               router.replace(
-                e.target.value
-                  ? `?month=${e.target.value}${kind !== 'all' ? `&loai=${kind}` : ''}`
+                next
+                  ? `?month=${next}${kind !== 'all' ? `&loai=${kind}` : ''}`
                   : `?month=all${kind !== 'all' ? `&loai=${kind}` : ''}`,
               )
             }
-            aria-label="Tháng"
-            className="h-9 rounded-xl border border-border/80 bg-card px-3 text-xs font-medium text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+            placeholder="Tất cả tháng"
+            className="w-40"
           />
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Tìm người, phòng, ghi chú"
+            placeholder="Tìm theo tên, phòng…"
             aria-label="Tìm kiếm"
-            className="h-9 w-56"
+            className="h-9 w-48"
           />
         </div>
       </div>

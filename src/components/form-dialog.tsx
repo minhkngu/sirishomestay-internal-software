@@ -37,7 +37,7 @@ export function FormDialog({
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
-        <div className="overflow-y-auto pr-2">{children}</div>
+        <div className="min-h-0 -mx-1 overflow-y-auto px-1 py-0.5">{children}</div>
       </DialogContent>
     </Dialog>
   )

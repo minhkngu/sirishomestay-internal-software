@@ -77,8 +77,8 @@ export function RoomGrid({ rooms, facilities }: { rooms: GridRoom[]; facilities:
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Tìm mã phòng, tầng, loại, khách…"
-              className="h-9 w-full rounded-xl border border-border/80 bg-card pl-9 pr-3 text-xs text-foreground shadow-2xs outline-none transition-all placeholder:text-muted-foreground/75 focus:border-ring focus:ring-2 focus:ring-ring/20"
+              placeholder="Tìm phòng, tầng, khách…"
+              className="h-9 w-full rounded-lg border border-input bg-card pl-9 pr-3 text-[13px] text-foreground outline-none transition-[border-color,background-color] placeholder:text-muted-foreground/80 focus:border-ring focus:ring-2 focus:ring-ring/20"
             />
           </div>
           <Select
@@ -86,7 +86,7 @@ export function RoomGrid({ rooms, facilities }: { rooms: GridRoom[]; facilities:
             onValueChange={(value) => setStatusFilter(value ?? 'all')}
             items={STATUS_OPTIONS}
           >
-            <SelectTrigger aria-label="Trạng thái phòng" className="h-9 min-w-36 border-border/80 bg-card text-xs">
+            <SelectTrigger aria-label="Trạng thái phòng" className="min-w-36">
               <SelectValue />
             </SelectTrigger>
             <SelectContent align="start">
@@ -100,7 +100,7 @@ export function RoomGrid({ rooms, facilities }: { rooms: GridRoom[]; facilities:
         </div>
 
         <div
-          className="inline-flex h-9 items-center rounded-xl border border-border/80 bg-muted/60 p-0.5 text-xs"
+          className="inline-flex h-9 items-center rounded-lg border border-input bg-muted/60 p-0.5 text-xs"
           role="group"
           aria-label="Chế độ xem phòng"
         >
@@ -109,8 +109,8 @@ export function RoomGrid({ rooms, facilities }: { rooms: GridRoom[]; facilities:
             aria-pressed={viewMode === 'grid'}
             onClick={() => setViewMode('grid')}
             className={cn(
-              'inline-flex h-7.5 items-center gap-1.5 rounded-lg px-2.5 font-medium transition-colors',
-              viewMode === 'grid' ? 'bg-card text-primary shadow-2xs' : 'text-muted-foreground hover:text-foreground',
+              'inline-flex h-7.5 items-center gap-1.5 rounded-md px-2.5 font-medium transition-colors',
+              viewMode === 'grid' ? 'bg-card text-primary' : 'text-muted-foreground hover:text-foreground',
             )}
           >
             <LayoutGrid className="size-3.5" />
@@ -121,8 +121,8 @@ export function RoomGrid({ rooms, facilities }: { rooms: GridRoom[]; facilities:
             aria-pressed={viewMode === 'table'}
             onClick={() => setViewMode('table')}
             className={cn(
-              'inline-flex h-7.5 items-center gap-1.5 rounded-lg px-2.5 font-medium transition-colors',
-              viewMode === 'table' ? 'bg-card text-primary shadow-2xs' : 'text-muted-foreground hover:text-foreground',
+              'inline-flex h-7.5 items-center gap-1.5 rounded-md px-2.5 font-medium transition-colors',
+              viewMode === 'table' ? 'bg-card text-primary' : 'text-muted-foreground hover:text-foreground',
             )}
           >
             <List className="size-3.5" />

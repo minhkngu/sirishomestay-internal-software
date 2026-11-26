@@ -20,18 +20,18 @@ import { getAccessContext } from '@/modules/platform'
 const SEVERITY_CONFIG = {
   danger: {
     label: 'Khẩn cấp',
-    badge: 'border border-rose-200/70 bg-rose-50 text-rose-700',
-    dot: 'bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.4)]',
+    badge: 'border border-rose-200/80 bg-rose-50 text-rose-800',
+    dot: 'bg-rose-600',
   },
   warning: {
     label: 'Sắp tới',
-    badge: 'border border-amber-200/70 bg-amber-50 text-amber-700',
-    dot: 'bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.4)]',
+    badge: 'border border-amber-200/80 bg-amber-50 text-amber-800',
+    dot: 'bg-amber-500',
   },
   info: {
     label: 'Cần làm',
-    badge: 'border border-emerald-200/70 bg-emerald-50 text-emerald-700',
-    dot: 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.4)]',
+    badge: 'border border-emerald-200/80 bg-emerald-50 text-emerald-800',
+    dot: 'bg-emerald-600',
   },
 } as const
 
@@ -65,12 +65,10 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-6">
-      {/* Header Greeting */}
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Nhắc việc</h1>
-        <p className="text-xs text-muted-foreground">
-          Xin chào, <span className="font-semibold text-foreground">{ctx.fullName || 'bạn'}</span> 👋 — Tổng quan tình
-          trạng vận hành và các đầu việc cần xử lý.
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">Nhắc việc</h1>
+        <p className="text-[13px] text-muted-foreground">
+          {ctx.fullName ? `${ctx.fullName} — ` : ''}Tổng quan tình trạng vận hành và các đầu việc cần xử lý.
         </p>
       </div>
 
@@ -94,23 +92,17 @@ export default async function HomePage() {
             </span>
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-border/80 bg-card shadow-2xs">
-            <table className="w-full text-xs">
-              <thead className="border-b border-border/60 bg-muted/40 text-left">
+          <div className="overflow-x-auto rounded-2xl border border-border/80 bg-card">
+            <table className="w-full text-[13px]">
+              <thead className="border-b border-border/70 text-left">
                 <tr>
-                  <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground">Hạng mục</th>
-                  <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground">
-                    Đối tượng / Phòng
-                  </th>
-                  <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground">
-                    Chi tiết / Hạn chót
-                  </th>
-                  <th className="p-3 w-32 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                  <th className="px-3.5 py-2.5 text-[13px] font-medium text-muted-foreground">Hạng mục</th>
+                  <th className="px-3.5 py-2.5 text-[13px] font-medium text-muted-foreground">Đối tượng / Phòng</th>
+                  <th className="px-3.5 py-2.5 text-[13px] font-medium text-muted-foreground">Chi tiết / Hạn chót</th>
+                  <th className="w-32 px-3.5 py-2.5 text-[13px] font-medium whitespace-nowrap text-muted-foreground">
                     Mức độ
                   </th>
-                  <th className="p-3 text-right font-semibold uppercase tracking-wider text-muted-foreground">
-                    Thao tác
-                  </th>
+                  <th className="px-3.5 py-2.5 text-right text-[13px] font-medium text-muted-foreground">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
@@ -119,21 +111,19 @@ export default async function HomePage() {
                   const sev = SEVERITY_CONFIG[t.severity]
                   return (
                     <tr key={idx} className="transition-colors hover:bg-muted/30">
-                      <td className="p-3">
+                      <td className="px-3.5 py-2.5">
                         <div className="flex items-center gap-2">
-                          <div className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground/80">
-                            <Icon className="size-3.5" />
-                          </div>
+                          <Icon className="size-4 shrink-0 text-muted-foreground" />
                           <span className="font-medium text-foreground">{t.categoryTitle}</span>
                         </div>
                       </td>
-                      <td className="p-3">
+                      <td className="px-3.5 py-2.5">
                         <Link href={t.href} className="font-semibold text-primary hover:underline underline-offset-2">
                           {t.label}
                         </Link>
                       </td>
-                      <td className="p-3 text-muted-foreground">{t.sub}</td>
-                      <td className="p-3 whitespace-nowrap">
+                      <td className="px-3.5 py-2.5 text-muted-foreground">{t.sub}</td>
+                      <td className="px-3.5 py-2.5 whitespace-nowrap">
                         <span
                           className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium whitespace-nowrap shrink-0 ${sev.badge}`}
                         >
@@ -141,10 +131,10 @@ export default async function HomePage() {
                           <span>{sev.label}</span>
                         </span>
                       </td>
-                      <td className="p-3 text-right">
+                      <td className="px-3.5 py-2.5 text-right">
                         <Link
                           href={t.href}
-                          className="inline-flex items-center gap-1 rounded-lg border border-border/70 bg-card px-2.5 py-1 text-[11px] font-medium text-foreground shadow-2xs transition-all hover:bg-muted/60 active:scale-95"
+                          className="inline-flex items-center gap-1 rounded-lg border border-border/80 bg-card px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted/60"
                         >
                           <span>Xử lý</span>
                           <ArrowRight className="size-3" />
@@ -173,24 +163,21 @@ export default async function HomePage() {
                 {r.items.map((i, n) => {
                   const sev = SEVERITY_CONFIG[i.severity]
                   return (
-                    <li
-                      key={n}
-                      className="group rounded-xl border border-border/50 bg-card/60 p-2.5 shadow-2xs transition-all hover:border-primary/30 hover:bg-accent/20"
-                    >
+                    <li key={n} className="group py-2.5 first:pt-0 last:pb-0">
                       <div className="flex items-start justify-between gap-2">
                         <Link
                           href={i.href}
-                          className="truncate text-xs font-semibold text-foreground transition-colors group-hover:text-primary hover:underline underline-offset-2"
+                          className="truncate text-[13px] font-medium text-foreground transition-colors group-hover:text-primary hover:underline underline-offset-2"
                         >
                           {i.label}
                         </Link>
-                        <span className={`shrink-0 rounded-full px-1.5 py-0.2 text-[10px] font-medium ${sev.badge}`}>
+                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${sev.badge}`}>
                           {sev.label}
                         </span>
                       </div>
-                      <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+                      <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
                         <span className="truncate">{i.sub}</span>
-                        <ArrowRight className="size-3 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+                        <ArrowRight className="size-3 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
                       </div>
                     </li>
                   )

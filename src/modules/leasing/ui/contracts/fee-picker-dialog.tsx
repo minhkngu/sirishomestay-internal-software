@@ -71,15 +71,15 @@ export function FeePickerDialog({
   return (
     <FormDialog open={open} onOpenChange={onOpenChange} title="Chọn phí dịch vụ" description={description} size="sm">
       <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2">
           <Input
             aria-label="Tìm phí"
             placeholder="Tìm tên phí hoặc đơn vị"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="h-9 min-w-36 flex-1"
+            className="h-9 min-w-0 flex-1"
           />
-          <div className="w-40">
+          <div className="w-36 shrink-0">
             <Select
               value={source}
               onValueChange={(next) => setSource(next == null ? '' : String(next))}
@@ -104,6 +104,7 @@ export function FeePickerDialog({
             <Button
               type="button"
               size="sm"
+              className="h-9 shrink-0"
               variant={creating ? 'secondary' : 'outline'}
               aria-expanded={creating}
               aria-label="Tạo phí mới"
@@ -151,7 +152,7 @@ export function FeePickerDialog({
             </li>
           )}
         </ul>
-        <div className="flex justify-end">
+        <div className="flex justify-end border-t border-border/60 pt-3">
           <Button type="button" onClick={() => onOpenChange(false)}>
             Xong
           </Button>

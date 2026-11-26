@@ -91,7 +91,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
               {/* Financial Highlights */}
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:flex md:items-center md:gap-2.5">
-                <div className="flex flex-col justify-between rounded-xl border border-border/70 bg-card p-3 min-w-[125px] text-left md:text-right shadow-2xs">
+                <div className="flex flex-col justify-between rounded-xl border border-border/70 bg-card p-3 min-w-[125px] text-left md:text-right">
                   <div className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">
                     {isRefund ? 'Hoàn trả cho khách' : 'Khách phải thanh toán'}
                   </div>
@@ -99,7 +99,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                     {formatVND(Math.abs(d.total))}
                   </div>
                 </div>
-                <div className="flex flex-col justify-between rounded-xl border border-emerald-200/70 bg-emerald-50/40 p-3 min-w-[125px] text-left md:text-right shadow-2xs">
+                <div className="flex flex-col justify-between rounded-xl border border-emerald-200/70 bg-emerald-50/40 p-3 min-w-[125px] text-left md:text-right">
                   <div className="text-[11px] font-medium text-emerald-800 whitespace-nowrap">
                     {isRefund ? 'Đã hoàn cho khách' : 'Khách đã thanh toán'}
                   </div>
@@ -107,7 +107,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                     {formatVND(Math.abs(d.paid))}
                   </div>
                 </div>
-                <div className="flex flex-col justify-between rounded-xl border border-amber-200/70 bg-amber-50/40 p-3 min-w-[125px] text-left md:text-right shadow-2xs">
+                <div className="flex flex-col justify-between rounded-xl border border-amber-200/70 bg-amber-50/40 p-3 min-w-[125px] text-left md:text-right">
                   <div className="text-[11px] font-medium text-amber-800 whitespace-nowrap">
                     {isRefund ? 'Còn phải hoàn khách' : 'Khách còn phải trả'}
                   </div>
@@ -115,7 +115,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                     {formatVND(Math.abs(remaining))}
                   </div>
                 </div>
-                <div className="flex flex-col justify-between rounded-xl border border-border/70 bg-card p-3 min-w-[125px] text-left md:text-right shadow-2xs">
+                <div className="flex flex-col justify-between rounded-xl border border-border/70 bg-card p-3 min-w-[125px] text-left md:text-right">
                   <div className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">Công nợ khách</div>
                   <div className="mt-1 text-sm font-bold text-foreground tabular-nums">
                     {formatVND(balance.balance)}

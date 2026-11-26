@@ -75,19 +75,28 @@ function PhotoPreview({
 function AssetPhotos({ name, files, onChange }: { name: string; files: File[]; onChange: (files: File[]) => void }) {
   return (
     <div className="space-y-2">
-      <label className="block space-y-1.5 text-xs text-muted-foreground">
-        Ảnh lúc bàn giao
-        <Input
-          aria-label={`Ảnh ${name}`}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          multiple
-          onChange={(e) => {
-            onChange([...files, ...Array.from(e.target.files ?? [])])
-            e.currentTarget.value = ''
-          }}
-        />
-      </label>
+      <div className="space-y-1.5">
+        <span className="block text-xs text-muted-foreground">Ảnh lúc bàn giao</span>
+        <div className="flex items-center gap-2.5">
+          <label className="inline-flex h-8 cursor-pointer items-center rounded-lg border border-input bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted/60">
+            Chọn ảnh
+            <input
+              aria-label={`Ảnh ${name}`}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              className="sr-only"
+              onChange={(e) => {
+                onChange([...files, ...Array.from(e.target.files ?? [])])
+                e.currentTarget.value = ''
+              }}
+            />
+          </label>
+          <span className="text-xs text-muted-foreground">
+            {files.length > 0 ? `${files.length} ảnh đã chọn` : 'Chưa chọn ảnh'}
+          </span>
+        </div>
+      </div>
       {files.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {files.map((file, index) => (
@@ -407,38 +416,56 @@ export function LeaseAssets({
                       placeholder="— Chọn tài sản —"
                     />
                   </div>
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    <Input
-                      aria-label="Mã tài sản mới"
-                      placeholder="Mã tài sản"
-                      value={code}
-                      onChange={(e) => setCode(e.target.value)}
-                    />
-                    <Input
-                      aria-label="Tên tài sản mới"
-                      placeholder="Tên tài sản"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                    />
-                    <Input
-                      aria-label="Model tài sản mới"
-                      placeholder="Model"
-                      value={model}
-                      onChange={(e) => setModel(e.target.value)}
-                    />
-                    <Input
-                      aria-label="Loại tài sản mới"
-                      placeholder="Loại tài sản"
-                      value={category}
-                      onChange={(e) => setCategory(e.target.value)}
-                    />
-                    <MoneyInput aria-label="Giá trị tài sản mới" value={value} onValueChange={setValue} />
-                    <Input
-                      aria-label="Tình trạng tài sản mới"
-                      placeholder="Tình trạng"
-                      value={condition}
-                      onChange={(e) => setCondition(e.target.value)}
-                    />
+                  <div className="grid gap-2.5 sm:grid-cols-3">
+                    <label className="block space-y-1">
+                      <span className="block text-xs text-muted-foreground">Mã tài sản</span>
+                      <Input
+                        aria-label="Mã tài sản mới"
+                        placeholder="VD: TS-01"
+                        value={code}
+                        onChange={(e) => setCode(e.target.value)}
+                      />
+                    </label>
+                    <label className="block space-y-1">
+                      <span className="block text-xs text-muted-foreground">Tên tài sản</span>
+                      <Input
+                        aria-label="Tên tài sản mới"
+                        placeholder="VD: Máy lạnh"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                      />
+                    </label>
+                    <label className="block space-y-1">
+                      <span className="block text-xs text-muted-foreground">Model</span>
+                      <Input
+                        aria-label="Model tài sản mới"
+                        placeholder="VD: Daikin 1HP"
+                        value={model}
+                        onChange={(e) => setModel(e.target.value)}
+                      />
+                    </label>
+                    <label className="block space-y-1">
+                      <span className="block text-xs text-muted-foreground">Loại tài sản</span>
+                      <Input
+                        aria-label="Loại tài sản mới"
+                        placeholder="VD: Điện lạnh"
+                        value={category}
+                        onChange={(e) => setCategory(e.target.value)}
+                      />
+                    </label>
+                    <label className="block space-y-1">
+                      <span className="block text-xs text-muted-foreground">Giá trị (VND)</span>
+                      <MoneyInput aria-label="Giá trị tài sản mới" value={value} onValueChange={setValue} />
+                    </label>
+                    <label className="block space-y-1">
+                      <span className="block text-xs text-muted-foreground">Tình trạng</span>
+                      <Input
+                        aria-label="Tình trạng tài sản mới"
+                        placeholder="Tình trạng"
+                        value={condition}
+                        onChange={(e) => setCondition(e.target.value)}
+                      />
+                    </label>
                   </div>
                   <Button
                     type="button"

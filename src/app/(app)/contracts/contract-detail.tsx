@@ -539,7 +539,7 @@ export default async function ContractDetail({ id }: { id: string }) {
                         <p className="flex flex-wrap items-center gap-1.5 text-[13px] font-medium text-foreground">
                           <span className="truncate">{o.name}</span>
                           {o.id === lease.tenantId && (
-                            <StatusChip tone="positive" className="h-5 px-2 text-[10px]">
+                            <StatusChip tone="positive" className="h-5 px-2 text-[11px]">
                               Đại diện
                             </StatusChip>
                           )}

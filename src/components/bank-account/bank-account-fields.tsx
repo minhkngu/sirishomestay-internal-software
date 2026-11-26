@@ -4,6 +4,7 @@ import { VN_BANKS } from '@/domain/banks'
 import type { BankAccount } from '@/domain/types'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export const emptyBankAccount: BankAccount = { bankBin: '', bankName: '', accountNumber: '', accountName: '' }
 
@@ -16,25 +17,32 @@ export function BankAccountFields({
   onChange: (value: BankAccount) => void
   prefix: string
 }) {
+  const bankItems = [
+    { value: '', label: 'Chọn ngân hàng' },
+    ...VN_BANKS.map((bank) => ({ value: bank.bin, label: `${bank.shortName} — ${bank.name}` })),
+  ]
   return (
-    <div className="space-y-3">
-      <div className="space-y-1">
+    <div className="space-y-3.5">
+      <div className="space-y-1.5">
         <Label htmlFor={`${prefix}-bank`}>Ngân hàng</Label>
-        <select
-          id={`${prefix}-bank`}
-          className="h-9 w-full rounded-md border px-2 text-sm"
+        <Select
           value={value.bankBin}
-          onChange={(e) => onChange({ ...value, bankBin: e.target.value })}
+          onValueChange={(next) => onChange({ ...value, bankBin: String(next ?? '') })}
+          items={bankItems}
         >
-          <option value="">Chọn ngân hàng</option>
-          {VN_BANKS.map((bank) => (
-            <option key={bank.bin} value={bank.bin}>
-              {bank.shortName} — {bank.name}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger id={`${prefix}-bank`} aria-label="Ngân hàng" className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {bankItems.map((bank) => (
+              <SelectItem key={bank.value || '__empty__'} value={bank.value}>
+                {bank.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         <Label htmlFor={`${prefix}-number`}>Số tài khoản</Label>
         <Input
           id={`${prefix}-number`}
@@ -43,7 +51,7 @@ export function BankAccountFields({
           onChange={(e) => onChange({ ...value, accountNumber: e.target.value })}
         />
       </div>
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         <Label htmlFor={`${prefix}-name`}>Chủ tài khoản</Label>
         <Input
           id={`${prefix}-name`}

@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { PdfInline } from '@/components/pdf-inline'
 import { Button } from '@/components/ui/button'
@@ -97,21 +98,21 @@ export function InvoiceTemplatesManager({ templates }: { templates: Tpl[] }) {
         <span className="text-xs text-muted-foreground">Chỉ tạo mẫu còn thiếu, không ghi đè mẫu đã sửa.</span>
       </div>
       {error && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-[13px] text-destructive">
           {error}
         </p>
       )}
       {msg && (
-        <p role="status" className="text-sm text-green-700">
+        <p role="status" className="text-[13px] text-primary">
           {msg}
         </p>
       )}
-      <section className="space-y-3 rounded-lg border bg-card p-4">
-        <ul className="space-y-3">
+      <section className="overflow-hidden rounded-2xl border border-border/80 bg-card">
+        <ul className="divide-y divide-border/60">
           {templates.map((t) => {
             const shown = !collapsible || open.has(t.id)
             return (
-              <li key={t.id} className="space-y-2 rounded-xl border border-border/70 p-3 text-sm">
+              <li key={t.id} className="space-y-2.5 px-4 py-2.5 text-[13px]">
                 <div className="flex flex-wrap items-center gap-2">
                   {collapsible ? (
                     <button
@@ -119,44 +120,57 @@ export function InvoiceTemplatesManager({ templates }: { templates: Tpl[] }) {
                       aria-expanded={shown}
                       aria-controls={`preview-${t.id}`}
                       onClick={() => toggle(t.id)}
-                      className="flex items-center gap-2 font-medium"
+                      className="flex items-center gap-1.5 font-medium text-foreground hover:text-primary"
                     >
-                      <span aria-hidden className="text-muted-foreground">
-                        {shown ? '▾' : '▸'}
-                      </span>
-                      {t.name}
+                      {shown ? (
+                        <ChevronDown className="size-3.5 text-muted-foreground" />
+                      ) : (
+                        <ChevronRight className="size-3.5 text-muted-foreground" />
+                      )}
+                      <span>{t.name}</span>
                     </button>
                   ) : (
-                    <span className="font-medium">{t.name}</span>
+                    <span className="font-medium text-foreground">{t.name}</span>
                   )}
                   {t.hasBody ? (
-                    <span className="rounded bg-muted px-2 py-0.5 text-xs">{STYLE_LABEL[t.style]}</span>
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                      {STYLE_LABEL[t.style]}
+                    </span>
                   ) : (
-                    <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-900">
+                    <span className="rounded-full border border-amber-200/80 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-800">
                       Mẫu cũ, nên soạn lại
                     </span>
                   )}
                   {t.isDefault && (
-                    <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-900">Mặc định</span>
+                    <span className="rounded-full border border-emerald-200/80 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
+                      Mặc định
+                    </span>
                   )}
-                  <Button size="sm" variant="outline" onClick={() => setEditing({ template: t })}>
-                    {t.hasBody ? 'Sửa' : 'Soạn lại'}
-                  </Button>
-                  {!t.isDefault && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={pending}
-                      onClick={() => act(() => setDefaultInvoiceTemplateAction(t.id))}
-                    >
-                      Đặt mặc định
+                  <div className="ml-auto flex items-center gap-1.5">
+                    <Button size="xs" variant="outline" onClick={() => setEditing({ template: t })}>
+                      {t.hasBody ? 'Sửa' : 'Soạn lại'}
                     </Button>
-                  )}
-                  {!t.isDefault && !t.isSystem && (
-                    <button type="button" className="text-destructive underline" onClick={() => setDeleting(t)}>
-                      Xoá
-                    </button>
-                  )}
+                    {!t.isDefault && (
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        disabled={pending}
+                        onClick={() => act(() => setDefaultInvoiceTemplateAction(t.id))}
+                      >
+                        Đặt mặc định
+                      </Button>
+                    )}
+                    {!t.isDefault && !t.isSystem && (
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => setDeleting(t)}
+                      >
+                        Xoá
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 {shown && (
                   <div id={`preview-${t.id}`}>

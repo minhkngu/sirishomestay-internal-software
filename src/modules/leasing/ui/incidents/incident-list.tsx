@@ -29,7 +29,7 @@ export function IncidentList({
   )
   return (
     <>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <ParamChips
           param="mine"
           defaultValue=""

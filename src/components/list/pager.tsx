@@ -19,7 +19,7 @@ export function Pager({ total, page, pageCount, start, end, size, onPage, onSize
             onValueChange={(value) => value && onSize(Number(value))}
             items={PAGE_SIZES.map((n) => ({ value: String(n), label: String(n) }))}
           >
-            <SelectTrigger aria-label="Số dòng" className="h-8 w-16 gap-1 border-border/80 bg-card px-2 text-xs">
+            <SelectTrigger aria-label="Số dòng" size="sm" className="w-16 gap-1 border-input bg-card px-2">
               <SelectValue />
             </SelectTrigger>
             <SelectContent align="end">

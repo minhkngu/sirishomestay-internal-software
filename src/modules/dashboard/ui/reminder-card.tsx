@@ -14,7 +14,7 @@ export function ReminderCard({
   children: ReactNode
 }) {
   return (
-    <section className="flex flex-col justify-between rounded-2xl border border-border/80 bg-card p-5 shadow-2xs transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xs">
+    <section className="flex flex-col justify-between rounded-2xl border border-border/80 bg-card p-5">
       <div>
         <div className="mb-4 flex items-center justify-between gap-2 border-b border-border/60 pb-3">
           <div className="flex items-center gap-2">
@@ -29,16 +29,16 @@ export function ReminderCard({
           </span>
         </div>
         {count === 0 ? (
-          <p className="py-3 text-center text-xs text-muted-foreground italic">Không có việc cần xử lý</p>
+          <p className="py-3 text-center text-xs text-muted-foreground">Không có việc cần xử lý</p>
         ) : (
-          <ul className="space-y-2">{children}</ul>
+          <ul className="divide-y divide-border/50">{children}</ul>
         )}
       </div>
       {href && count > 0 && (
         <div className="mt-4 pt-3 border-t border-border/50">
           <Link
             href={href}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-primary transition-all hover:gap-2 hover:text-primary/90"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-primary transition-colors hover:text-primary/80"
           >
             <span>Xem tất cả danh sách</span>
             <ArrowRight className="size-3" />
