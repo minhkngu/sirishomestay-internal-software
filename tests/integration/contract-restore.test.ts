@@ -13,6 +13,7 @@ import {
   leases,
   meterReadings,
   meters,
+  oneOffCharges,
   payments,
   rooms,
   tenants,
@@ -361,6 +362,27 @@ describe('khôi phục hợp đồng', () => {
     storage.delete = remove
     expect(await cleanupPendingRestoredFiles(db, editor, storage)).toBe(0)
     expect(await db.select().from(files).where(eq(files.id, file.id))).toHaveLength(0)
+  })
+  it('hoàn tác thanh lý xoá cả khoản phạt nhập khi thanh lý, không để dồn sang lần thanh lý sau', async () => {
+    const input = {
+      roomId,
+      tenantId,
+      startDate: '2026-01-01',
+      endDate: '2026-12-31',
+      monthlyRent: 1000,
+      depositAmount: 500,
+    }
+    const { lease } = await createLease(db, ctx, input)
+    await createTermination(db, ctx, lease.id, {
+      endDate: '2026-10-01',
+      readings: [],
+      penalties: [{ description: 'Phạt thử', amount: 100 }],
+    })
+    expect(await db.select().from(oneOffCharges).where(eq(oneOffCharges.leaseId, lease.id))).toHaveLength(1)
+    const preview = await previewContractRestore(db, ctx, 'lease', lease.id)
+    expect(preview.blockedReason).toBeNull()
+    await restoreContract(db, ctx, 'lease', lease.id, preview.token, new MemoryStorage())
+    expect(await db.select().from(oneOffCharges).where(eq(oneOffCharges.leaseId, lease.id))).toHaveLength(0)
   })
   it('không hoàn tác sửa sau khi hợp đồng đã được thanh lý và duyệt', async () => {
     const input = {

@@ -165,6 +165,27 @@ describe('phụ lục hợp đồng', () => {
       expect(r.invoice!.lines.find((l) => l.description.startsWith('Điện'))).toMatchObject({ quantity: 50 })
     })
 
+    it('thanh lý ngay ngày bắt đầu: giữ chỉ số đầu hợp đồng và tính điện từ chỉ số đầu đến chỉ số chốt', async () => {
+      await db.update(leases).set({ startDate: '2026-11-28' }).where(eq(leases.id, leaseId))
+      const [m] = await db
+        .insert(meters)
+        .values({ roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 })
+        .returning()
+      await db
+        .insert(meterReadings)
+        .values({ meterId: m.id, period: '2026-11', kind: 'handover', readOn: '2026-11-28', value: 2133 })
+      await electricFee(m.id)
+      const r = await createTermination(db, ctx(), leaseId, {
+        endDate: '2026-11-28',
+        forfeit: { mode: 'none' },
+        readings: [{ meterId: m.id, value: 2140 }],
+      })
+      expect(r.invoice!.lines.find((l) => l.description.startsWith('Điện'))).toMatchObject({ quantity: 7 })
+      const kept = await db.select().from(meterReadings).where(eq(meterReadings.meterId, m.id))
+      expect(kept).toHaveLength(1)
+      expect(kept[0].value).toBe(2133)
+    })
+
     it('dòng phí đồng hồ của hoá đơn thanh lý nháp sửa được (hoá đơn tháng thì bị khoá)', async () => {
       const [m] = await db
         .insert(meters)

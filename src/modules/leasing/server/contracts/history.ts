@@ -110,3 +110,12 @@ export async function recordTerminationHandover(
     .set({ snapshot: { ...(version.snapshot as object), terminationHandoverId: createdHandoverId } })
     .where(eq(contractVersions.id, versionId))
 }
+
+/** Ghi các khoản phát sinh (phạt…) do thanh lý tạo ra để hoàn tác xoá đúng chúng. */
+export async function recordTerminationOneOffs(tx: DB, versionId: string, oneOffIds: string[]): Promise<void> {
+  const [version] = await tx.select().from(contractVersions).where(eq(contractVersions.id, versionId))
+  await tx
+    .update(contractVersions)
+    .set({ snapshot: { ...(version.snapshot as object), terminationOneOffIds: oneOffIds } })
+    .where(eq(contractVersions.id, versionId))
+}

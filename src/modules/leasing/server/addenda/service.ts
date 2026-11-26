@@ -52,7 +52,12 @@ import type {
   Proration,
 } from '@/domain/types'
 import { recordAudit, registerExportOwnerResolver, registerOwnerResolver, getSettings } from '@/modules/platform'
-import { captureContractVersion, recordTerminationHandover, recordTerminationReadings } from '../contracts/history'
+import {
+  captureContractVersion,
+  recordTerminationHandover,
+  recordTerminationOneOffs,
+  recordTerminationReadings,
+} from '../contracts/history'
 import { applyTerminationClosure } from './finalize'
 import { leaseData, loadAddenda, nextInvoiceCode } from '../invoices/service'
 import type { StorageAdapter } from '@/modules/platform'
@@ -292,6 +297,8 @@ async function recordReadings(
   date: string,
   input: { meterId: string; value: number }[],
   onlyMeterIds?: Set<string>,
+  /** Đồng hồ giữ nguyên chỉ số bàn giao đã có cùng ngày (vd. chỉ số đầu hợp đồng khi thanh lý trong ngày bắt đầu): vẫn kiểm tra, không ghi đè. */
+  keepExisting?: Set<string>,
 ) {
   const needed = (await Promise.all(roomIds.map((r) => activeMeters(tx, r))))
     .flat()
@@ -310,6 +317,7 @@ async function recordReadings(
       .sort((a, b) => (a.readOn < b.readOn ? 1 : -1))[0]
     if (r.value < (prior?.value ?? m.startReading))
       throw new ValidationError('Chỉ số mới nhỏ hơn chỉ số cũ', { value: 'Chỉ số mới nhỏ hơn chỉ số cũ' })
+    if (keepExisting?.has(m.id)) continue
     await tx
       .insert(meterReadings)
       .values({ meterId: m.id, period: date.slice(0, 7), readOn: date, value: r.value, kind: 'handover' })
@@ -604,7 +612,23 @@ export async function createTermination(
       .limit(1)
     if (dup) throw new ValidationError('Hợp đồng đã có phụ lục thanh lý')
     const versionId = await captureContractVersion(tx, ctx, 'lease', leaseId, 'termination')
-    await recordReadings(tx, [l.roomId], data.endDate, data.readings, await linkedMeterIdsForLease(tx, leaseId))
+    // Thanh lý ngay ngày bắt đầu: chỉ số đầu hợp đồng nằm đúng ngày này, giữ nguyên để làm chỉ số đầu khi tính điện nước
+    const linkedIds = await linkedMeterIdsForLease(tx, leaseId)
+    const startReadings =
+      l.startDate === data.endDate && linkedIds.size
+        ? await tx
+            .select()
+            .from(meterReadings)
+            .where(
+              and(
+                inArray(meterReadings.meterId, [...linkedIds]),
+                eq(meterReadings.readOn, data.endDate),
+                eq(meterReadings.kind, 'handover'),
+              ),
+            )
+        : []
+    const keepStartReadings = new Set(startReadings.map((r) => r.meterId))
+    await recordReadings(tx, [l.roomId], data.endDate, data.readings, linkedIds, keepStartReadings)
     await recordTerminationReadings(
       tx,
       versionId,
@@ -656,15 +680,23 @@ export async function createTermination(
     }
 
     if (data.penalties?.length) {
-      await tx.insert(oneOffCharges).values(
-        data.penalties.map((p) => ({
-          leaseId,
-          kind: 'penalty',
-          description: p.description,
-          date: data.endDate,
-          quantity: 1,
-          unitPrice: p.amount,
-        })),
+      const createdPenalties = await tx
+        .insert(oneOffCharges)
+        .values(
+          data.penalties.map((p) => ({
+            leaseId,
+            kind: 'penalty',
+            description: p.description,
+            date: data.endDate,
+            quantity: 1,
+            unitPrice: p.amount,
+          })),
+        )
+        .returning()
+      await recordTerminationOneOffs(
+        tx,
+        versionId,
+        createdPenalties.map((x) => x.id),
       )
     }
     const [row] = await tx
@@ -789,7 +821,18 @@ export async function createTermination(
         startDate: base.startDate,
       })
       if (u.missing.length) throw new ValidationError(`Chưa có chỉ số ${f.name} để tính tiền`)
-      meterFees.push({ leaseFeeId: f.leaseFeeId!, name: f.name, unit: f.unit, usage: u.usage, unitPrice: f.unitPrice })
+      let usage = u.usage
+      // Thanh lý trong ngày bắt đầu: không còn ngày nào sau ngày bắt đầu nên tính thẳng từ chỉ số đầu đến chỉ số chốt
+      const startReading = keepStartReadings.has(linked.id)
+        ? startReadings.find((r) => r.meterId === linked.id)
+        : undefined
+      const endValue = data.readings.find((r) => r.meterId === linked.id)?.value
+      if (startReading && endValue !== undefined) {
+        if (endValue < startReading.value)
+          throw new ValidationError('Chỉ số mới nhỏ hơn chỉ số cũ', { value: 'Chỉ số mới nhỏ hơn chỉ số cũ' })
+        usage = endValue - startReading.value
+      }
+      meterFees.push({ leaseFeeId: f.leaseFeeId!, name: f.name, unit: f.unit, usage, unitPrice: f.unitPrice })
     }
     const built = buildTerminationInvoice({
       terms,
@@ -1167,7 +1210,9 @@ export async function addendumFormData(db: DB, ctx: AccessContext, leaseId: stri
   const people = await db
     .select({ id: tenants.id, name: tenants.fullName })
     .from(tenants)
-    .where(and(ne(tenants.kind, 'company'), or(eq(tenants.homeFacilityId, row.facilityId), isNull(tenants.homeFacilityId))))
+    .where(
+      and(ne(tenants.kind, 'company'), or(eq(tenants.homeFacilityId, row.facilityId), isNull(tenants.homeFacilityId))),
+    )
     .orderBy(asc(tenants.fullName))
   const fees = await db
     .select({ id: feeTypes.id, name: feeTypes.name, defaultPrice: feeTypes.defaultPrice })
