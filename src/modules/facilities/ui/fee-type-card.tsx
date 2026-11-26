@@ -37,7 +37,9 @@ export function FeeTypeCard({ fee, unitName, units, facilities, defaultFacilityI
 
   function remove() {
     if (
-      !window.confirm(`Xoá hẳn phí ${fee.name}? Không thể hoàn tác. Phí đã dùng trong hợp đồng thì chỉ có thể lưu trữ.`)
+      !window.confirm(
+        `Xoá hẳn phí ${fee.name}? Không thể hoàn tác. Phí đang dùng trong hợp đồng còn hiệu lực thì chỉ có thể lưu trữ.`,
+      )
     )
       return
     run(() => deleteFeeTypeAction(fee.id), 'Đã xoá')

@@ -8,6 +8,7 @@ import {
   feeDefaults,
   facilities,
   leaseFeeSnapshots,
+  leases,
   meters,
   oneOffCharges,
 } from '@/db'
@@ -206,7 +207,10 @@ export async function archiveFeeType(db: DB, ctx: AccessContext, id: string): Pr
   })
 }
 
-/** Xoá hẳn loại phí chưa từng dùng; phí đã gắn hợp đồng, phí phát sinh hoặc đồng hồ thì phải lưu trữ thay vì xoá. */
+/**
+ * Xoá hẳn loại phí. Chỉ phí đang dùng trong hợp đồng còn hiệu lực (phí hợp đồng hoặc phí phát sinh của hợp đồng đó) hoặc gắn đồng hồ thì không xoá được.
+ * Hợp đồng đã kết thúc giữ tên, đơn vị, giá đã chụp; chỉ bỏ liên kết tới loại phí.
+ */
 export async function deleteFeeType(db: DB, ctx: AccessContext, id: string): Promise<void> {
   assertCan(ctx, 'settings')
   await db.transaction(async (tx) => {
@@ -216,15 +220,22 @@ export async function deleteFeeType(db: DB, ctx: AccessContext, id: string): Pro
       tx
         .select({ id: leaseFeeSnapshots.id })
         .from(leaseFeeSnapshots)
-        .where(eq(leaseFeeSnapshots.feeTypeId, id))
+        .innerJoin(leases, eq(leases.id, leaseFeeSnapshots.leaseId))
+        .where(and(eq(leaseFeeSnapshots.feeTypeId, id), eq(leases.status, 'active')))
         .limit(1),
-      tx.select({ id: oneOffCharges.id }).from(oneOffCharges).where(eq(oneOffCharges.feeTypeId, id)).limit(1),
+      tx
+        .select({ id: oneOffCharges.id })
+        .from(oneOffCharges)
+        .innerJoin(leases, eq(leases.id, oneOffCharges.leaseId))
+        .where(and(eq(oneOffCharges.feeTypeId, id), eq(leases.status, 'active')))
+        .limit(1),
       tx.select({ id: meters.id }).from(meters).where(eq(meters.feeTypeId, id)).limit(1),
     ])
-    if (lease.length || charge.length || meter.length)
-      throw new ValidationError(
-        'Loại phí đã được dùng trong hợp đồng, phí phát sinh hoặc đồng hồ, hãy lưu trữ thay vì xoá',
-      )
+    if (lease.length || charge.length)
+      throw new ValidationError('Loại phí đang dùng trong hợp đồng còn hiệu lực, hãy lưu trữ thay vì xoá')
+    if (meter.length) throw new ValidationError('Loại phí đang gắn với đồng hồ, hãy lưu trữ thay vì xoá')
+    await tx.update(leaseFeeSnapshots).set({ feeTypeId: null }).where(eq(leaseFeeSnapshots.feeTypeId, id))
+    await tx.update(oneOffCharges).set({ feeTypeId: null }).where(eq(oneOffCharges.feeTypeId, id))
     await tx.delete(feeTypes).where(eq(feeTypes.id, id))
     await recordAudit(tx, ctx, {
       action: 'delete',

@@ -227,7 +227,7 @@ export function FeeSettings({ facilities, units, feeTypes, prices, defaults }: P
                     onClick={() => {
                       if (
                         !window.confirm(
-                          `Xoá hẳn phí ${fee.name}? Không thể hoàn tác. Phí đã dùng trong hợp đồng thì chỉ có thể lưu trữ.`,
+                          `Xoá hẳn phí ${fee.name}? Không thể hoàn tác. Phí đang dùng trong hợp đồng còn hiệu lực thì chỉ có thể lưu trữ.`,
                         )
                       )
                         return
