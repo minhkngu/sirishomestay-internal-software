@@ -73,7 +73,15 @@ Lucas mới nêu nhu cầu "thao tác được hết", chưa chọn rõ A, B hay
 3. **Server.** Nới `checkDate` cho gia hạn. `newFees` mang `leaseFeeId` (dòng cũ) hoặc tạo dòng `lease_fee_snapshots` mới (phí thêm, có đồng hồ và chỉ số đầu). Phí bỏ thì vắng mặt trong danh sách; dòng cũ giữ lại cho các kỳ trước.
 4. **Hoá đơn.** Mỗi kỳ dùng điều khoản tại ngày của kỳ như hiện nay. Đơn giá điện, nước của hoá đơn tháng N theo điều khoản của kỳ hoá đơn N (hành vi hiện có), nghĩa là chỉ số dùng từ tháng N−1 được tính theo giá mới nếu kỳ N đã thuộc kỳ gia hạn. Đây là lựa chọn của Claude, cần Lucas xác nhận.
 5. **Khôi phục.** Xoá các dòng phí mới do phụ lục tạo, trả lại phiên bản đã chụp.
-6. **Kiểm thử (viết, chưa chạy theo quy trình của repo).** Thêm vào `tests/integration/addenda.test.ts`: gia hạn đổi giá điện giữ đủ dòng điện, nước; bỏ phí; thêm phí đồng hồ; ngày hiệu lực = ngày kết thúc cũ + 1; Khôi phục. Cập nhật `tests/e2e/addenda.spec.ts` và mục Gia hạn trong Test Flow.
+6. **Xem lại lịch sử: so sánh Trước/Sau.** Chi tiết phụ lục gia hạn hiện hai cột "Trước" và "Sau" cho giá thuê, cọc và từng phí (đơn giá, số lượng; phí bỏ hoặc thêm có nhãn). "Trước" lấy từ điều khoản hiệu lực ngay trước ngày hiệu lực (`contractTermsAt`). Không đổi cách lưu dữ liệu. Hoá đơn cũ không đổi vì `invoice_lines` đã lưu cứng đơn giá lúc tạo.
+7. **Kiểm thử (viết, chưa chạy theo quy trình của repo).** Thêm vào `tests/integration/addenda.test.ts`: gia hạn đổi giá điện giữ đủ dòng điện, nước; bỏ phí; thêm phí đồng hồ; ngày hiệu lực = ngày kết thúc cũ + 1; Khôi phục. Cập nhật `tests/e2e/addenda.spec.ts` và mục Gia hạn trong Test Flow.
+
+## Giá thuê và tiền cọc khi gia hạn (hành vi hiện có, giữ nguyên)
+
+- Giá thuê mới tính từ ngày hiệu lực qua `contractTermsAt`; hoá đơn mỗi kỳ tự lấy điều khoản tại ngày đầu kỳ. Hợp đồng gốc không bị sửa, chỉ ngày kết thúc được cập nhật ngay khi lưu phụ lục.
+- Cọc tăng: phụ lục ghi khoản "Thu cọc bổ sung" (chờ) vào sổ cọc; hoá đơn tiền phòng đầu tiên của kỳ gia hạn tự có dòng "Tiền cọc còn thiếu" bằng phần tăng, chỉ một lần.
+- Cọc giảm: ghi khoản "Hoàn cọc chênh lệch" (chờ) vào sổ cọc; nhân viên hoàn tiền thủ công.
+- Cần kiểm tra khi lập kế hoạch: (a) khoản "Thu cọc bổ sung" chờ trong sổ cọc có bị tính trùng với dòng "Tiền cọc còn thiếu" không; (b) hoá đơn nháp của kỳ gia hạn tạo trước khi lưu phụ lục có được tính lại không.
 
 ## Việc để người làm kế hoạch tự quyết
 
