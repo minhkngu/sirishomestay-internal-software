@@ -26,3 +26,4 @@ export {
   updatePayment,
 } from './server/invoices/service'
 export { computeDueDate } from './domain/due-date'
+export { addWalletEntry, listOverpayEntries, listWalletEntries, walletBalance } from './server/wallet/service'
