@@ -155,6 +155,7 @@ function toAddendum(a: typeof addenda.$inferSelect): Addendum {
     newMonthlyRent: a.newMonthlyRent,
     newDepositAmount: a.newDepositAmount,
     newFees: a.newFees as Addendum['newFees'],
+    reference: a.reference as Addendum['reference'],
     newOccupantIds: a.newOccupantIds as string[] | null,
     oldRoomId: a.oldRoomId,
     adjustmentTarget: a.adjustmentTarget as 'next' | 'current',

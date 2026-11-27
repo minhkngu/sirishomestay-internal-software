@@ -1,0 +1,1 @@
+ALTER TABLE "addenda" ADD COLUMN "reference" jsonb;

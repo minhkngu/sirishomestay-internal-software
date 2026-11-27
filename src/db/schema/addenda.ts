@@ -21,6 +21,8 @@ export const addenda = pgTable(
     oldTenantId: uuid('old_tenant_id').references(() => tenants.id),
     newTenantId: uuid('new_tenant_id').references(() => tenants.id),
     newFees: jsonb('new_fees'),
+    /** Phụ lục gia hạn ghi thẳng vào hợp đồng: lưu điều khoản trước và sau để tham khảo, không dùng để tính tiền. */
+    reference: jsonb('reference'),
     newOccupantIds: jsonb('new_occupant_ids'),
     oldOccupantIds: jsonb('old_occupant_ids'),
     depositForfeit: jsonb('deposit_forfeit'),
