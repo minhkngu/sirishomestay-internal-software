@@ -93,7 +93,10 @@ describe('schema', () => {
   })
 
   it('sổ ví khách: sourceKey duy nhất và hợp đồng có cột transferFromLeaseId', async () => {
-    const [t] = await db.insert(tenants).values({ kind: 'vietnamese', fullName: 'Khách ví' }).returning()
+    const [t] = await db
+      .insert(tenants)
+      .values({ kind: 'vietnamese', fullName: 'Khách ví', phone: '+84901234567', idNumber: '012345678902' })
+      .returning()
     const row = {
       tenantId: t.id,
       facilityId: fA,

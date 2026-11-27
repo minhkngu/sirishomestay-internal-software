@@ -37,7 +37,7 @@ const context = (permissions: Permission[], facilityId: string): AccessContext =
 
 describe('thanh lý nối ví và chuyển phòng', () => {
   let db: DB, facilityId: string, leaseId: string, roomId: string, room2Id: string, tenantId: string
-  const ctx = () => context(['tenants_contracts', 'billing'], facilityId)
+  const ctx = () => context(['tenants_contracts', 'billing', 'delete_contracts'], facilityId)
   // Hoá đơn tháng 11 (9 triệu) đã duyệt, chưa thu; cọc 9 triệu đã thu
   beforeEach(async () => {
     db = await createTestDb()
@@ -254,7 +254,10 @@ describe('thanh lý nối ví và chuyển phòng', () => {
     await newLease()
     await terminate({}, { transfer: true })
     const preview = await previewContractRestore(db, ctx(), 'lease', leaseId)
-    expect(preview.blockedReason).toContain('chuyển phòng')
+    // Khôi phục hợp đồng cũ chính là huỷ chuyển phòng: xem trước báo roomChange và liệt kê hợp đồng mới bị xoá
+    expect(preview.roomChange).toBe(true)
+    expect(preview.blockedReason).toBeNull()
+    expect(preview.items.some((i) => i.type === 'lease')).toBe(true)
   })
 
   describe('chuyển phòng hai bước', () => {

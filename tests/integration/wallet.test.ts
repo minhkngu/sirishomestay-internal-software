@@ -19,7 +19,10 @@ describe('sổ ví khách', () => {
     db = await createTestDb()
     ;[{ id: fA }] = await db.insert(facilities).values({ code: 'A', name: 'A' }).returning()
     ;[{ id: fB }] = await db.insert(facilities).values({ code: 'B', name: 'B' }).returning()
-    ;[{ id: tenantId }] = await db.insert(tenants).values({ kind: 'vietnamese', fullName: 'Khách' }).returning()
+    ;[{ id: tenantId }] = await db
+      .insert(tenants)
+      .values({ kind: 'vietnamese', fullName: 'Khách', phone: '+84901234567', idNumber: '012345678901' })
+      .returning()
   })
 
   it('số dư là tổng các biến động', async () => {
