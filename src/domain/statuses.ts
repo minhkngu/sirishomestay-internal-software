@@ -13,3 +13,5 @@ export type HandoverStatus = 'draft' | 'done'
 export type InvoiceStatus = 'draft' | 'approved'
 // Loại hoá đơn: monthly (tháng), first (kỳ đầu), termination (thanh lý), manual (nhập từ Excel). Hiện chỉ monthly, termination, manual được ghi; first vẫn được đọc ở domain/types.ts.
 export type InvoiceKind = 'monthly' | 'first' | 'termination' | 'manual'
+// Loại biến động ví khách: overpay (thu vượt, +), use_invoice (dùng ví khi thu tiền, −), use_termination (ví gạch vào hoá đơn thanh lý, −).
+export type WalletEntryKind = 'overpay' | 'use_invoice' | 'use_termination'
