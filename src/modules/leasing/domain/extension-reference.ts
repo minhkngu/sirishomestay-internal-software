@@ -50,15 +50,13 @@ export function referenceMismatches(current: TermsRef, expected: TermsRef): Refe
   }))
 }
 
-/** Điều khoản sau gia hạn của phụ lục gia hạn mới nhất (theo ngày hiệu lực, rồi ngày tạo); bỏ qua phụ lục không có bản tham khảo. */
+/** Điều khoản sau gia hạn của phụ lục gia hạn mới nhất (theo ngày tạo, phụ lục tạo sau là điều khoản hiện hành); bỏ qua phụ lục không có bản tham khảo. */
 export function latestExtensionReference(
   list: { type: string; effectiveDate: string; createdAt?: Date | string | null; reference?: unknown }[],
 ): TermsRef | null {
   const withRef = list.filter((a) => a.type === 'extension' && a.reference)
   if (!withRef.length) return null
   const stamp = (a: { createdAt?: Date | string | null }) => (a.createdAt ? new Date(a.createdAt).getTime() : 0)
-  const last = [...withRef].sort((a, b) =>
-    a.effectiveDate < b.effectiveDate ? -1 : a.effectiveDate > b.effectiveDate ? 1 : stamp(a) - stamp(b),
-  )[withRef.length - 1]
+  const last = [...withRef].sort((a, b) => stamp(a) - stamp(b))[withRef.length - 1]
   return (last.reference as { after: TermsRef }).after
 }

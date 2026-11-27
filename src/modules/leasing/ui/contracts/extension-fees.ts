@@ -35,7 +35,7 @@ export function initialFeeRows(current: FeeData['current']): ExtensionFeeRow[] {
     unit: f.unit,
     isMeter: f.quantitySource === 'meter',
     price: String(f.unitPrice),
-    meterId: '',
+    meterId: f.meterId ?? '',
     initialReading: '',
   }))
 }
@@ -45,14 +45,22 @@ export function extensionFeesPayload(
   rows: ExtensionFeeRow[],
   initial: ExtensionFeeRow[],
 ): ExtensionFeeEdit[] | undefined {
+  // Dòng cũ để trống đơn giá thì giữ giá hiện tại; dòng mới để trống thì gửi -1 để server báo lỗi
+  const priceOf = (r: ExtensionFeeRow) => {
+    if (r.price.trim() !== '') return Number(r.price)
+    const old = r.leaseFeeId ? initial.find((i) => i.leaseFeeId === r.leaseFeeId) : undefined
+    return old ? Number(old.price) : -1
+  }
   const unchanged =
     rows.length === initial.length &&
-    rows.every((r) => r.leaseFeeId && initial.some((i) => i.leaseFeeId === r.leaseFeeId && i.price === r.price))
+    rows.every(
+      (r) => r.leaseFeeId && initial.some((i) => i.leaseFeeId === r.leaseFeeId && i.price === String(priceOf(r))),
+    )
   if (unchanged) return undefined
   return rows.map((r) => ({
     ...(r.leaseFeeId ? { leaseFeeId: r.leaseFeeId } : {}),
     ...(!r.leaseFeeId && r.feeTypeId ? { feeTypeId: r.feeTypeId } : {}),
-    unitPrice: Number(r.price),
+    unitPrice: priceOf(r),
     ...(!r.leaseFeeId && r.isMeter
       ? {
           existingMeterId: r.meterId || undefined,

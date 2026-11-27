@@ -112,7 +112,7 @@ const occupantSchema = z.object({
 const extensionFeeEditSchema = z.object({
   leaseFeeId: z.uuid().optional(),
   feeTypeId: z.uuid().optional(),
-  unitPrice: z.number().int().nonnegative().max(MAX_MONEY),
+  unitPrice: z.number().int('Đơn giá phí không hợp lệ').nonnegative('Đơn giá phí không hợp lệ').max(MAX_MONEY),
   existingMeterId: z.uuid().optional(),
   initialReading: z.number().int().nonnegative().optional(),
 })
@@ -471,12 +471,18 @@ export async function createExtension(
     const [base, existing] = await Promise.all([leaseData(tx, leaseId), loadAddenda(tx, leaseId)])
     // Phụ lục cũ (mô hình cũ) còn ghi đè giá thì giá ghi thẳng vào hợp đồng sẽ không có tác dụng: báo rõ thay vì ghi sai
     const shadowed =
-      (data.newMonthlyRent != null && existing.some((a) => a.newMonthlyRent != null)) ||
-      (data.newDepositAmount != null && existing.some((a) => a.newDepositAmount != null)) ||
-      (data.fees != null && existing.some((a) => a.newFees))
+      (data.newMonthlyRent != null &&
+        data.newMonthlyRent !== base.monthlyRent &&
+        existing.some((a) => a.newMonthlyRent != null)) ||
+      (data.newDepositAmount != null &&
+        data.newDepositAmount !== base.depositAmount &&
+        existing.some((a) => a.newDepositAmount != null)) ||
+      (data.fees != null && data.fees.length > 0 && existing.some((a) => a.newFees && a.newFees.length > 0))
     if (shadowed)
-      throw new ValidationError('Hợp đồng có phụ lục cũ đã đổi giá hoặc phí, chưa gia hạn ghi thẳng được cho mục đó')
-    const before = termsRefOf(contractTermsAt(base, existing, l.endDate))
+      throw new ValidationError(
+        'Hợp đồng có phụ lục đã đổi giá hoặc phí (gia hạn kiểu cũ hoặc chuyển phòng), chưa gia hạn ghi thẳng được cho mục đó',
+      )
+    const before = termsRefOf(base)
     const newDeposit =
       data.newDepositAmount != null && data.newDepositAmount !== l.depositAmount ? data.newDepositAmount : null
     await captureContractVersion(tx, ctx, 'lease', leaseId, 'extension')
@@ -491,7 +497,7 @@ export async function createExtension(
       .where(eq(leases.id, leaseId))
     if (data.fees) await applyLeaseFeeEdits(tx, ctx, leaseId, data.fees, l.roomId, l.startDate)
     const afterBase = await leaseData(tx, leaseId)
-    const after = termsRefOf(contractTermsAt(afterBase, existing, data.newEndDate))
+    const after = termsRefOf(afterBase)
     const [row] = await tx
       .insert(addenda)
       .values({
@@ -1164,6 +1170,7 @@ for (const docType of Object.values(DOC)) {
           }
         : undefined
     const t = row.tenant
+    const ref = a.reference as { before: TermsRef; after: TermsRef } | null
     const entities: DocEntities = {
       now: todayVN(),
       oldTenant: person(oldTenant),
@@ -1182,15 +1189,15 @@ for (const docType of Object.values(DOC)) {
       lease: {
         code: row.l.code,
         startDate: row.l.startDate,
-        endDate: row.l.endDate,
-        monthlyRent: row.l.monthlyRent,
-        depositAmount: row.l.depositAmount,
+        endDate: ref?.before.endDate ?? row.l.endDate,
+        monthlyRent: ref?.before.monthlyRent ?? row.l.monthlyRent,
+        depositAmount: ref?.before.depositAmount ?? row.l.depositAmount,
       },
       addendum: {
         effectiveDate: a.effectiveDate,
-        newEndDate: a.newEndDate,
-        newMonthlyRent: a.newMonthlyRent,
-        newDepositAmount: a.newDepositAmount,
+        newEndDate: ref?.after.endDate ?? a.newEndDate,
+        newMonthlyRent: ref?.after.monthlyRent ?? a.newMonthlyRent,
+        newDepositAmount: ref?.after.depositAmount ?? a.newDepositAmount,
         newRoomCode: a.newRoomId ? row.room.code : null,
       },
     }

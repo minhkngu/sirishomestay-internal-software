@@ -61,11 +61,11 @@ describe('referenceMismatches', () => {
 
 describe('latestExtensionReference', () => {
   const ref = (rent: number) => ({ before: base, after: { ...base, monthlyRent: rent } })
-  it('lấy phụ lục gia hạn mới nhất theo ngày hiệu lực rồi ngày tạo', () => {
+  it('lấy phụ lục gia hạn tạo sau cùng', () => {
     const list = [
       { type: 'extension', effectiveDate: '2027-01-01', createdAt: '2026-12-01', reference: ref(1) },
       { type: 'extension', effectiveDate: '2028-01-01', createdAt: '2026-12-02', reference: ref(2) },
-      { type: 'extension', effectiveDate: '2028-01-01', createdAt: '2026-12-03', reference: ref(3) },
+      { type: 'extension', effectiveDate: '2027-06-01', createdAt: '2026-12-03', reference: ref(3) },
     ]
     expect(latestExtensionReference(list)?.monthlyRent).toBe(3)
   })

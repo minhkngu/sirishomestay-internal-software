@@ -348,6 +348,25 @@ describe('phụ lục hợp đồng', () => {
       await db.update(leases).set({ monthlyRent: 10500000 }).where(eq(leases.id, leaseId))
       expect((await terms()).monthlyRent).toBe(10500000)
     })
+    it('sửa ngày kết thúc hợp đồng sau gia hạn: ngày mới có hiệu lực vì phụ lục gia hạn không ghi đè', async () => {
+      await extend()
+      await db.update(leases).set({ endDate: '2027-03-31' }).where(eq(leases.id, leaseId))
+      const t = contractTermsAt(await leaseData(db, leaseId), await loadAddenda(db, leaseId), '2027-03-01')
+      expect(t.endDate).toBe('2027-03-31')
+    })
+    it('hợp đồng có phụ lục cũ ghi đè giá: gia hạn giữ nguyên giá vẫn được, tham khảo lấy giá của hợp đồng', async () => {
+      await db
+        .insert(addenda)
+        .values({ leaseId, type: 'extension', effectiveDate: '2026-06-01', newMonthlyRent: 9500000 })
+      const r = await extend({ newMonthlyRent: 9000000 })
+      expect(r.addendum.reference).toMatchObject({
+        before: { monthlyRent: 9000000 },
+        after: { monthlyRent: 9000000, endDate: '2027-06-30' },
+      })
+      await expect(
+        extend({ effectiveDate: '2027-07-01', newEndDate: '2027-12-31', newMonthlyRent: 9100000 }),
+      ).rejects.toThrow(ValidationError)
+    })
     it('đổi giá điện giữ nguyên dòng phí điện và gắn đồng hồ; bỏ phí cố định; thêm phí mới', async () => {
       const { fee: electric } = await electricMeterFee()
       const parking = await fixedFee('Giữ xe')

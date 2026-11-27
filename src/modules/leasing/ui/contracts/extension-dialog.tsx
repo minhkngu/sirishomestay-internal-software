@@ -38,7 +38,7 @@ export function ExtensionDialog({
   const input = {
     effectiveDate,
     newEndDate,
-    ...(rent ? { newMonthlyRent: Number(rent) } : {}),
+    ...(rent && Number(rent) !== monthlyRent ? { newMonthlyRent: Number(rent) } : {}),
     // Chỉ đổi cọc nếu có nhập và khác cọc hiện tại
     ...(deposit && Number(deposit) !== depositAmount ? { newDepositAmount: Number(deposit) } : {}),
     ...(fees ? { fees } : {}),
@@ -141,7 +141,7 @@ export function ExtensionDialog({
                 setRows((rs) => [
                   ...rs,
                   {
-                    key: `new-${o.id}-${rs.length}`,
+                    key: `new-${crypto.randomUUID()}`,
                     leaseFeeId: null,
                     feeTypeId: o.id,
                     name: o.name,
