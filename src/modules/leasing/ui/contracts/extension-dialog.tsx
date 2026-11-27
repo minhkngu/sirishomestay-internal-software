@@ -1,5 +1,5 @@
 'use client'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { createExtensionAction } from '../../server/addenda/actions'
 import { AddendumShell, Field, inputCls } from './addendum-shell'
 import { BareSelect } from './contract-form-ui'
@@ -25,7 +25,7 @@ export function ExtensionDialog({
   defaultOpen?: boolean
   onCompleted?: () => void
 }) {
-  const initialRows = useMemo(() => initialFeeRows(feeData?.current ?? []), [feeData])
+  const [initialRows] = useState(() => initialFeeRows(feeData?.current ?? []))
   const [effectiveDate, setEffective] = useState(defaultExtensionDate(endDate))
   const [newEndDate, setEnd] = useState('')
   const [rent, setRent] = useState('')
