@@ -30,7 +30,12 @@ export async function walletBalance(db: DB, tenantId: string, facilityId: string
 
 /** Ghi một biến động ví; trùng `sourceKey` thì bỏ qua. Trả true nếu đã ghi mới. */
 export async function addWalletEntry(tx: DB, e: WalletEntryInput): Promise<boolean> {
-  const rows = await tx
+  const [exists] = await tx
+    .select({ id: tenantWalletEntries.id })
+    .from(tenantWalletEntries)
+    .where(eq(tenantWalletEntries.sourceKey, e.sourceKey))
+  if (exists) return false
+  await tx
     .insert(tenantWalletEntries)
     .values({
       tenantId: e.tenantId,
@@ -45,8 +50,7 @@ export async function addWalletEntry(tx: DB, e: WalletEntryInput): Promise<boole
       sourceKey: e.sourceKey,
     })
     .onConflictDoNothing({ target: tenantWalletEntries.sourceKey })
-    .returning({ id: tenantWalletEntries.id })
-  return rows.length > 0
+  return true
 }
 
 /** Lịch sử biến động ví của khách tại một cơ sở (mới nhất trước); cần quyền thu tiền ở cơ sở đó. */
