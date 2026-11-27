@@ -10,6 +10,7 @@ import {
   invoiceLines,
   leaseOccupants,
   leases,
+  pendingAdjustments,
 } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
@@ -17,6 +18,7 @@ import { addDays } from '@/domain/dates'
 import { depositBalance } from '@/domain/deposit'
 import type { DepositEntry, ForfeitInput } from '@/domain/types'
 import { recordAudit, getSettings } from '@/modules/platform'
+import { addWalletEntry } from '../wallet/service'
 
 /**
  * Chốt trạng thái hợp đồng thanh lý (`ended`), cập nhật `endDate`, đặt hạn xoá ảnh bàn giao/giấy tờ,
@@ -142,6 +144,48 @@ export async function applyTerminationClosure(
 }
 
 /**
+ * Duyệt hoá đơn thanh lý: trừ ví khách thật bằng dòng ví của hoá đơn, và nếu hợp đồng này được chuyển phòng
+ * (có hợp đồng mới trỏ về nó) thì cộng dồn kết quả T (dương là nợ, âm là số dư) sang hợp đồng mới thành điều chỉnh chờ.
+ * Mọi bút toán có `sourceKey` nên chạy lại không ghi trùng.
+ */
+async function settleWalletAndTransfer(
+  tx: DB,
+  invoice: { id: string; facilityId: string },
+  lease: { id: string; code: string; tenantId: string },
+  endDate: string,
+): Promise<void> {
+  const lines = await tx.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, invoice.id))
+  const meta = (l: (typeof lines)[number]) => (l.meta ?? {}) as Record<string, unknown>
+  const walletLine = lines.find((l) => typeof meta(l).wallet === 'number')
+  if (walletLine && walletLine.amount < 0)
+    await addWalletEntry(tx, {
+      tenantId: lease.tenantId,
+      facilityId: invoice.facilityId,
+      amount: walletLine.amount,
+      kind: 'use_termination',
+      leaseId: lease.id,
+      invoiceId: invoice.id,
+      date: endDate,
+      note: 'Ví khách gạch vào hoá đơn thanh lý',
+      sourceKey: `use_termination:${invoice.id}`,
+    })
+  const transferLine = lines.find((l) => meta(l).transfer === true)
+  if (!transferLine) return
+  const [next] = await tx.select({ id: leases.id }).from(leases).where(eq(leases.transferFromLeaseId, lease.id))
+  const carried = -transferLine.amount
+  if (!next || carried === 0) return
+  await tx
+    .insert(pendingAdjustments)
+    .values({
+      leaseId: next.id,
+      description: `Chuyển từ hợp đồng ${lease.code}`,
+      amount: carried,
+      sourceKey: `transfer:${lease.id}`,
+    })
+    .onConflictDoNothing({ target: pendingAdjustments.sourceKey })
+}
+
+/**
  * Chạy khi hoá đơn thanh lý được duyệt: chốt hợp đồng nếu chưa chốt (dữ liệu cũ);
  * ghi sổ cọc `forfeit` (mất cọc) và `deduct` (phần cọc đã trừ vào hoá đơn) ở trạng thái done để số dư về 0.
  */
@@ -167,6 +211,7 @@ export async function finalizeTermination(
       endDate,
     })
   }
+  await settleWalletAndTransfer(tx, invoice, lease, endDate)
 
   const entries = await tx.select().from(depositEntries).where(eq(depositEntries.leaseId, lease.id))
   const alreadySettled = entries.some((e) => e.status === 'done' && (e.type === 'forfeit' || e.type === 'deduct'))

@@ -1319,6 +1319,22 @@ export async function unapproveInvoice(db: DB, ctx: AccessContext, id: string): 
     await tx.select({ id: invoices.id }).from(invoices).where(eq(invoices.id, id)).for('update')
     const before = await getInvoice(tx, ctx, id)
     if (before.status !== 'approved') throw new ValidationError('Chỉ bỏ duyệt hoá đơn đã duyệt')
+    if (before.kind === 'termination') {
+      // Hoá đơn thanh lý đã gạch ví hoặc chuyển phòng: duyệt đã ghi sổ ví/điều chỉnh nên không bỏ duyệt được
+      const lineMeta = await tx
+        .select({ meta: invoiceLines.meta })
+        .from(invoiceLines)
+        .where(eq(invoiceLines.invoiceId, id))
+      if (
+        lineMeta.some((l) => {
+          const m = (l.meta ?? {}) as Record<string, unknown>
+          return m.transfer === true || typeof m.wallet === 'number'
+        })
+      )
+        throw new ValidationError(
+          'Hoá đơn thanh lý chuyển phòng hoặc đã gạch ví không bỏ duyệt được: dùng Huỷ chuyển phòng',
+        )
+    }
     if ((await tx.select({ id: payments.id }).from(payments).where(eq(payments.invoiceId, id)).limit(1)).length)
       throw new ValidationError('Gỡ các khoản đã thu trước khi bỏ duyệt')
     const [after] = await tx

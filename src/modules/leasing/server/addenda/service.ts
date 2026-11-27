@@ -66,6 +66,7 @@ import { applyLeaseFeeEdits } from '../contracts/lease-fees'
 import { leaseData, loadAddenda, nextInvoiceCode } from '../invoices/service'
 import type { StorageAdapter } from '@/modules/platform'
 import { exportDocument, registerDocLoader } from '@/modules/documents'
+import { walletBalance } from '../wallet/service'
 
 type AddendumRow = typeof addenda.$inferSelect
 export type AdjustmentPreview = {
@@ -667,11 +668,16 @@ export async function createAssignment(
   })
 }
 
+/**
+ * Thanh lý hợp đồng. `opts.transfer` = thanh lý để chuyển phòng: ngày kết thúc thuộc phòng mới nên tiền phòng cũ chỉ tính
+ * đến hết ngày trước đó, và hoá đơn có dòng "Chuyển sang hợp đồng mới" đưa tổng về 0.
+ */
 export async function createTermination(
   db: DB,
   ctx: AccessContext,
   leaseId: string,
   input: unknown,
+  opts: { transfer?: boolean } = {},
 ): Promise<AddendumResult> {
   const data = parse(terminationSchema, input)
   return db.transaction(async (tx0) => {
@@ -917,6 +923,9 @@ export async function createTermination(
       ),
       forfeit: data.forfeit as ForfeitInput,
       rentRefund: data.rentRefund,
+      walletBalance: await walletBalance(tx, l.tenantId, facilityId),
+      transfer: opts.transfer,
+      billedUntil: opts.transfer ? addDays(data.endDate, -1) : undefined,
     })
     if (data.rentRefund.mode === 'partial' && (data.rentRefund.amount ?? 0) > built.maxRefund)
       throw new ValidationError('Số tiền hoàn vượt mức tính theo ngày', {
