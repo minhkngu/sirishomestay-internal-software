@@ -27,7 +27,7 @@ import { createAssignmentAction } from '../../server/addenda/actions'
 import { ContractEditActions, type RenderCreateFee, type RenderCreatePerson } from './contract-edit-actions'
 import { ExtensionDialog } from './extension-dialog'
 import { TerminationWizard } from './termination-wizard'
-import { TransferWizard } from './transfer-wizard'
+import { RoomChangeWizard } from './room-change-dialog'
 import { BareSelect } from './contract-form-ui'
 
 type Action = 'edit' | 'delete' | 'termination' | 'assignment' | 'extension' | 'transfer' | 'restore'
@@ -283,12 +283,15 @@ export function ContractRowActions({
             />
           )}
           {data?.form && action === 'transfer' && (
-            <TransferWizard
+            <RoomChangeWizard
               leaseId={id}
               currentRoomId={data.form.currentRoomId}
               freeRooms={data.form.freeRooms}
               meters={data.form.meters}
               today={data.form.today}
+              endDate={data.form.endDate}
+              monthlyRent={data.form.monthlyRent}
+              depositAmount={data.form.depositAmount}
               defaultOpen
               onCompleted={close}
             />
