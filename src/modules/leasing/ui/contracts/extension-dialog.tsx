@@ -56,6 +56,7 @@ export function ExtensionDialog({
       create={createExtensionAction}
       defaultOpen={defaultOpen}
       onCompleted={onCompleted}
+      simple
     >
       <Field label="Ngày hiệu lực của phụ lục">
         <input type="date" className={inputCls} value={effectiveDate} onChange={(e) => setEffective(e.target.value)} />
