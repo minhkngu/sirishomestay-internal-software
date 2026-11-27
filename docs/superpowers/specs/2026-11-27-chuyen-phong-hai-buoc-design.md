@@ -32,7 +32,7 @@ Phản mục tiêu:
 ## 3. Hiện trạng (đã đọc code)
 
 - `createTransfer` (`src/modules/leasing/server/addenda/service.ts`) giữ một hợp đồng, đổi `roomId`, tạo phụ lục `transfer`.
-- Thanh lý chạy hai pha: `createTermination` tạo phụ lục `termination` và hoá đơn thanh lý **nháp**, chốt chỉ số cuối, biên bản check-out, phạt. Hợp đồng chỉ thành `ended` và sổ cọc chỉ ghi `deduct`/`forfeit` khi **duyệt** hoá đơn thanh lý (`finalizeTermination`, `addenda/finalize.ts`).
+- Thanh lý chạy hai pha: `createTermination` tạo phụ lục `termination` và hoá đơn thanh lý **nháp**, chốt chỉ số cuối, biên bản check-out, phạt. Hợp đồng thành `ended` ngay lúc tạo thanh lý (`applyTerminationClosure`); sổ cọc chỉ ghi `deduct`/`forfeit` khi **duyệt** hoá đơn thanh lý (`finalizeTermination`, `addenda/finalize.ts`).
 - `buildTerminationInvoice` (`leasing/domain/liquidation.ts`) dựng hoá đơn thanh lý: hoàn tiền phòng và phí cố định đã trả trước theo ngày, tiền phòng còn thiếu, phí đồng hồ, khoản phát sinh, điều chỉnh chờ, phạt, nợ cũ, dòng `deposit_offset` cho cọc. Tổng âm là hoàn cho khách.
 - `LeaseStatus` chỉ có `active | ended`.
 - **Thu vượt đang bị chặn**: `recordLeasePayment` (`invoices/service.ts`) ném "Số tiền vượt tổng dư nợ". `payments` luôn gắn một `invoiceId`.
@@ -93,7 +93,7 @@ Phản mục tiêu:
 - Hoá đơn hiện dòng cuối "Chuyển sang hợp đồng <mã mới>" bằng `−T`, để số phải trả của hoá đơn về 0 và **không phát sinh khoản hoàn tiền mặt** ở chế độ chuyển phòng.
 
 **Khi duyệt hoá đơn thanh lý (cùng một giao dịch).**
-1. `finalizeTermination` chạy như hiện nay: kết thúc hợp đồng cũ, ghi sổ cọc cũ.
+1. `finalizeTermination` chạy như hiện nay: ghi sổ cọc cũ (hợp đồng cũ đã `ended` từ lúc tạo thanh lý).
 2. Trừ ví thật bằng biến động `use_termination` (nếu có dòng giảm ví).
 3. Ghi một điều chỉnh chờ cho hợp đồng **mới**: `amount = T` (dương là nợ, âm là số dư), `sourceKey = transfer:<mã chuyển>`, mô tả "Chuyển từ hợp đồng <mã cũ>". Hoá đơn kế tiếp của hợp đồng mới hút dòng này bằng cơ chế sẵn có. Không cần khoá tài chính: dòng này chờ ở hợp đồng mới và vào hoá đơn đầu khi nhân viên tạo.
 4. Ghi khoản "chuyển sang hợp đồng mới" để hoá đơn thanh lý đóng, không ghi tiền thu. Mọi bút toán có `sourceKey` theo mã chuyển nên chạy lại không ghi trùng.
