@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { facilities, leases, payments, rooms, tenants } from '@/db'
+import { facilities, leases, payments, rooms, tenants, tenantWalletEntries } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ForbiddenError, ValidationError } from '@/domain/errors'
@@ -8,6 +8,7 @@ import {
   approveInvoice,
   createDrafts,
   leaseDebt,
+  leaseWalletBalance,
   listInvoices,
   recordLeasePayment,
 } from '@/modules/leasing/server/invoices/service'
@@ -79,10 +80,47 @@ describe('ghi thu theo hợp đồng', () => {
     expect(await leaseDebt(db, ctx(), leaseId)).toBe(0)
     expect((await db.select().from(payments)).length).toBe(2)
   })
-  it('thu quá dư nợ, bằng 0 hoặc không nguyên thì từ chối và không ghi gì', async () => {
-    for (const amount of [18000001, 0, -5, 1.5])
+  it('thu bằng 0, âm hoặc không nguyên thì từ chối và không ghi gì', async () => {
+    for (const amount of [0, -5, 1.5])
       await expect(recordLeasePayment(db, ctx(), leaseId, pay(amount))).rejects.toThrow(ValidationError)
     expect(await db.select().from(payments).where(eq(payments.paidOn, '2026-08-10'))).toHaveLength(0)
+  })
+  it('thu vượt tổng dư nợ: phần dư vào ví một lần, tiền thật hiện đúng một lần', async () => {
+    await recordLeasePayment(db, ctx(), leaseId, pay(20000000))
+    expect(await leaseDebt(db, ctx(), leaseId)).toBe(0)
+    expect(await leaseWalletBalance(db, ctx(), leaseId)).toBe(2000000)
+    const entries = await db.select().from(tenantWalletEntries)
+    expect(entries.map((e) => [e.kind, e.amount])).toEqual([['overpay', 2000000]])
+    const paid = (await db.select().from(payments)).reduce((n, p) => n + p.amount, 0)
+    expect(paid + entries[0].amount).toBe(20000000)
+  })
+  it('dùng ví gạch nợ: khoản thu method wallet, ví giảm tương ứng', async () => {
+    await recordLeasePayment(db, ctx(), leaseId, pay(20000000))
+    const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-09' })
+    await approveInvoice(db, ctx(), inv.id, {})
+    await recordLeasePayment(db, ctx(), leaseId, { ...pay(1000000), walletAmount: 1500000 })
+    const rows = await db.select().from(payments).where(eq(payments.invoiceId, inv.id))
+    expect(rows.map((p) => [p.method, p.amount]).sort()).toEqual([
+      ['cash', 1000000],
+      ['wallet', 1500000],
+    ])
+    expect(await leaseWalletBalance(db, ctx(), leaseId)).toBe(500000)
+    expect(await leaseDebt(db, ctx(), leaseId)).toBe(6500000)
+  })
+  it('dùng ví vượt số dư ví hoặc vượt nợ thì từ chối', async () => {
+    await expect(recordLeasePayment(db, ctx(), leaseId, { ...pay(1000), walletAmount: 1 })).rejects.toThrow(
+      ValidationError,
+    )
+    await recordLeasePayment(db, ctx(), leaseId, pay(18500000))
+    await expect(recordLeasePayment(db, ctx(), leaseId, { ...pay(0), walletAmount: 600000 })).rejects.toThrow(
+      ValidationError,
+    )
+  })
+  it('hợp đồng không còn hoá đơn mở thì không thu được', async () => {
+    await recordLeasePayment(db, ctx(), leaseId, pay(18000000))
+    await expect(recordLeasePayment(db, ctx(), leaseId, pay(1000))).rejects.toThrow(
+      'Hợp đồng không có hoá đơn cần thu',
+    )
   })
   it('thiếu quyền billing thì từ chối', async () => {
     await expect(recordLeasePayment(db, context(['meters'], facilityId), leaseId, pay(1000))).rejects.toThrow(

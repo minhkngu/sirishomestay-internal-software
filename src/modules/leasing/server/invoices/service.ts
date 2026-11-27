@@ -57,6 +57,8 @@ import {
 import { applyReadings, setLeaseInitialReading, setOpeningValue } from '@/modules/meters'
 import { resolveBankAccount } from '@/domain/vietqr'
 import { PAYMENT_METHOD_LABELS, type PaymentMethod } from '@/domain/payment-labels'
+import { addWalletEntry, walletBalance } from '../wallet/service'
+import { clampWalletUse, splitReceipt } from '../../domain/wallet'
 
 const batchSchema = z.object({ facilityId: z.uuid(), period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) })
 const periodSchema = z
@@ -1733,12 +1735,17 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
     return rows
   })
 }
-const leasePaymentSchema = z.object({
-  paidOn: z.iso.date(),
-  amount: z.number().int().safe().positive('Số tiền phải lớn hơn 0'),
-  method: z.enum(['cash', 'transfer', 'other']),
-  note: z.string().max(500).optional(),
-})
+const leasePaymentSchema = z
+  .object({
+    paidOn: z.iso.date(),
+    /** Tiền khách đưa. Phần vượt tổng dư nợ không bị chặn: tự vào ví khách. */
+    amount: z.number().int().safe().nonnegative('Số tiền không được âm'),
+    /** Số dùng từ ví khách để gạch nợ; không vượt số dư ví và dư nợ. */
+    walletAmount: z.number().int().safe().nonnegative('Số tiền dùng ví không được âm').optional(),
+    method: z.enum(['cash', 'transfer', 'other']),
+    note: z.string().max(500).optional(),
+  })
+  .refine((v) => v.amount + (v.walletAmount ?? 0) > 0, { message: 'Số tiền phải lớn hơn 0', path: ['amount'] })
 /** Hoá đơn đã duyệt của hợp đồng còn thiếu tiền (tổng dương), cũ nhất trước, kèm số còn thiếu. */
 async function openInvoices(tx: Pick<DB, 'select'>, leaseId: string) {
   const rows = await tx
@@ -1772,53 +1779,118 @@ export async function leaseDebt(db: DB, ctx: AccessContext, leaseId: string): Pr
   await facilityOfLease(db, ctx, leaseId)
   return (await openInvoices(db, leaseId)).reduce((n, r) => n + r.owed, 0)
 }
-/** Ghi một khoản thu cho hợp đồng, tự gạch các hoá đơn đã duyệt từ cũ đến mới; không thu quá tổng dư nợ. */
+/** Số dư ví của khách (người thuê chính) tại cơ sở của hợp đồng, để popup thu tiền hiện lựa chọn dùng ví. */
+export async function leaseWalletBalance(db: DB, ctx: AccessContext, leaseId: string): Promise<number> {
+  const facilityId = await facilityOfLease(db, ctx, leaseId)
+  const [l] = await db.select({ tenantId: leases.tenantId }).from(leases).where(eq(leases.id, leaseId))
+  return l ? walletBalance(db, l.tenantId, facilityId) : 0
+}
+/**
+ * Ghi một khoản thu cho hợp đồng, tự gạch các hoá đơn đã duyệt từ cũ đến mới. Phần ví dùng gạch trước (method `wallet`),
+ * rồi tiền khách đưa; tiền vượt tổng dư nợ không bị chặn mà vào ví khách (loại `overpay`).
+ */
 export async function recordLeasePayment(
   db: DB,
   ctx: AccessContext,
   leaseId: string,
-  input: { paidOn: string; amount: number; method: 'cash' | 'transfer' | 'other'; note?: string },
+  input: {
+    paidOn: string
+    amount: number
+    walletAmount?: number
+    method: 'cash' | 'transfer' | 'other'
+    note?: string
+  },
 ) {
   const data = parse(leasePaymentSchema, input)
   const facilityId = await facilityOfLease(db, ctx, leaseId)
   return db.transaction(async (tx0) => {
     const tx = tx0 as unknown as DB
     await tx.execute(sql`select id from leases where id = ${leaseId} for update`)
+    const [lease] = await tx.select({ tenantId: leases.tenantId }).from(leases).where(eq(leases.id, leaseId))
+    if (!lease) throw new NotFoundError()
+    // Khoá người thuê để hai lần thu cùng lúc không dùng quá số dư ví
+    await tx.execute(sql`select id from tenants where id = ${lease.tenantId} for update`)
     const open = await openInvoices(tx, leaseId)
     const debt = open.reduce((n, r) => n + r.owed, 0)
-    if (data.amount > debt) throw new ValidationError(`Số tiền vượt tổng dư nợ ${debt.toLocaleString('vi-VN')}`)
-    let left = data.amount
+    if (!open.length) throw new ValidationError('Hợp đồng không có hoá đơn cần thu')
+    const walletWanted = data.walletAmount ?? 0
+    const balance = await walletBalance(tx, lease.tenantId, facilityId)
+    if (walletWanted > balance) throw new ValidationError(`Số dư ví không đủ (còn ${balance.toLocaleString('vi-VN')})`)
+    if (walletWanted > debt)
+      throw new ValidationError(`Số tiền dùng ví vượt tổng dư nợ ${debt.toLocaleString('vi-VN')}`)
+    const walletUse = clampWalletUse(walletWanted, balance, debt)
+    const { toWallet } = splitReceipt(data.amount, debt - walletUse)
     const created: (typeof payments.$inferSelect)[] = []
-    for (const inv of open) {
-      if (left <= 0) break
-      const part = Math.min(left, inv.owed)
-      const [row] = await tx
-        .insert(payments)
-        .values({
-          invoiceId: inv.id,
-          paidOn: data.paidOn,
-          amount: part,
-          method: data.method,
-          note: data.note ?? '',
-          receivedBy: ctx.userId,
-        })
-        .returning()
-      created.push(row)
-      left -= part
-      await syncDepositWithInvoice(tx, ctx, inv.id)
+    const walletEntries: { paymentId: string; invoiceId: string; amount: number }[] = []
+    const owedLeft = new Map(open.map((r) => [r.id, r.owed]))
+    const allocate = async (total: number, method: string, note: string, isWallet: boolean) => {
+      let left = total
+      for (const inv of open) {
+        if (left <= 0) break
+        const part = Math.min(left, owedLeft.get(inv.id) ?? 0)
+        if (part <= 0) continue
+        const [row] = await tx
+          .insert(payments)
+          .values({ invoiceId: inv.id, paidOn: data.paidOn, amount: part, method, note, receivedBy: ctx.userId })
+          .returning()
+        created.push(row)
+        owedLeft.set(inv.id, (owedLeft.get(inv.id) ?? 0) - part)
+        left -= part
+        if (isWallet) walletEntries.push({ paymentId: row.id, invoiceId: inv.id, amount: part })
+        await syncDepositWithInvoice(tx, ctx, inv.id)
+      }
     }
-    await recordAuditBatch(
-      tx,
-      ctx,
-      created.map((row) => ({
+    await allocate(walletUse, 'wallet', 'Dùng số dư ví', true)
+    await allocate(data.amount - toWallet, data.method, data.note ?? '', false)
+    for (const w of walletEntries)
+      await addWalletEntry(tx, {
+        tenantId: lease.tenantId,
+        facilityId,
+        amount: -w.amount,
+        kind: 'use_invoice',
+        leaseId,
+        invoiceId: w.invoiceId,
+        paymentId: w.paymentId,
+        date: data.paidOn,
+        note: 'Dùng ví để gạch hoá đơn',
+        sourceKey: `use_invoice:${w.paymentId}`,
+      })
+    if (toWallet > 0) {
+      const firstCash = created.find((p) => p.method !== 'wallet')
+      await addWalletEntry(tx, {
+        tenantId: lease.tenantId,
+        facilityId,
+        amount: toWallet,
+        kind: 'overpay',
+        leaseId,
+        paymentId: firstCash?.id,
+        date: data.paidOn,
+        note: 'Tiền khách trả dư vào ví',
+        sourceKey: `overpay:${firstCash?.id ?? crypto.randomUUID()}`,
+      })
+    }
+    await recordAuditBatch(tx, ctx, [
+      ...created.map((row) => ({
         action: 'create' as const,
         entity: 'payment',
         entityId: row.id,
         facilityId,
-        summary: 'Ghi nhận thanh toán theo hợp đồng',
+        summary: row.method === 'wallet' ? 'Dùng số dư ví gạch hoá đơn' : 'Ghi nhận thanh toán theo hợp đồng',
         after: row,
       })),
-    )
+      ...(toWallet > 0
+        ? [
+            {
+              action: 'create' as const,
+              entity: 'wallet',
+              entityId: lease.tenantId,
+              facilityId,
+              summary: `Tiền dư ${toWallet.toLocaleString('vi-VN')} vào ví khách`,
+              after: { amount: toWallet },
+            },
+          ]
+        : []),
+    ])
     return created
   })
 }

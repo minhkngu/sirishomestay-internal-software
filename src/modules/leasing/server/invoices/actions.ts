@@ -20,6 +20,7 @@ import {
   previewBatch,
   previewLease,
   leaseDebt,
+  leaseWalletBalance,
   recordLeasePayment,
   removePayment,
   setInvoiceDueDate,
@@ -216,7 +217,7 @@ export async function setInvoiceDueDateAction(id: string, dueDate: string) {
 
 export async function recordLeasePaymentAction(
   leaseId: string,
-  input: { paidOn: string; amount: number; method: 'cash' | 'transfer' | 'other'; note?: string },
+  input: { paidOn: string; amount: number; walletAmount?: number; method: 'cash' | 'transfer' | 'other'; note?: string },
 ) {
   const ctx = await getAccessContext()
   return toActionResult(async () => {
@@ -224,6 +225,10 @@ export async function recordLeasePaymentAction(
     refresh()
     return {}
   })
+}
+export async function leaseWalletBalanceAction(leaseId: string) {
+  const ctx = await getAccessContext()
+  return toActionResult(() => leaseWalletBalance(db, ctx, leaseId))
 }
 export async function leaseDebtAction(leaseId: string) {
   const ctx = await getAccessContext()
