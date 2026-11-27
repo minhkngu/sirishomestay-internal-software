@@ -24,7 +24,7 @@ import {
 import type { DB } from '@/db/client'
 import { assertCan, can, facilityKey, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
-import { todayVN } from '@/domain/dates'
+import { formatDateVN, todayVN } from '@/domain/dates'
 import { recordAudit } from '@/modules/platform'
 import type { StorageAdapter } from '@/modules/platform'
 
@@ -133,18 +133,22 @@ export async function previewContractRestore(
     ...added(payRows, snapshot.payments).map((x) => ({
       type: 'payment',
       id: x.id,
-      label: `${x.paidOn} · ${x.amount}`,
+      label: `${formatDateVN(x.paidOn)} · ${x.amount}`,
     })),
-    ...added(entries, snapshot.entries).map((x) => ({ type: 'deposit', id: x.id, label: `${x.date} · ${x.amount}` })),
+    ...added(entries, snapshot.entries).map((x) => ({
+      type: 'deposit',
+      id: x.id,
+      label: `${formatDateVN(x.date)} · ${x.amount}`,
+    })),
     ...added(addons, snapshot.addenda).map((x) => ({
       type: 'addendum',
       id: x.id,
-      label: `${x.type} · ${x.effectiveDate}`,
+      label: `${x.type} · ${formatDateVN(x.effectiveDate)}`,
     })),
     ...(version.operation === 'termination' && snapshot.terminationHandoverId
       ? handoverRows
           .filter((x) => x.id === snapshot.terminationHandoverId)
-          .map((x) => ({ type: 'handover', id: x.id, label: `${x.kind} · ${x.date}` }))
+          .map((x) => ({ type: 'handover', id: x.id, label: `${x.kind} · ${formatDateVN(x.date)}` }))
       : []),
   ].sort((a, b) => a.type.localeCompare(b.type) || a.id.localeCompare(b.id))
   const addonIds = items.filter((item) => item.type === 'addendum').map((item) => item.id)
@@ -216,7 +220,7 @@ export async function previewContractRestore(
     items.push({
       type: 'meter_reading',
       id: effect.after.id,
-      label: `${effect.after.readOn} · ${effect.after.value}${effect.before ? ' · trả lại chỉ số cũ' : ''}`,
+      label: `${formatDateVN(effect.after.readOn)} · ${effect.after.value}${effect.before ? ' · trả lại chỉ số cũ' : ''}`,
     })
   const retention = snapshot.retention ?? []
   const currentRetention = retention.length

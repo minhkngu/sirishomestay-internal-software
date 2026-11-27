@@ -197,12 +197,17 @@ export function ContractList({
                     <span className="block max-w-36 truncate text-foreground">{l.tenantName}</span>
                   </td>
                   <td className="px-2.5 py-2.5">
-                    <span className="block max-w-40 truncate">
-                      <span className="font-medium text-foreground">Phòng {l.roomCode}</span>
-                      {facilities.length > 1 && names[l.facilityId] && (
-                        <span className="text-muted-foreground"> · {names[l.facilityId]}</span>
-                      )}
+                    <span className="block max-w-40 truncate font-medium text-foreground" title={`Phòng ${l.roomCode}`}>
+                      Phòng {l.roomCode}
                     </span>
+                    {facilities.length > 1 && names[l.facilityId] && (
+                      <span
+                        className="block max-w-40 truncate text-xs text-muted-foreground"
+                        title={names[l.facilityId]}
+                      >
+                        {names[l.facilityId]}
+                      </span>
+                    )}
                   </td>
                   <td className="px-2.5 py-2.5 whitespace-nowrap">
                     <div className="text-foreground">
@@ -247,9 +252,13 @@ export function ContractList({
                   <span className="block max-w-44 truncate text-foreground">{c.tenantName}</span>
                 </td>
                 <td className="px-3 py-2.5 whitespace-nowrap xl:px-4 xl:py-3">
-                  <span className="font-medium text-foreground">Phòng {c.roomCode}</span>
+                  <span className="block max-w-40 truncate font-medium text-foreground" title={`Phòng ${c.roomCode}`}>
+                    Phòng {c.roomCode}
+                  </span>
                   {facilities.length > 1 && names[c.facilityId] && (
-                    <span className="text-muted-foreground"> · {names[c.facilityId]}</span>
+                    <span className="block max-w-40 truncate text-xs text-muted-foreground" title={names[c.facilityId]}>
+                      {names[c.facilityId]}
+                    </span>
                   )}
                 </td>
                 <td className="px-3 py-2.5 whitespace-nowrap xl:px-4 xl:py-3">

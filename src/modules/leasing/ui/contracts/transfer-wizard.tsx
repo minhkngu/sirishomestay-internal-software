@@ -1,4 +1,5 @@
 'use client'
+import { DateField } from '@/components/date-field'
 import { BareSelect } from './contract-form-ui'
 import { useState } from 'react'
 import { createTransferAction } from '../../server/addenda/actions'
@@ -53,7 +54,7 @@ export function TransferWizard({
       onCompleted={onCompleted}
     >
       <Field label="Ngày chuyển">
-        <input type="date" className={inputCls} value={effectiveDate} onChange={(e) => setEffective(e.target.value)} />
+        <DateField id="transfer-date" ariaLabel="Ngày chuyển" value={effectiveDate} onValueChange={setEffective} />
       </Field>
       <Field label="Phòng mới (phòng trống)">
         <BareSelect

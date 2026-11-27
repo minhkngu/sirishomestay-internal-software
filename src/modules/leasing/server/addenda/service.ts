@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray, isNull, ne, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ASSET_CONDITION } from '@/domain/asset-labels'
 import {
@@ -118,7 +118,8 @@ const extensionFeeEditSchema = z.object({
 })
 /** Gia hạn ghi thẳng vào hợp đồng; phụ lục chỉ lưu bản tham khảo trước/sau. `fees` là danh sách phí sau khi sửa (cùng dạng Sửa hợp đồng). */
 const extensionSchema = z.object({
-  effectiveDate: date,
+  /** Bỏ trống = ngày liền sau ngày kết thúc hợp đồng cũ. */
+  effectiveDate: date.optional(),
   newEndDate: date,
   newMonthlyRent: z.number().int().positive().max(MAX_MONEY).optional(),
   newDepositAmount: z.number().int().nonnegative().max(MAX_MONEY).optional(),
@@ -458,13 +459,14 @@ export async function createExtension(
   return db.transaction(async (tx0) => {
     const tx = tx0 as unknown as DB
     const { l, facilityId } = await lockLease(tx, ctx, leaseId)
-    // Gia hạn: ngày hiệu lực được nằm ngay sau ngày hết hạn cũ (đầu kỳ gia hạn)
-    checkDate({ startDate: l.startDate, endDate: addDays(l.endDate, 1) }, data.effectiveDate)
+    // Gia hạn: ngày hiệu lực là ngày liền sau ngày hết hạn cũ (đầu kỳ gia hạn), không nhập tay
+    const effectiveDate = data.effectiveDate ?? addDays(l.endDate, 1)
+    checkDate({ startDate: l.startDate, endDate: addDays(l.endDate, 1) }, effectiveDate)
     if (data.newEndDate <= l.endDate)
       throw new ValidationError('Ngày kết thúc mới phải sau ngày kết thúc hiện tại', {
         newEndDate: 'Ngày kết thúc mới phải sau ngày kết thúc hiện tại',
       })
-    if (data.newEndDate < data.effectiveDate)
+    if (data.newEndDate < effectiveDate)
       throw new ValidationError('Ngày kết thúc mới phải sau ngày hiệu lực', {
         newEndDate: 'Ngày kết thúc mới phải sau ngày hiệu lực',
       })
@@ -490,13 +492,13 @@ export async function createExtension(
       .values({
         leaseId,
         type: 'extension',
-        effectiveDate: data.effectiveDate,
+        effectiveDate,
         newEndDate: data.newEndDate,
         reference: { before, after },
       })
       .returning()
     // Chỉ đổi cọc nếu có thay đổi
-    const diff = newDeposit != null ? depositDiffEntry(l.depositAmount, newDeposit, data.effectiveDate) : null
+    const diff = newDeposit != null ? depositDiffEntry(l.depositAmount, newDeposit, effectiveDate) : null
     if (diff)
       await tx.insert(depositEntries).values({
         leaseId,
@@ -1304,8 +1306,15 @@ export async function addendumFormData(db: DB, ctx: AccessContext, leaseId: stri
     ...fee,
     defaultPrice: resolveFeePrice(fee.defaultPrice, prices[fee.id], row.facilityId),
   }))
+  // Kỳ cuối: hoá đơn phủ tới ngày kết thúc hợp đồng (bỏ hoá đơn thanh lý)
+  const [finalInvoice] = await db
+    .select({ id: invoices.id })
+    .from(invoices)
+    .where(and(eq(invoices.leaseId, leaseId), gte(invoices.periodEnd, row.l.endDate), ne(invoices.kind, 'termination')))
+    .limit(1)
   return {
     currentRoomId: row.l.roomId,
+    finalInvoiceExists: !!finalInvoice,
     startDate: row.l.startDate,
     endDate: row.l.endDate,
     monthlyRent: row.l.monthlyRent,

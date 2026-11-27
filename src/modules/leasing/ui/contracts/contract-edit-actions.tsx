@@ -1,5 +1,6 @@
 'use client'
 
+import { DateField } from '@/components/date-field'
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -571,25 +572,16 @@ export function ContractEditActions({
               <MoneyInput id="edit-deposit" required value={deposit} onValueChange={setDeposit} />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="edit-start">{contract.kind === 'lease' ? 'Ngày bắt đầu' : 'Ngày vào ở dự kiến'}</Label>
-              <Input
+              <DateField
                 id="edit-start"
-                required
-                type="date"
+                label={contract.kind === 'lease' ? 'Ngày bắt đầu' : 'Ngày vào ở dự kiến'}
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onValueChange={setStartDate}
               />
             </div>
             {contract.kind === 'lease' && (
               <div className="space-y-1">
-                <Label htmlFor="edit-end">Ngày kết thúc</Label>
-                <Input
-                  id="edit-end"
-                  required
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                />
+                <DateField id="edit-end" label="Ngày kết thúc" value={endDate} onValueChange={setEndDate} />
               </div>
             )}
           </div>

@@ -25,7 +25,7 @@ import { assertCan, type AccessContext } from '@/domain/access'
 import { syncDepositWithInvoice } from './deposit-sync'
 import { computeDueDate } from '../../domain/due-date'
 import { depositHeld } from '@/domain/cashbook'
-import { daysInMonth, todayVN } from '@/domain/dates'
+import { daysInMonth, formatDateVN, todayVN } from '@/domain/dates'
 import { displayName } from '@/modules/tenants'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { midPeriodAdjustments } from '../../domain/adjustments'
@@ -625,7 +625,7 @@ export async function createDraftForLease(
       clash
         ? 'Kỳ này đã có hoá đơn của hợp đồng'
         : last?.end
-          ? `Hợp đồng đã được lập hoá đơn tới ${last.end}`
+          ? `Hợp đồng đã được lập hoá đơn tới ${formatDateVN(last.end)}`
           : 'Hợp đồng không có hiệu lực trong kỳ này',
     )
   }
@@ -1725,7 +1725,7 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
       summary:
         (inv.status === 'approved' ? 'Sửa dòng hoá đơn đã duyệt' : 'Sửa dòng hoá đơn') +
         (rentPeriod && periodChanged
-          ? ` (đổi kỳ ${inv.periodStart} – ${inv.periodEnd} thành ${rentPeriod.start} – ${rentPeriod.end})`
+          ? ` (đổi kỳ ${formatDateVN(inv.periodStart)} – ${formatDateVN(inv.periodEnd)} thành ${formatDateVN(rentPeriod.start)} – ${formatDateVN(rentPeriod.end)})`
           : ''),
       before: old,
       after: rows,

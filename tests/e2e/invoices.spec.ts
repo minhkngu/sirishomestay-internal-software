@@ -102,7 +102,7 @@ test('luồng xuyên suốt: tạo khách → cọc → hợp đồng thuê → 
   await page.goto('/contracts')
   await page.waitForLoadState('networkidle')
   await page.getByRole('row').filter({ hasText: name }).getByRole('button', { name: 'Thanh lý hợp đồng' }).click()
-  await page.getByLabel('Ngày trả phòng').fill('2026-12-10')
+  await pickDate(page, 'Ngày trả phòng', '2026-12-10')
   for (const input of await page
     .getByText('Chỉ số tại ngày trả phòng')
     .locator('xpath=..')

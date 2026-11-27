@@ -1,5 +1,6 @@
 'use client'
 
+import { DateField } from '@/components/date-field'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
@@ -78,8 +79,7 @@ export function EditEntryDialog({
             )}
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="entry-date">Ngày</Label>
-            <Input id="entry-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-9" />
+            <DateField id="entry-date" label="Ngày" value={date} onValueChange={setDate} />
           </div>
         </div>
         <div className="space-y-1.5">

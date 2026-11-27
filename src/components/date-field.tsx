@@ -94,3 +94,18 @@ export function DateField({
     </div>
   )
 }
+
+/** Ô ngày cho form không kiểm soát (FormData): giữ ngày trong state, gửi qua input ẩn `name`. */
+export function FormDateField({
+  name,
+  defaultValue = '',
+  ...props
+}: { name: string; defaultValue?: string } & Omit<React.ComponentProps<typeof DateField>, 'value' | 'onValueChange'>) {
+  const [value, setValue] = useState(defaultValue)
+  return (
+    <>
+      <DateField {...props} value={value} onValueChange={setValue} />
+      <input type="hidden" name={name} value={value} />
+    </>
+  )
+}

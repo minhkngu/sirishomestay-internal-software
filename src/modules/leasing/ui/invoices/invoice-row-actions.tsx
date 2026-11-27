@@ -23,7 +23,7 @@ export function InvoiceRowActions({
   code: string
   draft: boolean
   /** Lý do không bỏ duyệt được (null = bỏ duyệt được). */ unapproveBlock: string | null
-  collect: { leaseId: string; roomCode: string; tenantName: string; debt: number } | null
+  collect: { leaseId: string; roomCode: string; tenantName: string; debt: number; refundInvoiceId?: string } | null
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -72,8 +72,8 @@ export function InvoiceRowActions({
             <Button
               size="icon-sm"
               variant="ghost"
-              aria-label={`Thu tiền ${code}`}
-              title="Thu tiền"
+              aria-label={`${collect.refundInvoiceId ? 'Hoàn tiền' : 'Thu tiền'} ${code}`}
+              title={collect.refundInvoiceId ? 'Hoàn tiền cho khách' : 'Thu tiền'}
               onClick={() => setCollecting(true)}
             >
               <HandCoins className="size-4 text-emerald-700" aria-hidden="true" />

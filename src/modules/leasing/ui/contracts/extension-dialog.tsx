@@ -1,16 +1,20 @@
 'use client'
+import { DateField } from '@/components/date-field'
 import { useState } from 'react'
 import { createExtensionAction } from '../../server/addenda/actions'
 import { AddendumShell, Field, inputCls } from './addendum-shell'
 import { BareSelect } from './contract-form-ui'
 import type { FeeData } from './contract-edit-actions'
-import { defaultExtensionDate, extensionFeesPayload, initialFeeRows, type ExtensionFeeRow } from './extension-fees'
+import { extensionFeesPayload, initialFeeRows, type ExtensionFeeRow } from './extension-fees'
+import { Button } from '@/components/ui/button'
 import { MoneyInput } from '@/components/ui/money-input'
+import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 
 export function ExtensionDialog({
   leaseId,
   endDate,
+  finalInvoiceExists = true,
   monthlyRent,
   depositAmount,
   feeData,
@@ -19,6 +23,8 @@ export function ExtensionDialog({
 }: {
   leaseId: string
   endDate: string
+  /** Đã có hoá đơn kỳ cuối của hợp đồng; chưa có thì chặn gia hạn. */
+  finalInvoiceExists?: boolean
   monthlyRent: number
   depositAmount: number
   feeData?: FeeData | null
@@ -26,7 +32,6 @@ export function ExtensionDialog({
   onCompleted?: () => void
 }) {
   const [initialRows] = useState(() => initialFeeRows(feeData?.current ?? []))
-  const [effectiveDate, setEffective] = useState(defaultExtensionDate(endDate))
   const [newEndDate, setEnd] = useState('')
   const [rent, setRent] = useState('')
   const [deposit, setDeposit] = useState('')
@@ -36,7 +41,6 @@ export function ExtensionDialog({
   const showFees = feeData?.editable === true
   const fees = showFees ? extensionFeesPayload(rows, initialRows) : undefined
   const input = {
-    effectiveDate,
     newEndDate,
     ...(rent && Number(rent) !== monthlyRent ? { newMonthlyRent: Number(rent) } : {}),
     // Chỉ đổi cọc nếu có nhập và khác cọc hiện tại
@@ -47,6 +51,21 @@ export function ExtensionDialog({
     o.meter ? feeData?.canEditMeters === true : !rows.some((r) => r.feeTypeId === o.id),
   )
   const usedMeters = new Set(rows.map((r) => r.meterId).filter(Boolean))
+  if (!finalInvoiceExists)
+    return (
+      <section role="alert" className="max-w-xl space-y-3 rounded-lg border border-destructive/40 bg-card p-4">
+        <h3 className="font-medium">Chưa thể gia hạn hợp đồng</h3>
+        <p className="text-sm">
+          Hợp đồng chưa có hoá đơn kỳ cuối (kỳ kết thúc ngày {formatDateVN(endDate)}). Hãy lập hoá đơn kỳ cuối trước,
+          rồi mới gia hạn.
+        </p>
+        {onCompleted && (
+          <Button size="sm" variant="outline" onClick={onCompleted}>
+            Đóng
+          </Button>
+        )}
+      </section>
+    )
   return (
     <AddendumShell
       label="Gia hạn hợp đồng"
@@ -54,14 +73,12 @@ export function ExtensionDialog({
       leaseId={leaseId}
       input={input}
       create={createExtensionAction}
+      simple
       defaultOpen={defaultOpen}
       onCompleted={onCompleted}
     >
-      <Field label="Ngày hiệu lực của phụ lục">
-        <input type="date" className={inputCls} value={effectiveDate} onChange={(e) => setEffective(e.target.value)} />
-      </Field>
-      <Field label={`Ngày kết thúc mới (hiện tại ${endDate})`}>
-        <input type="date" className={inputCls} value={newEndDate} onChange={(e) => setEnd(e.target.value)} />
+      <Field label={`Ngày kết thúc mới (hiện tại ${formatDateVN(endDate)})`}>
+        <DateField id="extension-end" ariaLabel="Ngày kết thúc mới" value={newEndDate} onValueChange={setEnd} />
       </Field>
       <Field label={`Giá thuê mới (đang ${formatVND(monthlyRent)}, để trống nếu không đổi)`}>
         <MoneyInput className={inputCls} value={rent} onValueChange={setRent} />

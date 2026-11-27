@@ -50,4 +50,10 @@ describe('hằng số chỉ có một nguồn', () => {
     const allowed = (p: string) => p === 'src/domain/asset-labels.ts' || p.startsWith('src/db/schema/')
     expect(sources.filter((s) => !allowed(s.path) && literal.test(s.text)).map((s) => s.path)).toEqual([])
   })
+
+  it('ngày tháng hiện dd/mm/yyyy: không dùng ô ngày/tháng của trình duyệt (chỉ dùng DateField, MonthField)', () => {
+    // `<input type="date">` hiện theo ngôn ngữ hệ điều hành nên có thể ra mm/dd/yyyy.
+    const native = /(?<!`)<(?:input|Input)\b[^>]*type=["'](?:date|month|datetime-local)["']/
+    expect(filesMatching(native)).toEqual([])
+  })
 })
