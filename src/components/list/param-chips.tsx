@@ -36,7 +36,7 @@ export function ParamChips({
             {item.count !== undefined && (
               <span
                 className={cn(
-                  'rounded-full px-1.5 py-0.5 text-[11px] tabular-nums',
+                  'rounded-full px-1.5 py-0.5 text-xs tabular-nums',
                   on ? 'bg-primary/20 text-primary font-semibold' : 'bg-muted text-muted-foreground',
                 )}
               >

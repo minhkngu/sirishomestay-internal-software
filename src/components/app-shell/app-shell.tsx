@@ -35,7 +35,7 @@ export function AppShell({ children, hrefs, userName, logoutAction }: Props) {
         </form>
       </Topbar>
       <div className="flex flex-1">
-        <aside className="hidden w-60 shrink-0 border-r border-border/70 bg-sidebar md:block">
+        <aside className="hidden w-60 shrink-0 border-r border-border/70 bg-sidebar md:sticky md:top-14 md:block md:h-[calc(100vh-3.5rem)]">
           <Sidebar items={items} />
         </aside>
         {open && (

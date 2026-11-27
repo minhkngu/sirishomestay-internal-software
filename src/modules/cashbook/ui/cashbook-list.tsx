@@ -39,15 +39,15 @@ const KINDS = [
 function Stat({ label, value, tone }: { label: string; value: number; tone?: 'in' | 'out' }) {
   return (
     <div className="p-4">
-      <p className="text-[13px] text-muted-foreground">{label}</p>
+      <p className="text-[13px] font-medium text-muted-foreground">{label}</p>
       <p
         className={cn(
           'mt-1 text-2xl font-semibold tabular-nums',
-          tone === 'in' && 'text-emerald-700',
-          tone === 'out' && 'text-rose-700',
+          tone === 'in' && value > 0 && 'text-emerald-700',
+          tone === 'out' && value > 0 && 'text-rose-700',
         )}
       >
-        {value.toLocaleString('vi-VN')} <span className="text-sm font-normal text-muted-foreground">đ</span>
+        {value.toLocaleString('vi-VN')} <span className="text-base font-medium text-muted-foreground">đ</span>
       </p>
     </div>
   )
@@ -176,7 +176,7 @@ export function CashbookList({
       )}
     >
       {r.direction === 'in' ? '+' : '−'}
-      {formatVND(r.amount)}
+      {formatVND(r.amount)} đ
     </span>
   )
   const where = (r: LedgerRow) =>
@@ -212,7 +212,7 @@ export function CashbookList({
         <Stat label="Cọc đang giữ" value={depositHeld} />
       </div>
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="space-y-3">
         <ParamChips
           param="loai"
           defaultValue="all"
@@ -222,28 +222,30 @@ export function CashbookList({
             count: scoped.filter((r) => value === 'all' || r.kind === value).length,
           }))}
         />
-        <div className="flex flex-wrap items-center gap-2">
-          <FacilityFilter facilities={facilities} align="right" />
-          <MonthField
-            ariaLabel="Tháng"
-            value={month === 'all' ? '' : month}
-            onValueChange={(next) =>
-              router.replace(
-                next
-                  ? `?month=${next}${kind !== 'all' ? `&loai=${kind}` : ''}`
-                  : `?month=all${kind !== 'all' ? `&loai=${kind}` : ''}`,
-              )
-            }
-            placeholder="Tất cả tháng"
-            className="w-40"
-          />
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Tìm theo tên, phòng…"
             aria-label="Tìm kiếm"
-            className="h-9 w-48"
+            className="h-9 w-full sm:w-64"
           />
+          <div className="flex flex-wrap items-center gap-2">
+            <FacilityFilter facilities={facilities} align="right" />
+            <MonthField
+              ariaLabel="Tháng"
+              value={month === 'all' ? '' : month}
+              onValueChange={(next) =>
+                router.replace(
+                  next
+                    ? `?month=${next}${kind !== 'all' ? `&loai=${kind}` : ''}`
+                    : `?month=all${kind !== 'all' ? `&loai=${kind}` : ''}`,
+                )
+              }
+              placeholder="Tất cả tháng"
+              className="w-40"
+            />
+          </div>
         </div>
       </div>
 
@@ -267,16 +269,16 @@ export function CashbookList({
               <tr key={r.key} className="hover:bg-muted/30">
                 <td className="p-3 whitespace-nowrap text-muted-foreground">
                   {formatDateVN(r.date)}
-                  {r.time && <span className="ml-1.5 text-xs tabular-nums text-muted-foreground/80">{r.time}</span>}
+                  {r.time && <span className="ml-1.5 text-xs tabular-nums text-muted-foreground">{r.time}</span>}
                 </td>
                 <td className="p-3 whitespace-nowrap">
                   <span className="font-medium">{r.label}</span>
                 </td>
-                <td className="max-w-[170px] truncate p-3 text-muted-foreground" title={where(r)}>
+                <td className="max-w-[200px] truncate p-3 text-muted-foreground" title={where(r)}>
                   {where(r)}
                 </td>
                 <td className="p-3">
-                  <div className="max-w-[160px] truncate" title={r.party}>
+                  <div className="max-w-[180px] truncate" title={r.party}>
                     {r.party || '—'}
                   </div>
                   {r.method && (
@@ -285,7 +287,7 @@ export function CashbookList({
                     </div>
                   )}
                 </td>
-                <td className="max-w-[150px] truncate p-3 text-muted-foreground" title={r.note}>
+                <td className="max-w-[240px] truncate p-3 text-muted-foreground" title={r.note}>
                   {r.note || '—'}
                 </td>
                 <td className="p-3 text-right whitespace-nowrap">{amountCell(r)}</td>

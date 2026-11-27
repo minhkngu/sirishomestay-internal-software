@@ -47,9 +47,9 @@ export function Sidebar({
         })}
       </nav>
 
-      <div className="mt-auto pt-4 border-t border-border/60 px-2 text-[11px] text-muted-foreground">
-        <p className="font-medium text-foreground/70">Siris Residences</p>
-        <p className="text-[11px] text-muted-foreground/80">Quản trị căn hộ dịch vụ</p>
+      <div className="mt-auto border-t border-border/60 px-2 pt-4 text-xs text-muted-foreground">
+        <p className="font-medium text-foreground">Siris Residences</p>
+        <p className="text-xs text-muted-foreground">Quản trị căn hộ dịch vụ</p>
       </div>
     </div>
   )

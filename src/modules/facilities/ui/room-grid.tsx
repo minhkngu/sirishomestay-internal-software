@@ -146,11 +146,11 @@ export function RoomGrid({ rooms, facilities }: { rooms: GridRoom[]; facilities:
             Đã cọc
           </span>
           <span className="flex items-center gap-1">
-            <span className="size-3 rounded border border-border bg-muted/60" />
+            <span className="size-3 rounded border border-input bg-muted" />
             Không có khách
           </span>
           <span className="flex items-center gap-1">
-            <span className="size-3 rounded border border-dashed border-border bg-muted/30 opacity-60" />
+            <span className="size-3 rounded border border-dashed border-input bg-muted/70" />
             Ngừng sử dụng
           </span>
         </span>

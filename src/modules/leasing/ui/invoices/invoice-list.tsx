@@ -181,10 +181,10 @@ export function InvoiceList({
                   {formatDateVN(i.periodStart)} – {formatDateVN(i.periodEnd)}
                 </td>
                 <td className="px-1.5 py-2.5 text-right font-semibold text-foreground tabular-nums whitespace-nowrap">
-                  {formatVND(i.total)}
+                  {formatVND(i.total)} đ
                 </td>
                 <td className="px-1.5 py-2.5 text-right text-muted-foreground tabular-nums whitespace-nowrap">
-                  {formatVND(i.paid)}
+                  {formatVND(i.paid)} đ
                 </td>
                 <td className="px-1.5 py-2.5 text-muted-foreground whitespace-nowrap">
                   {i.dueDate ? formatDateVN(i.dueDate) : '—'}
