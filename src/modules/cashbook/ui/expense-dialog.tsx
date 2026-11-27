@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { FormDialog } from '@/components/form-dialog'
+import { DateField } from '@/components/date-field'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -105,16 +106,7 @@ export function ExpenseDialog({
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="expense-date">Ngày chi</Label>
-            <Input
-              id="expense-date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="h-9"
-            />
-          </div>
+          <DateField id="expense-date" label="Ngày chi" value={date} onValueChange={setDate} />
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
@@ -164,7 +156,7 @@ export function ExpenseDialog({
               id="expense-amount"
               value={amount}
               onValueChange={setAmount}
-              className="h-9 w-full rounded-xl border border-border/80 bg-background px-3 text-right text-sm font-medium tabular-nums"
+              className="text-right font-medium"
             />
             {amount !== '' && value <= 0 && (
               <p role="alert" className="text-xs text-destructive">

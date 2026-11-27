@@ -118,7 +118,7 @@ export function ContractList({
       </div>
 
       <div
-        className="flex items-center gap-0.5 overflow-x-auto border-b border-border/70 sm:gap-1"
+        className="flex items-center gap-0.5 overflow-x-auto overflow-y-hidden border-b border-border/70 sm:gap-1"
         role="group"
         aria-label="Bộ lọc trạng thái"
       >
@@ -150,7 +150,7 @@ export function ContractList({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Tìm mã hợp đồng, khách thuê, phòng…"
-            className="h-9 w-full rounded-xl border border-border/80 bg-card pl-9 pr-3 text-[13px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
+            className="h-9 w-full rounded-lg border border-input bg-card pl-9 pr-3 text-[13px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
           />
         </label>
         <FacilityFilter facilities={facilities} align="right" />
@@ -161,13 +161,13 @@ export function ContractList({
           <caption className="sr-only">{`${pager.total} hợp đồng trong phạm vi đang chọn`}</caption>
           <thead>
             <tr className="border-b border-border/70 text-left text-xs font-normal text-muted-foreground">
-              <th className="px-3 py-2.5 font-normal whitespace-nowrap xl:px-4 xl:py-3">Thao tác</th>
-              <th className="px-3 py-2.5 font-normal whitespace-nowrap xl:px-4 xl:py-3">Mã HĐ</th>
-              <th className="px-3 py-2.5 font-normal whitespace-nowrap xl:px-4 xl:py-3">Khách thuê</th>
-              <th className="px-3 py-2.5 font-normal whitespace-nowrap xl:px-4 xl:py-3">Phòng / Toà</th>
-              <th className="px-3 py-2.5 font-normal whitespace-nowrap xl:px-4 xl:py-3">Thời hạn</th>
-              <th className="px-3 py-2.5 text-right font-normal whitespace-nowrap xl:px-4 xl:py-3">Giá thuê</th>
-              <th className="px-3 py-2.5 font-normal whitespace-nowrap xl:px-4 xl:py-3">Ký</th>
+              <th className="px-2.5 py-2.5 font-normal whitespace-nowrap">Thao tác</th>
+              <th className="px-2.5 py-2.5 font-normal whitespace-nowrap">Mã HĐ</th>
+              <th className="px-2.5 py-2.5 font-normal whitespace-nowrap">Khách thuê</th>
+              <th className="px-2.5 py-2.5 font-normal whitespace-nowrap">Phòng / Toà</th>
+              <th className="px-2.5 py-2.5 font-normal whitespace-nowrap">Thời hạn</th>
+              <th className="px-2.5 py-2.5 text-right font-normal whitespace-nowrap">Giá thuê</th>
+              <th className="px-2.5 py-2.5 font-normal whitespace-nowrap">Ký</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60">
@@ -175,7 +175,7 @@ export function ContractList({
               const { left } = termProgress(l.startDate, l.endDate, today)
               return (
                 <tr key={l.id} className="transition-colors hover:bg-muted/30">
-                  <td className="px-3 py-2.5 whitespace-nowrap xl:px-4 xl:py-3">
+                  <td className="px-2.5 py-2.5 whitespace-nowrap">
                     <div className="flex justify-start">
                       {renderActions({
                         id: l.id,
@@ -185,7 +185,7 @@ export function ContractList({
                       })}
                     </div>
                   </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap xl:px-4 xl:py-3">
+                  <td className="px-2.5 py-2.5 whitespace-nowrap">
                     <PopupLink
                       className="font-medium text-foreground hover:text-primary hover:underline hover:underline-offset-2"
                       href={`/contracts/${l.id}`}
@@ -193,29 +193,31 @@ export function ContractList({
                       {l.code}
                     </PopupLink>
                   </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap xl:px-4 xl:py-3">
-                    <span className="block max-w-44 truncate text-foreground">{l.tenantName}</span>
+                  <td className="px-2.5 py-2.5">
+                    <span className="block max-w-36 truncate text-foreground">{l.tenantName}</span>
                   </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap xl:px-4 xl:py-3">
-                    <span className="font-medium text-foreground">Phòng {l.roomCode}</span>
-                    {facilities.length > 1 && names[l.facilityId] && (
-                      <span className="text-muted-foreground"> · {names[l.facilityId]}</span>
-                    )}
+                  <td className="px-2.5 py-2.5">
+                    <span className="block max-w-40 truncate">
+                      <span className="font-medium text-foreground">Phòng {l.roomCode}</span>
+                      {facilities.length > 1 && names[l.facilityId] && (
+                        <span className="text-muted-foreground"> · {names[l.facilityId]}</span>
+                      )}
+                    </span>
                   </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap xl:px-4 xl:py-3">
-                    <span className="text-foreground">
+                  <td className="px-2.5 py-2.5 whitespace-nowrap">
+                    <div className="text-foreground">
                       {formatDateVN(l.startDate)} – {formatDateVN(l.endDate)}
-                    </span>
-                    <span
-                      className={`ml-1.5 text-xs ${l.status === 'active' && left <= 30 ? 'text-amber-800' : 'text-muted-foreground'}`}
+                    </div>
+                    <div
+                      className={`text-xs ${l.status === 'active' && left <= 30 ? 'text-amber-800' : 'text-muted-foreground'}`}
                     >
-                      ({termLabel(left, l.status !== 'active')})
-                    </span>
+                      {termLabel(left, l.status !== 'active')}
+                    </div>
                   </td>
-                  <td className="px-3 py-2.5 text-right font-medium tabular-nums text-foreground whitespace-nowrap xl:px-4 xl:py-3">
+                  <td className="px-2.5 py-2.5 text-right font-medium tabular-nums text-foreground whitespace-nowrap">
                     {formatVND(l.monthlyRent)}
                   </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap xl:px-4 xl:py-3">
+                  <td className="px-2.5 py-2.5 whitespace-nowrap">
                     <SignStateChip status={l.signStatus} />
                   </td>
                 </tr>

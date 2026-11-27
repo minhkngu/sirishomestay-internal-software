@@ -185,9 +185,7 @@ export function TerminationWizard({
     <div className="space-y-5 text-sm">
       {/* 1. Ngày trả & Chỉ số điện nước */}
       <section className="space-y-3 rounded-xl border border-border/80 bg-card p-3.5">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          1. Ngày trả phòng & Chỉ số điện nước
-        </h3>
+        <h3 className="text-[13px] font-medium text-muted-foreground">1. Ngày trả phòng & Chỉ số điện nước</h3>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Ngày trả phòng">
             <input type="date" className={inputCls} value={endDate} onChange={(e) => setEnd(e.target.value)} />
@@ -216,7 +214,7 @@ export function TerminationWizard({
       {/* 2. Kiểm kê & Đền bù tài sản */}
       <section className="space-y-3 rounded-xl border border-border/80 bg-card p-3.5">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <h3 className="text-[13px] font-medium text-muted-foreground">
             2. Kiểm kê & Đền bù tài sản ({assetRows.length})
           </h3>
           {totalAssetPenalty > 0 && (
@@ -315,9 +313,7 @@ export function TerminationWizard({
       {/* 3. Mất cọc & Chi phí phạt hợp đồng */}
       <section className="space-y-3 rounded-xl border border-border/80 bg-card p-3.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            3. Mất cọc & Chi phí phạt hợp đồng
-          </h3>
+          <h3 className="text-[13px] font-medium text-muted-foreground">3. Mất cọc & Chi phí phạt hợp đồng</h3>
           {depositBalance > 0 && (
             <span className="text-xs text-muted-foreground">Số dư cọc hiện tại: {formatVND(depositBalance)}</span>
           )}
@@ -422,7 +418,7 @@ export function TerminationWizard({
       </section>
 
       {/* Footer cố định */}
-      <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t border-border/80 bg-background/95 pt-3 pb-1 backdrop-blur-xs">
+      <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t border-border/80 bg-background pt-3 pb-1">
         <div className="text-xs text-muted-foreground">
           Đền bù TS: <strong className="text-foreground">{formatVND(totalAssetPenalty)}</strong>
           {' · '}Phạt HĐ: <strong className="text-foreground">{formatVND(totalContractPenalty)}</strong>

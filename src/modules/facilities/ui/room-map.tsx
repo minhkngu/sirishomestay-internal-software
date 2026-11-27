@@ -44,7 +44,7 @@ export function RoomMap({ rooms }: { rooms: MapRoom[] }) {
         </div>
 
         <div
-          className="inline-flex h-8 items-center rounded-xl border border-border/80 bg-muted/60 p-0.5 text-xs"
+          className="inline-flex h-9 items-center rounded-lg border border-input bg-muted/60 p-0.5 text-xs"
           role="group"
           aria-label="Chế độ xem phòng"
         >
@@ -53,8 +53,8 @@ export function RoomMap({ rooms }: { rooms: MapRoom[] }) {
             aria-pressed={viewMode === 'grid'}
             onClick={() => setViewMode('grid')}
             className={cn(
-              'inline-flex h-6.5 items-center gap-1.5 rounded-lg px-2.5 font-medium transition-colors',
-              viewMode === 'grid' ? 'bg-card text-primary shadow-2xs' : 'text-muted-foreground hover:text-foreground',
+              'inline-flex h-7.5 items-center gap-1.5 rounded-md px-2.5 font-medium transition-colors',
+              viewMode === 'grid' ? 'bg-card text-primary' : 'text-muted-foreground hover:text-foreground',
             )}
           >
             <LayoutGrid className="size-3.5" />
@@ -65,8 +65,8 @@ export function RoomMap({ rooms }: { rooms: MapRoom[] }) {
             aria-pressed={viewMode === 'table'}
             onClick={() => setViewMode('table')}
             className={cn(
-              'inline-flex h-6.5 items-center gap-1.5 rounded-lg px-2.5 font-medium transition-colors',
-              viewMode === 'table' ? 'bg-card text-primary shadow-2xs' : 'text-muted-foreground hover:text-foreground',
+              'inline-flex h-7.5 items-center gap-1.5 rounded-md px-2.5 font-medium transition-colors',
+              viewMode === 'table' ? 'bg-card text-primary' : 'text-muted-foreground hover:text-foreground',
             )}
           >
             <List className="size-3.5" />

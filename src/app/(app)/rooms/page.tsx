@@ -16,10 +16,14 @@ export default async function RoomsPage() {
   const facilities = facs.map((f) => ({ id: f.id, name: f.name }))
   return (
     <div className="space-y-5">
-      <PageHeader title="Phòng" />
-      {ctx.isAdmin && (
-        <RoomPanels facilities={facilities} amenities={amenities.map((a) => ({ id: a.id, name: a.name }))} />
-      )}
+      <PageHeader
+        title="Phòng"
+        action={
+          ctx.isAdmin ? (
+            <RoomPanels facilities={facilities} amenities={amenities.map((a) => ({ id: a.id, name: a.name }))} />
+          ) : undefined
+        }
+      />
       <RoomGrid
         facilities={facilities}
         rooms={rooms.map((r) => ({

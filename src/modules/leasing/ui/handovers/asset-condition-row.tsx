@@ -82,7 +82,7 @@ export function AssetConditionRow({
         placeholder="Ghi chú"
         value={item.note}
         onChange={(e) => onChange({ note: e.target.value })}
-        className="h-10 w-full rounded-lg border px-2 text-sm"
+        className="h-9 w-full rounded-lg border border-input bg-card px-3 text-[13px] outline-none focus:border-ring focus:ring-2 focus:ring-ring/20"
       />
       {(item.damaged || item.missing) && (
         <label className="flex items-center gap-2 text-sm">
@@ -92,7 +92,7 @@ export function AssetConditionRow({
             disabled={readOnly}
             value={item.penalty}
             onValueChange={(penalty) => onChange({ penalty })}
-            className="h-10 w-36 rounded-lg border px-2"
+            className="h-9 w-36 rounded-lg border-input"
           />
         </label>
       )}

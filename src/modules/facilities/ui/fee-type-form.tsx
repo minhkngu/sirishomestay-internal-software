@@ -3,7 +3,9 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { MoneyInput } from '@/components/ui/money-input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { BILLING_OPTIONS, QUANTITY_OPTIONS } from './fee-options'
 
 type UnitOption = { id: string; name: string }
@@ -79,33 +81,39 @@ export function FeeTypeForm({
   const unitError = localErrors.unitId ?? fieldErrors?.unitId
   const priceError = localErrors.defaultPrice ?? fieldErrors?.defaultPrice
 
+  const unitOptions = [
+    ...units.map((u) => ({ value: u.id, label: u.name })),
+    ...(allowNewUnit ? [{ value: NEW_UNIT, label: 'Đơn vị mới…' }] : []),
+  ]
+
   return (
-    <div className="grid gap-2 rounded-md border bg-card p-3 sm:grid-cols-2">
-      <div className="space-y-1">
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div className="space-y-1.5">
+        <Label htmlFor="fee-name">Tên loại phí</Label>
         <Input
+          id="fee-name"
           aria-label="Tên loại phí"
-          placeholder="Tên loại phí"
+          placeholder="Ví dụ: Điện, Nước, Internet"
           value={name}
           onChange={(e) => setName(e.target.value)}
           aria-invalid={Boolean(nameError)}
         />
-        {nameError && <p className="text-sm text-destructive">{nameError}</p>}
+        {nameError && <p className="text-xs text-destructive">{nameError}</p>}
       </div>
-      <div className="space-y-1">
-        <select
-          aria-label="Đơn vị"
-          className="h-9 w-full rounded-lg border bg-card px-2 text-sm"
-          value={unitChoice}
-          onChange={(e) => setUnitChoice(e.target.value)}
-          aria-invalid={Boolean(unitError)}
-        >
-          {units.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.name}
-            </option>
-          ))}
-          {allowNewUnit && <option value={NEW_UNIT}>Đơn vị mới…</option>}
-        </select>
+      <div className="space-y-1.5">
+        <Label htmlFor="fee-unit">Đơn vị</Label>
+        <Select value={unitChoice} onValueChange={(v) => v && setUnitChoice(String(v))} items={unitOptions}>
+          <SelectTrigger id="fee-unit" aria-label="Đơn vị" className="h-9 w-full" aria-invalid={Boolean(unitError)}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {unitOptions.map((u) => (
+              <SelectItem key={u.value} value={u.value}>
+                {u.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {unitChoice === NEW_UNIT && (
           <Input
             aria-label="Tên đơn vị mới"
@@ -114,56 +122,68 @@ export function FeeTypeForm({
             onChange={(e) => setNewUnitName(e.target.value)}
           />
         )}
-        {unitError && <p className="text-sm text-destructive">{unitError}</p>}
+        {unitError && <p className="text-xs text-destructive">{unitError}</p>}
       </div>
-      <div className="space-y-1">
+      <div className="space-y-1.5">
+        <Label htmlFor="fee-price">Đơn giá mặc định (VND)</Label>
         <MoneyInput
+          id="fee-price"
           aria-label="Đơn giá mặc định"
-          placeholder="Đơn giá mặc định"
+          placeholder="0"
           value={price}
           onValueChange={setPrice}
           aria-invalid={Boolean(priceError)}
         />
-        {priceError && <p className="text-sm text-destructive">{priceError}</p>}
+        {priceError && <p className="text-xs text-destructive">{priceError}</p>}
       </div>
-      <select
-        aria-label="Kiểu phí"
-        className="h-9 w-full rounded-lg border bg-card px-2 text-sm"
-        value={billing}
-        onChange={(e) => setBilling(e.target.value)}
-      >
-        {BILLING_OPTIONS.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      <select
-        aria-label="Số lượng lấy từ"
-        className="h-9 w-full rounded-lg border bg-card px-2 text-sm"
-        value={quantityFrom}
-        onChange={(e) => setQuantityFrom(e.target.value)}
-      >
-        {QUANTITY_OPTIONS.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
+      <div className="space-y-1.5">
+        <Label htmlFor="fee-billing">Kiểu phí</Label>
+        <Select value={billing} onValueChange={(v) => v && setBilling(String(v))} items={[...BILLING_OPTIONS]}>
+          <SelectTrigger id="fee-billing" aria-label="Kiểu phí" className="h-9 w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {BILLING_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1.5 sm:col-span-2">
+        <Label htmlFor="fee-qty-from">Số lượng lấy từ</Label>
+        <Select
+          value={quantityFrom}
+          onValueChange={(v) => v && setQuantityFrom(String(v))}
+          items={[...QUANTITY_OPTIONS]}
+        >
+          <SelectTrigger id="fee-qty-from" aria-label="Số lượng lấy từ" className="h-9 w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {QUANTITY_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
       {error && (
         <p role="alert" className="text-sm text-destructive sm:col-span-2">
           {error}
         </p>
       )}
-      <div className="flex gap-2 sm:col-span-2">
-        <Button type="button" disabled={pending} onClick={submit}>
-          {submitLabel}
-        </Button>
+      <div className="flex justify-end gap-2 pt-1 sm:col-span-2">
         {onCancel && (
           <Button type="button" variant="outline" disabled={pending} onClick={onCancel}>
             Huỷ
           </Button>
         )}
+        <Button type="button" disabled={pending} onClick={submit}>
+          {submitLabel}
+        </Button>
       </div>
     </div>
   )

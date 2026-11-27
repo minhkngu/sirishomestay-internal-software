@@ -19,13 +19,13 @@ export function AmenitySettings({ amenities }: { amenities: AmenityRow[] }) {
         cho phòng mới.
       </p>
       {amenities.length > 0 && (
-        <div className="overflow-x-auto rounded-md border bg-card">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-left">
+        <div className="overflow-x-auto rounded-2xl border border-border/80 bg-card">
+          <table className="w-full text-[13px]">
+            <thead className="border-b border-border/70 text-left">
               <tr>
-                <th className="p-2">Tên tiện ích</th>
-                <th className="p-2">Trạng thái</th>
-                <th className="p-2" />
+                <th className="px-3 py-2.5 text-[13px] font-medium text-muted-foreground">Tên tiện ích</th>
+                <th className="px-3 py-2.5 text-[13px] font-medium text-muted-foreground">Trạng thái</th>
+                <th className="px-3 py-2.5" />
               </tr>
             </thead>
             <tbody>
@@ -68,7 +68,7 @@ export function AmenitySettings({ amenities }: { amenities: AmenityRow[] }) {
           </table>
         </div>
       )}
-      <div className="max-w-md space-y-2 rounded-md border bg-card p-3">
+      <div className="max-w-md space-y-2.5 rounded-2xl border border-border/80 bg-card p-4">
         <h3 className="text-sm font-medium">Thêm tiện ích</h3>
         <Input
           aria-label="Tên tiện ích mới"

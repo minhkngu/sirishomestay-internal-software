@@ -61,7 +61,7 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
-      <section className="rounded-2xl border border-border/80 bg-card p-4 shadow-2xs">
+      <section className="rounded-2xl border border-border/80 bg-card p-4">
         <dl className="flex flex-wrap gap-x-6 gap-y-2 text-xs">
           {(
             [
@@ -121,7 +121,7 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
       </section>
 
       {showContracts && (
-        <section className="space-y-4 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
+        <section className="space-y-4 rounded-2xl border border-border/80 bg-card p-5">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-3">
             <h2 className="text-sm font-semibold tracking-tight text-foreground">Hợp đồng phòng</h2>
             <div className="flex flex-wrap items-center gap-2">
@@ -222,9 +222,7 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
             )}
             {history.filter((l) => l.status === 'ended').length > 0 && (
               <div className="pt-2">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Lịch sử hợp đồng:
-                </span>
+                <span className="text-xs font-medium text-muted-foreground">Lịch sử hợp đồng:</span>
                 <ul className="mt-1 space-y-1 text-muted-foreground">
                   {history
                     .filter((l) => l.status === 'ended')

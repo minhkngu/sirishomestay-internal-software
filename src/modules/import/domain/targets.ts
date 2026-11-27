@@ -183,7 +183,7 @@ const EXAMPLES: Record<string, string> = {
   kind: 'Nước ngoài',
   fullName: 'Nguyễn Văn A',
   phone: '0901234567',
-  email: 'a@example.com',
+  email: 'minh.anh@siris.vn',
   nationality: 'Mỹ',
   passportNumber: 'X1234567',
   visaExpiry: '31/12/2026',

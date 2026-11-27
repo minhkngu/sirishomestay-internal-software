@@ -1,4 +1,4 @@
-import { Calendar, FileText, User } from 'lucide-react'
+import { AlertTriangle, Calendar, FileText, User } from 'lucide-react'
 import { db } from '@/db/client'
 import { formatDateVN, todayVN } from '@/domain/dates'
 import { computeDueDate, previewNewInvoice } from '@/modules/leasing'
@@ -98,7 +98,10 @@ export async function NewInvoice({ sp }: { sp: NewInvoiceParams }) {
                 </p>
               )}
               {preview.warnings.length > 0 && (
-                <p className="mt-2 text-xs text-amber-700">⚠ {preview.warnings.join('; ')} — bổ sung sau khi lưu.</p>
+                <p className="mt-2 flex items-center gap-1.5 text-xs text-amber-700">
+                  <AlertTriangle className="size-3.5 shrink-0" />
+                  <span>{preview.warnings.join('; ')} — bổ sung sau khi lưu.</span>
+                </p>
               )}
             </div>
           }

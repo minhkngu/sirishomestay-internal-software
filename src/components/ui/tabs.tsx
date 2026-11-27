@@ -16,12 +16,12 @@ function Tabs({ className, orientation = 'horizontal', ...props }: TabsPrimitive
 }
 
 const tabsListVariants = cva(
-  'group/tabs-list inline-flex w-fit items-center justify-center rounded-xl border border-border/80 bg-muted/70 p-1 text-muted-foreground group-data-horizontal/tabs:h-9.5 group-data-vertical/tabs:h-fit group-data-vertical/tabs:flex-col data-[variant=line]:rounded-none shadow-2xs',
+  'group/tabs-list inline-flex w-fit items-center justify-center rounded-lg border border-border/80 bg-muted/70 p-1 text-muted-foreground group-data-horizontal/tabs:h-9.5 group-data-vertical/tabs:h-fit group-data-vertical/tabs:flex-col data-[variant=line]:rounded-none',
   {
     variants: {
       variant: {
         default: 'bg-muted/70',
-        line: 'gap-1 bg-transparent border-0 shadow-none',
+        line: 'gap-1 bg-transparent border-0',
       },
     },
     defaultVariants: {
@@ -50,8 +50,8 @@ function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
     <TabsPrimitive.Tab
       data-slot="tabs-trigger"
       className={cn(
-        'relative inline-flex h-[calc(100%-2px)] flex-1 items-center justify-center gap-1.5 rounded-lg border border-transparent px-3 py-1 text-xs font-medium whitespace-nowrap text-muted-foreground transition-all duration-150 group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-50',
-        'data-active:bg-card data-active:text-primary data-active:font-semibold data-active:shadow-xs data-active:border-border/60',
+        'relative inline-flex h-[calc(100%-2px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-3 py-1 text-[13px] font-medium whitespace-nowrap text-muted-foreground transition-[color,background-color,border-color] duration-150 group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-50',
+        'data-active:bg-card data-active:text-primary data-active:font-semibold data-active:border-border/70',
         className,
       )}
       {...props}

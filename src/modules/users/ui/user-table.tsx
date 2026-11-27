@@ -4,15 +4,15 @@ import type { UserRow } from '../server/users/queries'
 
 export function UserTable({ users }: { users: UserRow[] }) {
   return (
-    <div className="overflow-x-auto rounded-md border bg-card">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/50 text-left">
+    <div className="overflow-x-auto rounded-2xl border border-border/80 bg-card">
+      <table className="w-full text-[13px]">
+        <thead className="border-b border-border/70 text-left">
           <tr>
-            <th className="p-2">Họ tên</th>
-            <th className="p-2">Email</th>
-            <th className="p-2">Cơ sở</th>
-            <th className="p-2">Nhóm quyền</th>
-            <th className="p-2">Trạng thái</th>
+            <th className="px-3.5 py-2.5 text-[13px] font-medium text-muted-foreground">Họ tên</th>
+            <th className="px-3.5 py-2.5 text-[13px] font-medium text-muted-foreground">Email</th>
+            <th className="px-3.5 py-2.5 text-[13px] font-medium text-muted-foreground">Cơ sở</th>
+            <th className="px-3.5 py-2.5 text-[13px] font-medium text-muted-foreground">Nhóm quyền</th>
+            <th className="px-3.5 py-2.5 text-[13px] font-medium text-muted-foreground">Trạng thái</th>
           </tr>
         </thead>
         <tbody>

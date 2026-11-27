@@ -45,10 +45,10 @@ export function IncidentBoard({ items }: { items: BoardItem[] }) {
       {COLS.map(([status, label]) => {
         const colItems = items.filter((i) => i.status === status)
         return (
-          <section key={status} className="space-y-3 rounded-2xl border border-border/80 bg-muted/20 p-3.5 shadow-2xs">
+          <section key={status} className="space-y-3 rounded-2xl border border-border/80 bg-muted/20 p-3.5">
             <div className="flex items-center justify-between px-1">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</h2>
-              <span className="rounded-full border border-border/70 bg-card px-2 py-0.5 text-[11px] font-semibold tabular-nums text-foreground shadow-2xs">
+              <h2 className="text-[13px] font-medium text-muted-foreground">{label}</h2>
+              <span className="rounded-full border border-border/70 bg-card px-2 py-0.5 text-[11px] font-semibold tabular-nums text-foreground">
                 {colItems.length}
               </span>
             </div>
@@ -59,7 +59,7 @@ export function IncidentBoard({ items }: { items: BoardItem[] }) {
                 return (
                   <div
                     key={i.id}
-                    className="space-y-2.5 rounded-xl border border-border/80 bg-card p-3.5 shadow-2xs transition-all hover:border-border hover:shadow-xs"
+                    className="space-y-2.5 rounded-xl border border-border/80 bg-card p-3.5 transition-colors hover:border-border"
                   >
                     <div>
                       <Link
@@ -78,7 +78,7 @@ export function IncidentBoard({ items }: { items: BoardItem[] }) {
                         {prio && i.priority !== 'normal' && (
                           <span
                             className={cn(
-                              'inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-medium',
+                              'inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium',
                               prio.badge,
                             )}
                           >

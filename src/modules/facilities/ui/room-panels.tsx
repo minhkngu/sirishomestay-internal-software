@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { MoneyInput } from '@/components/ui/money-input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { createRoomAction, createRoomsBulkAction } from '../server/rooms/actions'
 import { AmenityPicker, type AmenityOption } from './amenity-picker'
 
@@ -52,20 +53,24 @@ export function RoomPanels({ amenities, facilities, facilityId }: Props) {
   }
 
   const facilityField = facilityId ? null : (
-    <div className="space-y-1">
+    <div className="space-y-1.5">
       <Label htmlFor="room-facility">Cơ sở</Label>
-      <select
-        id="room-facility"
+      <Select
         value={picked}
-        onChange={(e) => setPicked(e.target.value)}
-        className="h-8 w-full rounded-lg border px-2 text-sm"
+        onValueChange={(v) => v && setPicked(String(v))}
+        items={facilities.map((f) => ({ value: f.id, label: f.name }))}
       >
-        {facilities.map((f) => (
-          <option key={f.id} value={f.id}>
-            {f.name}
-          </option>
-        ))}
-      </select>
+        <SelectTrigger id="room-facility" aria-label="Cơ sở" className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {facilities.map((f) => (
+            <SelectItem key={f.id} value={f.id}>
+              {f.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   )
 
@@ -86,29 +91,34 @@ export function RoomPanels({ amenities, facilities, facilityId }: Props) {
       >
         <div className="space-y-3">
           {facilityField}
-          {(
-            [
-              ['code', 'Mã phòng'],
-              ['floor', 'Tầng'],
-              ['roomType', 'Loại phòng'],
-              ['areaM2', 'Diện tích (m²)'],
-              ['beds', 'Số giường'],
-              ['listPrice', 'Giá niêm yết (VND)'],
-              ['capacity', 'Sức chứa'],
-            ] as const
-          ).map(([k, label]) => (
-            <div key={k} className="space-y-1">
-              <Label htmlFor={`r-${k}`}>{label}</Label>
-              {k === 'listPrice' ? (
-                <MoneyInput id={`r-${k}`} value={one[k]} onValueChange={(value) => setOne({ ...one, [k]: value })} />
-              ) : (
-                <Input id={`r-${k}`} value={one[k]} onChange={(e) => setOne({ ...one, [k]: e.target.value })} />
-              )}
-            </div>
-          ))}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {(
+              [
+                ['code', 'Mã phòng'],
+                ['floor', 'Tầng'],
+                ['roomType', 'Loại phòng'],
+                ['areaM2', 'Diện tích (m²)'],
+                ['beds', 'Số giường'],
+                ['capacity', 'Sức chứa'],
+                ['listPrice', 'Giá niêm yết (VND)'],
+              ] as const
+            ).map(([k, label]) => (
+              <div key={k} className={k === 'listPrice' ? 'space-y-1 sm:col-span-2' : 'space-y-1'}>
+                <Label htmlFor={`r-${k}`}>{label}</Label>
+                {k === 'listPrice' ? (
+                  <MoneyInput id={`r-${k}`} value={one[k]} onValueChange={(value) => setOne({ ...one, [k]: value })} />
+                ) : (
+                  <Input id={`r-${k}`} value={one[k]} onChange={(e) => setOne({ ...one, [k]: e.target.value })} />
+                )}
+              </div>
+            ))}
+          </div>
           <AmenityPicker idPrefix="r-am" options={amenities} value={oneAmenities} onChange={setOneAmenities} />
           {err && <p className="text-sm text-destructive">{err}</p>}
-          <div className="flex gap-2">
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="outline" onClick={closeDialog}>
+              Huỷ
+            </Button>
             <Button
               disabled={pending || !target}
               onClick={() =>
@@ -136,9 +146,6 @@ export function RoomPanels({ amenities, facilities, facilityId }: Props) {
             >
               Lưu
             </Button>
-            <Button variant="outline" onClick={closeDialog}>
-              Huỷ
-            </Button>
           </div>
         </div>
       </FormDialog>
@@ -151,29 +158,34 @@ export function RoomPanels({ amenities, facilities, facilityId }: Props) {
       >
         <div className="space-y-3">
           {facilityField}
-          {(
-            [
-              ['prefix', 'Tiền tố mã (tuỳ chọn)'],
-              ['floor', 'Tầng'],
-              ['from', 'Từ số'],
-              ['to', 'Đến số'],
-              ['areaM2', 'Diện tích (m²)'],
-              ['beds', 'Số giường'],
-              ['listPrice', 'Giá niêm yết (VND)'],
-            ] as const
-          ).map(([k, label]) => (
-            <div key={k} className="space-y-1">
-              <Label htmlFor={`b-${k}`}>{label}</Label>
-              {k === 'listPrice' ? (
-                <MoneyInput id={`b-${k}`} value={bulk[k]} onValueChange={(value) => setBulk({ ...bulk, [k]: value })} />
-              ) : (
-                <Input id={`b-${k}`} value={bulk[k]} onChange={(e) => setBulk({ ...bulk, [k]: e.target.value })} />
-              )}
-            </div>
-          ))}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {(
+              [
+                ['prefix', 'Tiền tố mã (tuỳ chọn)'],
+                ['floor', 'Tầng'],
+                ['from', 'Từ số'],
+                ['to', 'Đến số'],
+                ['areaM2', 'Diện tích (m²)'],
+                ['beds', 'Số giường'],
+                ['listPrice', 'Giá niêm yết (VND)'],
+              ] as const
+            ).map(([k, label]) => (
+              <div key={k} className={k === 'listPrice' ? 'space-y-1 sm:col-span-2' : 'space-y-1'}>
+                <Label htmlFor={`b-${k}`}>{label}</Label>
+                {k === 'listPrice' ? (
+                  <MoneyInput id={`b-${k}`} value={bulk[k]} onValueChange={(value) => setBulk({ ...bulk, [k]: value })} />
+                ) : (
+                  <Input id={`b-${k}`} value={bulk[k]} onChange={(e) => setBulk({ ...bulk, [k]: e.target.value })} />
+                )}
+              </div>
+            ))}
+          </div>
           <AmenityPicker idPrefix="b-am" options={amenities} value={bulkAmenities} onChange={setBulkAmenities} />
           {err && <p className="text-sm text-destructive">{err}</p>}
-          <div className="flex gap-2">
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="outline" onClick={closeDialog}>
+              Huỷ
+            </Button>
             <Button
               disabled={pending || !target}
               onClick={() =>
@@ -202,9 +214,6 @@ export function RoomPanels({ amenities, facilities, facilityId }: Props) {
               }
             >
               Tạo
-            </Button>
-            <Button variant="outline" onClick={closeDialog}>
-              Huỷ
             </Button>
           </div>
         </div>

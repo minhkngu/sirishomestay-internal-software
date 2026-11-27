@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Check, ChevronDown } from 'lucide-react'
+import { MonthField } from '@/components/month-field'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -16,8 +17,8 @@ const MONTH_OPTIONS: Option[] = [
 
 function FilterField({ label, className, children }: { label: string; className?: string; children: React.ReactNode }) {
   return (
-    <div className={cn('min-w-0 space-y-1', className)}>
-      <span className="block text-[11px] font-medium text-muted-foreground">{label}</span>
+    <div className={cn('flex min-w-0 flex-col gap-1', className)}>
+      <span className="block text-[11px] font-medium leading-none text-muted-foreground">{label}</span>
       {children}
     </div>
   )
@@ -64,7 +65,7 @@ function RoomFilter({ value, rooms, onChange }: { value: string; rooms: Option[]
           <button
             type="button"
             aria-label="Phòng"
-            className="flex h-9 w-full items-center justify-between gap-2 rounded-xl border border-input bg-card pl-3 pr-2.5 text-[13px] font-normal whitespace-nowrap text-foreground shadow-2xs outline-none transition-all hover:border-input/80 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
+            className="flex h-9 w-full items-center justify-between gap-2 rounded-lg border border-input bg-card pl-3 pr-2.5 text-[13px] font-normal whitespace-nowrap text-foreground outline-none transition-[border-color,background-color] hover:border-ring/50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/25"
           />
         }
       >
@@ -73,7 +74,7 @@ function RoomFilter({ value, rooms, onChange }: { value: string; rooms: Option[]
         </span>
         <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-64 p-0">
+      <PopoverContent align="start" className="min-w-(--anchor-width) w-64 p-0">
         <Command>
           <CommandInput autoFocus placeholder="Tìm phòng…" />
           <CommandList>
@@ -177,7 +178,7 @@ export function MeterFilters({
       <FilterField label="Phòng" className="sm:w-36">
         <RoomFilter value={roomId} rooms={rooms} onChange={(value) => update({ room: value || null, meter: null })} />
       </FilterField>
-      <FilterField label="Đồng hồ" className="sm:w-40">
+      <FilterField label="Đồng hồ" className="sm:w-48">
         <FilterSelect
           label="Đồng hồ"
           value={meter}
@@ -188,23 +189,23 @@ export function MeterFilters({
       {range && (
         <>
           <FilterField label="Từ tháng" className="sm:w-40">
-            <input
-              type="month"
-              aria-label="Từ tháng"
+            <MonthField
+              ariaLabel="Từ tháng"
               value={range.from}
-              max={range.to}
-              onChange={(e) => e.target.value && update({ from: e.target.value })}
-              className="h-9 w-full rounded-xl border border-input bg-card px-3 text-[13px]"
+              onValueChange={(next) => next && update({ from: next })}
+              clearable={false}
+              align="start"
+              className="w-full"
             />
           </FilterField>
           <FilterField label="Đến tháng" className="sm:w-40">
-            <input
-              type="month"
-              aria-label="Đến tháng"
+            <MonthField
+              ariaLabel="Đến tháng"
               value={range.to}
-              min={range.from}
-              onChange={(e) => e.target.value && update({ to: e.target.value })}
-              className="h-9 w-full rounded-xl border border-input bg-card px-3 text-[13px]"
+              onValueChange={(next) => next && update({ to: next })}
+              clearable={false}
+              align="start"
+              className="w-full"
             />
           </FilterField>
         </>

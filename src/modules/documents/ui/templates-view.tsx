@@ -44,8 +44,8 @@ export function TemplatesView({
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-semibold tracking-tight text-foreground">Mẫu giấy tờ</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Quản lý mẫu hóa đơn PDF, và mẫu hợp đồng, phụ lục, biên bản soạn ngay trong app (xuất PDF và Word).
+        <p className="mt-1 text-[13px] text-muted-foreground">
+          Quản lý mẫu hóa đơn PDF và mẫu hợp đồng, phụ lục, biên bản soạn trong app.
         </p>
       </div>
 
@@ -61,14 +61,14 @@ export function TemplatesView({
               aria-selected={active}
               onClick={() => setTab(t.id)}
               className={cn(
-                '-mb-px flex items-baseline gap-2 border-b-2 px-0.5 pb-2.5 text-sm transition-colors',
+                '-mb-px flex items-baseline gap-1.5 border-b-2 px-0.5 pb-2 text-[13px] transition-colors',
                 active
                   ? 'border-primary font-medium text-foreground'
                   : 'border-transparent text-muted-foreground hover:text-foreground',
               )}
             >
               {t.label}
-              <span className="text-xs tabular-nums text-muted-foreground">{count}</span>
+              <span className="text-[11px] tabular-nums text-muted-foreground">{count}</span>
             </button>
           )
         })}

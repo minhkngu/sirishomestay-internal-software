@@ -2,7 +2,9 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
+import { AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
+import { MonthField } from '@/components/month-field'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -89,16 +91,19 @@ export function GenerateWizard({
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="generate-period">Tháng</Label>
-          <input
+          <MonthField
             id="generate-period"
-            type="month"
+            ariaLabel="Tháng"
             value={period}
-            onChange={(e) => {
-              setPeriod(e.target.value)
+            onValueChange={(next) => {
+              setPeriod(next)
               setRows(null)
               setError('')
             }}
-            className="h-9 w-full rounded-lg border border-border/80 bg-background px-2 text-sm"
+            clearable={false}
+            align="start"
+            placeholder="Chọn tháng"
+            className="w-full"
           />
         </div>
       </div>
@@ -124,8 +129,9 @@ export function GenerateWizard({
                 </span>
               </div>
               {r.warnings.map((w) => (
-                <p key={w} className="text-amber-700">
-                  ⚠ {w}
+                <p key={w} className="flex items-center gap-1.5 text-amber-700">
+                  <AlertTriangle className="size-3.5 shrink-0" />
+                  <span>{w}</span>
                 </p>
               ))}
             </div>

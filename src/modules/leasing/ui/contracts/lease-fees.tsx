@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { MoneyInput } from '@/components/ui/money-input'
+import { cn } from '@/lib/utils'
 import { availableMeters, resolveMeterIds } from './lease-fee-meters'
 import { BareSelect } from './contract-form-ui'
 import { FeePickerDialog, type FeeOption } from './fee-picker-dialog'
@@ -63,6 +64,7 @@ export function LeaseFees({
     <div className="space-y-3">
       {fees.map((f) => {
         const choices = availableMeters({ roomMeters, roomId, fee: f, resolved })
+        const hasMeterFields = !hideMeterInputs && f.quantitySource === 'meter'
         return (
           <div key={f.key} className="rounded-xl border border-border/70 bg-muted/20 p-3.5">
             <div className="flex flex-wrap items-start justify-between gap-2">
@@ -84,8 +86,8 @@ export function LeaseFees({
               </button>
             </div>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <label className="space-y-1.5 text-xs text-muted-foreground">
-                Đơn giá
+              <label className={cn('block space-y-1.5', !f.legacyFixed && 'sm:col-span-2')}>
+                <span className="block text-xs text-muted-foreground">Đơn giá</span>
                 <MoneyInput
                   aria-label={`Đơn giá ${f.name}`}
                   value={f.price}
@@ -93,8 +95,8 @@ export function LeaseFees({
                 />
               </label>
               {f.legacyFixed && (
-                <label className="space-y-1.5 text-xs text-muted-foreground">
-                  Số lượng
+                <label className="block space-y-1.5">
+                  <span className="block text-xs text-muted-foreground">Số lượng</span>
                   <Input
                     aria-label={`Số lượng ${f.name}`}
                     inputMode="numeric"
@@ -103,10 +105,10 @@ export function LeaseFees({
                   />
                 </label>
               )}
-              {!hideMeterInputs && f.quantitySource === 'meter' && (
+              {hasMeterFields && (
                 <>
-                  <div className="space-y-1.5 text-xs text-muted-foreground">
-                    <span>Đồng hồ</span>
+                  <div className="space-y-1.5">
+                    <span className="block text-xs text-muted-foreground">Đồng hồ</span>
                     <BareSelect
                       ariaLabel={`Đồng hồ ${f.name}`}
                       value={resolved[f.key] ?? ''}
@@ -117,8 +119,10 @@ export function LeaseFees({
                       ]}
                     />
                   </div>
-                  <label className="space-y-1.5 text-xs text-muted-foreground">
-                    {resolved[f.key] ? 'Chỉ số hiện tại của đồng hồ' : 'Chỉ số ban đầu'}
+                  <label className="block space-y-1.5">
+                    <span className="block text-xs text-muted-foreground">
+                      {resolved[f.key] ? 'Chỉ số hiện tại của đồng hồ' : 'Chỉ số ban đầu'}
+                    </span>
                     <Input
                       aria-label={`Chỉ số ban đầu ${f.name}`}
                       inputMode="numeric"

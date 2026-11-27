@@ -7,10 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 /** Ô chọn/ô nhập dùng chung cho form hợp đồng: cùng cao 36px, cùng bo góc. */
 export const controlClass =
-  'h-9 w-full rounded-xl border border-border/80 bg-card pl-3 pr-9 text-[13px] text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60'
+  'h-9 w-full rounded-lg border border-input bg-card pl-3 pr-9 text-[13px] text-foreground outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-60'
 
 export const textareaClass =
-  'min-h-24 w-full rounded-xl border border-border/80 bg-card p-3 text-[13px] leading-relaxed text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20'
+  'min-h-24 w-full rounded-lg border border-input bg-card p-3 text-[13px] leading-relaxed text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20'
 
 export function FormSection({
   title,
@@ -133,11 +133,17 @@ export function FormSelect({
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
-          {options.map((option) => (
-            <SelectItem key={option.value || '__empty__'} value={option.value} disabled={option.disabled}>
-              {option.label}
+          {options.length === 0 ? (
+            <SelectItem value="__none__" disabled>
+              {placeholder || 'Không có lựa chọn'}
             </SelectItem>
-          ))}
+          ) : (
+            options.map((option) => (
+              <SelectItem key={option.value || '__empty__'} value={option.value} disabled={option.disabled}>
+                {option.label}
+              </SelectItem>
+            ))
+          )}
         </SelectContent>
       </Select>
     </Field>
@@ -180,11 +186,17 @@ export function BareSelect({
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
-        {options.map((option) => (
-          <SelectItem key={option.value || '__empty__'} value={option.value} disabled={option.disabled}>
-            {option.label}
+        {options.length === 0 ? (
+          <SelectItem value="__none__" disabled>
+            {placeholder || 'Không có lựa chọn'}
           </SelectItem>
-        ))}
+        ) : (
+          options.map((option) => (
+            <SelectItem key={option.value || '__empty__'} value={option.value} disabled={option.disabled}>
+              {option.label}
+            </SelectItem>
+          ))
+        )}
       </SelectContent>
     </Select>
   )

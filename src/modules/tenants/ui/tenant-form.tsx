@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
+import { DateField } from '@/components/date-field'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -132,8 +133,11 @@ export function TenantForm({ tenant, onCreated, onSaved, kinds, deferCreate, bar
   }
 
   return (
-    <div className={bare ? 'space-y-4' : 'max-w-2xl space-y-4 rounded-lg border bg-card p-4 sm:p-6'}>
-      <div className="flex flex-wrap gap-2" role="tablist">
+    <div className={bare ? 'space-y-4' : 'max-w-2xl space-y-4 rounded-2xl border border-border/80 bg-card p-4 sm:p-6'}>
+      <div
+        className="inline-flex w-full flex-wrap gap-1 rounded-lg border border-border/80 bg-muted/70 p-1"
+        role="tablist"
+      >
         {(kinds ?? (Object.keys(TENANT_KIND_LABELS) as Kind[])).map((k) => (
           <button
             key={k}
@@ -142,24 +146,39 @@ export function TenantForm({ tenant, onCreated, onSaved, kinds, deferCreate, bar
             aria-selected={kind === k}
             onClick={() => setKind(k)}
             className={cn(
-              'min-w-36 flex-1 rounded-lg border px-4 py-3 text-base font-medium',
-              kind === k && 'bg-[var(--primary-strong)] text-primary-foreground',
+              'min-w-28 flex-1 rounded-md border border-transparent px-3 py-1.5 text-[13px] font-medium transition-colors',
+              kind === k
+                ? 'border-border/70 bg-card font-semibold text-primary'
+                : 'text-muted-foreground hover:text-foreground',
             )}
           >
             {TENANT_KIND_LABELS[k]}
           </button>
         ))}
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3.5 sm:grid-cols-2">
         {FIELDS[kind].map((f) => (
-          <div key={f.key} className="space-y-1">
-            <Label htmlFor={`t-${f.key}`}>{f.label}</Label>
-            <Input
-              id={`t-${f.key}`}
-              type={f.type ?? 'text'}
-              value={values[f.key] ?? ''}
-              onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}
-            />
+          <div key={f.key} className="space-y-1.5">
+            {f.type === 'date' ? (
+              <DateField
+                id={`t-${f.key}`}
+                label={f.label}
+                value={values[f.key] ?? ''}
+                onValueChange={(next) => setValues({ ...values, [f.key]: next })}
+              />
+            ) : (
+              <>
+                <Label htmlFor={`t-${f.key}`} className="text-[13px] font-medium">
+                  {f.label}
+                </Label>
+                <Input
+                  id={`t-${f.key}`}
+                  type="text"
+                  value={values[f.key] ?? ''}
+                  onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}
+                />
+              </>
+            )}
             {f.key === 'phone' && values.phone && !fe.phone && (
               <p className="text-xs text-muted-foreground">
                 {normalizePhone(values.phone)
@@ -167,18 +186,22 @@ export function TenantForm({ tenant, onCreated, onSaved, kinds, deferCreate, bar
                   : 'Số điện thoại chưa hợp lệ'}
               </p>
             )}
-            {fe[f.key] && <p className="text-sm text-destructive">{fe[f.key]}</p>}
+            {fe[f.key] && <p className="text-xs text-destructive">{fe[f.key]}</p>}
           </div>
         ))}
       </div>
-      <div className="space-y-1">
-        <Label htmlFor="t-note">Ghi chú</Label>
+      <div className="space-y-1.5">
+        <Label htmlFor="t-note" className="text-[13px] font-medium">
+          Ghi chú
+        </Label>
         <Input id="t-note" value={note} onChange={(e) => setNote(e.target.value)} />
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
-      <Button onClick={submit} disabled={pending}>
-        {tenant ? 'Lưu' : 'Tạo khách'}
-      </Button>
+      <div className="flex justify-end pt-1">
+        <Button onClick={submit} disabled={pending}>
+          {tenant ? 'Lưu' : 'Tạo khách'}
+        </Button>
+      </div>
     </div>
   )
 }

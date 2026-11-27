@@ -12,17 +12,13 @@ export default async function LoginPage() {
   const demo = publicEnv.demoMode
   const accounts = demo ? await listDemoAccounts(db) : []
   return (
-    <main className="relative flex min-h-screen w-full flex-col justify-center items-center bg-gradient-to-b from-[#F4FAF6] via-background to-[#EDF5F1] px-4 py-12">
-      {/* Decorative subtle ambient lights */}
-      <div className="pointer-events-none absolute -top-40 -left-40 size-96 rounded-full bg-primary/8 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-40 -right-40 size-96 rounded-full bg-accent/30 blur-3xl" />
-
-      <div className="relative z-10 mx-auto flex w-full max-w-lg flex-col gap-6">
+    <main className="flex min-h-screen w-full flex-col items-center justify-center bg-background px-4 py-12">
+      <div className="mx-auto flex w-full max-w-lg flex-col gap-6">
         <div className="text-center">
-          <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-xs">
-            <Building2 className="size-6" />
+          <div className="mx-auto mb-3 flex size-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+            <Building2 className="size-5" />
           </div>
-          <p className="text-xs font-semibold tracking-widest text-primary uppercase">SIRIS RESIDENCES</p>
+          <p className="text-[13px] font-medium text-primary">Siris Residences</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">Không gian làm việc Siris</h1>
           <p className="mt-1 text-sm text-muted-foreground">Đăng nhập để quản lý các toà nhà và công việc hằng ngày.</p>
         </div>

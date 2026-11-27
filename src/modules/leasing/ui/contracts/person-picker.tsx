@@ -46,7 +46,7 @@ export function PersonPicker({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger render={trigger} />
-      <PopoverContent align={align} className="w-80 p-0">
+      <PopoverContent align={align} className="w-(--anchor-width) min-w-80 max-w-[min(42rem,calc(100vw-2rem))] p-0">
         <Command
           filter={(value, search) => {
             const query = search.trim().toLowerCase()
@@ -71,7 +71,7 @@ export function PersonPicker({
                     setOpen(false)
                   }}
                 >
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary text-[10px] font-semibold text-secondary-foreground">
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary text-[11px] font-semibold text-secondary-foreground">
                     {initials(person.name)}
                   </span>
                   <span className="min-w-0 flex-1">
@@ -81,7 +81,7 @@ export function PersonPicker({
                     </span>
                   </span>
                   {person.kind === 'company' && (
-                    <span className="shrink-0 rounded-full border border-border/80 bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                    <span className="shrink-0 rounded-full border border-border/80 bg-muted/60 px-2 py-0.5 text-[11px] text-muted-foreground">
                       Công ty
                     </span>
                   )}

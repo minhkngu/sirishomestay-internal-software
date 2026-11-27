@@ -2,10 +2,10 @@
 
 import * as React from 'react'
 import { Input } from '@/components/ui/input'
-import { formatVND, parseMoneyInput } from '@/domain/money'
+import { parseMoneyInput } from '@/domain/money'
 
 type Props = Omit<React.ComponentProps<typeof Input>, 'type' | 'value' | 'onChange'> & {
-  /** Chuỗi số nguyên thô (không có dấu chấm). */
+  /** Chuỗi số nguyên thô (không có dấu phân cách). */
   value: string
   onValueChange: (value: string) => void
   allowNegative?: boolean
@@ -15,7 +15,14 @@ type Props = Omit<React.ComponentProps<typeof Input>, 'type' | 'value' | 'onChan
 function toDisplay(value: string): string {
   if (value === '' || value === '-') return value
   const n = Number(value)
-  return Number.isFinite(n) ? formatVND(n) : ''
+  if (!Number.isFinite(n)) return ''
+  const sign = n < 0 ? '-' : ''
+  return (
+    sign +
+    Math.abs(Math.trunc(n))
+      .toString()
+      .replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  )
 }
 
 function countSignificant(text: string, caret: number): number {
@@ -41,7 +48,7 @@ function caretAfter(text: string, count: number): number {
   return text.length
 }
 
-/** Bỏ dấu chấm do ô tự chèn; giữ dấu trừ đầu (nếu được phép). */
+/** Bỏ dấu phân cách hàng nghìn do ô tự chèn; giữ dấu trừ đầu (nếu được phép). */
 function digitsOnly(text: string, allowNegative: boolean): string {
   const negative = allowNegative && text.trimStart().startsWith('-')
   const digits = text.replace(/\D/g, '')

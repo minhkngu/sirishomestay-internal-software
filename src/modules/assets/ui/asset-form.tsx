@@ -105,7 +105,7 @@ function AssetDialogForm({ facilities, onClose }: { facilities: TreeFacility[]; 
           <MoneyInput
             id="asset-value"
             aria-label="Giá trị"
-            placeholder="4.500.000"
+            placeholder="4,500,000"
             value={v.value}
             onValueChange={(value) => setV({ ...v, value })}
           />
@@ -116,7 +116,6 @@ function AssetDialogForm({ facilities, onClose }: { facilities: TreeFacility[]; 
             id="asset-condition"
             value={v.condition}
             onChange={(e) => setV({ ...v, condition: e.target.value })}
-            className="h-9 w-full rounded-xl border border-border/80 bg-card px-2.5 text-sm outline-none focus:border-primary"
           >
             {ASSET_CONDITIONS.map((c) => (
               <option key={c} value={c}>
@@ -132,7 +131,6 @@ function AssetDialogForm({ facilities, onClose }: { facilities: TreeFacility[]; 
             aria-label="Cơ sở"
             value={v.facilityId}
             onChange={(e) => setV({ ...v, facilityId: e.target.value, where: `warehouse:${e.target.value}` })}
-            className="h-9 w-full rounded-xl border border-border/80 bg-card px-2.5 text-sm outline-none focus:border-primary"
           >
             {facilities.map((f) => (
               <option key={f.id} value={f.id}>
@@ -148,7 +146,6 @@ function AssetDialogForm({ facilities, onClose }: { facilities: TreeFacility[]; 
             aria-label="Vị trí"
             value={v.where}
             onChange={(e) => setV({ ...v, where: e.target.value })}
-            className="h-9 w-full rounded-xl border border-border/80 bg-card px-2.5 text-sm outline-none focus:border-primary"
           >
             <option value={`warehouse:${v.facilityId}`}>Kho</option>
             <option value={`common:${v.facilityId}`}>Khu chung</option>

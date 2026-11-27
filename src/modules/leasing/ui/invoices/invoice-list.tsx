@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { exportDocumentAction } from '@/modules/documents/actions'
 import { InvoiceRowActions } from './invoice-row-actions'
+import { MonthField } from '@/components/month-field'
 import { FacilityFilter } from '@/components/list/facility-filter'
 import { Pager } from '@/components/list/pager'
 import { ParamChips } from '@/components/list/param-chips'
@@ -97,52 +98,44 @@ export function InvoiceList({
         />
         <div className="flex flex-wrap items-center gap-2.5">
           <FacilityFilter facilities={facilities} align="right" />
-          <input
-            type="month"
+          <MonthField
+            ariaLabel="Kỳ"
             value={period}
-            onChange={(e) => setListParams({ period: e.target.value || null })}
-            aria-label="Kỳ"
-            className="h-9 rounded-xl border border-border/80 bg-card px-3 text-xs font-medium text-foreground shadow-2xs outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+            onValueChange={(next) => setListParams({ period: next || null })}
+            placeholder="Tất cả kỳ"
+            className="w-40"
           />
         </div>
       </div>
 
       {/* Invoices Table */}
-      <div className="overflow-x-auto rounded-2xl border border-border/80 bg-card shadow-2xs">
-        <table className="w-full min-w-[900px] text-xs">
-          <thead className="border-b border-border/60 bg-muted/40 text-left">
+      <div className="overflow-x-auto rounded-2xl border border-border/80 bg-card">
+        <table className="w-full text-[13px]">
+          <thead className="border-b border-border/70 text-left">
             <tr>
-              <th className="w-px p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+              <th className="w-px px-1.5 py-2.5 text-[13px] font-medium text-muted-foreground whitespace-nowrap">
                 <span className="sr-only">Thao tác</span>
               </th>
-              <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Mã</th>
-              <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
-                Phòng
-              </th>
+              <th className="px-1.5 py-2.5 text-[13px] font-medium text-muted-foreground whitespace-nowrap">Mã</th>
+              <th className="px-1.5 py-2.5 text-[13px] font-medium text-muted-foreground whitespace-nowrap">Phòng</th>
               {facilities.length > 1 && (
-                <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
-                  Toà
-                </th>
+                <th className="px-1.5 py-2.5 text-[13px] font-medium text-muted-foreground whitespace-nowrap">Toà</th>
               )}
-              <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
-                Bên thuê
-              </th>
-              <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Kỳ</th>
-              <th className="p-3 text-right font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+              <th className="px-1.5 py-2.5 text-[13px] font-medium text-muted-foreground whitespace-nowrap">Bên thuê</th>
+              <th className="px-1.5 py-2.5 text-[13px] font-medium text-muted-foreground whitespace-nowrap">Kỳ</th>
+              <th className="px-1.5 py-2.5 text-right text-[13px] font-medium text-muted-foreground whitespace-nowrap">
                 Tổng
               </th>
-              <th className="p-3 text-right font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+              <th className="px-1.5 py-2.5 text-right text-[13px] font-medium text-muted-foreground whitespace-nowrap">
                 Đã thu
               </th>
-              <th className="p-3 font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
-                Hạn
-              </th>
+              <th className="px-1.5 py-2.5 text-[13px] font-medium text-muted-foreground whitespace-nowrap">Hạn</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50">
             {pageRows.map((i) => (
               <tr key={i.id} className="transition-colors hover:bg-muted/30">
-                <td className="p-3 whitespace-nowrap">
+                <td className="px-1.5 py-2.5 whitespace-nowrap">
                   <InvoiceRowActions
                     id={i.id}
                     code={i.code}
@@ -162,7 +155,7 @@ export function InvoiceList({
                     }
                   />
                 </td>
-                <td className="p-3 whitespace-nowrap">
+                <td className="px-1.5 py-2.5 whitespace-nowrap">
                   <button
                     type="button"
                     disabled={opening}
@@ -173,21 +166,27 @@ export function InvoiceList({
                     {i.code}
                   </button>
                 </td>
-                <td className="p-3 font-medium text-foreground whitespace-nowrap">{i.roomCode}</td>
+                <td className="px-1.5 py-2.5 font-medium text-foreground">
+                  <span className="block max-w-24 truncate">{i.roomCode}</span>
+                </td>
                 {facilities.length > 1 && (
-                  <td className="p-3 text-muted-foreground whitespace-nowrap">{names[i.facilityId]}</td>
+                  <td className="px-1.5 py-2.5 text-muted-foreground">
+                    <span className="block max-w-24 truncate">{names[i.facilityId]}</span>
+                  </td>
                 )}
-                <td className="p-3 font-medium text-foreground whitespace-nowrap">{i.tenantName}</td>
-                <td className="p-3 text-muted-foreground whitespace-nowrap">
+                <td className="px-1.5 py-2.5 font-medium text-foreground">
+                  <span className="block max-w-28 truncate">{i.tenantName}</span>
+                </td>
+                <td className="px-1.5 py-2.5 text-muted-foreground whitespace-nowrap">
                   {formatDateVN(i.periodStart)} – {formatDateVN(i.periodEnd)}
                 </td>
-                <td className="p-3 text-right font-semibold text-foreground tabular-nums whitespace-nowrap">
-                  {formatVND(i.total)}
+                <td className="px-1.5 py-2.5 text-right font-semibold text-foreground tabular-nums whitespace-nowrap">
+                  {formatVND(i.total)} đ
                 </td>
-                <td className="p-3 text-right text-muted-foreground tabular-nums whitespace-nowrap">
-                  {formatVND(i.paid)}
+                <td className="px-1.5 py-2.5 text-right text-muted-foreground tabular-nums whitespace-nowrap">
+                  {formatVND(i.paid)} đ
                 </td>
-                <td className="p-3 text-muted-foreground whitespace-nowrap">
+                <td className="px-1.5 py-2.5 text-muted-foreground whitespace-nowrap">
                   {i.dueDate ? formatDateVN(i.dueDate) : '—'}
                 </td>
               </tr>

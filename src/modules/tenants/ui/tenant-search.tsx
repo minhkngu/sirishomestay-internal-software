@@ -50,7 +50,7 @@ export function TenantSearch() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Tìm tên, SĐT, passport, CCCD…"
-          className="h-9 w-full rounded-xl border border-border/80 bg-card pl-9 pr-3 text-xs text-foreground shadow-2xs outline-none transition-all placeholder:text-muted-foreground/75 focus:border-ring focus:ring-2 focus:ring-ring/20"
+          className="h-9 w-full rounded-lg border border-input bg-card pl-9 pr-3 text-[13px] text-foreground outline-none transition-[border-color,background-color] placeholder:text-muted-foreground/80 focus:border-ring focus:ring-2 focus:ring-ring/20"
         />
       </div>
       <Select
@@ -58,10 +58,10 @@ export function TenantSearch() {
         onValueChange={(value) => setListParams({ stay: !value || value === 'all' ? null : value })}
         items={STAY_OPTIONS}
       >
-        <SelectTrigger aria-label="Trạng thái ở" className="h-9 min-w-36 border-border/80 bg-card text-xs">
+        <SelectTrigger aria-label="Trạng thái ở" className="min-w-36">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent align="end">
+        <SelectContent align="start">
           {STAY_OPTIONS.map((o) => (
             <SelectItem key={o.value} value={o.value}>
               {o.label}
@@ -74,10 +74,10 @@ export function TenantSearch() {
         onValueChange={(value) => setListParams({ kind: !value || value === 'all' ? null : value })}
         items={KIND_OPTIONS}
       >
-        <SelectTrigger aria-label="Loại khách" className="h-9 min-w-36 border-border/80 bg-card text-xs">
+        <SelectTrigger aria-label="Loại khách" className="min-w-36">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent align="end">
+        <SelectContent align="start">
           {KIND_OPTIONS.map((o) => (
             <SelectItem key={o.value} value={o.value}>
               {o.label}

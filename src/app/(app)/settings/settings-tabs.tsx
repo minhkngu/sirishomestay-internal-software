@@ -5,6 +5,7 @@ import { BankAccountFields, emptyBankAccount } from '@/components/bank-account/b
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AmenitySettings, FeeSettings, type AmenityRow } from '@/modules/facilities/ui'
 import { MeterTypeSettings, type MeterTypeRow } from '@/modules/meters/ui'
@@ -55,17 +56,24 @@ function GeneralTab({ s }: { s: Settings }) {
         <Label htmlFor="contract">Cảnh báo hợp đồng sắp hết hạn trước (ngày)</Label>
         <Input id="contract" inputMode="numeric" value={contract} onChange={(e) => setContract(e.target.value)} />
       </div>
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         <Label htmlFor="proration">Cách tính lẻ ngày</Label>
-        <select
-          id="proration"
+        <Select
           value={proration}
-          onChange={(e) => setProration(e.target.value as Settings['proration'])}
-          className="h-8 w-full rounded-lg border px-2 text-sm"
+          onValueChange={(v) => v && setProration(v as Settings['proration'])}
+          items={[
+            { value: 'actual_days', label: 'Chia số ngày thực của tháng' },
+            { value: 'days_30', label: 'Chia 30' },
+          ]}
         >
-          <option value="actual_days">Chia số ngày thực của tháng</option>
-          <option value="days_30">Chia 30</option>
-        </select>
+          <SelectTrigger id="proration" aria-label="Cách tính lẻ ngày" className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="actual_days">Chia số ngày thực của tháng</SelectItem>
+            <SelectItem value="days_30">Chia 30</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">Hạn thanh toán mặc định</legend>

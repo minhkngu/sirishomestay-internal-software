@@ -7,9 +7,9 @@ export function StatusDot({ tone, children }: { tone: 'ok' | 'warn' | 'muted' | 
       <span aria-hidden="true" className="relative mt-1 flex size-2 shrink-0">
         <span
           className={cn('size-2 rounded-full', {
-            'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.35)]': tone === 'ok',
-            'bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.35)]': tone === 'warn',
-            'bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.35)]': tone === 'danger',
+            'bg-emerald-600': tone === 'ok',
+            'bg-amber-500': tone === 'warn',
+            'bg-rose-600': tone === 'danger',
             'bg-slate-400': tone === 'muted',
           })}
         />

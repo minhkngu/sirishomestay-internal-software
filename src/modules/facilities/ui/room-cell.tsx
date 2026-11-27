@@ -47,7 +47,7 @@ export function RoomCell({ room }: { room: CellRoom }) {
           tone(room.status, room.isActive ?? true),
         )}
       >
-        <div className="font-semibold">{room.code}</div>
+        <div className="truncate pr-6 font-semibold">{room.code}</div>
         <div className="truncate text-xs">
           {room.isActive === false ? 'Ngừng sử dụng' : ROOM_STATUS_LABELS[room.status]}
         </div>

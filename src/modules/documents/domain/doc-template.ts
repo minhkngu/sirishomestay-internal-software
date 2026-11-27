@@ -8,7 +8,7 @@ export type DocBlock =
   | { type: 'heading'; level: 1 | 2 | 3; align?: Align; inlines: Inline[] }
   | { type: 'paragraph'; align?: Align; inlines: Inline[] }
   | { type: 'list'; ordered: boolean; items: Inline[][] }
-  | { type: 'table'; rows: { cells: { inlines: Inline[]; header?: boolean }[] }[] }
+  | { type: 'table'; rows: { cells: { inlines: Inline[]; header?: boolean; align?: Align }[] }[] }
   | { type: 'summary'; cells: { label: string; value: Inline[] }[] }
   | { type: 'pageBreak' }
   /** Mã QR thanh toán của hoá đơn; chỉ hiện khi hoá đơn còn tiền phải trả và có tài khoản nhận. */
@@ -94,17 +94,30 @@ function cellInlines(cell: HTMLElement, scope: Scope, ctx: Ctx): Inline[] {
   return out
 }
 
+function cellAlign(cell: HTMLElement): Align | undefined {
+  const direct = alignOf(cell)
+  if (direct) return direct
+  const firstP = cell.childNodes.find(
+    (n): n is HTMLElement => n instanceof HTMLElement && n.tagName?.toLowerCase() === 'p',
+  )
+  return firstP ? alignOf(firstP) : undefined
+}
+
 function tableBlock(el: HTMLElement, scope: Scope, ctx: Ctx): DocBlock {
-  const rows: { cells: { inlines: Inline[]; header?: boolean }[] }[] = []
+  const rows: { cells: { inlines: Inline[]; header?: boolean; align?: Align }[] }[] = []
   const addRow = (tr: HTMLElement, s: Scope) => {
     const cells = tr.childNodes.filter(
       (n): n is HTMLElement => n instanceof HTMLElement && ['td', 'th'].includes(n.tagName?.toLowerCase() ?? ''),
     )
     rows.push({
-      cells: cells.map((c) => ({
-        inlines: cellInlines(c, s, ctx),
-        ...(c.tagName.toLowerCase() === 'th' && { header: true }),
-      })),
+      cells: cells.map((c) => {
+        const align = cellAlign(c)
+        return {
+          inlines: cellInlines(c, s, ctx),
+          ...(c.tagName.toLowerCase() === 'th' && { header: true }),
+          ...(align && { align }),
+        }
+      }),
     })
   }
   for (const tr of el.querySelectorAll('tr')) {

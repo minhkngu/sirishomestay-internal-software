@@ -459,7 +459,7 @@ export function LeaseWizard({
                         <p className="flex flex-wrap items-center gap-1.5 text-[13px] font-medium text-foreground">
                           <span className="truncate">{person.name}</span>
                           {person.id === tenantId && (
-                            <span className="rounded-full border border-primary/20 bg-primary/8 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                            <span className="rounded-full border border-primary/20 bg-primary/8 px-2 py-0.5 text-[11px] font-medium text-primary">
                               Bên ký
                             </span>
                           )}
@@ -533,7 +533,7 @@ export function LeaseWizard({
                     label: `${months} tháng`,
                   })),
                 ]}
-                className="h-7 w-auto rounded-lg px-2 text-[11px] data-[size=default]:h-7"
+                className="h-9 w-32 rounded-lg text-[13px]"
               />
             </span>
           }

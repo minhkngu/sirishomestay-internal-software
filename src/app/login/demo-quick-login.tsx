@@ -10,14 +10,13 @@ export function DemoQuickLogin({ accounts }: { accounts: { email: string; name: 
   return (
     <section className="space-y-3 pt-2">
       <div className="flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Đăng nhập nhanh bằng tài khoản mẫu
-        </h2>
-        <span className="text-[11px] text-muted-foreground/80">Chọn 1 để thử ngay</span>
+        <h2 className="text-[13px] font-medium text-muted-foreground">Đăng nhập nhanh bằng tài khoản mẫu</h2>
+        <span className="text-xs text-muted-foreground">Chọn 1 để thử ngay</span>
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
-        {accounts.map((a) => {
+        {accounts.map((a, idx) => {
           const initial = a.name.charAt(0).toUpperCase()
+          const isOrphan = accounts.length % 2 === 1 && idx === accounts.length - 1
           return (
             <button
               key={a.email}
@@ -30,7 +29,7 @@ export function DemoQuickLogin({ accounts }: { accounts: { email: string; name: 
                   if (r && !r.ok) setError(r.error)
                 })
               }
-              className="group relative flex flex-col justify-between rounded-xl border border-border/80 bg-card p-3 text-left shadow-2xs transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-accent/30 hover:shadow-xs active:scale-[0.985] disabled:pointer-events-none disabled:opacity-50"
+              className={`group relative flex flex-col justify-between rounded-xl border border-border/80 bg-card p-3 text-left transition-colors duration-150 hover:border-primary/40 hover:bg-accent/30 disabled:pointer-events-none disabled:opacity-50${isOrphan ? ' sm:col-span-2' : ''}`}
             >
               <div className="flex items-start gap-2.5">
                 <div

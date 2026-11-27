@@ -52,9 +52,9 @@ export default async function TenantDetail({ id, embedded = false }: { id: strin
         )}
 
         {/* Hero Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border/80 bg-card p-5">
           <div className="flex items-center gap-3.5">
-            <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-base font-bold text-primary shadow-2xs">
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-base font-bold text-primary">
               {displayName.charAt(0).toUpperCase()}
             </div>
             <div>
@@ -88,7 +88,7 @@ export default async function TenantDetail({ id, embedded = false }: { id: strin
       </div>
 
       {/* Read-only Info Card */}
-      <section className="space-y-3 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
+      <section className="space-y-3 rounded-2xl border border-border/80 bg-card p-5">
         <h2 className="text-sm font-semibold tracking-tight text-foreground">Thông tin chi tiết</h2>
         {tenant.kind === 'foreign' && (
           <dl className="grid gap-4 sm:grid-cols-3">
@@ -141,7 +141,7 @@ export default async function TenantDetail({ id, embedded = false }: { id: strin
       </section>
 
       {/* Contracts Section */}
-      <section className="space-y-3 rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
+      <section className="space-y-3 rounded-2xl border border-border/80 bg-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold tracking-tight text-foreground">Hợp đồng thuê</h2>
@@ -229,7 +229,7 @@ export default async function TenantDetail({ id, embedded = false }: { id: strin
       </section>
 
       {/* Documents */}
-      <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-2xs">
+      <div className="rounded-2xl border border-border/80 bg-card p-5">
         <TenantDocuments tenantId={id} docs={docs.map((d) => ({ id: d.id, name: d.name }))} />
       </div>
     </div>
