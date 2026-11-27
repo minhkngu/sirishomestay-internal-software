@@ -31,7 +31,10 @@ export function IncidentForm({
   const [error, setError] = useState<string | null>(null)
   const [priority, setPriority] = useState('normal')
   const [assigneeId, setAssigneeId] = useState('')
-  const assigneeOptions = [{ value: '', label: '— Chưa giao —' }, ...assignees.map((a) => ({ value: a.id, label: a.name }))]
+  const assigneeOptions = [
+    { value: '', label: '— Chưa giao —' },
+    ...assignees.map((a) => ({ value: a.id, label: a.name })),
+  ]
   return (
     <form
       className="grid max-w-lg gap-3.5 text-sm"

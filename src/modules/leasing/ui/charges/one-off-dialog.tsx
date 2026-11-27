@@ -86,7 +86,13 @@ export function OneOffDialog({
                   <Label htmlFor="oneoff-price" className="text-[13px] font-medium">
                     Đơn giá
                   </Label>
-                  <MoneyInput id="oneoff-price" name="unitPrice" required value={unitPrice} onValueChange={setUnitPrice} />
+                  <MoneyInput
+                    id="oneoff-price"
+                    name="unitPrice"
+                    required
+                    value={unitPrice}
+                    onValueChange={setUnitPrice}
+                  />
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-1">

@@ -121,7 +121,9 @@ export function InvoiceList({
               {facilities.length > 1 && (
                 <th className="px-1.5 py-2.5 text-[13px] font-medium text-muted-foreground whitespace-nowrap">Toà</th>
               )}
-              <th className="px-1.5 py-2.5 text-[13px] font-medium text-muted-foreground whitespace-nowrap">Bên thuê</th>
+              <th className="px-1.5 py-2.5 text-[13px] font-medium text-muted-foreground whitespace-nowrap">
+                Bên thuê
+              </th>
               <th className="px-1.5 py-2.5 text-[13px] font-medium text-muted-foreground whitespace-nowrap">Kỳ</th>
               <th className="px-1.5 py-2.5 text-right text-[13px] font-medium text-muted-foreground whitespace-nowrap">
                 Tổng

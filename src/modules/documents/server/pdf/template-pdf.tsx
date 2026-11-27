@@ -42,7 +42,10 @@ const ALIGN: Record<Align, 'left' | 'center' | 'right' | 'justify'> = {
 }
 
 const plainText = (inlines: Inline[]): string =>
-  inlines.map((i) => ('br' in i ? ' ' : i.text)).join('').trim()
+  inlines
+    .map((i) => ('br' in i ? ' ' : i.text))
+    .join('')
+    .trim()
 
 const NUMERIC_HEADER_RE = /^(sl|số lượng|đơn giá|thành tiền|số tiền|tổng|đã trả|còn lại|chỉ số)/i
 const MONEY_LABEL_RE = /^(thanh toán|tổng|còn lại|giá thuê|tiền cọc|phải trả)/i
@@ -53,7 +56,9 @@ function isSignatureTable(block: Extract<DocBlock, { type: 'table' }>): boolean 
   if (cells.length < 2 || cells.length > 3) return false
   if (cells.some((c) => c.header)) return false
   const text = cells.map((c) => plainText(c.inlines).toLowerCase()).join(' ')
-  return text.includes('ký') || text.includes('bên a') || text.includes('bên b') || cells.every((c) => c.align === 'center')
+  return (
+    text.includes('ký') || text.includes('bên a') || text.includes('bên b') || cells.every((c) => c.align === 'center')
+  )
 }
 
 function Runs({ inlines, size, color, bold }: { inlines: Inline[]; size?: number; color?: string; bold?: boolean }) {
@@ -195,13 +200,7 @@ function Summary({ block, style }: { block: Extract<DocBlock, { type: 'summary' 
   )
 }
 
-function PaymentWithQr({
-  paragraphs,
-  qr,
-}: {
-  paragraphs: Extract<DocBlock, { type: 'paragraph' }>[]
-  qr: string
-}) {
+function PaymentWithQr({ paragraphs, qr }: { paragraphs: Extract<DocBlock, { type: 'paragraph' }>[]; qr: string }) {
   return (
     <View
       wrap={false}

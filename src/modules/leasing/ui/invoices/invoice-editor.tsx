@@ -921,12 +921,7 @@ export function InvoiceEditor(p: Props) {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
-            <Button
-              size="sm"
-              disabled={pending}
-              onClick={() => saveAll()}
-              className="gap-1.5"
-            >
+            <Button size="sm" disabled={pending} onClick={() => saveAll()} className="gap-1.5">
               <Check className="size-3.5" />
               <span>Lưu thay đổi</span>
             </Button>
