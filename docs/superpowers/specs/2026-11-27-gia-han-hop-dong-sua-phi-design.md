@@ -28,6 +28,36 @@ Phí điện, nước và phí nhập theo kỳ biến mất khỏi hoá đơn s
 - `checkDate` trong `createExtension` chỉ cho ngày hiệu lực trong [ngày bắt đầu, ngày kết thúc cũ]. Phải nới cho gia hạn: cho phép đến ngày kết thúc cũ + 1.
 - `Khôi phục hợp đồng` đã chụp phiên bản trước khi gia hạn; phải dọn thêm các dòng phí mới tạo bởi phụ lục.
 
+## Luồng thao tác (ví dụ: hợp đồng hết hạn 31/12/2026, tăng giá thuê và giá điện)
+
+1. Nhân viên mở hợp đồng, bấm **Gia hạn**.
+2. Popup hiện, ngày hiệu lực điền sẵn 01/01/2027, các phí hiện tại điền sẵn.
+3. Nhân viên nhập ngày kết thúc mới, đổi giá thuê, sửa đơn giá điện, bỏ phí cũ hoặc thêm phí mới.
+4. Bấm **Xem trước**: hiện tóm tắt thay đổi, chưa lưu.
+5. Bấm **Lưu**: tạo một phụ lục gia hạn.
+6. Hoá đơn từ kỳ 01/2027 dùng giá và danh sách phí mới; hoá đơn trước đó giữ nguyên.
+
+Phác thảo popup:
+
+```
+Gia hạn hợp đồng HD-0123
+Ngày hiệu lực        [01/01/2027]   (mặc định: sau ngày hết hạn cũ 31/12/2026)
+Ngày kết thúc mới    [31/12/2027]
+Giá thuê             [5.500.000]    (đang 5.000.000)
+Tiền cọc             [        ]     (để trống nếu không đổi)
+
+Phí áp dụng từ 01/01/2027
+ Điện   (đồng hồ Đ-101)   3.500 → [4.000] /kWh      [Bỏ]
+ Nước   (đồng hồ N-101)   18.000   [18.000] /m3     [Bỏ]
+ Giữ xe                    100.000 [100.000] /xe    [Bỏ]
+ Dọn phòng                 200.000                   [Đã bỏ — Hoàn lại]
+ [+ Thêm phí]  → chọn phí; nếu tính theo đồng hồ thì chọn đồng hồ và nhập chỉ số đầu
+
+[Huỷ]  [Xem trước]
+```
+
+Phần Phí là mới so với popup hiện tại.
+
 ## Các cách đã cân nhắc
 
 - **A. Phụ lục lưu danh sách phí đầy đủ, mỗi dòng mang `leaseFeeId`, `quantitySource`, đồng hồ (chọn).** Ít sửa nhất, giữ cách thay toàn bộ danh sách đang có, sửa được lỗi mất phí. Cái giá: sửa cách lưu và popup dài hơn.
