@@ -38,6 +38,7 @@ import { updateLeaseOccupants } from '@/modules/leasing/server/contracts/service
 import { saveHandover, startHandover } from '@/modules/leasing/server/handovers/service'
 import {
   approveInvoice,
+  createDraftForLease,
   getInvoiceDetail,
   leaseData,
   loadAddenda,
@@ -385,6 +386,17 @@ describe('phụ lục hợp đồng', () => {
         .insert(addenda)
         .values({ leaseId, type: 'extension', effectiveDate: '2026-06-01', newMonthlyRent: 9500000 })
       await expect(extend()).rejects.toThrow(ValidationError)
+    })
+    it('cọc tăng: hoá đơn kỳ gia hạn có đúng một dòng cọc còn thiếu bằng phần tăng, kỳ sau không lặp', async () => {
+      await extend({ newDepositAmount: 10000000 })
+      const depositLines = async (invoiceId: string) =>
+        (await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, invoiceId))).filter(
+          (l) => l.type === 'deposit',
+        )
+      const first = await createDraftForLease(db, ctx(), { leaseId, period: '2027-01' })
+      expect(await depositLines(first.id)).toMatchObject([{ description: 'Tiền cọc còn thiếu', amount: 1000000 }])
+      const next = await createDraftForLease(db, ctx(), { leaseId, period: '2027-02' })
+      expect(await depositLines(next.id)).toHaveLength(0)
     })
     it('xem trước không đổi hợp đồng, phí, sổ cọc, phụ lục', async () => {
       await fixedFee()
