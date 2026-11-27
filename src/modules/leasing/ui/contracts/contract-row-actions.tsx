@@ -272,7 +272,9 @@ export function ContractRowActions({
             <ExtensionDialog
               leaseId={id}
               endDate={data.form.endDate}
-              today={data.form.today}
+              monthlyRent={data.form.monthlyRent}
+              depositAmount={data.form.depositAmount}
+              feeData={kind === 'lease' ? data.feeData : undefined}
               defaultOpen
               onCompleted={close}
             />

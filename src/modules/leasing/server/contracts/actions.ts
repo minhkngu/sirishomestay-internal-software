@@ -419,6 +419,8 @@ export async function quickContractDataAction(kind: 'lease' | 'deposit', id: str
         ? {
             startDate: form.startDate,
             endDate: form.endDate,
+            monthlyRent: form.monthlyRent,
+            depositAmount: form.depositAmount,
             today: form.today,
             meters: form.meters,
             terminationMeters: form.terminationMeters,
