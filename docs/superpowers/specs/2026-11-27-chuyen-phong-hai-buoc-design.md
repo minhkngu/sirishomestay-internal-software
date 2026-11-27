@@ -1,6 +1,6 @@
 # Chuyển phòng hai bước và ví khách
 
-Trạng thái: bản nháp chờ duyệt (2026-11-27, viết lại lần 2). Chưa có code.
+Trạng thái: đã duyệt để lập kế hoạch (2026-11-27, viết lại lần 2). Chưa có code.
 
 ## 1. Ý định và lý do
 
