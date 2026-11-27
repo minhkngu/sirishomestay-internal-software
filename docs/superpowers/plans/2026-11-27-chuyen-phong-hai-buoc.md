@@ -14,7 +14,7 @@
 
 - Tiền là số nguyên VND, có dấu. Ví tách theo cơ sở; chỉ chuyển phòng trong cùng một cơ sở.
 - Khoản dùng ví ghi `payments.method = 'wallet'`; thu vượt ghi biến động ví loại `overpay`. Khoá chống trùng: `overpay:<paymentId>`, `transfer:<oldLeaseId>`.
-- Hợp đồng cũ kết thúc đúng ngày chuyển; hợp đồng mới bắt đầu ngày chuyển + 1.
+- Hợp đồng cũ kết thúc đúng ngày chuyển và hợp đồng mới bắt đầu ngày chuyển; ngày chuyển thuộc phòng mới (hoá đơn thanh lý chuyển phòng tính phòng cũ đến hết `ngày chuyển − 1`).
 - Sổ quỹ chỉ tính tiền thật: `overpay` tính một lần vào ngày khách đưa; `method = 'wallet'` và biến động dùng ví không tính.
 - Nút "Bỏ duyệt" bị chặn với hoá đơn thanh lý thuộc chuyển phòng. Không có khôi phục tự động sau duyệt.
 - Schema chỉ đổi qua `src/db/schema/` rồi `npm run db:generate`, không sửa tay `drizzle/`.
@@ -127,16 +127,16 @@
 - Test: `tests/unit/leasing/liquidation.test.ts` (hoặc file test liquidation hiện có, tìm bằng `ls tests/unit`)
 
 **Interfaces:**
-- Produces: `TerminationInput` thêm `walletBalance?: number` và `transfer?: boolean`. Khi `walletBalance > 0`: thêm dòng `adjustment` "Số dư ví" amount `−min(walletBalance, max(0, tổng trước ví))`, `meta: { wallet: true }`. Khi `transfer`: sau cùng thêm dòng `adjustment` "Chuyển sang hợp đồng mới" amount `−T` với `T` là tổng các dòng trước nó, `meta: { transfer: true }`, nên tổng hoá đơn bằng 0.
+- Produces: `TerminationInput` thêm `walletBalance?: number`, `transfer?: boolean` và `billedUntil?: ISODate` (mặc định `endDate`; tiền phòng, phí cố định và hoàn theo ngày dùng `billedUntil` thay `endDate`; chỉ số đồng hồ vẫn theo `endDate`). Khi `walletBalance > 0`: thêm dòng `adjustment` "Số dư ví" amount `−min(walletBalance, max(0, tổng trước ví))`, `meta: { wallet: true }`. Khi `transfer`: sau cùng thêm dòng `adjustment` "Chuyển sang hợp đồng mới" amount `−T` với `T` là tổng các dòng trước nó, `meta: { transfer: true }`, nên tổng hoá đơn bằng 0.
 
-- [ ] **Step 1:** Viết test với số cụ thể: tổng trước ví `4_000_000`, `walletBalance 5_000_000` → dòng ví `−4_000_000`; tổng trước ví `−3_000_000` thì không có dòng ví; `transfer` với `T = −3_000_000` → dòng chuyển `+3_000_000`, tổng `0`; `T = 2_000_000` → dòng `−2_000_000`; `T = 0` → không có dòng chuyển.
+- [ ] **Step 1:** Viết test với số cụ thể: tổng trước ví `4_000_000`, `walletBalance 5_000_000` → dòng ví `−4_000_000`; tổng trước ví `−3_000_000` thì không có dòng ví; `transfer` với `T = −3_000_000` → dòng chuyển `+3_000_000`, tổng `0`; `T = 2_000_000` → dòng `−2_000_000`; với `endDate = 2026-12-16`, `billedUntil = 2026-12-15` và hoá đơn tháng 12 đã trả trước, dòng hoàn bắt đầu từ 16/12; `T = 0` → không có dòng chuyển.
 - [ ] **Step 2:** Cài trong `buildTerminationInvoice`; các nơi gọi cũ không truyền hai trường mới thì không đổi kết quả.
 - [ ] **Step 3:** `npm run typecheck`; commit `feat: hoá đơn thanh lý gạch số dư ví và dòng chuyển`.
 
 ### Task 8: Thanh lý nối ví và cộng dồn sang hợp đồng mới
 
 **Files:**
-- Modify: `src/modules/leasing/server/addenda/service.ts` (`createTermination` thêm tham số `opts?: { transfer?: boolean }`, truyền `walletBalance` và `transfer` vào `buildTerminationInvoice`), `src/modules/leasing/server/addenda/finalize.ts` (`finalizeTermination`), `src/modules/leasing/server/invoices/service.ts` (`unapproveInvoice`)
+- Modify: `src/modules/leasing/server/addenda/service.ts` (`createTermination` thêm tham số `opts?: { transfer?: boolean }` (khi `transfer` thì `billedUntil = addDays(endDate, -1)`), truyền `walletBalance` và `transfer` vào `buildTerminationInvoice`), `src/modules/leasing/server/addenda/finalize.ts` (`finalizeTermination`), `src/modules/leasing/server/invoices/service.ts` (`unapproveInvoice`)
 - Test: `tests/integration/room-change.test.ts`
 
 **Interfaces:**
@@ -161,7 +161,7 @@
   - `cancelRoomChange(db, ctx, oldLeaseId, storage): Promise<void>`
   - `createRoomChangeAction`, `cancelRoomChangeAction` (bọc `toActionResult`, `revalidatePath`).
 
-- [ ] **Step 1:** Viết test: chuyển phòng tạo hợp đồng mới ngày bắt đầu `moveDate + 1` với `transferFromLeaseId`, hợp đồng cũ có phụ lục thanh lý `endDate = moveDate` và hoá đơn thanh lý nháp ở chế độ chuyển; sao chép người ở cùng và phí, phí đồng hồ gắn đồng hồ phòng mới; phòng mới khác cơ sở bị từ chối; lỗi ở thanh lý (ví dụ thiếu chỉ số cuối) thì không còn hợp đồng mới nào; `cancelRoomChange` khi hoá đơn còn nháp xoá hợp đồng mới và đưa hợp đồng cũ về trạng thái trước thanh lý; bị từ chối khi hợp đồng mới đã có hoá đơn duyệt hoặc thu tiền.
+- [ ] **Step 1:** Viết test: chuyển phòng tạo hợp đồng mới ngày bắt đầu `moveDate` với `transferFromLeaseId`, hợp đồng cũ có phụ lục thanh lý `endDate = moveDate` và hoá đơn thanh lý nháp ở chế độ chuyển; sao chép người ở cùng và phí, phí đồng hồ gắn đồng hồ phòng mới; phòng mới khác cơ sở bị từ chối; lỗi ở thanh lý (ví dụ thiếu chỉ số cuối) thì không còn hợp đồng mới nào; `cancelRoomChange` khi hoá đơn còn nháp xoá hợp đồng mới và đưa hợp đồng cũ về trạng thái trước thanh lý; bị từ chối khi hợp đồng mới đã có hoá đơn duyệt hoặc thu tiền.
 - [ ] **Step 2:** Cài `createRoomChange` trong một `db.transaction` (tx ép kiểu `DB` như mã hiện có): kiểm cùng cơ sở và quyền `tenants_contracts`; gọi `createLease` rồi gán `transferFromLeaseId`; gọi `createTermination` với `opts.transfer = true`; việc ngoài cơ sở dữ liệu chạy sau giao dịch.
 - [ ] **Step 3:** Cài `cancelRoomChange` và hai action; `npm run typecheck`.
 - [ ] **Step 4:** Commit `feat: chuyển phòng hai bước và huỷ chuyển phòng`.

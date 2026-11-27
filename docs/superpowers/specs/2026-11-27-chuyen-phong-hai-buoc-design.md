@@ -76,7 +76,7 @@ Phản mục tiêu:
 
 **Form.** Phòng mới (cùng cơ sở), ngày chuyển, điều khoản hợp đồng mới, chỉ số cuối phòng cũ và chỉ số đầu phòng mới, biên bản check-out, tuỳ chọn hoàn tiền phòng như thanh lý (mặc định hoàn theo ngày), phạt hoặc mất cọc nếu có. Cạnh đó là bảng xem trước kết quả thanh lý.
 
-**Ngày.** Nhập một ngày chuyển, là ngày khách trả phòng cũ lúc trưa và nhận phòng mới (xem 5.0). Hợp đồng cũ thanh lý vào ngày chuyển; hợp đồng mới bắt đầu đúng ngày chuyển. Mỗi ngày được tính tiền đúng một lần. Cho phép ngày quá khứ và tương lai như thanh lý hiện nay (chỉ kiểm là ngày hợp lệ và sau ngày bắt đầu hợp đồng cũ).
+**Ngày.** Hợp đồng cũ kết thúc đúng **ngày chuyển** và hợp đồng mới bắt đầu cũng **ngày chuyển**. Vì hệ thống đếm ngày tính cả hai đầu, **ngày chuyển thuộc phòng mới**: hoá đơn thanh lý ở chế độ chuyển phòng tính tiền phòng và phí cố định của phòng cũ đến hết `ngày chuyển − 1` và hoàn theo ngày từ ngày chuyển; hợp đồng mới tính từ ngày chuyển. Ví dụ chuyển ngày 16: phòng cũ tính đến 15, phòng mới tính từ 16. Chỉ số điện nước chốt vào ngày chuyển. Cho phép ngày quá khứ và tương lai như thanh lý hiện nay (chỉ kiểm là ngày hợp lệ và sau ngày bắt đầu hợp đồng cũ).
 
 **Sao chép sang hợp đồng mới.** Người thuê chính, người ở cùng, các dòng phí, mẫu hợp đồng. Giá phòng theo phòng mới. Phí tính theo đồng hồ gắn lại vào đồng hồ của phòng mới, đơn giá giữ theo hợp đồng cũ. Mã hợp đồng cấp mới.
 
