@@ -396,10 +396,10 @@ describe('phụ lục hợp đồng', () => {
       await expect(extend({ fees: [] })).rejects.toThrow(ValidationError)
       expect((await lease()).endDate).toBe('2026-12-31')
     })
-    it('ngày hiệu lực: ngày hết hạn cũ + 1 được nhận, + 2 bị chặn; ngày kết thúc mới không được trước ngày hiệu lực', async () => {
-      await expect(extend({ effectiveDate: '2027-01-02' })).rejects.toThrow(ValidationError)
-      await expect(extend({ effectiveDate: '2027-01-01', newEndDate: '2026-12-31' })).rejects.toThrow(ValidationError)
-      await expect(extend({ effectiveDate: '2027-01-01' })).resolves.toBeDefined()
+    it('ngày hiệu lực luôn là ngày liền sau ngày hết hạn cũ, bỏ qua ngày client gửi; ngày kết thúc mới phải sau ngày kết thúc cũ', async () => {
+      await expect(extend({ newEndDate: '2026-12-31' })).rejects.toThrow(ValidationError)
+      const r = await extend({ effectiveDate: '2030-05-05' })
+      expect(r.addendum.effectiveDate).toBe('2027-01-01')
     })
     it('cọc tăng: hoá đơn kỳ gia hạn có đúng một dòng cọc còn thiếu bằng phần tăng, kỳ sau không lặp', async () => {
       await extend({ newDepositAmount: 10000000 })

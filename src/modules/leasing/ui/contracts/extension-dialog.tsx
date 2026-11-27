@@ -4,7 +4,7 @@ import { createExtensionAction } from '../../server/addenda/actions'
 import { AddendumShell, Field, inputCls } from './addendum-shell'
 import { BareSelect } from './contract-form-ui'
 import type { FeeData } from './contract-edit-actions'
-import { defaultExtensionDate, extensionFeesPayload, initialFeeRows, type ExtensionFeeRow } from './extension-fees'
+import { extensionFeesPayload, initialFeeRows, type ExtensionFeeRow } from './extension-fees'
 import { MoneyInput } from '@/components/ui/money-input'
 import { formatVND } from '@/domain/money'
 
@@ -26,7 +26,6 @@ export function ExtensionDialog({
   onCompleted?: () => void
 }) {
   const [initialRows] = useState(() => initialFeeRows(feeData?.current ?? []))
-  const [effectiveDate, setEffective] = useState(defaultExtensionDate(endDate))
   const [newEndDate, setEnd] = useState('')
   const [rent, setRent] = useState('')
   const [deposit, setDeposit] = useState('')
@@ -36,7 +35,6 @@ export function ExtensionDialog({
   const showFees = feeData?.editable === true
   const fees = showFees ? extensionFeesPayload(rows, initialRows) : undefined
   const input = {
-    effectiveDate,
     newEndDate,
     ...(rent && Number(rent) !== monthlyRent ? { newMonthlyRent: Number(rent) } : {}),
     // Chỉ đổi cọc nếu có nhập và khác cọc hiện tại
@@ -58,10 +56,7 @@ export function ExtensionDialog({
       onCompleted={onCompleted}
       simple
     >
-      <Field label="Ngày hiệu lực của phụ lục">
-        <input type="date" className={inputCls} value={effectiveDate} onChange={(e) => setEffective(e.target.value)} />
-      </Field>
-      <Field label={`Ngày kết thúc mới (hiện tại ${endDate})`}>
+      <Field label={`Ngày kết thúc mới (hiện tại ${endDate}, hiệu lực từ ngày liền sau)`}>
         <input type="date" className={inputCls} value={newEndDate} onChange={(e) => setEnd(e.target.value)} />
       </Field>
       <Field label={`Giá thuê mới (đang ${formatVND(monthlyRent)}, để trống nếu không đổi)`}>

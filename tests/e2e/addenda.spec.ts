@@ -17,7 +17,6 @@ test('gia hạn tăng cọc: xem trước tiền, lưu, sổ cọc có khoản t
     .innerText()
   const newDeposit = Number(depositText.replace(/\D/g, '')) + 1000000
   await page.getByRole('button', { name: 'Gia hạn hợp đồng' }).click()
-  await page.getByLabel('Ngày hiệu lực').fill('2026-12-15')
   await page.getByLabel(/Ngày kết thúc mới/).fill(newEnd)
   await page.getByLabel(/Tiền cọc mới/).fill(String(newDeposit))
   await page.getByRole('button', { name: 'Lưu', exact: true }).click()
@@ -34,8 +33,8 @@ test('gia hạn đổi giá thuê và phí: ghi thẳng vào hợp đồng', asy
     .innerText()
   const [dd, mm, yyyy] = term.split('–')[1].trim().split('/')
   await page.getByRole('button', { name: 'Gia hạn hợp đồng' }).click()
-  // ngày hiệu lực mặc định là ngày liền sau ngày hết hạn cũ, phần phí hiện ngay trong popup
-  await expect(page.getByLabel('Ngày hiệu lực')).not.toHaveValue('')
+  // không có ô ngày hiệu lực (luôn là ngày liền sau ngày hết hạn cũ), phần phí hiện ngay trong popup
+  await expect(page.getByLabel('Ngày hiệu lực')).toHaveCount(0)
   await expect(page.getByText('Phí dịch vụ', { exact: true })).toBeVisible()
   await page.getByLabel(/Ngày kết thúc mới/).fill(`${Number(yyyy) + 1}-${mm}-${dd}`)
   await page.getByLabel(/Giá thuê mới/).fill('12000000')

@@ -118,7 +118,6 @@ const extensionFeeEditSchema = z.object({
 })
 /** Gia hạn ghi thẳng vào hợp đồng; phụ lục chỉ lưu bản tham khảo trước/sau. `fees` là danh sách phí sau khi sửa (cùng dạng Sửa hợp đồng). */
 const extensionSchema = z.object({
-  effectiveDate: date,
   newEndDate: date,
   newMonthlyRent: z.number().int().positive().max(MAX_MONEY).optional(),
   newDepositAmount: z.number().int().nonnegative().max(MAX_MONEY).optional(),
@@ -458,15 +457,11 @@ export async function createExtension(
   return db.transaction(async (tx0) => {
     const tx = tx0 as unknown as DB
     const { l, facilityId } = await lockLease(tx, ctx, leaseId)
-    // Gia hạn: ngày hiệu lực được nằm ngay sau ngày hết hạn cũ (đầu kỳ gia hạn)
-    checkDate({ startDate: l.startDate, endDate: addDays(l.endDate, 1) }, data.effectiveDate)
+    // Gia hạn không nhập ngày hiệu lực: luôn là ngày liền sau ngày hết hạn cũ (đầu kỳ gia hạn)
+    const effectiveDate = addDays(l.endDate, 1)
     if (data.newEndDate <= l.endDate)
       throw new ValidationError('Ngày kết thúc mới phải sau ngày kết thúc hiện tại', {
         newEndDate: 'Ngày kết thúc mới phải sau ngày kết thúc hiện tại',
-      })
-    if (data.newEndDate < data.effectiveDate)
-      throw new ValidationError('Ngày kết thúc mới phải sau ngày hiệu lực', {
-        newEndDate: 'Ngày kết thúc mới phải sau ngày hiệu lực',
       })
     const base = await leaseData(tx, leaseId)
     const before = termsRefOf(base)
@@ -490,13 +485,13 @@ export async function createExtension(
       .values({
         leaseId,
         type: 'extension',
-        effectiveDate: data.effectiveDate,
+        effectiveDate: effectiveDate,
         newEndDate: data.newEndDate,
         reference: { before, after },
       })
       .returning()
     // Chỉ đổi cọc nếu có thay đổi
-    const diff = newDeposit != null ? depositDiffEntry(l.depositAmount, newDeposit, data.effectiveDate) : null
+    const diff = newDeposit != null ? depositDiffEntry(l.depositAmount, newDeposit, effectiveDate) : null
     if (diff)
       await tx.insert(depositEntries).values({
         leaseId,
