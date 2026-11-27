@@ -468,20 +468,7 @@ export async function createExtension(
       throw new ValidationError('Ngày kết thúc mới phải sau ngày hiệu lực', {
         newEndDate: 'Ngày kết thúc mới phải sau ngày hiệu lực',
       })
-    const [base, existing] = await Promise.all([leaseData(tx, leaseId), loadAddenda(tx, leaseId)])
-    // Phụ lục cũ (mô hình cũ) còn ghi đè giá thì giá ghi thẳng vào hợp đồng sẽ không có tác dụng: báo rõ thay vì ghi sai
-    const shadowed =
-      (data.newMonthlyRent != null &&
-        data.newMonthlyRent !== base.monthlyRent &&
-        existing.some((a) => a.newMonthlyRent != null)) ||
-      (data.newDepositAmount != null &&
-        data.newDepositAmount !== base.depositAmount &&
-        existing.some((a) => a.newDepositAmount != null)) ||
-      (data.fees != null && data.fees.length > 0 && existing.some((a) => a.newFees && a.newFees.length > 0))
-    if (shadowed)
-      throw new ValidationError(
-        'Hợp đồng có phụ lục đã đổi giá hoặc phí (gia hạn kiểu cũ hoặc chuyển phòng), chưa gia hạn ghi thẳng được cho mục đó',
-      )
+    const base = await leaseData(tx, leaseId)
     const before = termsRefOf(base)
     const newDeposit =
       data.newDepositAmount != null && data.newDepositAmount !== l.depositAmount ? data.newDepositAmount : null

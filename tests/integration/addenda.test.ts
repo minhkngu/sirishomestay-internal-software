@@ -354,18 +354,19 @@ describe('phụ lục hợp đồng', () => {
       const t = contractTermsAt(await leaseData(db, leaseId), await loadAddenda(db, leaseId), '2027-03-01')
       expect(t.endDate).toBe('2027-03-31')
     })
-    it('hợp đồng có phụ lục cũ ghi đè giá: gia hạn giữ nguyên giá vẫn được, tham khảo lấy giá của hợp đồng', async () => {
+    it('hợp đồng có phụ lục cũ ghi đè giá: gia hạn đổi giá vẫn ghi thẳng và có hiệu lực', async () => {
       await db
         .insert(addenda)
         .values({ leaseId, type: 'extension', effectiveDate: '2026-06-01', newMonthlyRent: 9500000 })
-      const r = await extend({ newMonthlyRent: 9000000 })
+      const r = await extend({ newMonthlyRent: 10000000 })
       expect(r.addendum.reference).toMatchObject({
         before: { monthlyRent: 9000000 },
-        after: { monthlyRent: 9000000, endDate: '2027-06-30' },
+        after: { monthlyRent: 10000000, endDate: '2027-06-30' },
       })
-      await expect(
-        extend({ effectiveDate: '2027-07-01', newEndDate: '2027-12-31', newMonthlyRent: 9100000 }),
-      ).rejects.toThrow(ValidationError)
+      const at = async (d: string) =>
+        contractTermsAt(await leaseData(db, leaseId), await loadAddenda(db, leaseId), d).monthlyRent
+      expect(await at('2026-10-01')).toBe(9500000)
+      expect(await at('2027-02-01')).toBe(10000000)
     })
     it('đổi giá điện giữ nguyên dòng phí điện và gắn đồng hồ; bỏ phí cố định; thêm phí mới', async () => {
       const { fee: electric } = await electricMeterFee()
@@ -399,12 +400,6 @@ describe('phụ lục hợp đồng', () => {
       await expect(extend({ effectiveDate: '2027-01-02' })).rejects.toThrow(ValidationError)
       await expect(extend({ effectiveDate: '2027-01-01', newEndDate: '2026-12-31' })).rejects.toThrow(ValidationError)
       await expect(extend({ effectiveDate: '2027-01-01' })).resolves.toBeDefined()
-    })
-    it('phụ lục cũ còn ghi đè giá thì chặn đổi giá thuê ghi thẳng', async () => {
-      await db
-        .insert(addenda)
-        .values({ leaseId, type: 'extension', effectiveDate: '2026-06-01', newMonthlyRent: 9500000 })
-      await expect(extend()).rejects.toThrow(ValidationError)
     })
     it('cọc tăng: hoá đơn kỳ gia hạn có đúng một dòng cọc còn thiếu bằng phần tăng, kỳ sau không lặp', async () => {
       await extend({ newDepositAmount: 10000000 })
