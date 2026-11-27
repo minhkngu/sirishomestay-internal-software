@@ -1,5 +1,6 @@
 'use client'
 
+import { DateField } from '@/components/date-field'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
@@ -12,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { todayVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { PAYMENT_METHOD_OPTIONS } from '@/domain/payment-labels'
-import { recordLeasePaymentAction } from '../../server/invoices/actions'
+import { addPaymentAction, recordLeasePaymentAction } from '../../server/invoices/actions'
 
 /** Popup thu tiền theo hợp đồng: mặc định điền tổng dư nợ; tiền tự gạch các hoá đơn đã duyệt từ cũ đến mới. */
 export function CollectPaymentDialog({
@@ -22,13 +23,17 @@ export function CollectPaymentDialog({
   roomCode,
   tenantName,
   debt,
+  refundInvoiceId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   leaseId: string
   roomCode: string
   tenantName: string
+  /** Hoá đơn thu tiền: tổng dư nợ. Hoá đơn hoàn khách (tổng âm): số còn phải hoàn. */
   debt: number
+  /** Có giá trị = ghi khoản chi cho khách vào hoá đơn tổng âm này (số tiền ghi âm). */
+  refundInvoiceId?: string
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -40,18 +45,20 @@ export function CollectPaymentDialog({
   const value = amount === '' ? 0 : Number(amount)
   const amountError =
     amount !== '' && value <= 0
-      ? 'Số tiền thu phải lớn hơn 0'
+      ? 'Số tiền phải lớn hơn 0'
       : value > debt
-        ? `Số tiền thu không được vượt quá dư nợ (${formatVND(debt)})`
+        ? `Số tiền không được vượt quá ${refundInvoiceId ? 'số còn phải hoàn' : 'dư nợ'} (${formatVND(debt)})`
         : ''
   const submit = () =>
     start(async () => {
-      const r = await recordLeasePaymentAction(leaseId, { paidOn, amount: value, method: method as 'cash', note })
+      const r = refundInvoiceId
+        ? await addPaymentAction(refundInvoiceId, { paidOn, amount: -value, method: method as 'cash', note })
+        : await recordLeasePaymentAction(leaseId, { paidOn, amount: value, method: method as 'cash', note })
       if (!r.ok) {
         setError(r.error)
         return
       }
-      toast.success('Đã ghi thu')
+      toast.success(refundInvoiceId ? 'Đã ghi chi hoàn khách' : 'Đã ghi thu')
       onOpenChange(false)
       router.refresh()
     })
@@ -59,16 +66,21 @@ export function CollectPaymentDialog({
     <FormDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Thu tiền"
-      description={`Phòng ${roomCode} · ${tenantName}. Tiền thu gạch hoá đơn đã duyệt cũ nhất trước.`}
+      title={refundInvoiceId ? 'Hoàn tiền cho khách' : 'Thu tiền'}
+      description={
+        refundInvoiceId
+          ? `Phòng ${roomCode} · ${tenantName}. Ghi khoản chi hoàn tiền cho khách theo hoá đơn này.`
+          : `Phòng ${roomCode} · ${tenantName}. Tiền thu gạch hoá đơn đã duyệt cũ nhất trước.`
+      }
       size="sm"
     >
       <div className="space-y-4 pb-1">
         <p className="text-sm text-muted-foreground">
-          Tổng dư nợ: <span className="font-semibold tabular-nums text-foreground">{formatVND(debt)}</span>
+          {refundInvoiceId ? 'Còn phải hoàn khách' : 'Tổng dư nợ'}:{' '}
+          <span className="font-semibold tabular-nums text-foreground">{formatVND(debt)}</span>
         </p>
         <div className="space-y-1.5">
-          <Label htmlFor="collect-amount">Số tiền thu</Label>
+          <Label htmlFor="collect-amount">{refundInvoiceId ? 'Số tiền chi' : 'Số tiền thu'}</Label>
           <MoneyInput
             id="collect-amount"
             value={amount}
@@ -82,16 +94,12 @@ export function CollectPaymentDialog({
           )}
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="collect-date">Ngày thu</Label>
-            <Input
-              id="collect-date"
-              type="date"
-              value={paidOn}
-              onChange={(e) => setPaidOn(e.target.value)}
-              className="h-9"
-            />
-          </div>
+          <DateField
+            id="collect-date"
+            label={refundInvoiceId ? 'Ngày chi' : 'Ngày thu'}
+            value={paidOn}
+            onValueChange={setPaidOn}
+          />
           <div className="space-y-1.5">
             <Label>Hình thức</Label>
             <Select value={method} onValueChange={(v) => v && setMethod(String(v))} items={PAYMENT_METHOD_OPTIONS}>
@@ -128,7 +136,7 @@ export function CollectPaymentDialog({
             Huỷ
           </Button>
           <Button type="button" disabled={pending || value <= 0 || value > debt} onClick={submit}>
-            Ghi thu
+            {refundInvoiceId ? 'Ghi chi' : 'Ghi thu'}
           </Button>
         </div>
       </div>

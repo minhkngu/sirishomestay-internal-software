@@ -112,11 +112,7 @@ function AssetDialogForm({ facilities, onClose }: { facilities: TreeFacility[]; 
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="asset-condition">Tình trạng</Label>
-          <select
-            id="asset-condition"
-            value={v.condition}
-            onChange={(e) => setV({ ...v, condition: e.target.value })}
-          >
+          <select id="asset-condition" value={v.condition} onChange={(e) => setV({ ...v, condition: e.target.value })}>
             {ASSET_CONDITIONS.map((c) => (
               <option key={c} value={c}>
                 {c}

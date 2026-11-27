@@ -1,5 +1,6 @@
 'use client'
 
+import { DateField } from '@/components/date-field'
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -31,6 +32,8 @@ import {
 } from '../../server/contracts/actions'
 import { FormSelect, BareSelect } from './contract-form-ui'
 import { FEE_SOURCE_LABEL, type FeeSource } from './fee-source-label'
+import { referenceMismatches } from '../../domain/extension-reference'
+import type { TermsRef } from '@/domain/types'
 
 type Common = { id: string; roomId: string; tenantId: string; depositAmount: number; signStatus: string }
 type Contract =
@@ -117,6 +120,7 @@ export function ContractEditActions({
   people,
   templates,
   feeData,
+  extensionReference,
   documents,
   assets,
   facility,
@@ -134,6 +138,8 @@ export function ContractEditActions({
   /** Người ở hiện tại và những người có thể thêm (chỉ hợp đồng thuê). */ occupants?: Person[]
   people?: Person[]
   /** Phí dịch vụ của hợp đồng thuê và các loại phí đã cài đặt để thêm. */ feeData?: FeeData | null
+  /** Điều khoản sau phụ lục gia hạn mới nhất; giá trị đang nhập khác thì cảnh báo đỏ (không chặn lưu). */
+  extensionReference?: TermsRef | null
   /** Mẫu hợp đồng và mẫu hoá đơn của hợp đồng thuê; lưu cùng nút "Lưu thay đổi". */ templates?: {
     contract: { id: string; name: string; isDefault: boolean }[]
     contractId: string | null
@@ -195,6 +201,23 @@ export function ContractEditActions({
   const patchFee = (key: string, patch: Partial<FeeRow>) =>
     setFeeRows((rows) => rows.map((r) => (r.key === key ? { ...r, ...patch } : r)))
   const [addingFee, setAddingFee] = useState(false)
+  const mismatches = extensionReference
+    ? referenceMismatches(
+        {
+          endDate,
+          monthlyRent: Number(rent) || 0,
+          depositAmount: Number(deposit) || 0,
+          fees: feeRows.map((r) => ({
+            feeTypeId: r.feeTypeId,
+            name: r.name,
+            unit: r.unit,
+            unitPrice: Number(r.price) || 0,
+            quantitySource: r.quantitySource,
+          })),
+        },
+        extensionReference,
+      )
+    : []
   const feeOptions = (feeData?.options ?? []).filter((o) =>
     o.meter ? feeData?.canEditMeters === true : !feeRows.some((r) => r.feeTypeId === o.id),
   )
@@ -508,6 +531,21 @@ export function ContractEditActions({
           <p className="text-sm text-muted-foreground">
             Hoá đơn và các khoản tiền cọc hiện có sẽ được giữ nguyên. Vui lòng tự kiểm tra và điều chỉnh nếu cần.
           </p>
+          {mismatches.length > 0 && (
+            <div
+              role="alert"
+              className="space-y-1 rounded-lg border border-destructive/50 bg-destructive/5 p-3 text-sm text-destructive"
+            >
+              <p className="font-medium">Khác phụ lục gia hạn mới nhất:</p>
+              <ul className="list-disc pl-5">
+                {mismatches.map((m) => (
+                  <li key={m.key}>
+                    {m.label}: hợp đồng {m.current}, phụ lục {m.expected}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="grid gap-3 sm:grid-cols-2">
             <FormSelect
               id="edit-room"
@@ -534,25 +572,16 @@ export function ContractEditActions({
               <MoneyInput id="edit-deposit" required value={deposit} onValueChange={setDeposit} />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="edit-start">{contract.kind === 'lease' ? 'Ngày bắt đầu' : 'Ngày vào ở dự kiến'}</Label>
-              <Input
+              <DateField
                 id="edit-start"
-                required
-                type="date"
+                label={contract.kind === 'lease' ? 'Ngày bắt đầu' : 'Ngày vào ở dự kiến'}
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onValueChange={setStartDate}
               />
             </div>
             {contract.kind === 'lease' && (
               <div className="space-y-1">
-                <Label htmlFor="edit-end">Ngày kết thúc</Label>
-                <Input
-                  id="edit-end"
-                  required
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                />
+                <DateField id="edit-end" label="Ngày kết thúc" value={endDate} onValueChange={setEndDate} />
               </div>
             )}
           </div>

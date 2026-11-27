@@ -10,6 +10,7 @@ import {
   listLeaseOccupants,
   listInvoices,
   listAddenda,
+  referenceChanges,
 } from '@/modules/leasing'
 import { DepositLedger, ExportMenu, SignStatus, AddendaList } from '@/modules/leasing/ui'
 import { buttonVariants } from '@/components/ui/button'
@@ -709,6 +710,10 @@ export default async function ContractDetail({ id }: { id: string }) {
                 effectiveDate: a.effectiveDate,
                 signStatus: a.signStatus,
                 signedFileId: a.signedFileId,
+                changes:
+                  a.type === 'extension' && a.reference
+                    ? referenceChanges(a.reference as Parameters<typeof referenceChanges>[0])
+                    : undefined,
               }))}
             />
           </Panel>

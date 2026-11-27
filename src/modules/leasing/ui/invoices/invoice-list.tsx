@@ -121,7 +121,9 @@ export function InvoiceList({
               {facilities.length > 1 && (
                 <th className="px-1.5 py-2.5 text-[13px] font-medium text-muted-foreground whitespace-nowrap">Toà</th>
               )}
-              <th className="px-1.5 py-2.5 text-[13px] font-medium text-muted-foreground whitespace-nowrap">Bên thuê</th>
+              <th className="px-1.5 py-2.5 text-[13px] font-medium text-muted-foreground whitespace-nowrap">
+                Bên thuê
+              </th>
               <th className="px-1.5 py-2.5 text-[13px] font-medium text-muted-foreground whitespace-nowrap">Kỳ</th>
               <th className="px-1.5 py-2.5 text-right text-[13px] font-medium text-muted-foreground whitespace-nowrap">
                 Tổng
@@ -151,7 +153,16 @@ export function InvoiceList({
                             tenantName: i.tenantName,
                             debt: debtByLease[i.leaseId],
                           }
-                        : null
+                        : i.status === 'approved' && i.total < 0 && i.paid > i.total
+                          ? {
+                              // Hoá đơn tổng âm: khoản chi hoàn khách
+                              leaseId: i.leaseId,
+                              roomCode: i.roomCode,
+                              tenantName: i.tenantName,
+                              debt: i.paid - i.total,
+                              refundInvoiceId: i.id,
+                            }
+                          : null
                     }
                   />
                 </td>

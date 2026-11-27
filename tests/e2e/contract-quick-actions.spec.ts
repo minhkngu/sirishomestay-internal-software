@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test'
 import postgres from 'postgres'
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { pickDate } from './helpers'
 
 test.skip(!process.env.E2E_BASE_URL, 'Cần môi trường demo cô lập')
 
@@ -149,10 +150,8 @@ test('gia hạn, thanh lý, cảnh báo đã ký và xóa trong môi trường c
     await expect(modal).toBeHidden()
     await row.getByRole('button', { name: 'Gia hạn hợp đồng' }).click()
     modal = page.getByRole('dialog')
-    await modal.getByLabel(/Ngày kết thúc mới/).fill('2028-12-31')
-    await modal.getByRole('button', { name: 'Xem trước tiền' }).click()
-    await expect(modal.getByRole('button', { name: 'Lưu phụ lục' })).toBeEnabled()
-    await modal.getByRole('button', { name: 'Lưu phụ lục' }).click()
+    await pickDate(page, 'Ngày kết thúc mới', '2028-12-31')
+    await modal.getByRole('button', { name: 'Lưu', exact: true }).click()
     await expect(modal).toBeHidden()
     await row.getByRole('button', { name: 'Khôi phục hợp đồng' }).click()
     await page.getByRole('dialog').getByRole('button', { name: 'Xác nhận khôi phục' }).click()

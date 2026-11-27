@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { contractVersions, facilities, rooms, tenants } from '@/db'
+import { contractVersions, facilities, invoices, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
 import { createTestDb } from '../helpers/db'
@@ -79,7 +79,17 @@ describe('lịch sử hợp đồng', () => {
       monthlyRent: 1000,
       depositAmount: 500,
     })
-    await createExtension(db, ctx, lease.id, { effectiveDate: '2026-06-01', newEndDate: '2027-12-31' })
+    const [room] = await db.select().from(rooms).where(eq(rooms.id, roomId))
+    await db.insert(invoices).values({
+      code: 'HIST-CUOI',
+      leaseId: lease.id,
+      facilityId: room.facilityId,
+      kind: 'monthly',
+      periodStart: '2026-12-01',
+      periodEnd: '2026-12-31',
+      issueDate: '2026-12-31',
+    })
+    await createExtension(db, ctx, lease.id, { newEndDate: '2027-12-31' })
     await createTermination(db, ctx, lease.id, { endDate: '2026-10-01', readings: [] })
     const versions = await db
       .select()

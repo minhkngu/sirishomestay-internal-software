@@ -1,7 +1,8 @@
 'use client'
 
+import { DateField } from '@/components/date-field'
 import { useRouter } from 'next/navigation'
-import { useRef, useState, useTransition } from 'react'
+import { useId, useRef, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Check, CheckCircle2, Layers, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -157,6 +158,7 @@ function LineTime({
   editable: boolean
   onChange: (meta: Record<string, unknown>) => void
 }) {
+  const uid = useId()
   const meta = line.meta ?? {}
   const from = typeof meta.from === 'string' ? meta.from : defaultFrom
   const to = typeof meta.to === 'string' ? meta.to : defaultTo
@@ -179,20 +181,20 @@ function LineTime({
   }
   return (
     <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-      <input
-        aria-label="Từ ngày"
-        type="date"
+      <DateField
+        id={`line-from-${uid}`}
+        ariaLabel="Từ ngày"
         value={from}
-        onChange={(e) => setDates(e.target.value, to)}
-        className="h-8 w-full min-w-0 rounded-lg border border-border/80 bg-background px-1.5 text-xs text-foreground"
+        onValueChange={(v) => setDates(v, to)}
+        className="w-full min-w-0"
       />
       <span>–</span>
-      <input
-        aria-label="Đến ngày"
-        type="date"
+      <DateField
+        id={`line-to-${uid}`}
+        ariaLabel="Đến ngày"
         value={to}
-        onChange={(e) => setDates(from, e.target.value)}
-        className="h-8 w-full min-w-0 rounded-lg border border-border/80 bg-background px-1.5 text-xs text-foreground"
+        onValueChange={(v) => setDates(from, v)}
+        className="w-full min-w-0"
       />
     </div>
   )
@@ -908,12 +910,12 @@ export function InvoiceEditor(p: Props) {
               Hạn thanh toán
             </label>
             <div className="flex flex-wrap items-center gap-2.5">
-              <input
+              <DateField
                 id="invoice-due"
-                type="date"
                 value={due}
-                onChange={(e) => setDue(e.target.value)}
-                className="h-9 rounded-lg border border-border/80 bg-background px-2.5 text-sm font-semibold tabular-nums text-foreground focus:border-primary focus:outline-none"
+                onValueChange={setDue}
+                className="w-40"
+                ariaLabel="Hạn thanh toán"
               />
               <span className="text-xs text-muted-foreground" title={`Theo Cài đặt: ${p.dueDefaultLabel}`}>
                 Mặc định {formatDateVN(p.dueDefaultIso)}
@@ -921,12 +923,7 @@ export function InvoiceEditor(p: Props) {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
-            <Button
-              size="sm"
-              disabled={pending}
-              onClick={() => saveAll()}
-              className="gap-1.5"
-            >
+            <Button size="sm" disabled={pending} onClick={() => saveAll()} className="gap-1.5">
               <Check className="size-3.5" />
               <span>Lưu thay đổi</span>
             </Button>

@@ -1,5 +1,6 @@
 'use client'
 
+import { DateField } from '@/components/date-field'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
@@ -188,7 +189,7 @@ export function TerminationWizard({
         <h3 className="text-[13px] font-medium text-muted-foreground">1. Ngày trả phòng & Chỉ số điện nước</h3>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Ngày trả phòng">
-            <input type="date" className={inputCls} value={endDate} onChange={(e) => setEnd(e.target.value)} />
+            <DateField id="termination-end" ariaLabel="Ngày trả phòng" value={endDate} onValueChange={setEnd} />
             {endDateError && (
               <p role="alert" className="mt-1 text-xs text-destructive">
                 {endDateError}

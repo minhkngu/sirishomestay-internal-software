@@ -34,6 +34,14 @@ export type Lease = {
   proration?: Proration | null
 }
 
+/** Điều khoản chụp lại ở phụ lục gia hạn (chỉ để tham khảo). */
+export type TermsRef = {
+  endDate: ISODate
+  monthlyRent: number
+  depositAmount: number
+  fees: { feeTypeId: string | null; name: string; unit: string; unitPrice: number; quantitySource: string }[]
+}
+
 export type Addendum = {
   id: string
   leaseId: string
@@ -44,6 +52,7 @@ export type Addendum = {
   newMonthlyRent?: number | null
   newDepositAmount?: number | null
   newFees?: ContractFee[] | null
+  reference?: { before: TermsRef; after: TermsRef } | null
   newOccupantIds?: string[] | null
   /** phòng trước khi chuyển (chỉ phụ lục chuyển phòng) */
   oldRoomId?: string | null

@@ -1,4 +1,5 @@
 'use client'
+import { FormDateField } from '@/components/date-field'
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { FormDialog } from '@/components/form-dialog'
@@ -6,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { addOneOffAction, removeOneOffAction } from '../../server/charges/actions'
+import { todayVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { MoneyInput } from '@/components/ui/money-input'
 
@@ -69,10 +71,7 @@ export function OneOffDialog({
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="oneoff-date" className="text-[13px] font-medium">
-                    Ngày
-                  </Label>
-                  <Input id="oneoff-date" type="date" name="date" required />
+                  <FormDateField id="oneoff-date" name="date" label="Ngày" defaultValue={todayVN()} />
                 </div>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -86,7 +85,13 @@ export function OneOffDialog({
                   <Label htmlFor="oneoff-price" className="text-[13px] font-medium">
                     Đơn giá
                   </Label>
-                  <MoneyInput id="oneoff-price" name="unitPrice" required value={unitPrice} onValueChange={setUnitPrice} />
+                  <MoneyInput
+                    id="oneoff-price"
+                    name="unitPrice"
+                    required
+                    value={unitPrice}
+                    onValueChange={setUnitPrice}
+                  />
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-1">

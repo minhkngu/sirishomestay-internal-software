@@ -18,7 +18,13 @@ export function contractTermsAt(lease: Lease, addenda: Addendum[], date: ISODate
     .sort((a, b) => (a.effectiveDate === b.effectiveDate ? 0 : a.effectiveDate < b.effectiveDate ? -1 : 1)) // cùng ngày giữ thứ tự nhập (sắp xếp ổn định)
   for (const a of applicable) {
     if (a.type === 'termination') t.endDate = a.effectiveDate
-    if (a.newEndDate) t.endDate = a.newEndDate
+    if (a.newEndDate && !a.reference) t.endDate = a.newEndDate
+    // Gia hạn ghi thẳng: giá, cọc, phí của hợp đồng đã là điều khoản mới, phụ lục cũ (kiểu cũ) hết ghi đè từ ngày này
+    if (a.reference) {
+      t.monthlyRent = lease.monthlyRent
+      t.depositAmount = lease.depositAmount
+      t.fees = lease.fees
+    }
     if (a.newRoomId) t.roomId = a.newRoomId
     if (a.newMonthlyRent != null) t.monthlyRent = a.newMonthlyRent
     if (a.newDepositAmount != null) t.depositAmount = a.newDepositAmount

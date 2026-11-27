@@ -1,6 +1,7 @@
 // Cổng phía server của module leasing: chỉ những gì nơi ngoài module đang dùng.
 export { INVOICE_STATUS_LABELS } from './domain/labels'
 export { listAddenda } from './server/addenda/service'
+export { referenceChanges } from './domain/extension-reference'
 export { listOneOffs } from './server/charges/service'
 export {
   getDepositContract,

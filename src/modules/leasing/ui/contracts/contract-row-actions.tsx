@@ -1,5 +1,6 @@
 'use client'
 
+import { DateField } from '@/components/date-field'
 import { useRef, useState, useTransition } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import {
@@ -251,6 +252,7 @@ export function ContractRowActions({
               occupants={kind === 'lease' ? data.occupants : undefined}
               people={kind === 'lease' && data.form ? data.people : undefined}
               feeData={kind === 'lease' ? data.feeData : undefined}
+              extensionReference={kind === 'lease' ? data.extensionReference : undefined}
               templates={
                 data.extras
                   ? {
@@ -272,7 +274,10 @@ export function ContractRowActions({
             <ExtensionDialog
               leaseId={id}
               endDate={data.form.endDate}
-              today={data.form.today}
+              finalInvoiceExists={data.form.finalInvoiceExists}
+              monthlyRent={data.form.monthlyRent}
+              depositAmount={data.form.depositAmount}
+              feeData={kind === 'lease' ? data.feeData : undefined}
               defaultOpen
               onCompleted={close}
             />
@@ -328,16 +333,7 @@ export function ContractRowActions({
                   placeholder="Chọn người nhận"
                 />
               </div>
-              <label className="grid gap-1.5 text-[13px] font-medium">
-                Ngày hiệu lực
-                <input
-                  required
-                  type="date"
-                  value={date}
-                  onChange={(event) => setDate(event.target.value)}
-                  className="h-9 rounded-lg border border-input bg-card px-2.5 text-[13px] font-normal"
-                />
-              </label>
+              <DateField id="assign-date" label="Ngày hiệu lực" value={date} onValueChange={setDate} />
               <Button disabled={pending} type="submit">
                 Lưu phụ lục
               </Button>

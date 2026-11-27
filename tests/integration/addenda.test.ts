@@ -36,7 +36,15 @@ import {
 } from '@/modules/leasing/server/addenda/service'
 import { updateLeaseOccupants } from '@/modules/leasing/server/contracts/service'
 import { saveHandover, startHandover } from '@/modules/leasing/server/handovers/service'
-import { approveInvoice, getInvoiceDetail, updateLines } from '@/modules/leasing/server/invoices/service'
+import {
+  approveInvoice,
+  createDraftForLease,
+  getInvoiceDetail,
+  leaseData,
+  loadAddenda,
+  updateLines,
+} from '@/modules/leasing/server/invoices/service'
+import { contractTermsAt } from '@/modules/leasing/domain/contract-terms'
 import { createTestDb } from '../helpers/db'
 
 const context = (permissions: Permission[], facilityId: string): AccessContext => ({
@@ -286,46 +294,174 @@ describe('phụ lục hợp đồng', () => {
     await db.insert(feeTypePrices).values({ feeTypeId: fee.id, facilityId, price: 250000 })
     expect((await addendumFormData(db, ctx(), leaseId)).fees.find((f) => f.id === fee.id)?.defaultPrice).toBe(250000)
   })
-  it('gia hạn đổi giá: sinh điều chỉnh chờ, cọc chờ thu và cập nhật ngày kết thúc; chạy lại không sinh lặp', async () => {
-    const r = await createExtension(db, ctx(), leaseId, {
-      effectiveDate: '2026-11-16',
-      newEndDate: '2027-06-30',
-      newMonthlyRent: 10000000,
-      newDepositAmount: 10000000,
+  describe('gia hạn ghi thẳng vào hợp đồng', () => {
+    let finalCode = 0
+    // Gia hạn cần hoá đơn kỳ cuối đã duyệt: dựng sẵn một hoá đơn đến hết ngày kết thúc hiện tại
+    async function closeLastPeriod() {
+      const l = (await db.select().from(leases).where(eq(leases.id, leaseId)))[0]
+      await db.insert(invoices).values({
+        code: `TD-CUOI-${++finalCode}`,
+        leaseId,
+        facilityId,
+        kind: 'monthly',
+        periodStart: l.endDate.slice(0, 8) + '01',
+        periodEnd: l.endDate,
+        issueDate: l.endDate,
+        status: 'approved',
+      })
+    }
+    const extend = async (input: Record<string, unknown> = {}) => {
+      await closeLastPeriod()
+      return createExtension(db, ctx(), leaseId, {
+        effectiveDate: '2027-01-01',
+        newEndDate: '2027-06-30',
+        newMonthlyRent: 10000000,
+        ...input,
+      })
+    }
+    const lease = async () => (await db.select().from(leases).where(eq(leases.id, leaseId)))[0]
+    async function fixedFee(name = 'Giữ xe', unitPrice = 100000) {
+      const [fee] = await db
+        .insert(leaseFeeSnapshots)
+        .values({ leaseId, name, unit: 'xe', quantitySource: 'legacy_fixed', billing: 'monthly_fixed', unitPrice })
+        .returning()
+      return fee
+    }
+    async function electricMeterFee(unitPrice = 3500) {
+      const [m] = await db
+        .insert(meters)
+        .values({ roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 })
+        .returning()
+      return { meter: m, fee: await electricFee(m.id, unitPrice) }
+    }
+    it('ghi thẳng giá thuê, ngày kết thúc, cọc; phụ lục chỉ lưu tham khảo và không sinh điều chỉnh', async () => {
+      const r = await extend({ newDepositAmount: 10000000 })
+      expect(r.adjustments).toHaveLength(0)
+      expect(r.depositEntry).toMatchObject({ type: 'topup', amount: 1000000 })
+      expect(await lease()).toMatchObject({ endDate: '2027-06-30', monthlyRent: 10000000, depositAmount: 10000000 })
+      expect(r.addendum).toMatchObject({ newMonthlyRent: null, newDepositAmount: null, newFees: null })
+      expect(r.addendum.reference).toMatchObject({
+        before: { endDate: '2026-12-31', monthlyRent: 9000000, depositAmount: 9000000 },
+        after: { endDate: '2027-06-30', monthlyRent: 10000000, depositAmount: 10000000 },
+      })
+      expect(await db.select().from(pendingAdjustments)).toHaveLength(0)
+      expect((await db.select().from(depositEntries)).filter((e) => e.status === 'pending')).toHaveLength(1)
     })
-    expect(r.adjustments).toHaveLength(1)
-    expect(r.adjustments[0].amount).toBeGreaterThan(0)
-    expect(r.depositEntry).toMatchObject({ type: 'topup', amount: 1000000 })
-    expect((await db.select().from(leases).where(eq(leases.id, leaseId)))[0].endDate).toBe('2027-06-30')
-    expect(await db.select().from(pendingAdjustments)).toHaveLength(1)
-    expect((await db.select().from(depositEntries)).filter((e) => e.status === 'pending')).toHaveLength(1)
-    await expect(
-      createExtension(db, ctx(), leaseId, { effectiveDate: '2026-11-20', newEndDate: '2027-01-01' }),
-    ).rejects.toThrow(ValidationError)
-  })
-  it('chọn điều chỉnh vào hoá đơn hiện tại: thêm dòng vào hoá đơn đã duyệt, không tạo điều chỉnh chờ', async () => {
-    await createExtension(db, ctx(), leaseId, {
-      effectiveDate: '2026-11-16',
-      newEndDate: '2027-06-30',
-      newMonthlyRent: 10000000,
-      adjustmentTarget: 'current',
+    it('cọc trống hoặc bằng cọc cũ: không đổi cọc, không ghi sổ cọc', async () => {
+      await extend()
+      await closeLastPeriod()
+      await createExtension(db, ctx(), leaseId, {
+        effectiveDate: '2027-07-01',
+        newEndDate: '2027-12-31',
+        newDepositAmount: 9000000,
+      })
+      expect((await lease()).depositAmount).toBe(9000000)
+      expect((await db.select().from(depositEntries)).filter((e) => e.status === 'pending')).toHaveLength(0)
     })
-    expect(await db.select().from(pendingAdjustments)).toHaveLength(0)
-    expect(
-      (await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, invoiceId))).filter(
-        (l) => l.type === 'adjustment',
-      ),
-    ).toHaveLength(1)
-  })
-  it('xem trước không lưu gì', async () => {
-    const r = await previewAddendum(db, ctx(), 'extension', leaseId, {
-      effectiveDate: '2026-11-16',
-      newEndDate: '2027-06-30',
-      newMonthlyRent: 10000000,
+    it('sửa hợp đồng sau gia hạn: giá thuê vừa sửa có hiệu lực vì phụ lục không ghi đè', async () => {
+      await extend()
+      const terms = async () =>
+        contractTermsAt(await leaseData(db, leaseId), await loadAddenda(db, leaseId), '2027-03-01')
+      expect((await terms()).monthlyRent).toBe(10000000)
+      await db.update(leases).set({ monthlyRent: 10500000 }).where(eq(leases.id, leaseId))
+      expect((await terms()).monthlyRent).toBe(10500000)
     })
-    expect(r.adjustments).toHaveLength(1)
-    expect(await db.select().from(addenda)).toHaveLength(0)
-    expect(await db.select().from(pendingAdjustments)).toHaveLength(0)
+    it('sửa ngày kết thúc hợp đồng sau gia hạn: ngày mới có hiệu lực vì phụ lục gia hạn không ghi đè', async () => {
+      await extend()
+      await db.update(leases).set({ endDate: '2027-03-31' }).where(eq(leases.id, leaseId))
+      const t = contractTermsAt(await leaseData(db, leaseId), await loadAddenda(db, leaseId), '2027-03-01')
+      expect(t.endDate).toBe('2027-03-31')
+    })
+    it('hợp đồng có phụ lục cũ ghi đè giá: gia hạn đổi giá vẫn ghi thẳng và có hiệu lực', async () => {
+      await db
+        .insert(addenda)
+        .values({ leaseId, type: 'extension', effectiveDate: '2026-06-01', newMonthlyRent: 9500000 })
+      const r = await extend({ newMonthlyRent: 10000000 })
+      expect(r.addendum.reference).toMatchObject({
+        before: { monthlyRent: 9000000 },
+        after: { monthlyRent: 10000000, endDate: '2027-06-30' },
+      })
+      const at = async (d: string) =>
+        contractTermsAt(await leaseData(db, leaseId), await loadAddenda(db, leaseId), d).monthlyRent
+      expect(await at('2026-10-01')).toBe(9500000)
+      expect(await at('2027-02-01')).toBe(10000000)
+    })
+    it('đổi giá điện giữ nguyên dòng phí điện và gắn đồng hồ; bỏ phí cố định; thêm phí mới', async () => {
+      const { fee: electric } = await electricMeterFee()
+      const parking = await fixedFee('Giữ xe')
+      const [unit] = await db.insert(feeUnits).values({ name: 'tháng' }).returning()
+      const [type] = await db.insert(feeTypes).values({ name: 'Rác', unitId: unit.id, defaultPrice: 30000 }).returning()
+      await extend({
+        fees: [
+          { leaseFeeId: electric.id, unitPrice: 4000 },
+          { feeTypeId: type.id, unitPrice: 30000 },
+        ],
+      })
+      const fees = await db.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, leaseId))
+      expect(fees.find((f) => f.id === electric.id)?.unitPrice).toBe(4000)
+      expect(fees.find((f) => f.id === parking.id)).toBeUndefined()
+      expect(fees.some((f) => f.name === 'Rác')).toBe(true)
+      expect(await db.select().from(leaseFeeMeters).where(eq(leaseFeeMeters.leaseFeeId, electric.id))).toHaveLength(1)
+      const after = (await db.select().from(addenda))[0].reference as {
+        before: { fees: unknown[] }
+        after: { fees: unknown[] }
+      }
+      expect(after.before.fees).toHaveLength(2)
+      expect(after.after.fees).toHaveLength(2)
+    })
+    it('phí tính theo đồng hồ không bỏ được khi gia hạn', async () => {
+      await electricMeterFee()
+      await expect(extend({ fees: [] })).rejects.toThrow(ValidationError)
+      expect((await lease()).endDate).toBe('2026-12-31')
+    })
+    it('chưa có hoá đơn kỳ cuối thì chưa gia hạn được, có rồi (nháp cũng tính) thì được', async () => {
+      const input = { newEndDate: '2027-06-30', newMonthlyRent: 10000000 }
+      await expect(createExtension(db, ctx(), leaseId, input)).rejects.toThrow(/hoá đơn kỳ cuối/)
+      await db.insert(invoices).values({
+        code: 'TD-NHAP-1',
+        leaseId,
+        facilityId,
+        kind: 'monthly',
+        periodStart: '2026-12-01',
+        periodEnd: '2026-12-31',
+        issueDate: '2026-12-31',
+        status: 'draft',
+      })
+      await expect(createExtension(db, ctx(), leaseId, input)).resolves.toBeDefined()
+      expect((await lease()).endDate).toBe('2027-06-30')
+    })
+    it('ngày hiệu lực luôn là ngày liền sau ngày hết hạn cũ, bỏ qua ngày client gửi; ngày kết thúc mới phải sau ngày kết thúc cũ', async () => {
+      await expect(extend({ newEndDate: '2026-12-31' })).rejects.toThrow(ValidationError)
+      const r = await extend({ effectiveDate: '2030-05-05' })
+      expect(r.addendum.effectiveDate).toBe('2027-01-01')
+    })
+    it('cọc tăng: hoá đơn kỳ gia hạn có đúng một dòng cọc còn thiếu bằng phần tăng, kỳ sau không lặp', async () => {
+      await extend({ newDepositAmount: 10000000 })
+      const depositLines = async (invoiceId: string) =>
+        (await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, invoiceId))).filter(
+          (l) => l.type === 'deposit',
+        )
+      const first = await createDraftForLease(db, ctx(), { leaseId, period: '2027-01' })
+      expect(await depositLines(first.id)).toMatchObject([{ description: 'Tiền cọc còn thiếu', amount: 1000000 }])
+      const next = await createDraftForLease(db, ctx(), { leaseId, period: '2027-02' })
+      expect(await depositLines(next.id)).toHaveLength(0)
+    })
+    it('xem trước không đổi hợp đồng, phí, sổ cọc, phụ lục', async () => {
+      await fixedFee()
+      await closeLastPeriod()
+      const r = await previewAddendum(db, ctx(), 'extension', leaseId, {
+        effectiveDate: '2027-01-01',
+        newEndDate: '2027-06-30',
+        newMonthlyRent: 10000000,
+        newDepositAmount: 12000000,
+        fees: [],
+      })
+      expect(r.depositEntry).toMatchObject({ type: 'topup' })
+      expect(await db.select().from(addenda)).toHaveLength(0)
+      expect(await lease()).toMatchObject({ endDate: '2026-12-31', monthlyRent: 9000000, depositAmount: 9000000 })
+      expect(await db.select().from(leaseFeeSnapshots)).toHaveLength(1)
+      expect((await db.select().from(depositEntries)).filter((e) => e.status === 'pending')).toHaveLength(0)
+    })
   })
   it('đổi người ở: chỉ nhận khách cá nhân và cập nhật danh sách người ở', async () => {
     const [company] = await db
@@ -480,6 +616,16 @@ describe('phụ lục hợp đồng', () => {
       await db.update(leases).set({ proration: 'days_30' }).where(eq(leases.id, leaseId))
     })
     it('gia hạn cọc 9tr → 10tr: thu bổ sung 1.000.000 chờ', async () => {
+      await db.insert(invoices).values({
+        code: 'TD-CUOI-X',
+        leaseId,
+        facilityId,
+        kind: 'monthly',
+        periodStart: '2026-12-01',
+        periodEnd: '2026-12-31',
+        issueDate: '2026-12-31',
+        status: 'approved',
+      })
       const r = await createExtension(db, ctx(), leaseId, {
         effectiveDate: '2026-11-16',
         newEndDate: '2027-06-30',

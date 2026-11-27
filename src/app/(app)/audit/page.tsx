@@ -43,7 +43,10 @@ export default async function AuditPage({
             </option>
           ))}
         </select>
-        <button className="h-9 rounded-lg border border-input bg-card px-3.5 text-[13px] font-medium hover:bg-muted/60" type="submit">
+        <button
+          className="h-9 rounded-lg border border-input bg-card px-3.5 text-[13px] font-medium hover:bg-muted/60"
+          type="submit"
+        >
           Lọc
         </button>
       </form>

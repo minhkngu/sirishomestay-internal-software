@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray, isNull, ne, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ASSET_CONDITION } from '@/domain/asset-labels'
 import {
@@ -34,7 +34,7 @@ import type { SignStatus } from '@/domain/statuses'
 import { listFeeTypePrices } from '@/modules/facilities'
 import { midPeriodAdjustments } from '../../domain/adjustments'
 import { contractTermsAt } from '../../domain/contract-terms'
-import { addDays, todayVN } from '@/domain/dates'
+import { addDays, formatDateVN, todayVN } from '@/domain/dates'
 import { depositBalance, depositDiffEntry } from '@/domain/deposit'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import type { DocEntities } from '@/domain/template-fields'
@@ -51,7 +51,9 @@ import type {
   OneOffCharge,
   PendingAdjustment,
   Proration,
+  TermsRef,
 } from '@/domain/types'
+import { MAX_MONEY } from '@/domain/money'
 import { recordAudit, registerExportOwnerResolver, registerOwnerResolver, getSettings } from '@/modules/platform'
 import {
   captureContractVersion,
@@ -60,6 +62,7 @@ import {
   recordTerminationReadings,
 } from '../contracts/history'
 import { applyTerminationClosure } from './finalize'
+import { applyLeaseFeeEdits } from '../contracts/lease-fees'
 import { leaseData, loadAddenda, nextInvoiceCode } from '../invoices/service'
 import type { StorageAdapter } from '@/modules/platform'
 import { exportDocument, registerDocLoader } from '@/modules/documents'
@@ -106,13 +109,19 @@ const occupantSchema = z.object({
   occupantIds: z.array(z.uuid()).min(1, 'Chọn ít nhất một người ở'),
   adjustmentTarget: target,
 })
+const extensionFeeEditSchema = z.object({
+  leaseFeeId: z.uuid().optional(),
+  feeTypeId: z.uuid().optional(),
+  unitPrice: z.number().int('Đơn giá phí không hợp lệ').nonnegative('Đơn giá phí không hợp lệ').max(MAX_MONEY),
+  existingMeterId: z.uuid().optional(),
+  initialReading: z.number().int().nonnegative().optional(),
+})
+/** Gia hạn ghi thẳng vào hợp đồng; phụ lục chỉ lưu bản tham khảo trước/sau. `fees` là danh sách phí sau khi sửa (cùng dạng Sửa hợp đồng). */
 const extensionSchema = z.object({
-  effectiveDate: date,
   newEndDate: date,
-  newMonthlyRent: z.number().int().positive().optional(),
-  newDepositAmount: z.number().int().nonnegative().optional(),
-  newFees: feesSchema,
-  adjustmentTarget: target,
+  newMonthlyRent: z.number().int().positive().max(MAX_MONEY).optional(),
+  newDepositAmount: z.number().int().nonnegative().max(MAX_MONEY).optional(),
+  fees: z.array(extensionFeeEditSchema).optional(),
 })
 const transferSchema = z.object({
   effectiveDate: date,
@@ -417,6 +426,27 @@ export async function createOccupantChange(
   })
 }
 
+/** Điều khoản hiện hành của hợp đồng để lưu tham khảo ở phụ lục gia hạn. */
+function termsRefOf(terms: {
+  endDate: string
+  monthlyRent: number
+  depositAmount: number
+  fees: ContractFee[]
+}): TermsRef {
+  return {
+    endDate: terms.endDate,
+    monthlyRent: terms.monthlyRent,
+    depositAmount: terms.depositAmount,
+    fees: terms.fees.map((f) => ({
+      feeTypeId: f.feeTypeId,
+      name: f.name,
+      unit: f.unit,
+      unitPrice: f.unitPrice,
+      quantitySource: f.quantitySource ?? 'legacy_fixed',
+    })),
+  }
+}
+
 export async function createExtension(
   db: DB,
   ctx: AccessContext,
@@ -427,33 +457,51 @@ export async function createExtension(
   return db.transaction(async (tx0) => {
     const tx = tx0 as unknown as DB
     const { l, facilityId } = await lockLease(tx, ctx, leaseId)
-    checkDate(l, data.effectiveDate)
+    // Gia hạn không nhập ngày hiệu lực: luôn là ngày liền sau ngày hết hạn cũ (đầu kỳ gia hạn)
+    const effectiveDate = addDays(l.endDate, 1)
     if (data.newEndDate <= l.endDate)
       throw new ValidationError('Ngày kết thúc mới phải sau ngày kết thúc hiện tại', {
         newEndDate: 'Ngày kết thúc mới phải sau ngày kết thúc hiện tại',
       })
-    const [base, existing] = await Promise.all([leaseData(tx, leaseId), loadAddenda(tx, leaseId)])
-    const current = contractTermsAt(base, existing, data.effectiveDate)
-    const newFees = data.newFees ? await resolveFees(tx, data.newFees) : null
+    // Hoá đơn kỳ cuối (đến hết ngày kết thúc cũ) phải được tạo trước khi gia hạn: gia hạn ghi giá mới thẳng vào hợp đồng nên kỳ cũ chưa chốt sẽ bị tính theo giá mới
+    const [finalInvoice] = await tx
+      .select({ id: invoices.id })
+      .from(invoices)
+      .where(and(eq(invoices.leaseId, leaseId), ne(invoices.kind, 'termination'), gte(invoices.periodEnd, l.endDate)))
+      .limit(1)
+    if (!finalInvoice)
+      throw new ValidationError(
+        `Chưa có hoá đơn kỳ cuối (đến ${formatDateVN(l.endDate)}). Hãy tạo hoá đơn kỳ cuối trước khi gia hạn.`,
+      )
+    const base = await leaseData(tx, leaseId)
+    const before = termsRefOf(base)
+    const newDeposit =
+      data.newDepositAmount != null && data.newDepositAmount !== l.depositAmount ? data.newDepositAmount : null
     await captureContractVersion(tx, ctx, 'lease', leaseId, 'extension')
+    await tx
+      .update(leases)
+      .set({
+        endDate: data.newEndDate,
+        ...(data.newMonthlyRent != null ? { monthlyRent: data.newMonthlyRent } : {}),
+        ...(newDeposit != null ? { depositAmount: newDeposit } : {}),
+        updatedAt: new Date(),
+      })
+      .where(eq(leases.id, leaseId))
+    if (data.fees) await applyLeaseFeeEdits(tx, ctx, leaseId, data.fees, l.roomId, l.startDate)
+    const afterBase = await leaseData(tx, leaseId)
+    const after = termsRefOf(afterBase)
     const [row] = await tx
       .insert(addenda)
       .values({
         leaseId,
         type: 'extension',
-        effectiveDate: data.effectiveDate,
+        effectiveDate: effectiveDate,
         newEndDate: data.newEndDate,
-        newMonthlyRent: data.newMonthlyRent ?? null,
-        newDepositAmount: data.newDepositAmount ?? null,
-        newFees,
-        adjustmentTarget: data.adjustmentTarget,
+        reference: { before, after },
       })
       .returning()
-    await tx.update(leases).set({ endDate: data.newEndDate, updatedAt: new Date() }).where(eq(leases.id, leaseId))
-    const diff =
-      data.newDepositAmount != null
-        ? depositDiffEntry(current.depositAmount, data.newDepositAmount, data.effectiveDate)
-        : null
+    // Chỉ đổi cọc nếu có thay đổi
+    const diff = newDeposit != null ? depositDiffEntry(l.depositAmount, newDeposit, effectiveDate) : null
     if (diff)
       await tx.insert(depositEntries).values({
         leaseId,
@@ -463,17 +511,16 @@ export async function createExtension(
         status: 'pending',
         note: diff.note ?? '',
       })
-    const adjustments = await applyAdjustments(tx, ctx, leaseId, facilityId, row)
     await recordAudit(tx, ctx, {
       action: 'create',
       entity: 'addendum',
       entityId: row.id,
       facilityId,
       summary: `Phụ lục gia hạn ${l.code}`,
-      before: { endDate: l.endDate },
+      before,
       after: row,
     })
-    return { addendum: row, adjustments, depositEntry: diff, invoice: null }
+    return { addendum: row, adjustments: [], depositEntry: diff, invoice: null }
   })
 }
 
@@ -1115,6 +1162,7 @@ for (const docType of Object.values(DOC)) {
           }
         : undefined
     const t = row.tenant
+    const ref = a.reference as { before: TermsRef; after: TermsRef } | null
     const entities: DocEntities = {
       now: todayVN(),
       oldTenant: person(oldTenant),
@@ -1133,15 +1181,15 @@ for (const docType of Object.values(DOC)) {
       lease: {
         code: row.l.code,
         startDate: row.l.startDate,
-        endDate: row.l.endDate,
-        monthlyRent: row.l.monthlyRent,
-        depositAmount: row.l.depositAmount,
+        endDate: ref?.before.endDate ?? row.l.endDate,
+        monthlyRent: ref?.before.monthlyRent ?? row.l.monthlyRent,
+        depositAmount: ref?.before.depositAmount ?? row.l.depositAmount,
       },
       addendum: {
         effectiveDate: a.effectiveDate,
-        newEndDate: a.newEndDate,
-        newMonthlyRent: a.newMonthlyRent,
-        newDepositAmount: a.newDepositAmount,
+        newEndDate: ref?.after.endDate ?? a.newEndDate,
+        newMonthlyRent: ref?.after.monthlyRent ?? a.newMonthlyRent,
+        newDepositAmount: ref?.after.depositAmount ?? a.newDepositAmount,
         newRoomCode: a.newRoomId ? row.room.code : null,
       },
     }
@@ -1261,8 +1309,15 @@ export async function addendumFormData(db: DB, ctx: AccessContext, leaseId: stri
     ...fee,
     defaultPrice: resolveFeePrice(fee.defaultPrice, prices[fee.id], row.facilityId),
   }))
+  // Kỳ cuối: hoá đơn phủ tới ngày kết thúc hợp đồng (bỏ hoá đơn thanh lý)
+  const [finalInvoice] = await db
+    .select({ id: invoices.id })
+    .from(invoices)
+    .where(and(eq(invoices.leaseId, leaseId), gte(invoices.periodEnd, row.l.endDate), ne(invoices.kind, 'termination')))
+    .limit(1)
   return {
     currentRoomId: row.l.roomId,
+    finalInvoiceExists: !!finalInvoice,
     startDate: row.l.startDate,
     endDate: row.l.endDate,
     monthlyRent: row.l.monthlyRent,

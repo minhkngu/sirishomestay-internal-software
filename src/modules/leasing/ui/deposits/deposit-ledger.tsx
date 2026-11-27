@@ -1,4 +1,5 @@
 'use client'
+import { FormDateField } from '@/components/date-field'
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { formatDateVN, todayVN } from '@/domain/dates'
@@ -69,13 +70,12 @@ export function DepositLedger({ entries, canEdit, leaseId }: { entries: Entry[];
                           })
                         }}
                       >
-                        <input
-                          aria-label="Ngày hoàn tất"
-                          type="date"
+                        <FormDateField
+                          id={`deposit-done-${entry.id}`}
+                          ariaLabel="Ngày hoàn tất"
                           name="date"
                           defaultValue={todayVN()}
-                          required
-                          className="h-8 rounded-lg border border-border/80 bg-card px-2 text-xs"
+                          className="w-36"
                         />
                         <select
                           aria-label="Hình thức"
@@ -161,16 +161,7 @@ export function DepositLedger({ entries, canEdit, leaseId }: { entries: Entry[];
             })
           }}
         >
-          <label className="grid gap-1 text-xs text-muted-foreground">
-            Ngày
-            <input
-              type="date"
-              name="date"
-              defaultValue={todayVN()}
-              required
-              className="h-9 rounded-lg border border-border/80 bg-card px-2 text-[13px] text-foreground"
-            />
-          </label>
+          <FormDateField id="deposit-entry-date" name="date" label="Ngày" defaultValue={todayVN()} />
           <label className="grid gap-1 text-xs text-muted-foreground">
             Loại
             <select
