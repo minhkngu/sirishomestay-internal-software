@@ -173,7 +173,11 @@ export function RoomPanels({ amenities, facilities, facilityId }: Props) {
               <div key={k} className={k === 'listPrice' ? 'space-y-1 sm:col-span-2' : 'space-y-1'}>
                 <Label htmlFor={`b-${k}`}>{label}</Label>
                 {k === 'listPrice' ? (
-                  <MoneyInput id={`b-${k}`} value={bulk[k]} onValueChange={(value) => setBulk({ ...bulk, [k]: value })} />
+                  <MoneyInput
+                    id={`b-${k}`}
+                    value={bulk[k]}
+                    onValueChange={(value) => setBulk({ ...bulk, [k]: value })}
+                  />
                 ) : (
                   <Input id={`b-${k}`} value={bulk[k]} onChange={(e) => setBulk({ ...bulk, [k]: e.target.value })} />
                 )}

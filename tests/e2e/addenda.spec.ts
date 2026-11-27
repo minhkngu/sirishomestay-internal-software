@@ -33,13 +33,12 @@ test('gia hạn đổi giá thuê và phí: ghi thẳng vào hợp đồng', asy
     .innerText()
   const [dd, mm, yyyy] = term.split('–')[1].trim().split('/')
   await page.getByRole('button', { name: 'Gia hạn hợp đồng' }).click()
-  // ngày hiệu lực là ngày liền sau hết hạn cũ nên không có ô nhập; phần phí hiện ngay trong popup
+  // không có ô ngày hiệu lực (luôn là ngày liền sau ngày hết hạn cũ), phần phí hiện ngay trong popup
   await expect(page.getByLabel('Ngày hiệu lực')).toHaveCount(0)
   await expect(page.getByText('Phí dịch vụ', { exact: true })).toBeVisible()
   await pickDate(page, 'Ngày kết thúc mới', `${Number(yyyy) + 1}-${mm}-${dd}`)
   await page.getByLabel(/Giá thuê mới/).fill('12000000')
-  await page.getByRole('button', { name: 'Xem trước tiền' }).click()
-  await page.getByRole('button', { name: 'Lưu phụ lục' }).click()
+  await page.getByRole('button', { name: 'Lưu', exact: true }).click()
   await expect(page.getByText('Đã lưu phụ lục')).toBeVisible()
   // giá mới hiện thẳng trên hợp đồng
   await expect(page.getByText(/12\.000\.000/).first()).toBeVisible()

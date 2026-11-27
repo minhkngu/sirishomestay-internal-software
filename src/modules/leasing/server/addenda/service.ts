@@ -34,7 +34,7 @@ import type { SignStatus } from '@/domain/statuses'
 import { listFeeTypePrices } from '@/modules/facilities'
 import { midPeriodAdjustments } from '../../domain/adjustments'
 import { contractTermsAt } from '../../domain/contract-terms'
-import { addDays, todayVN } from '@/domain/dates'
+import { addDays, formatDateVN, todayVN } from '@/domain/dates'
 import { depositBalance, depositDiffEntry } from '@/domain/deposit'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import type { DocEntities } from '@/domain/template-fields'
@@ -118,8 +118,6 @@ const extensionFeeEditSchema = z.object({
 })
 /** Gia hạn ghi thẳng vào hợp đồng; phụ lục chỉ lưu bản tham khảo trước/sau. `fees` là danh sách phí sau khi sửa (cùng dạng Sửa hợp đồng). */
 const extensionSchema = z.object({
-  /** Bỏ trống = ngày liền sau ngày kết thúc hợp đồng cũ. */
-  effectiveDate: date.optional(),
   newEndDate: date,
   newMonthlyRent: z.number().int().positive().max(MAX_MONEY).optional(),
   newDepositAmount: z.number().int().nonnegative().max(MAX_MONEY).optional(),
@@ -459,17 +457,22 @@ export async function createExtension(
   return db.transaction(async (tx0) => {
     const tx = tx0 as unknown as DB
     const { l, facilityId } = await lockLease(tx, ctx, leaseId)
-    // Gia hạn: ngày hiệu lực là ngày liền sau ngày hết hạn cũ (đầu kỳ gia hạn), không nhập tay
-    const effectiveDate = data.effectiveDate ?? addDays(l.endDate, 1)
-    checkDate({ startDate: l.startDate, endDate: addDays(l.endDate, 1) }, effectiveDate)
+    // Gia hạn không nhập ngày hiệu lực: luôn là ngày liền sau ngày hết hạn cũ (đầu kỳ gia hạn)
+    const effectiveDate = addDays(l.endDate, 1)
     if (data.newEndDate <= l.endDate)
       throw new ValidationError('Ngày kết thúc mới phải sau ngày kết thúc hiện tại', {
         newEndDate: 'Ngày kết thúc mới phải sau ngày kết thúc hiện tại',
       })
-    if (data.newEndDate < effectiveDate)
-      throw new ValidationError('Ngày kết thúc mới phải sau ngày hiệu lực', {
-        newEndDate: 'Ngày kết thúc mới phải sau ngày hiệu lực',
-      })
+    // Hoá đơn kỳ cuối (đến hết ngày kết thúc cũ) phải được tạo trước khi gia hạn: gia hạn ghi giá mới thẳng vào hợp đồng nên kỳ cũ chưa chốt sẽ bị tính theo giá mới
+    const [finalInvoice] = await tx
+      .select({ id: invoices.id })
+      .from(invoices)
+      .where(and(eq(invoices.leaseId, leaseId), ne(invoices.kind, 'termination'), gte(invoices.periodEnd, l.endDate)))
+      .limit(1)
+    if (!finalInvoice)
+      throw new ValidationError(
+        `Chưa có hoá đơn kỳ cuối (đến ${formatDateVN(l.endDate)}). Hãy tạo hoá đơn kỳ cuối trước khi gia hạn.`,
+      )
     const base = await leaseData(tx, leaseId)
     const before = termsRefOf(base)
     const newDeposit =
@@ -492,7 +495,7 @@ export async function createExtension(
       .values({
         leaseId,
         type: 'extension',
-        effectiveDate,
+        effectiveDate: effectiveDate,
         newEndDate: data.newEndDate,
         reference: { before, after },
       })

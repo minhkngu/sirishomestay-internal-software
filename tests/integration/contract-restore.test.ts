@@ -215,7 +215,16 @@ describe('khôi phục hợp đồng', () => {
       depositAmount: 500,
     }
     const { lease } = await createLease(db, ctx, input)
-    await createExtension(db, ctx, lease.id, { effectiveDate: '2026-06-01', newEndDate: '2027-12-31' })
+    await db.insert(invoices).values({
+      code: `RESTORE-CUOI-${lease.id.slice(0, 6)}`,
+      leaseId: lease.id,
+      facilityId,
+      kind: 'monthly',
+      periodStart: '2026-12-01',
+      periodEnd: '2026-12-31',
+      issueDate: '2026-12-31',
+    })
+    await createExtension(db, ctx, lease.id, { newEndDate: '2027-12-31' })
     const preview = await previewContractRestore(db, ctx, 'lease', lease.id)
     await restoreContract(db, ctx, 'lease', lease.id, preview.token, new MemoryStorage())
     expect((await db.select().from(leases).where(eq(leases.id, lease.id)))[0].endDate).toBe('2026-12-31')
@@ -240,8 +249,16 @@ describe('khôi phục hợp đồng', () => {
       .returning()
     const [unit] = await db.insert(feeUnits).values({ name: 'tháng' }).returning()
     const [type] = await db.insert(feeTypes).values({ name: 'Rác', unitId: unit.id, defaultPrice: 30 }).returning()
+    await db.insert(invoices).values({
+      code: `RESTORE-CUOI-${lease.id.slice(0, 6)}`,
+      leaseId: lease.id,
+      facilityId,
+      kind: 'monthly',
+      periodStart: '2026-12-01',
+      periodEnd: '2026-12-31',
+      issueDate: '2026-12-31',
+    })
     await createExtension(db, ctx, lease.id, {
-      effectiveDate: '2027-01-01',
       newEndDate: '2027-12-31',
       newMonthlyRent: 2000,
       newDepositAmount: 900,

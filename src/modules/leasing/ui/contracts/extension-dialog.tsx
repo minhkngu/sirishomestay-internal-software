@@ -73,11 +73,11 @@ export function ExtensionDialog({
       leaseId={leaseId}
       input={input}
       create={createExtensionAction}
-      simple
       defaultOpen={defaultOpen}
       onCompleted={onCompleted}
+      simple
     >
-      <Field label={`Ngày kết thúc mới (hiện tại ${formatDateVN(endDate)})`}>
+      <Field label={`Ngày kết thúc mới (hiện tại ${formatDateVN(endDate)}, hiệu lực từ ngày liền sau)`}>
         <DateField id="extension-end" ariaLabel="Ngày kết thúc mới" value={newEndDate} onValueChange={setEnd} />
       </Field>
       <Field label={`Giá thuê mới (đang ${formatVND(monthlyRent)}, để trống nếu không đổi)`}>
