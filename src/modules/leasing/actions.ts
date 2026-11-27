@@ -4,6 +4,8 @@ export {
   createAssignmentAction,
   createExtensionAction,
   createOccupantChangeAction,
+  cancelRoomChangeAction,
+  createRoomChangeAction,
   createTerminationAction,
   createTransferAction,
   exportAddendumAction,

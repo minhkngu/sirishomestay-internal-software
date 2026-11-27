@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   depositEntries,
   facilities,
+  handovers,
   invoiceLines,
   invoices,
   leaseOccupants,
@@ -16,6 +17,8 @@ import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
 import { createTermination } from '@/modules/leasing/server/addenda/service'
+import { cancelRoomChange, createRoomChange } from '@/modules/leasing/server/addenda/room-change'
+import type { StorageAdapter } from '@/modules/platform'
 import { finalizeTermination } from '@/modules/leasing/server/addenda/finalize'
 import { approveInvoice, unapproveInvoice } from '@/modules/leasing/server/invoices/service'
 import { addWalletEntry, walletBalance } from '@/modules/leasing/server/wallet/service'
@@ -87,16 +90,14 @@ describe('thanh lý nối ví và chuyển phòng', () => {
         status: 'approved',
       })
       .returning()
-    await db
-      .insert(invoiceLines)
-      .values({
-        invoiceId: inv.id,
-        type: 'rent',
-        description: 'Tiền phòng',
-        quantity: 1,
-        unitPrice: 9000000,
-        amount: 9000000,
-      })
+    await db.insert(invoiceLines).values({
+      invoiceId: inv.id,
+      type: 'rent',
+      description: 'Tiền phòng',
+      quantity: 1,
+      unitPrice: 9000000,
+      amount: 9000000,
+    })
   })
   const terminate = (over: Record<string, unknown> = {}, opts: { transfer?: boolean } = {}) =>
     createTermination(
@@ -183,5 +184,69 @@ describe('thanh lý nối ví và chuyển phòng', () => {
     const r = await terminate({}, { transfer: true })
     await approveInvoice(db, ctx(), r.invoice!.id, {})
     await expect(unapproveInvoice(db, ctx(), r.invoice!.id)).rejects.toThrow(ValidationError)
+  })
+
+  describe('chuyển phòng hai bước', () => {
+    const storage = { delete: async () => {} } as unknown as StorageAdapter
+    const change = (over: Record<string, unknown> = {}) =>
+      createRoomChange(db, ctx(), leaseId, {
+        newRoomId: room2Id,
+        moveDate: '2026-11-20',
+        lease: { endDate: '2027-11-19', monthlyRent: 12_000_000, depositAmount: 12_000_000 },
+        termination: { forfeit: { mode: 'none' }, readings: [] },
+        ...over,
+      })
+
+    it('tạo hợp đồng mới bắt đầu đúng ngày chuyển, liên kết hợp đồng cũ và hoá đơn thanh lý nháp ở chế độ chuyển', async () => {
+      const r = await change()
+      const [next] = await db.select().from(leases).where(eq(leases.id, r.newLeaseId))
+      expect(next).toMatchObject({
+        roomId: room2Id,
+        startDate: '2026-11-20',
+        transferFromLeaseId: leaseId,
+        status: 'active',
+      })
+      const [old] = await db.select().from(leases).where(eq(leases.id, leaseId))
+      expect(old).toMatchObject({ status: 'ended', endDate: '2026-11-20' })
+      const [inv] = await db.select().from(invoices).where(eq(invoices.id, r.terminationInvoiceId))
+      expect(inv).toMatchObject({ kind: 'termination', status: 'draft' })
+      expect((await linesOf(inv.id)).some((l) => (l.meta as { transfer?: boolean } | null)?.transfer)).toBe(true)
+      expect((await db.select().from(handovers).where(eq(handovers.leaseId, r.newLeaseId))).length).toBeGreaterThan(0)
+    })
+
+    it('phòng mới khác cơ sở hoặc trùng phòng cũ bị từ chối', async () => {
+      const [other] = await db.insert(facilities).values({ code: 'BT', name: 'Bình Thạnh' }).returning()
+      const [far] = await db.insert(rooms).values({ facilityId: other.id, code: '901' }).returning()
+      await expect(change({ newRoomId: far.id })).rejects.toThrow(ValidationError)
+      await expect(change({ newRoomId: roomId })).rejects.toThrow(ValidationError)
+    })
+
+    it('thanh lý lỗi thì không còn hợp đồng mới nào và hợp đồng cũ vẫn hiệu lực', async () => {
+      await expect(
+        change({
+          termination: {
+            forfeit: { mode: 'partial', amount: 99_000_000 },
+            rentRefund: { mode: 'partial', amount: 99_000_000 },
+            readings: [],
+          },
+        }),
+      ).rejects.toThrow()
+      expect((await db.select().from(leases)).map((l) => l.code).sort()).toEqual(['HD1'])
+      const [old] = await db.select().from(leases).where(eq(leases.id, leaseId))
+      expect(old.status).toBe('active')
+    })
+
+    it('huỷ chuyển phòng khi hoá đơn còn nháp: hợp đồng cũ hiệu lực lại, hợp đồng mới bị xoá', async () => {
+      const r = await change()
+      await cancelRoomChange(db, ctx(), leaseId, storage)
+      expect((await db.select().from(leases).where(eq(leases.id, leaseId)))[0].status).toBe('active')
+      expect(await db.select().from(leases).where(eq(leases.id, r.newLeaseId))).toHaveLength(0)
+    })
+
+    it('huỷ chuyển phòng bị từ chối khi hoá đơn thanh lý đã duyệt', async () => {
+      const r = await change()
+      await approveInvoice(db, ctx(), r.terminationInvoiceId, {})
+      await expect(cancelRoomChange(db, ctx(), leaseId, storage)).rejects.toThrow(ValidationError)
+    })
   })
 })
