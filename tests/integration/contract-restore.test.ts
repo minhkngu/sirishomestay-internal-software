@@ -11,6 +11,8 @@ import {
   invoiceLines,
   invoices,
   leaseFeeMeters,
+  feeTypes,
+  feeUnits,
   leaseFeeSnapshots,
   leases,
   meterReadings,
@@ -217,6 +219,52 @@ describe('khôi phục hợp đồng', () => {
     const preview = await previewContractRestore(db, ctx, 'lease', lease.id)
     await restoreContract(db, ctx, 'lease', lease.id, preview.token, new MemoryStorage())
     expect((await db.select().from(leases).where(eq(leases.id, lease.id)))[0].endDate).toBe('2026-12-31')
+    expect(await db.select().from(addenda)).toHaveLength(0)
+  })
+  it('hoàn tác gia hạn ghi thẳng: trả lại giá thuê, cọc, ngày kết thúc và phí (đơn giá, phí đã bỏ, phí thêm)', async () => {
+    const input = {
+      roomId,
+      tenantId,
+      startDate: '2026-01-01',
+      endDate: '2026-12-31',
+      monthlyRent: 1000,
+      depositAmount: 500,
+    }
+    const { lease } = await createLease(db, ctx, input)
+    const [parking, cleaning] = await db
+      .insert(leaseFeeSnapshots)
+      .values([
+        { leaseId: lease.id, name: 'Giữ xe', unit: 'xe', quantitySource: 'legacy_fixed', unitPrice: 100 },
+        { leaseId: lease.id, name: 'Dọn phòng', unit: 'lần', quantitySource: 'legacy_fixed', unitPrice: 200 },
+      ])
+      .returning()
+    const [unit] = await db.insert(feeUnits).values({ name: 'tháng' }).returning()
+    const [type] = await db.insert(feeTypes).values({ name: 'Rác', unitId: unit.id, defaultPrice: 30 }).returning()
+    await createExtension(db, ctx, lease.id, {
+      effectiveDate: '2027-01-01',
+      newEndDate: '2027-12-31',
+      newMonthlyRent: 2000,
+      newDepositAmount: 900,
+      fees: [
+        { leaseFeeId: parking.id, unitPrice: 150 },
+        { feeTypeId: type.id, unitPrice: 30 },
+      ],
+    })
+    const preview = await previewContractRestore(db, ctx, 'lease', lease.id)
+    expect(preview.items.filter((i) => i.type === 'fee')).toHaveLength(3)
+    await restoreContract(db, ctx, 'lease', lease.id, preview.token, new MemoryStorage())
+    expect((await db.select().from(leases).where(eq(leases.id, lease.id)))[0]).toMatchObject({
+      endDate: '2026-12-31',
+      monthlyRent: 1000,
+      depositAmount: 500,
+    })
+    const fees = await db.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, lease.id))
+    expect(fees.map((f) => [f.id, f.unitPrice]).sort()).toEqual(
+      [
+        [parking.id, 100],
+        [cleaning.id, 200],
+      ].sort(),
+    )
     expect(await db.select().from(addenda)).toHaveLength(0)
   })
   it('hoàn tác thanh lý và biên bản trả phòng do thanh lý tạo', async () => {

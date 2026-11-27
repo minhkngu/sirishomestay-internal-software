@@ -428,7 +428,12 @@ export async function createOccupantChange(
 }
 
 /** Điều khoản hiện hành của hợp đồng để lưu tham khảo ở phụ lục gia hạn. */
-function termsRefOf(terms: { endDate: string; monthlyRent: number; depositAmount: number; fees: ContractFee[] }): TermsRef {
+function termsRefOf(terms: {
+  endDate: string
+  monthlyRent: number
+  depositAmount: number
+  fees: ContractFee[]
+}): TermsRef {
   return {
     endDate: terms.endDate,
     monthlyRent: terms.monthlyRent,

@@ -10,6 +10,8 @@ import {
   handovers,
   invoiceLines,
   invoices,
+  leaseFeeMeters,
+  leaseFeeSnapshots,
   leaseOccupants,
   leases,
   meterReadings,
@@ -35,6 +37,9 @@ type Snapshot = {
   payments: { id: string }[]
   addenda: { id: string }[]
   handovers: { id: string }[]
+  /** Phí hợp đồng lúc chụp; phiên bản cũ không có thì không hoàn lại phí. */
+  fees?: (typeof leaseFeeSnapshots.$inferSelect)[]
+  feeMeters?: { leaseFeeId: string; meterId: string }[]
   terminationHandoverId?: string | null
   terminationReadings?: { before: typeof meterReadings.$inferSelect | null; after: typeof meterReadings.$inferSelect }[]
   terminationFinalized?: boolean
@@ -97,7 +102,33 @@ export async function previewContractRestore(
   const handoverRows = kind === 'lease' ? await db.select().from(handovers).where(eq(handovers.leaseId, id)) : []
   const added = <T extends { id: string }>(current: T[], before: { id: string }[]) =>
     current.filter((row) => !before.some((old) => old.id === row.id))
+  const feeRows =
+    kind === 'lease' && snapshot.fees
+      ? await db.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, id))
+      : []
+  const feeItems = snapshot.fees
+    ? [
+        ...added(feeRows, snapshot.fees).map((x) => ({
+          type: 'fee',
+          id: x.id,
+          label: `Phí ${x.name} · xoá phí đã thêm`,
+        })),
+        ...added(snapshot.fees, feeRows).map((x) => ({
+          type: 'fee',
+          id: x.id,
+          label: `Phí ${x.name} · thêm lại phí đã bỏ`,
+        })),
+        ...feeRows
+          .filter((x) => snapshot.fees!.some((old) => old.id === x.id && old.unitPrice !== x.unitPrice))
+          .map((x) => ({
+            type: 'fee',
+            id: x.id,
+            label: `Phí ${x.name} · đơn giá ${x.unitPrice} về ${snapshot.fees!.find((o) => o.id === x.id)!.unitPrice}`,
+          })),
+      ]
+    : []
   const items = [
+    ...feeItems,
     ...added(invoiceRows, snapshot.invoices).map((x) => ({ type: 'invoice', id: x.id, label: x.code })),
     ...added(payRows, snapshot.payments).map((x) => ({
       type: 'payment',
@@ -266,6 +297,7 @@ export async function previewContractRestore(
         payRows: ordered(payRows),
         entries: ordered(entries),
         addons: ordered(addons),
+        feeRows: ordered(feeRows),
         handoverRows: ordered(handoverRows),
         handoverItems: ordered(handoverItemRows),
         lines: ordered(lines),
@@ -279,6 +311,45 @@ export async function previewContractRestore(
     )
     .digest('hex')
   return { versionId: version.id, operation: version.operation, items, blockedReason, token }
+}
+
+/** Hoàn lại phí dịch vụ và đồng hồ gắn phí về như lúc chụp: xoá phí đã thêm, thêm lại phí đã bỏ, trả đơn giá cũ. */
+async function restoreLeaseFees(
+  tx: DB,
+  leaseId: string,
+  fees: (typeof leaseFeeSnapshots.$inferSelect)[],
+  feeMeters: { leaseFeeId: string; meterId: string }[],
+): Promise<void> {
+  const keep = new Set(fees.map((f) => f.id))
+  const current = await tx
+    .select({ id: leaseFeeSnapshots.id })
+    .from(leaseFeeSnapshots)
+    .where(eq(leaseFeeSnapshots.leaseId, leaseId))
+  const drop = current.filter((f) => !keep.has(f.id)).map((f) => f.id)
+  if (drop.length) await tx.delete(leaseFeeSnapshots).where(inArray(leaseFeeSnapshots.id, drop))
+  for (const f of fees)
+    await tx
+      .insert(leaseFeeSnapshots)
+      .values(f)
+      .onConflictDoUpdate({
+        target: leaseFeeSnapshots.id,
+        set: {
+          name: f.name,
+          unit: f.unit,
+          quantitySource: f.quantitySource,
+          quantity: f.quantity,
+          billing: f.billing,
+          unitPrice: f.unitPrice,
+        },
+      })
+  if (fees.length)
+    await tx.delete(leaseFeeMeters).where(
+      inArray(
+        leaseFeeMeters.leaseFeeId,
+        fees.map((f) => f.id),
+      ),
+    )
+  if (feeMeters.length) await tx.insert(leaseFeeMeters).values(feeMeters)
 }
 
 /** Restore unsupported operations fail closed until their effects can be reversed safely. */
@@ -377,6 +448,7 @@ export async function restoreContract(
             updatedAt: new Date(),
           })
           .where(eq(leases.id, id))
+        if (snapshot.fees) await restoreLeaseFees(tx, id, snapshot.fees, snapshot.feeMeters ?? [])
         await tx.delete(leaseOccupants).where(eq(leaseOccupants.leaseId, id))
         if (snapshot.occupants.length)
           await tx.insert(leaseOccupants).values(snapshot.occupants.map((o) => ({ leaseId: id, tenantId: o.tenantId })))

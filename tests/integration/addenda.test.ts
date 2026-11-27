@@ -36,7 +36,13 @@ import {
 } from '@/modules/leasing/server/addenda/service'
 import { updateLeaseOccupants } from '@/modules/leasing/server/contracts/service'
 import { saveHandover, startHandover } from '@/modules/leasing/server/handovers/service'
-import { approveInvoice, getInvoiceDetail, leaseData, loadAddenda, updateLines } from '@/modules/leasing/server/invoices/service'
+import {
+  approveInvoice,
+  getInvoiceDetail,
+  leaseData,
+  loadAddenda,
+  updateLines,
+} from '@/modules/leasing/server/invoices/service'
 import { contractTermsAt } from '@/modules/leasing/domain/contract-terms'
 import { createTestDb } from '../helpers/db'
 
@@ -357,7 +363,10 @@ describe('phụ lục hợp đồng', () => {
       expect(fees.find((f) => f.id === parking.id)).toBeUndefined()
       expect(fees.some((f) => f.name === 'Rác')).toBe(true)
       expect(await db.select().from(leaseFeeMeters).where(eq(leaseFeeMeters.leaseFeeId, electric.id))).toHaveLength(1)
-      const after = (await db.select().from(addenda))[0].reference as { before: { fees: unknown[] }; after: { fees: unknown[] } }
+      const after = (await db.select().from(addenda))[0].reference as {
+        before: { fees: unknown[] }
+        after: { fees: unknown[] }
+      }
       expect(after.before.fees).toHaveLength(2)
       expect(after.after.fees).toHaveLength(2)
     })

@@ -8,6 +8,8 @@ import {
   handovers,
   invoiceLines,
   invoices,
+  leaseFeeMeters,
+  leaseFeeSnapshots,
   leaseOccupants,
   leases,
   meterReadings,
@@ -51,8 +53,15 @@ export async function captureContractVersion(
           handovers: await tx.select().from(handovers).where(eq(handovers.leaseId, id)),
           adjustments: await tx.select().from(pendingAdjustments).where(eq(pendingAdjustments.leaseId, id)),
           meters: await tx.select().from(meters).where(eq(meters.roomId, contract.roomId)),
+          // Phí dịch vụ và đồng hồ gắn phí: để Khôi phục sau gia hạn hoặc sửa hợp đồng hoàn lại cả phí
+          fees: await tx.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, id)),
+          feeMeters: await tx
+            .select({ leaseFeeId: leaseFeeMeters.leaseFeeId, meterId: leaseFeeMeters.meterId })
+            .from(leaseFeeMeters)
+            .innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId))
+            .where(eq(leaseFeeSnapshots.leaseId, id)),
         }
-      : { occupants: [], addenda: [], handovers: [], adjustments: [], meters: [] }
+      : { occupants: [], addenda: [], handovers: [], adjustments: [], meters: [], fees: [], feeMeters: [] }
   const handoverIds = related.handovers.map((h) => h.id)
   const meterIds = related.meters.map((m) => m.id)
   const snapshot = {
