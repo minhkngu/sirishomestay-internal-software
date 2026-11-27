@@ -64,10 +64,7 @@ export async function listWalletEntries(db: DB, ctx: AccessContext, tenantId: st
 }
 
 /** Biến động thu vượt (tiền thật khách đưa) trong phạm vi cơ sở và tháng, cho sổ quỹ. */
-export async function listOverpayEntries(
-  db: DB,
-  filter: { facilityIds: string[] | 'all'; month?: string },
-) {
+export async function listOverpayEntries(db: DB, filter: { facilityIds: string[] | 'all'; month?: string }) {
   const rows = await db
     .select()
     .from(tenantWalletEntries)

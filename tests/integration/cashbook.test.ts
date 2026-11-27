@@ -94,6 +94,28 @@ describe('sổ quỹ thu chi', () => {
     expect(summarize(rows)).toEqual({ income: 13000000, expense: 500000, net: 12500000 })
     expect(depositHeld).toBe(8700000)
   })
+  it('thu vượt: tiền dư vào ví tính thu một lần; khoản dùng ví không tính thu', async () => {
+    const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-08' })
+    await approveInvoice(db, ctx(), inv.id, {})
+    await recordLeasePayment(db, ctx(), leaseId, { paidOn: '2026-08-10', amount: 12000000, method: 'cash' })
+    let { rows } = await listCashbook(db, ctx(), { month: '2026-08' })
+    expect(rows.map((r) => [r.source, r.amount]).sort()).toEqual([
+      ['payment', 9000000],
+      ['wallet', 3000000],
+    ])
+    expect(summarize(rows).income).toBe(12000000)
+    const [next] = await createDrafts(db, ctx(), { facilityId, period: '2026-09' })
+    await approveInvoice(db, ctx(), next.id, {})
+    await recordLeasePayment(db, ctx(), leaseId, {
+      paidOn: '2026-09-05',
+      amount: 0,
+      walletAmount: 3000000,
+      method: 'cash',
+    })
+    ;({ rows } = await listCashbook(db, ctx(), {}))
+    expect(summarize(rows).income).toBe(12000000)
+    expect(rows.some((r) => r.method === 'wallet')).toBe(false)
+  })
   it('hoá đơn có dòng cọc: tiền thu trả cọc trước, sổ quỹ tách dòng thu cọc và thu tiền thuê, không tính hai lần', async () => {
     await db
       .insert(depositEntries)

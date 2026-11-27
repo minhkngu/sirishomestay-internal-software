@@ -118,9 +118,7 @@ describe('ghi thu theo hợp đồng', () => {
   })
   it('hợp đồng không còn hoá đơn mở thì không thu được', async () => {
     await recordLeasePayment(db, ctx(), leaseId, pay(18000000))
-    await expect(recordLeasePayment(db, ctx(), leaseId, pay(1000))).rejects.toThrow(
-      'Hợp đồng không có hoá đơn cần thu',
-    )
+    await expect(recordLeasePayment(db, ctx(), leaseId, pay(1000))).rejects.toThrow('Hợp đồng không có hoá đơn cần thu')
   })
   it('thiếu quyền billing thì từ chối', async () => {
     await expect(recordLeasePayment(db, context(['meters'], facilityId), leaseId, pay(1000))).rejects.toThrow(

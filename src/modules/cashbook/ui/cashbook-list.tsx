@@ -121,7 +121,7 @@ export function CashbookList({
   }
 
   const actions = (r: LedgerRow) =>
-    r.source === 'expense' ? (
+    r.source === 'wallet' ? null : r.source === 'expense' ? (
       <div className="flex justify-end gap-1">
         <Button
           type="button"

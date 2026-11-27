@@ -94,7 +94,14 @@ describe('schema', () => {
 
   it('sổ ví khách: sourceKey duy nhất và hợp đồng có cột transferFromLeaseId', async () => {
     const [t] = await db.insert(tenants).values({ kind: 'vietnamese', fullName: 'Khách ví' }).returning()
-    const row = { tenantId: t.id, facilityId: fA, amount: 5_000_000, kind: 'overpay' as const, date: '2026-12-01', sourceKey: 'overpay:test-1' }
+    const row = {
+      tenantId: t.id,
+      facilityId: fA,
+      amount: 5_000_000,
+      kind: 'overpay' as const,
+      date: '2026-12-01',
+      sourceKey: 'overpay:test-1',
+    }
     await db.insert(tenantWalletEntries).values(row)
     expect(await dbError(db.insert(tenantWalletEntries).values(row))).toMatch(/unique|duplicate/i)
     expect(Object.keys(leases)).toContain('transferFromLeaseId')

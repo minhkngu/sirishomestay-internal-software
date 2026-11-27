@@ -1,7 +1,8 @@
 import { DEPOSIT_ENTRY_LABELS, depositBalance } from './deposit'
 import type { DepositEntry } from './types'
 
-export type LedgerSource = 'payment' | 'deposit' | 'expense'
+/** wallet: tiền khách trả dư vào ví (chỉ xem, sửa/xoá ở khoản thu gốc). */
+export type LedgerSource = 'payment' | 'deposit' | 'expense' | 'wallet'
 export type LedgerRow = {
   key: string
   source: LedgerSource

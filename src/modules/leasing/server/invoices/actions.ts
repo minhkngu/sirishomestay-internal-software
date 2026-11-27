@@ -217,7 +217,13 @@ export async function setInvoiceDueDateAction(id: string, dueDate: string) {
 
 export async function recordLeasePaymentAction(
   leaseId: string,
-  input: { paidOn: string; amount: number; walletAmount?: number; method: 'cash' | 'transfer' | 'other'; note?: string },
+  input: {
+    paidOn: string
+    amount: number
+    walletAmount?: number
+    method: 'cash' | 'transfer' | 'other'
+    note?: string
+  },
 ) {
   const ctx = await getAccessContext()
   return toActionResult(async () => {

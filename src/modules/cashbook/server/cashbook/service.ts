@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, sql, type SQL } from 'drizzle-orm'
+import { and, asc, eq, inArray, ne, sql, type SQL } from 'drizzle-orm'
 import { depositEntries, expenses, invoiceLines, invoices, leases, payments, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, can, type AccessContext } from '@/domain/access'
@@ -6,6 +6,7 @@ import { depositHeld, depositMovement, expenseLabel, type LedgerRow } from '@/do
 import { splitPaymentsDepositFirst } from '@/domain/deposit'
 import { VN_TIME_ZONE } from '@/domain/dates'
 import { NotFoundError, ValidationError } from '@/domain/errors'
+import { listOverpayEntries } from '@/modules/leasing'
 import { displayName } from '@/modules/tenants'
 import { recordAudit } from '@/modules/platform'
 import { expenseInput } from './schemas'
@@ -60,7 +61,14 @@ export async function listCashbook(
       .innerJoin(leases, eq(leases.id, invoices.leaseId))
       .innerJoin(rooms, eq(rooms.id, leases.roomId))
       .innerJoin(tenants, eq(tenants.id, leases.tenantId))
-      .where(and(inScope(invoices.facilityId, scope), inMonth(payments.paidOn, month))),
+      .where(
+        and(
+          inScope(invoices.facilityId, scope),
+          inMonth(payments.paidOn, month),
+          // Khoản dùng ví không phải tiền mới thu: tiền thật đã tính ở dòng thu dư
+          ne(payments.method, 'wallet'),
+        ),
+      ),
     db
       .select({
         e: depositEntries,
@@ -138,8 +146,53 @@ export async function listCashbook(
         : []),
     ]
   })
+  // Tiền khách trả dư vào ví: tiền thật, tính một lần vào ngày khách đưa
+  const overpay = await listOverpayEntries(db, { facilityIds: scope ?? 'all', month })
+  const overTenants = overpay.length
+    ? await db
+        .select()
+        .from(tenants)
+        .where(inArray(tenants.id, [...new Set(overpay.map((o) => o.tenantId))]))
+    : []
+  const overLeaseIds = [...new Set(overpay.flatMap((o) => (o.leaseId ? [o.leaseId] : [])))]
+  const overRooms = overLeaseIds.length
+    ? await db
+        .select({ leaseId: leases.id, roomCode: rooms.code })
+        .from(leases)
+        .innerJoin(rooms, eq(rooms.id, leases.roomId))
+        .where(inArray(leases.id, overLeaseIds))
+    : []
+  const overPayments = overpay.flatMap((o) => (o.paymentId ? [o.paymentId] : []))
+  const overMethods = overPayments.length
+    ? await db
+        .select({ id: payments.id, method: payments.method })
+        .from(payments)
+        .where(inArray(payments.id, overPayments))
+    : []
+  const walletRows = overpay.map((o): LedgerRow => {
+    const t = overTenants.find((x) => x.id === o.tenantId)
+    return {
+      key: `wallet:${o.id}`,
+      source: 'wallet',
+      id: o.id,
+      date: o.date,
+      direction: 'in',
+      kind: 'rent',
+      label: 'Thu dư vào ví',
+      amount: o.amount,
+      counted: true,
+      facilityId: o.facilityId,
+      roomCode: overRooms.find((r) => r.leaseId === o.leaseId)?.roomCode ?? null,
+      party: t ? displayName(t) : '',
+      method: overMethods.find((m) => m.id === o.paymentId)?.method ?? null,
+      note: o.note,
+      status: 'done',
+      ...when(o.createdAt),
+    }
+  })
   const rows: LedgerRow[] = [
     ...paymentRows,
+    ...walletRows,
     // Sổ quỹ chỉ ghi khi tiền đã thực nhận hoặc đã chi: bỏ cọc chờ thu/hoàn và bù trừ, mất cọc (không có tiền đi qua)
     ...dep
       // Cọc thu cùng hoá đơn đã hiện ở dòng thu cọc của khoản thu, không ghi lần nữa
