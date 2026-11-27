@@ -8,6 +8,7 @@ import {
   invoices,
   leaseOccupants,
   leases,
+  payments,
   pendingAdjustments,
   rooms,
   tenants,
@@ -18,6 +19,7 @@ import type { AccessContext, Permission } from '@/domain/access'
 import { ValidationError } from '@/domain/errors'
 import { createTermination } from '@/modules/leasing/server/addenda/service'
 import { cancelRoomChange, createRoomChange } from '@/modules/leasing/server/addenda/room-change'
+import { previewContractRestore } from '@/modules/leasing/server/contracts/restore'
 import type { StorageAdapter } from '@/modules/platform'
 import { finalizeTermination } from '@/modules/leasing/server/addenda/finalize'
 import { approveInvoice, unapproveInvoice } from '@/modules/leasing/server/invoices/service'
@@ -186,6 +188,77 @@ describe('thanh lý nối ví và chuyển phòng', () => {
     await expect(unapproveInvoice(db, ctx(), r.invoice!.id)).rejects.toThrow(ValidationError)
   })
 
+  it('duyệt thanh lý khi ví đã bị dùng hết sau khi lập hoá đơn: từ chối, ví không âm', async () => {
+    await addWalletEntry(db, {
+      tenantId,
+      facilityId,
+      amount: 5_000_000,
+      kind: 'overpay',
+      date: '2026-11-01',
+      sourceKey: 'overpay:f1',
+    })
+    const r = await terminate({ forfeit: { mode: 'all' } })
+    await addWalletEntry(db, {
+      tenantId,
+      facilityId,
+      amount: -5_000_000,
+      kind: 'use_invoice',
+      date: '2026-11-05',
+      sourceKey: 'use_invoice:f1',
+    })
+    await expect(approveInvoice(db, ctx(), r.invoice!.id, {})).rejects.toThrow(ValidationError)
+    expect(await walletBalance(db, tenantId, facilityId)).toBe(0)
+    expect(
+      (await db.select().from(tenantWalletEntries).where(eq(tenantWalletEntries.kind, 'use_termination'))).length,
+    ).toBe(0)
+  })
+
+  it('hoàn tiền thanh lý: toàn bộ ví cộng vào tiền hoàn (không kẹt ví)', async () => {
+    await addWalletEntry(db, {
+      tenantId,
+      facilityId,
+      amount: 2_000_000,
+      kind: 'overpay',
+      date: '2026-11-01',
+      sourceKey: 'overpay:f5',
+    })
+    const r = await terminate()
+    expect((await linesOf(r.invoice!.id)).find((l) => (l.meta as { wallet?: number } | null)?.wallet)?.amount).toBe(
+      -2_000_000,
+    )
+    await approveInvoice(db, ctx(), r.invoice!.id, {})
+    expect(await walletBalance(db, tenantId, facilityId)).toBe(0)
+  })
+
+  it('chuyển phòng: sửa hoá đơn nháp thì dòng chuyển và điều chỉnh theo số cuối; nợ cũ được đóng bằng khoản carry', async () => {
+    const nextId = await newLease()
+    const r = await terminate({}, { transfer: true })
+    await db
+      .insert(invoiceLines)
+      .values({
+        invoiceId: r.invoice!.id,
+        type: 'penalty',
+        description: 'Phạt thêm',
+        quantity: 1,
+        unitPrice: 1_000_000,
+        amount: 1_000_000,
+      })
+    await approveInvoice(db, ctx(), r.invoice!.id, {})
+    const lines = await linesOf(r.invoice!.id)
+    expect(lines.reduce((n, l) => n + l.amount, 0)).toBe(0)
+    const adj = await db.select().from(pendingAdjustments).where(eq(pendingAdjustments.leaseId, nextId))
+    expect(adj.map((a) => a.amount)).toEqual([-2_300_000]) // −3.300.000 + 1.000.000
+    const carry = await db.select().from(payments).where(eq(payments.method, 'carry'))
+    expect(carry.map((p) => p.amount)).toEqual([9_000_000])
+  })
+
+  it('khôi phục hợp đồng cũ bị chặn sau khi chuyển phòng', async () => {
+    await newLease()
+    await terminate({}, { transfer: true })
+    const preview = await previewContractRestore(db, ctx(), 'lease', leaseId)
+    expect(preview.blockedReason).toContain('chuyển phòng')
+  })
+
   describe('chuyển phòng hai bước', () => {
     const storage = { delete: async () => {} } as unknown as StorageAdapter
     const change = (over: Record<string, unknown> = {}) =>
@@ -247,6 +320,12 @@ describe('thanh lý nối ví và chuyển phòng', () => {
       const r = await change()
       await approveInvoice(db, ctx(), r.terminationInvoiceId, {})
       await expect(cancelRoomChange(db, ctx(), leaseId, storage)).rejects.toThrow(ValidationError)
+    })
+
+    it('huỷ chuyển phòng thiếu quyền xoá hợp đồng thì từ chối trước khi làm gì', async () => {
+      await change()
+      await expect(cancelRoomChange(db, context(['tenants_contracts'], facilityId), leaseId, storage)).rejects.toThrow()
+      expect((await db.select().from(leases).where(eq(leases.id, leaseId)))[0].status).toBe('ended')
     })
   })
 })

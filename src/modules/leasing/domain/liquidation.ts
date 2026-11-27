@@ -40,7 +40,7 @@ export type TerminationInput = {
   /** thiếu = hoàn theo ngày */
   rentRefund?: RentRefundInput
   proration: Proration
-  /** Số dư ví của khách tại cơ sở: gạch vào phần khách phải trả (dòng giảm), không vượt phần phải trả. */
+  /** Số dư ví của khách tại cơ sở: toàn bộ ví gạch vào hoá đơn (dòng giảm), tăng tiền hoàn hoặc giảm phần phải trả. */
   walletBalance?: number
   /** Chuyển phòng: thêm dòng "Chuyển sang hợp đồng mới" bằng −T để hoá đơn về 0, không phát sinh hoàn tiền mặt. */
   transfer?: boolean
@@ -214,9 +214,8 @@ export function buildTerminationInvoice(input: TerminationInput): {
       meta: { forfeit: forfeited },
     })
   }
-  // Ví khách tự gạch vào phần khách phải trả (không bao giờ làm hoá đơn âm thêm)
-  const beforeWallet = lines.reduce((s, l) => s + l.amount, 0)
-  const walletUse = Math.min(Math.max(0, input.walletBalance ?? 0), Math.max(0, beforeWallet))
+  // Ví khách tự gạch vào hoá đơn: toàn bộ số dư, để khách không rời đi mà còn ví không ai hoàn được
+  const walletUse = Math.max(0, input.walletBalance ?? 0)
   if (walletUse > 0)
     lines.push({
       type: 'adjustment',

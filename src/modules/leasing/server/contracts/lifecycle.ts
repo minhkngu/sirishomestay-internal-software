@@ -29,6 +29,7 @@ import { getLease } from './leases'
 import { listLeaseMeterInitials } from '@/modules/meters'
 import { SIGN_RANK } from '../../domain/sign-status'
 import { loadRoom, type SignStatus } from './shared'
+import { reverseWalletForPayments } from '../wallet/service'
 
 export async function deleteContract(
   db: DB,
@@ -194,6 +195,12 @@ export async function deleteContract(
           .update(pendingAdjustments)
           .set({ invoiceId: null })
           .where(inArray(pendingAdjustments.invoiceId, invoiceIds))
+        const paid = await tx.select({ id: payments.id }).from(payments).where(inArray(payments.invoiceId, invoiceIds))
+        await reverseWalletForPayments(
+          tx,
+          paid.map((p) => p.id),
+          { allowNegative: true },
+        )
         await tx.delete(payments).where(inArray(payments.invoiceId, invoiceIds))
         await tx.delete(invoices).where(inArray(invoices.id, invoiceIds))
       }

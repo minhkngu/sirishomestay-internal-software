@@ -11,6 +11,8 @@ import {
   leaseWalletBalance,
   listInvoices,
   recordLeasePayment,
+  removePayment,
+  updatePayment,
 } from '@/modules/leasing/server/invoices/service'
 import { createTestDb } from '../helpers/db'
 
@@ -106,6 +108,29 @@ describe('ghi thu theo hợp đồng', () => {
     ])
     expect(await leaseWalletBalance(db, ctx(), leaseId)).toBe(500000)
     expect(await leaseDebt(db, ctx(), leaseId)).toBe(6500000)
+  })
+  it('gỡ khoản dùng ví trả lại ví; sửa khoản có liên quan ví bị từ chối', async () => {
+    await recordLeasePayment(db, ctx(), leaseId, pay(20000000))
+    const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-09' })
+    await approveInvoice(db, ctx(), inv.id, {})
+    await recordLeasePayment(db, ctx(), leaseId, { ...pay(0), walletAmount: 1500000 })
+    expect(await leaseWalletBalance(db, ctx(), leaseId)).toBe(500000)
+    const [walletPay] = await db.select().from(payments).where(eq(payments.method, 'wallet'))
+    await expect(
+      updatePayment(db, ctx(), walletPay.id, { paidOn: '2026-09-05', amount: 1000000, method: 'cash' }),
+    ).rejects.toThrow(ValidationError)
+    await removePayment(db, ctx(), walletPay.id)
+    expect(await leaseWalletBalance(db, ctx(), leaseId)).toBe(2000000)
+  })
+  it('gỡ khoản thu có phần dư rút lại phần dư; dư đã dùng thì từ chối', async () => {
+    await recordLeasePayment(db, ctx(), leaseId, pay(20000000))
+    const cash = (await db.select().from(payments)).filter((p) => p.method === 'cash')
+    expect(cash.length).toBeGreaterThan(0)
+    const overpayPayment = (await db.select().from(tenantWalletEntries))[0].paymentId!
+    const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-09' })
+    await approveInvoice(db, ctx(), inv.id, {})
+    await recordLeasePayment(db, ctx(), leaseId, { ...pay(0), walletAmount: 2000000 })
+    await expect(removePayment(db, ctx(), overpayPayment)).rejects.toThrow(ValidationError)
   })
   it('dùng ví vượt số dư ví hoặc vượt nợ thì từ chối', async () => {
     await expect(recordLeasePayment(db, ctx(), leaseId, { ...pay(1000), walletAmount: 1 })).rejects.toThrow(

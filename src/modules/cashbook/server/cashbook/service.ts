@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, ne, sql, type SQL } from 'drizzle-orm'
+import { and, asc, eq, inArray, notInArray, sql, type SQL } from 'drizzle-orm'
 import { depositEntries, expenses, invoiceLines, invoices, leases, payments, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, can, type AccessContext } from '@/domain/access'
@@ -65,8 +65,8 @@ export async function listCashbook(
         and(
           inScope(invoices.facilityId, scope),
           inMonth(payments.paidOn, month),
-          // Khoản dùng ví không phải tiền mới thu: tiền thật đã tính ở dòng thu dư
-          ne(payments.method, 'wallet'),
+          // Khoản dùng ví và khoản "carry" (chuyển nợ sang hợp đồng mới) không phải tiền mới thu
+          notInArray(payments.method, ['wallet', 'carry']),
         ),
       ),
     db

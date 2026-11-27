@@ -1,7 +1,8 @@
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 import { tenantWalletEntries } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
+import { ValidationError } from '@/domain/errors'
 import type { WalletEntryKind } from '@/domain/statuses'
 
 export type WalletEntryInput = {
@@ -51,6 +52,38 @@ export async function addWalletEntry(tx: DB, e: WalletEntryInput): Promise<boole
     })
     .onConflictDoNothing({ target: tenantWalletEntries.sourceKey })
   return true
+}
+
+/**
+ * Gỡ các biến động ví gắn với khoản thu sắp bị xoá: dùng ví (−) được trả lại, thu vượt (+) bị rút lại.
+ * Mặc định từ chối nếu rút lại làm ví âm (tiền dư đã được dùng); `allowNegative` dùng khi xoá cả hợp đồng.
+ */
+export async function reverseWalletForPayments(
+  tx: DB,
+  paymentIds: string[],
+  opts: { allowNegative?: boolean } = {},
+): Promise<void> {
+  if (!paymentIds.length) return
+  const rows = await tx.select().from(tenantWalletEntries).where(inArray(tenantWalletEntries.paymentId, paymentIds))
+  if (!rows.length) return
+  if (!opts.allowNegative) {
+    const net = new Map<string, { tenantId: string; facilityId: string; delta: number }>()
+    for (const r of rows) {
+      const key = `${r.tenantId}|${r.facilityId}`
+      const g = net.get(key) ?? { tenantId: r.tenantId, facilityId: r.facilityId, delta: 0 }
+      g.delta -= r.amount
+      net.set(key, g)
+    }
+    for (const g of net.values())
+      if ((await walletBalance(tx, g.tenantId, g.facilityId)) + g.delta < 0)
+        throw new ValidationError('Tiền dư của khoản thu này đã được dùng: gỡ các khoản dùng ví trước')
+  }
+  await tx.delete(tenantWalletEntries).where(
+    inArray(
+      tenantWalletEntries.id,
+      rows.map((r) => r.id),
+    ),
+  )
 }
 
 /** Lịch sử biến động ví của khách tại một cơ sở (mới nhất trước); cần quyền thu tiền ở cơ sở đó. */

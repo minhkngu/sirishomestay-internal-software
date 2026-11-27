@@ -20,12 +20,14 @@ import {
   pendingAdjustments,
   rooms,
   tenants,
+  tenantWalletEntries,
 } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, can, facilityKey, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { formatDateVN, todayVN } from '@/domain/dates'
 import { recordAudit } from '@/modules/platform'
+import { reverseWalletForPayments } from '../wallet/service'
 import type { StorageAdapter } from '@/modules/platform'
 
 type Kind = 'lease' | 'deposit'
@@ -60,6 +62,7 @@ export async function previewContractRestore(
   ctx: AccessContext,
   kind: Kind,
   id: string,
+  opts: { allowRoomChange?: boolean } = {},
 ): Promise<RestorePreview> {
   if (kind !== 'lease' && kind !== 'deposit') throw new ValidationError('Loại hợp đồng không hợp lệ')
   const table = kind === 'lease' ? leases : depositContracts
@@ -254,6 +257,18 @@ export async function previewContractRestore(
     blockedReason = 'Trạng thái hợp đồng đã thay đổi sau lần sửa; không thể khôi phục tự động'
   if (added(addons, snapshot.addenda).some((addon) => addon.type === 'transfer' || addon.type === 'occupants'))
     blockedReason = 'Có phụ lục chuyển phòng hoặc thay đổi người ở chưa hỗ trợ hoàn tác tự động'
+  if (kind === 'lease') {
+    // Chuyển phòng: hợp đồng mới và ví khách đã đi theo; chỉ "Huỷ chuyển phòng" (hoá đơn còn nháp) được khôi phục
+    const [moved] = await db.select({ id: leases.id }).from(leases).where(eq(leases.transferFromLeaseId, id)).limit(1)
+    if (moved && !opts.allowRoomChange)
+      blockedReason = 'Hợp đồng đã chuyển phòng: dùng Huỷ chuyển phòng (khi hoá đơn thanh lý còn nháp)'
+    const [walletUsed] = await db
+      .select({ id: tenantWalletEntries.id })
+      .from(tenantWalletEntries)
+      .where(and(eq(tenantWalletEntries.leaseId, id), eq(tenantWalletEntries.kind, 'use_termination')))
+      .limit(1)
+    if (walletUsed) blockedReason = 'Hoá đơn thanh lý đã trừ ví khách; không thể khôi phục tự động'
+  }
   if (kind === 'lease' && snapshot.contract.status === 'active') {
     const [busy] = await db
       .select({ id: leases.id })
@@ -364,6 +379,7 @@ export async function restoreContract(
   id: string,
   previewToken: string,
   storage: StorageAdapter,
+  opts: { allowRoomChange?: boolean } = {},
 ): Promise<{ pendingFiles: number }> {
   const fileIds = await db.transaction(
     async (raw) => {
@@ -371,7 +387,7 @@ export async function restoreContract(
       const table = kind === 'lease' ? leases : depositContracts
       const [current] = await tx.select().from(table).where(eq(table.id, id)).for('update')
       if (!current) throw new NotFoundError()
-      const preview = await previewContractRestore(tx, ctx, kind, id)
+      const preview = await previewContractRestore(tx, ctx, kind, id, opts)
       if (preview.token !== previewToken)
         throw new ValidationError('Dữ liệu đã thay đổi; hãy xem lại trước khi xác nhận')
       if (preview.blockedReason) throw new ValidationError(preview.blockedReason)
@@ -423,6 +439,7 @@ export async function restoreContract(
               affectedFiles.map((f) => f.id),
             ),
           )
+      await reverseWalletForPayments(tx, paymentIds, { allowNegative: true })
       if (paymentIds.length) await tx.delete(payments).where(inArray(payments.id, paymentIds))
       if (invoiceIds.length) {
         await tx.update(oneOffCharges).set({ invoiceId: null }).where(inArray(oneOffCharges.invoiceId, invoiceIds))

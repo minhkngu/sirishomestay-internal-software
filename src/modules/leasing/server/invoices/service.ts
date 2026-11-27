@@ -16,6 +16,7 @@ import {
   meters,
   oneOffCharges,
   payments,
+  tenantWalletEntries,
   pendingAdjustments,
   rooms,
   tenants,
@@ -57,7 +58,7 @@ import {
 import { applyReadings, setLeaseInitialReading, setOpeningValue } from '@/modules/meters'
 import { resolveBankAccount } from '@/domain/vietqr'
 import { PAYMENT_METHOD_LABELS, type PaymentMethod } from '@/domain/payment-labels'
-import { addWalletEntry, walletBalance } from '../wallet/service'
+import { addWalletEntry, reverseWalletForPayments, walletBalance } from '../wallet/service'
 import { clampWalletUse, splitReceipt } from '../../domain/wallet'
 
 const batchSchema = z.object({ facilityId: z.uuid(), period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) })
@@ -1331,9 +1332,7 @@ export async function unapproveInvoice(db: DB, ctx: AccessContext, id: string): 
           return m.transfer === true || typeof m.wallet === 'number'
         })
       )
-        throw new ValidationError(
-          'Hoá đơn thanh lý chuyển phòng hoặc đã gạch ví không bỏ duyệt được: dùng Huỷ chuyển phòng',
-        )
+        throw new ValidationError('Hoá đơn thanh lý chuyển phòng hoặc đã gạch ví không bỏ duyệt được')
     }
     if ((await tx.select({ id: payments.id }).from(payments).where(eq(payments.invoiceId, id)).limit(1)).length)
       throw new ValidationError('Gỡ các khoản đã thu trước khi bỏ duyệt')
@@ -1953,6 +1952,13 @@ export async function updatePayment(db: DB, ctx: AccessContext, id: string, inpu
       .from(payments)
       .where(and(eq(payments.invoiceId, inv.id), sql`${payments.id} <> ${id}`))
     const owed = total - others
+    const [linked] = await tx
+      .select({ id: tenantWalletEntries.id })
+      .from(tenantWalletEntries)
+      .where(eq(tenantWalletEntries.paymentId, id))
+      .limit(1)
+    if (before.method === 'wallet' || linked)
+      throw new ValidationError('Khoản thu có liên quan đến ví khách: gỡ khoản thu rồi ghi lại, không sửa trực tiếp')
     if (data.amount > owed)
       throw new ValidationError(`Số tiền vượt phần còn nợ ${Math.max(owed, 0).toLocaleString('vi-VN')}`, {
         amount: 'Vượt phần còn nợ của hoá đơn',
@@ -1980,6 +1986,7 @@ export async function removePayment(db: DB, ctx: AccessContext, paymentId: strin
     const [row] = await tx.select().from(payments).where(eq(payments.id, paymentId))
     if (!row) throw new NotFoundError()
     const inv = await getInvoice(tx, ctx, row.invoiceId)
+    await reverseWalletForPayments(tx, [paymentId])
     await tx.delete(payments).where(eq(payments.id, paymentId))
     await recordAudit(tx, ctx, {
       action: 'delete',

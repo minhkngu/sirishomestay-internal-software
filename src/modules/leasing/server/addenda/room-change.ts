@@ -161,6 +161,15 @@ export async function cancelRoomChange(
 ): Promise<void> {
   const [next] = await db.select().from(leases).where(eq(leases.transferFromLeaseId, oldLeaseId))
   if (!next) throw new ValidationError('Hợp đồng này không có chuyển phòng nào để huỷ')
+  // Kiểm quyền cả hai bước trước khi làm bước nào, để không dừng nửa chừng vì thiếu quyền xoá
+  const [oldRoom] = await db
+    .select({ facilityId: rooms.facilityId })
+    .from(leases)
+    .innerJoin(rooms, eq(rooms.id, leases.roomId))
+    .where(eq(leases.id, oldLeaseId))
+  if (!oldRoom) throw new NotFoundError()
+  assertCan(ctx, 'tenants_contracts', oldRoom.facilityId)
+  assertCan(ctx, 'delete_contracts', oldRoom.facilityId)
   const [termination] = await db
     .select({ status: invoices.status })
     .from(invoices)
@@ -186,9 +195,9 @@ export async function cancelRoomChange(
       .limit(1)
     if (paid.length) throw new ValidationError('Hợp đồng mới đã có khoản thu: không huỷ được')
   }
-  const preview = await previewContractRestore(db, ctx, 'lease', oldLeaseId)
+  const preview = await previewContractRestore(db, ctx, 'lease', oldLeaseId, { allowRoomChange: true })
   if (preview.operation !== 'termination')
     throw new ValidationError('Hợp đồng cũ đã có thay đổi sau thanh lý: không huỷ tự động được')
-  await restoreContract(db, ctx, 'lease', oldLeaseId, preview.token, storage)
+  await restoreContract(db, ctx, 'lease', oldLeaseId, preview.token, storage, { allowRoomChange: true })
   await deleteContract(db, ctx, 'lease', next.id, true, storage)
 }

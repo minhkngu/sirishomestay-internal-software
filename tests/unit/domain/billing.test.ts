@@ -703,18 +703,18 @@ describe('buildTerminationInvoice', () => {
   })
 
   describe('ví khách và chuyển phòng', () => {
-    it('ví gạch vào phần khách phải trả, không vượt phần đó', () => {
+    it('toàn bộ ví gạch vào hoá đơn, kể cả khi phần phải trả nhỏ hơn ví', () => {
       // Không có cọc, hoàn tiền: tổng trước ví = 6.000.000 (tiền phòng lẻ) + 420.000 (điện nước) + 500.000 (phạt)
       const base = { ...input(), approvedInvoices: [], depositBalance: 0 }
       const r = buildTerminationInvoice({ ...base, walletBalance: 10_000_000 })
       const w = r.lines.find((l) => l.meta?.wallet)
-      expect(w?.amount).toBe(-6_920_000)
-      expect(r.total).toBe(0)
+      expect(w?.amount).toBe(-10_000_000)
+      expect(r.total).toBe(-3_080_000)
     })
-    it('tổng trước ví âm (hoàn cho khách) thì không có dòng ví', () => {
+    it('tổng trước ví âm (hoàn cho khách): ví cộng vào tiền hoàn', () => {
       const r = buildTerminationInvoice({ ...input(), walletBalance: 5_000_000 })
-      expect(r.lines.some((l) => l.meta?.wallet)).toBe(false)
-      expect(r.total).toBe(-11_080_000)
+      expect(r.lines.find((l) => l.meta?.wallet)?.amount).toBe(-5_000_000)
+      expect(r.total).toBe(-16_080_000)
     })
     it('chuyển phòng, T âm (còn số dư cho khách): dòng chuyển +11.080.000, tổng 0', () => {
       const r = buildTerminationInvoice({ ...input(), transfer: true })
