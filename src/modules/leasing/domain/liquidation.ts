@@ -40,6 +40,15 @@ export type TerminationInput = {
   /** thiếu = hoàn theo ngày */
   rentRefund?: RentRefundInput
   proration: Proration
+  /** Số dư ví của khách tại cơ sở: gạch vào phần khách phải trả (dòng giảm), không vượt phần phải trả. */
+  walletBalance?: number
+  /** Chuyển phòng: thêm dòng "Chuyển sang hợp đồng mới" bằng −T để hoá đơn về 0, không phát sinh hoàn tiền mặt. */
+  transfer?: boolean
+  /**
+   * Tính tiền phòng, phí cố định và hoàn theo ngày đến hết ngày này (mặc định `endDate`).
+   * Chuyển phòng: ngày chuyển thuộc phòng mới nên bằng ngày chuyển − 1. Chỉ số đồng hồ vẫn theo `endDate`.
+   */
+  billedUntil?: ISODate
 }
 
 /**
@@ -52,7 +61,9 @@ export function buildTerminationInvoice(input: TerminationInput): {
   /** tổng tiền hoàn theo ngày (tiền phòng + phí cố định), tính cả khi chọn không hoàn hoặc hoàn một phần */
   maxRefund: number
 } {
-  const { terms, endDate } = input
+  const { terms } = input
+  // Mọi phép tính tiền theo ngày dùng ngày tính tiền cuối (billedUntil), mặc định là ngày kết thúc
+  const endDate = input.billedUntil ?? input.endDate
   const lines: InvoiceLineInput[] = []
 
   // tiền phòng và phí cố định đã trả trước vượt ngày trả → các dòng hoàn theo ngày (ứng viên), áp lựa chọn rentRefund bên dưới;
@@ -203,6 +214,29 @@ export function buildTerminationInvoice(input: TerminationInput): {
       meta: { forfeit: forfeited },
     })
   }
+  // Ví khách tự gạch vào phần khách phải trả (không bao giờ làm hoá đơn âm thêm)
+  const beforeWallet = lines.reduce((s, l) => s + l.amount, 0)
+  const walletUse = Math.min(Math.max(0, input.walletBalance ?? 0), Math.max(0, beforeWallet))
+  if (walletUse > 0)
+    lines.push({
+      type: 'adjustment',
+      description: `Số dư ví khách: ${walletUse.toLocaleString('vi-VN')}`,
+      quantity: 1,
+      unitPrice: -walletUse,
+      amount: -walletUse,
+      meta: { wallet: walletUse },
+    })
+  // Chuyển phòng: T = tổng trước dòng chuyển; dòng chuyển = −T đưa hoá đơn về 0 (T > 0 nợ, T < 0 còn số dư, sang hợp đồng mới)
+  const carried = lines.reduce((s, l) => s + l.amount, 0)
+  if (input.transfer && carried !== 0)
+    lines.push({
+      type: 'adjustment',
+      description: 'Chuyển sang hợp đồng mới',
+      quantity: 1,
+      unitPrice: -carried,
+      amount: -carried,
+      meta: { transfer: true },
+    })
   return { lines, total: lines.reduce((s, l) => s + l.amount, 0), maxRefund }
 }
 

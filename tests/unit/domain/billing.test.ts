@@ -702,6 +702,58 @@ describe('buildTerminationInvoice', () => {
     expect(r.total).toBe(-9_000_000 + 6_000_000 + 920_000)
   })
 
+  describe('ví khách và chuyển phòng', () => {
+    it('ví gạch vào phần khách phải trả, không vượt phần đó', () => {
+      // Không có cọc, hoàn tiền: tổng trước ví = 6.000.000 (tiền phòng lẻ) + 420.000 (điện nước) + 500.000 (phạt)
+      const base = { ...input(), approvedInvoices: [], depositBalance: 0 }
+      const r = buildTerminationInvoice({ ...base, walletBalance: 10_000_000 })
+      const w = r.lines.find((l) => l.meta?.wallet)
+      expect(w?.amount).toBe(-6_920_000)
+      expect(r.total).toBe(0)
+    })
+    it('tổng trước ví âm (hoàn cho khách) thì không có dòng ví', () => {
+      const r = buildTerminationInvoice({ ...input(), walletBalance: 5_000_000 })
+      expect(r.lines.some((l) => l.meta?.wallet)).toBe(false)
+      expect(r.total).toBe(-11_080_000)
+    })
+    it('chuyển phòng, T âm (còn số dư cho khách): dòng chuyển +11.080.000, tổng 0', () => {
+      const r = buildTerminationInvoice({ ...input(), transfer: true })
+      // T = −11.080.000 (như test hoàn khách không mất cọc) → dòng chuyển +11.080.000
+      expect(r.lines.find((l) => l.meta?.transfer)?.amount).toBe(11_080_000)
+      expect(r.total).toBe(0)
+    })
+    it('chuyển phòng, T dương: nợ 2.000.000 sang hợp đồng mới', () => {
+      const r = buildTerminationInvoice({ ...input(), transfer: true, unpaidTotal: 13_080_000 })
+      // T = −11.080.000 + 13.080.000 = 2.000.000
+      expect(r.lines.find((l) => l.meta?.transfer)?.amount).toBe(-2_000_000)
+      expect(r.total).toBe(0)
+    })
+    it('chuyển phòng, T = 0: không có dòng chuyển', () => {
+      const r = buildTerminationInvoice({ ...input(), transfer: true, unpaidTotal: 11_080_000 })
+      expect(r.lines.some((l) => l.meta?.transfer)).toBe(false)
+    })
+    it('billedUntil: ngày chuyển thuộc phòng mới, hoàn trả trước bắt đầu từ ngày chuyển', () => {
+      const dec = invoice({
+        periodStart: '2026-12-01',
+        periodEnd: '2026-12-31',
+        lines: [
+          { type: 'rent', description: 'Tiền phòng tháng 12', quantity: 1, unitPrice: 9_000_000, amount: 9_000_000 },
+        ],
+      })
+      const r = buildTerminationInvoice({
+        ...input(),
+        endDate: '2026-12-16',
+        billedUntil: '2026-12-15',
+        approvedInvoices: [dec],
+        meterFees: [],
+        penalties: [],
+        depositBalance: 0,
+      })
+      // phòng 9 triệu, tháng 30 ngày: hoàn từ 16/12 đến 31/12 = 16 ngày = 4.800.000
+      expect(r.lines.find((l) => l.type === 'refund')?.amount).toBe(-4_800_000)
+    })
+  })
+
   describe('hoàn tiền phòng đã trả trước', () => {
     const rentLine = {
       type: 'rent' as const,
