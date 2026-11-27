@@ -20,7 +20,15 @@ const TYPE: Record<string, string> = {
 export function AddendaList({
   items,
 }: {
-  items: { id: string; type: string; effectiveDate: string; signStatus: string; signedFileId?: string | null }[]
+  items: {
+    id: string
+    type: string
+    effectiveDate: string
+    signStatus: string
+    signedFileId?: string | null
+    /** Trước/Sau của phụ lục gia hạn (chỉ để tham khảo). */
+    changes?: { label: string; before: string; after: string }[]
+  }[]
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -37,6 +45,26 @@ export function AddendaList({
                 <SignChip status={a.signStatus} />
               </div>
               <p className="mt-0.5 text-xs text-muted-foreground">Hiệu lực {formatDateVN(a.effectiveDate)}</p>
+              {a.changes && a.changes.length > 0 && (
+                <table className="mt-2 w-full max-w-md text-xs">
+                  <thead>
+                    <tr className="text-left text-muted-foreground">
+                      <th className="pr-3 font-normal">Khoản</th>
+                      <th className="pr-3 font-normal">Trước</th>
+                      <th className="font-normal">Sau</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {a.changes.map((c) => (
+                      <tr key={c.label}>
+                        <td className="pr-3 py-0.5">{c.label}</td>
+                        <td className="pr-3 py-0.5">{c.before}</td>
+                        <td className="py-0.5 font-medium">{c.after}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {a.type !== 'occupants' && (

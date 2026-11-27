@@ -46,6 +46,14 @@ test('gia hạn đổi giá thuê và phí: ghi thẳng vào hợp đồng', asy
   await expect(page.getByText('Đã lưu phụ lục')).toBeVisible()
   // giá mới hiện thẳng trên hợp đồng
   await expect(page.getByText(/12\.000\.000/).first()).toBeVisible()
+  // Sửa hợp đồng: giá thuê khác phụ lục gia hạn mới nhất thì cảnh báo đỏ, khớp lại thì hết cảnh báo
+  await page.getByRole('button', { name: 'Sửa hợp đồng' }).first().click()
+  const warning = page.getByRole('alert').filter({ hasText: 'Khác phụ lục gia hạn mới nhất' })
+  await expect(warning).toHaveCount(0)
+  await page.getByLabel('Giá thuê (VND/tháng)').fill('13000000')
+  await expect(warning).toBeVisible()
+  await page.getByLabel('Giá thuê (VND/tháng)').fill('12000000')
+  await expect(warning).toHaveCount(0)
 })
 
 test('chuyển phòng và thanh lý: bước xem trước tiền không lưu gì', async ({ page }) => {

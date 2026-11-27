@@ -251,6 +251,7 @@ export function ContractRowActions({
               occupants={kind === 'lease' ? data.occupants : undefined}
               people={kind === 'lease' && data.form ? data.people : undefined}
               feeData={kind === 'lease' ? data.feeData : undefined}
+              extensionReference={kind === 'lease' ? data.extensionReference : undefined}
               templates={
                 data.extras
                   ? {

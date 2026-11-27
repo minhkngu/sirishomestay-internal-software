@@ -181,7 +181,8 @@ export async function quickContractDataAction(kind: 'lease' | 'deposit', id: str
     const { getLease, getDepositContract } = await import('./service')
     const { listRooms } = await import('@/modules/facilities')
     const { searchTenants, displayName } = await import('@/modules/tenants')
-    const { addendumFormData, getTerminationCheckoutAssets } = await import('../addenda/service')
+    const { addendumFormData, getTerminationCheckoutAssets, listAddenda } = await import('../addenda/service')
+    const { latestExtensionReference } = await import('../../domain/extension-reference')
     const { listLeaseOccupants } = await import('./service')
     const { depositBalance } = await import('@/domain/deposit')
     const contract = kind === 'lease' ? await getLease(db, ctx, id) : await getDepositContract(db, ctx, id)
@@ -403,8 +404,11 @@ export async function quickContractDataAction(kind: 'lease' | 'deposit', id: str
             }
           })()
         : null
+    // Phụ lục gia hạn mới nhất: form Sửa hợp đồng cảnh báo đỏ khi giá trị đang nhập khác phụ lục
+    const extensionReference = kind === 'lease' ? latestExtensionReference(await listAddenda(db, ctx, id)) : null
     return {
       assetData,
+      extensionReference,
       facility: { id: contract.facilityId, name: facility?.name ?? '' },
       feeData,
       extras,

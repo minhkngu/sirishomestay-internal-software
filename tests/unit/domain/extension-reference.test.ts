@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { referenceChanges, referenceMismatches, type TermsRef } from '@/modules/leasing/domain/extension-reference'
+import {
+  latestExtensionReference,
+  referenceChanges,
+  referenceMismatches,
+  type TermsRef,
+} from '@/modules/leasing/domain/extension-reference'
 
 const fee = (feeTypeId: string, name: string, unitPrice: number, unit = 'kWh') => ({
   feeTypeId,
@@ -51,5 +56,25 @@ describe('referenceMismatches', () => {
     const m = referenceMismatches(current, base)
     expect(m).toHaveLength(1)
     expect(m[0].expected).toBe('Không có')
+  })
+})
+
+describe('latestExtensionReference', () => {
+  const ref = (rent: number) => ({ before: base, after: { ...base, monthlyRent: rent } })
+  it('lấy phụ lục gia hạn mới nhất theo ngày hiệu lực rồi ngày tạo', () => {
+    const list = [
+      { type: 'extension', effectiveDate: '2027-01-01', createdAt: '2026-12-01', reference: ref(1) },
+      { type: 'extension', effectiveDate: '2028-01-01', createdAt: '2026-12-02', reference: ref(2) },
+      { type: 'extension', effectiveDate: '2028-01-01', createdAt: '2026-12-03', reference: ref(3) },
+    ]
+    expect(latestExtensionReference(list)?.monthlyRent).toBe(3)
+  })
+  it('phụ lục cũ không có reference hoặc loại khác thì bỏ qua', () => {
+    expect(
+      latestExtensionReference([
+        { type: 'extension', effectiveDate: '2027-01-01', reference: null },
+        { type: 'transfer', effectiveDate: '2027-02-01', reference: ref(9) },
+      ]),
+    ).toBeNull()
   })
 })
