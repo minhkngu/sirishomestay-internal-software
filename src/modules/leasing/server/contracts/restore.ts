@@ -53,6 +53,8 @@ export type RestorePreview = {
   operation: string
   items: { type: string; id: string; label: string }[]
   blockedReason: string | null
+  /** Hợp đồng đã chuyển phòng: xác nhận khôi phục sẽ huỷ chuyển phòng (khôi phục thanh lý + xoá hợp đồng mới) */
+  roomChange: boolean
   token: string
 }
 
@@ -253,6 +255,7 @@ export async function previewContractRestore(
     })
   items.sort((a, b) => a.type.localeCompare(b.type) || a.id.localeCompare(b.id))
   let blockedReason: string | null = null
+  let roomChange = false
   if (version.operation !== 'termination' && contract.status !== snapshot.contract.status)
     blockedReason = 'Trạng thái hợp đồng đã thay đổi sau lần sửa; không thể khôi phục tự động'
   if (added(addons, snapshot.addenda).some((addon) => addon.type === 'transfer' || addon.type === 'occupants'))
@@ -260,8 +263,16 @@ export async function previewContractRestore(
   if (kind === 'lease') {
     // Chuyển phòng: hợp đồng mới và ví khách đã đi theo; chỉ "Huỷ chuyển phòng" (hoá đơn còn nháp) được khôi phục
     const [moved] = await db.select({ id: leases.id }).from(leases).where(eq(leases.transferFromLeaseId, id)).limit(1)
-    if (moved && !opts.allowRoomChange)
-      blockedReason = 'Hợp đồng đã chuyển phòng: dùng Huỷ chuyển phòng (khi hoá đơn thanh lý còn nháp)'
+    if (moved && !opts.allowRoomChange) {
+      roomChange = true
+      items.push({ type: 'lease', id: moved.id, label: 'Hợp đồng mới ở phòng mới · bị xoá' })
+      const [draft] = await db
+        .select({ id: invoices.id })
+        .from(invoices)
+        .where(and(eq(invoices.leaseId, id), eq(invoices.kind, 'termination'), eq(invoices.status, 'draft')))
+        .limit(1)
+      if (!draft) blockedReason = 'Hoá đơn thanh lý đã duyệt: không khôi phục chuyển phòng tự động được'
+    }
     const [walletUsed] = await db
       .select({ id: tenantWalletEntries.id })
       .from(tenantWalletEntries)
@@ -329,7 +340,7 @@ export async function previewContractRestore(
       }),
     )
     .digest('hex')
-  return { versionId: version.id, operation: version.operation, items, blockedReason, token }
+  return { versionId: version.id, operation: version.operation, items, blockedReason, roomChange, token }
 }
 
 /** Hoàn lại phí dịch vụ và đồng hồ gắn phí về như lúc chụp: xoá phí đã thêm, thêm lại phí đã bỏ, trả đơn giá cũ. */

@@ -80,7 +80,7 @@ export async function cancelRoomChangeAction(oldLeaseId: string) {
   return toActionResult(async () => {
     await cancelRoomChange(db, ctx, oldLeaseId, getStorage())
     refresh()
-    return {}
+    return { pendingFiles: 0 }
   })
 }
 export async function createTerminationAction(leaseId: string, input: unknown) {

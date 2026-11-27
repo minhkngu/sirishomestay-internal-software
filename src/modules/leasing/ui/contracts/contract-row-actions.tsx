@@ -23,7 +23,7 @@ import {
   previewContractRestoreAction,
   restoreContractAction,
 } from '../../server/contracts/actions'
-import { createAssignmentAction } from '../../server/addenda/actions'
+import { cancelRoomChangeAction, createAssignmentAction } from '../../server/addenda/actions'
 import { ContractEditActions, type RenderCreateFee, type RenderCreatePerson } from './contract-edit-actions'
 import { ExtensionDialog } from './extension-dialog'
 import { TerminationWizard } from './termination-wizard'
@@ -363,6 +363,7 @@ export function ContractRowActions({
                         meter_reading: 'Chỉ số',
                         adjustment: 'Điều chỉnh',
                         invoice_line: 'Dòng hóa đơn',
+                        lease: 'Hợp đồng',
                       } as Record<string, string>
                     )[item.type] ?? item.type}
                     : {item.label}
@@ -380,7 +381,9 @@ export function ContractRowActions({
                 disabled={pending || !!preview.blockedReason}
                 onClick={() =>
                   start(async () => {
-                    const result = await restoreContractAction(kind, id, preview.token)
+                    const result = preview.roomChange
+                      ? await cancelRoomChangeAction(id)
+                      : await restoreContractAction(kind, id, preview.token)
                     if (!result.ok) {
                       setError(result.error)
                       setPreview(null)
