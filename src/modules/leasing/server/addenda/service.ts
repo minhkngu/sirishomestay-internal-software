@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray, isNull, ne, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ASSET_CONDITION } from '@/domain/asset-labels'
 import {
@@ -34,7 +34,7 @@ import type { SignStatus } from '@/domain/statuses'
 import { listFeeTypePrices } from '@/modules/facilities'
 import { midPeriodAdjustments } from '../../domain/adjustments'
 import { contractTermsAt } from '../../domain/contract-terms'
-import { addDays, todayVN } from '@/domain/dates'
+import { addDays, formatDateVN, todayVN } from '@/domain/dates'
 import { depositBalance, depositDiffEntry } from '@/domain/deposit'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import type { DocEntities } from '@/domain/template-fields'
@@ -463,6 +463,16 @@ export async function createExtension(
       throw new ValidationError('Ngày kết thúc mới phải sau ngày kết thúc hiện tại', {
         newEndDate: 'Ngày kết thúc mới phải sau ngày kết thúc hiện tại',
       })
+    // Hoá đơn kỳ cuối (đến hết ngày kết thúc cũ) phải được tạo trước khi gia hạn: gia hạn ghi giá mới thẳng vào hợp đồng nên kỳ cũ chưa chốt sẽ bị tính theo giá mới
+    const [finalInvoice] = await tx
+      .select({ id: invoices.id })
+      .from(invoices)
+      .where(and(eq(invoices.leaseId, leaseId), ne(invoices.kind, 'termination'), gte(invoices.periodEnd, l.endDate)))
+      .limit(1)
+    if (!finalInvoice)
+      throw new ValidationError(
+        `Chưa có hoá đơn kỳ cuối (đến ${formatDateVN(l.endDate)}). Hãy tạo hoá đơn kỳ cuối trước khi gia hạn.`,
+      )
     const base = await leaseData(tx, leaseId)
     const before = termsRefOf(base)
     const newDeposit =
