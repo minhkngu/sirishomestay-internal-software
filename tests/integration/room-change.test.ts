@@ -233,16 +233,14 @@ describe('thanh lý nối ví và chuyển phòng', () => {
   it('chuyển phòng: sửa hoá đơn nháp thì dòng chuyển và điều chỉnh theo số cuối; nợ cũ được đóng bằng khoản carry', async () => {
     const nextId = await newLease()
     const r = await terminate({}, { transfer: true })
-    await db
-      .insert(invoiceLines)
-      .values({
-        invoiceId: r.invoice!.id,
-        type: 'penalty',
-        description: 'Phạt thêm',
-        quantity: 1,
-        unitPrice: 1_000_000,
-        amount: 1_000_000,
-      })
+    await db.insert(invoiceLines).values({
+      invoiceId: r.invoice!.id,
+      type: 'penalty',
+      description: 'Phạt thêm',
+      quantity: 1,
+      unitPrice: 1_000_000,
+      amount: 1_000_000,
+    })
     await approveInvoice(db, ctx(), r.invoice!.id, {})
     const lines = await linesOf(r.invoice!.id)
     expect(lines.reduce((n, l) => n + l.amount, 0)).toBe(0)
