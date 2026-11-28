@@ -10,6 +10,7 @@ import {
   leaseFeeSnapshots,
   leaseOccupants,
   leases,
+  meterReadings,
   meters,
   payments,
   pendingAdjustments,
@@ -374,6 +375,35 @@ describe('thanh lý nối ví và chuyển phòng', () => {
         .innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId))
         .where(eq(leaseFeeSnapshots.leaseId, r.newLeaseId))
       expect(links.map((l) => l.meterId)).toEqual([newMeter.id])
+    })
+
+    it('huỷ chuyển phòng rồi chuyển lại với chỉ số khác: không vướng chỉ số bàn giao còn sót của lần trước', async () => {
+      const [oldMeter, newMeter] = await db
+        .insert(meters)
+        .values([
+          { roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 },
+          { roomId: room2Id, utility: 'electric', installedOn: '2026-01-01', startReading: 0 },
+        ])
+        .returning()
+      const [fee] = await db
+        .insert(leaseFeeSnapshots)
+        .values({
+          leaseId,
+          name: 'Điện',
+          unit: 'kWh',
+          quantitySource: 'meter',
+          billing: 'per_occurrence',
+          unitPrice: 3500,
+        })
+        .returning()
+      await db.insert(leaseFeeMeters).values({ leaseFeeId: fee.id, meterId: oldMeter.id })
+      const termination = { forfeit: { mode: 'none' }, readings: [{ meterId: oldMeter.id, value: 120 }] }
+      await change({ termination, newRoomReadings: [{ meterId: newMeter.id, value: 40 }] })
+      await cancelRoomChange(db, ctx(), leaseId, storage)
+      expect(await db.select().from(meterReadings).where(eq(meterReadings.meterId, newMeter.id))).toHaveLength(0)
+      await expect(
+        change({ termination, newRoomReadings: [{ meterId: newMeter.id, value: 45 }] }),
+      ).resolves.toBeDefined()
     })
 
     it('huỷ chuyển phòng thiếu quyền xoá hợp đồng thì từ chối trước khi làm gì', async () => {

@@ -7,6 +7,7 @@ import {
   leaseFeeSnapshots,
   leaseOccupants,
   leases,
+  meterReadings,
   meters,
   payments,
   rooms,
@@ -219,5 +220,37 @@ export async function cancelRoomChange(
   if (preview.operation !== 'termination')
     throw new ValidationError('Hợp đồng cũ đã có thay đổi sau thanh lý: không huỷ tự động được')
   await restoreContract(db, ctx, 'lease', oldLeaseId, preview.token, storage, { allowRoomChange: true })
+  await removeStartReadings(db, next)
   await deleteContract(db, ctx, 'lease', next.id, true, storage)
+}
+
+/**
+ * Xoá chỉ số bàn giao đầu kỳ mà hợp đồng mới ghi cho đồng hồ phòng mới (ngày chuyển), để chuyển lại với chỉ số khác
+ * không vướng "đồng hồ đã có chỉ số bàn giao trong ngày". Giữ lại nếu đồng hồ đó còn là số cuối của hợp đồng khác kết thúc đúng ngày này.
+ */
+async function removeStartReadings(db: DB, next: typeof leases.$inferSelect): Promise<void> {
+  const links = await db
+    .select({ meterId: leaseFeeMeters.meterId })
+    .from(leaseFeeMeters)
+    .innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId))
+    .where(eq(leaseFeeSnapshots.leaseId, next.id))
+  for (const meterId of new Set(links.map((l) => l.meterId))) {
+    const [sharedWithEnded] = await db
+      .select({ id: leases.id })
+      .from(leaseFeeMeters)
+      .innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId))
+      .innerJoin(leases, eq(leases.id, leaseFeeSnapshots.leaseId))
+      .where(and(eq(leaseFeeMeters.meterId, meterId), ne(leases.id, next.id), eq(leases.endDate, next.startDate)))
+      .limit(1)
+    if (sharedWithEnded) continue
+    await db
+      .delete(meterReadings)
+      .where(
+        and(
+          eq(meterReadings.meterId, meterId),
+          eq(meterReadings.kind, 'handover'),
+          eq(meterReadings.readOn, next.startDate),
+        ),
+      )
+  }
 }
