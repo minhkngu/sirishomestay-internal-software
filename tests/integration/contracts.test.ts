@@ -768,18 +768,22 @@ describe('contracts', () => {
     expect(logs.map((l) => l.summary)).toContain('Dùng lại đồng hồ cho phí hợp đồng')
   })
 
-  it('nhận lại chỉ số bàn giao cùng ngày khi trùng giá trị, từ chối khi khác giá trị', async () => {
+  it('chỉ số bàn giao cùng ngày: trùng giá trị thì nhận lại, khác giá trị thì ghi đè', async () => {
     await updateFeeType(db, admin, feePerson, { name: 'ABC', quantityFrom: 'meter' })
     const meter = await mkMeter(r301)
     await db
       .insert(meterReadings)
       .values({ meterId: meter.id, period: '2026-10', kind: 'handover', readOn: '2026-10-15', value: 500 })
-    await expect(createLease(db, lan(), snapshot([meterFee(meter.id, { initialReading: 520 })]))).rejects.toThrow(
-      ValidationError,
-    )
-    expect(await db.select().from(leases)).toHaveLength(0)
     await createLease(db, lan(), snapshot([meterFee(meter.id, { initialReading: 500 })]))
-    expect(await db.select().from(meterReadings).where(eq(meterReadings.meterId, meter.id))).toHaveLength(1)
+    expect(
+      (await db.select().from(meterReadings).where(eq(meterReadings.meterId, meter.id))).map((r) => r.value),
+    ).toEqual([500])
+    // Khác giá trị: ghi đè chỉ số cũ, vẫn chỉ một dòng chỉ số
+    await db.update(leases).set({ status: 'ended' })
+    await createLease(db, lan(), snapshot([meterFee(meter.id, { initialReading: 520 })]))
+    expect(
+      (await db.select().from(meterReadings).where(eq(meterReadings.meterId, meter.id))).map((r) => r.value),
+    ).toEqual([520])
   })
 
   it('từ chối trùng loại phí không theo đồng hồ dù input khai quantitySource là meter', async () => {
