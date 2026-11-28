@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { FileImage } from 'lucide-react'
+import { FileImage, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { exportDocumentAction } from '@/modules/documents/actions'
@@ -34,6 +34,7 @@ export function InvoiceList({
   invoices: InvoiceRow[]
   facilities: { id: string; name: string }[]
 }) {
+  const [query, setQuery] = useState('')
   const rawView = useListParam('view') ?? 'all'
   const view = (VIEWS.some(([k]) => k === rawView) ? rawView : 'all') as InvoiceView
   const rawPeriod = useListParam('period') ?? ''
@@ -73,19 +74,30 @@ export function InvoiceList({
   }, [invoices])
   const names = useMemo(() => Object.fromEntries(facilities.map((f) => [f.id, f.name])), [facilities])
 
-  const scoped = useMemo(
-    () =>
-      invoices.filter(
-        (i) =>
-          matchesPeriod(i.periodStart, period || null) && (selected.length === 0 || selected.includes(i.facilityId)),
-      ),
-    [invoices, period, selected],
-  )
+  const scoped = useMemo(() => {
+    const q = query.trim().toLocaleLowerCase('vi')
+    return invoices.filter(
+      (i) =>
+        matchesPeriod(i.periodStart, period || null) &&
+        (selected.length === 0 || selected.includes(i.facilityId)) &&
+        (!q || [i.roomCode, i.code, i.tenantName].some((p) => p?.toLocaleLowerCase('vi').includes(q))),
+    )
+  }, [invoices, period, selected, query])
   const rows = useMemo(() => scoped.filter((i) => matchesInvoiceView(i.state, view)), [scoped, view])
-  const { pageRows, pager } = usePager(rows, 'invoices', `${view}|${period}|${selected.join(',')}`)
+  const { pageRows, pager } = usePager(rows, 'invoices', `${view}|${period}|${selected.join(',')}|${query}`)
 
   return (
     <>
+      <label className="relative block min-w-52 sm:max-w-xs">
+        <span className="sr-only">Tìm hoá đơn</span>
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Tìm phòng, mã hoá đơn, bên thuê…"
+          className="h-9 w-full rounded-lg border border-input bg-card pl-9 pr-3 text-[13px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
+        />
+      </label>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <ParamChips
           param="view"
