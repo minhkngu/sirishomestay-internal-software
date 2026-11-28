@@ -58,6 +58,35 @@ export type RestorePreview = {
   token: string
 }
 
+/**
+ * Chuyển phòng đã duyệt hoá đơn thanh lý, hoặc hợp đồng mới đã có hoá đơn duyệt / khoản thu: hoàn tác phải xoá cả dữ liệu
+ * đã chốt (sổ ví, khoản chuyển, thu tiền), nên chỉ admin được làm.
+ */
+export async function roomChangeNeedsAdmin(db: DB, oldLeaseId: string, nextLeaseId: string): Promise<boolean> {
+  const [termination] = await db
+    .select({ status: invoices.status })
+    .from(invoices)
+    .where(and(eq(invoices.leaseId, oldLeaseId), eq(invoices.kind, 'termination')))
+  if (termination && termination.status !== 'draft') return true
+  const nextInvoices = await db
+    .select({ id: invoices.id, status: invoices.status })
+    .from(invoices)
+    .where(eq(invoices.leaseId, nextLeaseId))
+  if (nextInvoices.some((i) => i.status === 'approved')) return true
+  if (!nextInvoices.length) return false
+  const [paid] = await db
+    .select({ id: payments.id })
+    .from(payments)
+    .where(
+      inArray(
+        payments.invoiceId,
+        nextInvoices.map((i) => i.id),
+      ),
+    )
+    .limit(1)
+  return !!paid
+}
+
 /** Read-only preview. A later mutation must re-read it under locks and compare the token. */
 export async function previewContractRestore(
   db: DB,
@@ -265,20 +294,23 @@ export async function previewContractRestore(
     const [moved] = await db.select({ id: leases.id }).from(leases).where(eq(leases.transferFromLeaseId, id)).limit(1)
     if (moved && !opts.allowRoomChange) {
       roomChange = true
-      items.push({ type: 'lease', id: moved.id, label: 'Hợp đồng mới ở phòng mới · bị xoá' })
-      const [draft] = await db
-        .select({ id: invoices.id })
-        .from(invoices)
-        .where(and(eq(invoices.leaseId, id), eq(invoices.kind, 'termination'), eq(invoices.status, 'draft')))
+      items.push({
+        type: 'lease',
+        id: moved.id,
+        label: 'Hợp đồng mới ở phòng mới · xoá cùng mọi hoá đơn, khoản thu, ví, điều chỉnh của hợp đồng đó',
+      })
+      // Hoá đơn thanh lý đã duyệt hoặc hợp đồng mới đã có hoá đơn duyệt, khoản thu: chỉ admin hoàn tác được
+      if ((await roomChangeNeedsAdmin(db, id, moved.id)) && !ctx.isAdmin)
+        blockedReason = 'Chuyển phòng đã duyệt hoặc đã phát sinh thu tiền: chỉ admin hoàn tác được'
+    } else {
+      const [walletUsed] = await db
+        .select({ id: tenantWalletEntries.id })
+        .from(tenantWalletEntries)
+        .where(and(eq(tenantWalletEntries.leaseId, id), eq(tenantWalletEntries.kind, 'use_termination')))
         .limit(1)
-      if (!draft) blockedReason = 'Hoá đơn thanh lý đã duyệt: không khôi phục chuyển phòng tự động được'
+      if (walletUsed && !opts.allowRoomChange)
+        blockedReason = 'Hoá đơn thanh lý đã trừ ví khách; không thể khôi phục tự động'
     }
-    const [walletUsed] = await db
-      .select({ id: tenantWalletEntries.id })
-      .from(tenantWalletEntries)
-      .where(and(eq(tenantWalletEntries.leaseId, id), eq(tenantWalletEntries.kind, 'use_termination')))
-      .limit(1)
-    if (walletUsed) blockedReason = 'Hoá đơn thanh lý đã trừ ví khách; không thể khôi phục tự động'
   }
   if (kind === 'lease' && snapshot.contract.status === 'active') {
     const [busy] = await db

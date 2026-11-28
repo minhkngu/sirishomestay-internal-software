@@ -437,6 +437,84 @@ describe('thanh lý nối ví và chuyển phòng', () => {
       expect(rows.map((r) => r.value)).toEqual([40])
     })
 
+    describe('hoàn tác chuyển phòng đã duyệt (chỉ admin)', () => {
+      const admin = (): AccessContext => ({ ...ctx(), isAdmin: true })
+      // Ví 5tr, chuyển phòng rồi duyệt hoá đơn thanh lý: ví bị gạch, khoản chuyển sang hợp đồng mới, nợ tháng 11 đóng bằng carry
+      const approvedChange = async () => {
+        await addWalletEntry(db, {
+          tenantId,
+          facilityId,
+          amount: 5_000_000,
+          kind: 'overpay',
+          date: '2026-11-01',
+          sourceKey: 'overpay:seed',
+        })
+        const r = await change()
+        await approveInvoice(db, ctx(), r.terminationInvoiceId, {})
+        return r
+      }
+
+      it('người không phải admin bị từ chối, dữ liệu giữ nguyên', async () => {
+        await approvedChange()
+        await expect(cancelRoomChange(db, ctx(), leaseId, storage)).rejects.toThrow(ValidationError)
+        expect((await db.select().from(leases).where(eq(leases.id, leaseId)))[0].status).toBe('ended')
+      })
+
+      it('admin: hợp đồng cũ hiệu lực lại, hợp đồng mới và khoản chuyển bị xoá, ví và nợ cũ về như trước duyệt', async () => {
+        const r = await approvedChange()
+        expect(await walletBalance(db, tenantId, facilityId)).toBe(0)
+        expect(await db.select().from(payments).where(eq(payments.method, 'carry'))).toHaveLength(1)
+        await cancelRoomChange(db, admin(), leaseId, storage)
+        expect((await db.select().from(leases).where(eq(leases.id, leaseId)))[0].status).toBe('active')
+        expect(await db.select().from(leases).where(eq(leases.id, r.newLeaseId))).toHaveLength(0)
+        expect(
+          await db.select().from(pendingAdjustments).where(eq(pendingAdjustments.leaseId, r.newLeaseId)),
+        ).toHaveLength(0)
+        expect(await db.select().from(payments).where(eq(payments.method, 'carry'))).toHaveLength(0)
+        expect(await walletBalance(db, tenantId, facilityId)).toBe(5_000_000)
+        expect(await db.select().from(invoices).where(eq(invoices.kind, 'termination'))).toHaveLength(0)
+      })
+
+      it('admin: hợp đồng mới đã có hoá đơn duyệt và khoản thu cũng bị xoá, ví thu vượt rút lại', async () => {
+        const r = await approvedChange()
+        const [inv] = await db
+          .insert(invoices)
+          .values({
+            code: 'TD-HD-202612-0009',
+            leaseId: r.newLeaseId,
+            facilityId,
+            kind: 'monthly',
+            periodStart: '2026-12-01',
+            periodEnd: '2026-12-31',
+            issueDate: '2026-12-01',
+            dueDate: '2026-12-05',
+            status: 'approved',
+          })
+          .returning()
+        await db.insert(invoiceLines).values({
+          invoiceId: inv.id,
+          type: 'rent',
+          description: 'Tiền phòng',
+          quantity: 1,
+          unitPrice: 1_000_000,
+          amount: 1_000_000,
+        })
+        await db
+          .insert(payments)
+          .values({
+            invoiceId: inv.id,
+            paidOn: '2026-12-02',
+            amount: 1_000_000,
+            method: 'cash',
+            receivedBy: crypto.randomUUID(),
+          })
+        await cancelRoomChange(db, admin(), leaseId, storage)
+        expect(await db.select().from(invoices).where(eq(invoices.id, inv.id))).toHaveLength(0)
+        expect((await db.select().from(leases).where(eq(leases.id, leaseId)))[0].status).toBe('active')
+        expect(await walletBalance(db, tenantId, facilityId)).toBe(5_000_000)
+      })
+    })
+
     it('huỷ chuyển phòng thiếu quyền xoá hợp đồng thì từ chối trước khi làm gì', async () => {
       await change()
       await expect(cancelRoomChange(db, context(['tenants_contracts'], facilityId), leaseId, storage)).rejects.toThrow()

@@ -11,6 +11,7 @@ import {
   meters,
   payments,
   rooms,
+  tenantWalletEntries,
 } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
@@ -19,7 +20,7 @@ import type { StorageAdapter } from '@/modules/platform'
 import { deleteContract } from '../contracts/lifecycle'
 import { insertLease } from '../contracts/lease-insert'
 import type { LeaseFeeInput, LeaseInput } from '../contracts/lease-types'
-import { previewContractRestore, restoreContract } from '../contracts/restore'
+import { previewContractRestore, restoreContract, roomChangeNeedsAdmin } from '../contracts/restore'
 import { createTermination } from './service'
 
 const roomChangeSchema = z.object({
@@ -171,8 +172,9 @@ export async function createRoomChange(
 }
 
 /**
- * Huỷ chuyển phòng khi hoá đơn thanh lý còn nháp: khôi phục thanh lý của hợp đồng cũ rồi xoá hợp đồng mới.
- * Từ chối nếu hoá đơn thanh lý đã duyệt hoặc hợp đồng mới đã có hoá đơn được duyệt hay khoản thu.
+ * Huỷ chuyển phòng: khôi phục thanh lý của hợp đồng cũ rồi xoá hợp đồng mới, trong một giao dịch.
+ * Hoá đơn thanh lý còn nháp thì ai có quyền cũng làm được; đã duyệt hoặc hợp đồng mới đã có hoá đơn duyệt, khoản thu thì
+ * chỉ admin, và dữ liệu đã chốt (sổ ví, khoản chuyển, thu tiền) bị xoá hết.
  */
 export async function cancelRoomChange(
   db: DB,
@@ -191,37 +193,41 @@ export async function cancelRoomChange(
   if (!oldRoom) throw new NotFoundError()
   assertCan(ctx, 'tenants_contracts', oldRoom.facilityId)
   assertCan(ctx, 'delete_contracts', oldRoom.facilityId)
-  const [termination] = await db
-    .select({ status: invoices.status })
-    .from(invoices)
-    .where(and(eq(invoices.leaseId, oldLeaseId), eq(invoices.kind, 'termination')))
-  if (!termination || termination.status !== 'draft')
-    throw new ValidationError('Hoá đơn thanh lý đã duyệt: không huỷ tự động được, hãy sửa tay')
-  const nextInvoices = await db
-    .select({ id: invoices.id, status: invoices.status })
-    .from(invoices)
-    .where(eq(invoices.leaseId, next.id))
-  if (nextInvoices.some((i) => i.status === 'approved'))
-    throw new ValidationError('Hợp đồng mới đã có hoá đơn được duyệt: không huỷ được')
-  if (nextInvoices.length) {
-    const paid = await db
-      .select({ id: payments.id })
-      .from(payments)
-      .where(
+  // Đã duyệt hoặc đã phát sinh thu tiền: chỉ admin, và hoàn tác xoá cả dữ liệu đã chốt (sổ ví, khoản chuyển, thu tiền)
+  const force = await roomChangeNeedsAdmin(db, oldLeaseId, next.id)
+  if (force && !ctx.isAdmin)
+    throw new ValidationError('Chuyển phòng đã duyệt hoặc đã phát sinh thu tiền: chỉ admin hoàn tác được')
+  await db.transaction(async (raw) => {
+    const tx = raw as unknown as DB
+    if (force) await undoApprovedTransfer(tx, oldLeaseId)
+    const preview = await previewContractRestore(tx, ctx, 'lease', oldLeaseId, { allowRoomChange: true })
+    if (preview.operation !== 'termination')
+      throw new ValidationError('Hợp đồng cũ đã có thay đổi sau thanh lý: không huỷ tự động được')
+    await restoreContract(tx, ctx, 'lease', oldLeaseId, preview.token, storage, { allowRoomChange: true })
+    await removeStartReadings(tx, next)
+    await deleteContract(tx, ctx, 'lease', next.id, true, storage)
+  })
+}
+
+/**
+ * Gỡ những gì duyệt hoá đơn thanh lý chuyển phòng đã ghi ngoài hợp đồng cũ: dòng dùng ví (trả lại số dư) và các khoản
+ * `carry` đóng hoá đơn cũ (mở lại nợ). Khoản điều chỉnh sang hợp đồng mới bị xoá cùng hợp đồng mới.
+ */
+async function undoApprovedTransfer(tx: DB, oldLeaseId: string): Promise<void> {
+  await tx
+    .delete(tenantWalletEntries)
+    .where(and(eq(tenantWalletEntries.leaseId, oldLeaseId), eq(tenantWalletEntries.kind, 'use_termination')))
+  const oldInvoices = await tx.select({ id: invoices.id }).from(invoices).where(eq(invoices.leaseId, oldLeaseId))
+  if (oldInvoices.length)
+    await tx.delete(payments).where(
+      and(
+        eq(payments.method, 'carry'),
         inArray(
           payments.invoiceId,
-          nextInvoices.map((i) => i.id),
+          oldInvoices.map((i) => i.id),
         ),
-      )
-      .limit(1)
-    if (paid.length) throw new ValidationError('Hợp đồng mới đã có khoản thu: không huỷ được')
-  }
-  const preview = await previewContractRestore(db, ctx, 'lease', oldLeaseId, { allowRoomChange: true })
-  if (preview.operation !== 'termination')
-    throw new ValidationError('Hợp đồng cũ đã có thay đổi sau thanh lý: không huỷ tự động được')
-  await restoreContract(db, ctx, 'lease', oldLeaseId, preview.token, storage, { allowRoomChange: true })
-  await removeStartReadings(db, next)
-  await deleteContract(db, ctx, 'lease', next.id, true, storage)
+      ),
+    )
 }
 
 /**

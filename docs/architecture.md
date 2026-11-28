@@ -85,7 +85,7 @@ Luật:
 | `cascade-delete.ts` (xoá cơ sở/phòng) ghi bảng của hợp đồng, hoá đơn… | Vi phạm luật "ghi bảng module khác" | Ngoại lệ có chủ ý vì DB không có `ON DELETE CASCADE`; không "sửa" bằng cách thêm cascade trong schema nếu chưa bàn |
 | `NEXT_PUBLIC_*` đọc kiểu `process.env[name]` | Không được nhúng vào bundle trình duyệt, đăng nhập hỏng | Luôn viết literal `process.env.NEXT_PUBLIC_X` (gom ở `src/lib/env.ts`) |
 | Lưu trữ: `STORAGE_DRIVER` mặc định `supabase`; thiếu biến Supabase thì rơi về **bộ nhớ trong** (tệp mất khi khởi động lại) | Tưởng đã lưu ảnh nhưng không | Kiểm biến khi chạy thật; `r2` thiếu biến thì báo lỗi |
-| `unapproveInvoice` chỉ đưa hoá đơn về nháp, không mở lại hợp đồng và không đảo sổ cọc, ví | Bỏ duyệt hoá đơn thanh lý làm hợp đồng ended mà hoá đơn nháp | Hoá đơn thanh lý có dòng ví hoặc chuyển phòng bị chặn bỏ duyệt; chuyển phòng chưa duyệt thì dùng Huỷ chuyển phòng |
+| `unapproveInvoice` chỉ đưa hoá đơn về nháp, không mở lại hợp đồng và không đảo sổ cọc, ví | Bỏ duyệt hoá đơn thanh lý làm hợp đồng ended mà hoá đơn nháp | Hoá đơn thanh lý có dòng ví hoặc chuyển phòng bị chặn bỏ duyệt; chuyển phòng chưa duyệt thì dùng Huỷ chuyển phòng (nút Khôi phục hợp đồng cũ); đã duyệt hoặc hợp đồng mới đã có hoá đơn duyệt, khoản thu thì chỉ admin hoàn tác được, xoá hợp đồng mới cùng mọi dữ liệu và trả ví, nợ cũ về như trước duyệt |
 | Next.js 16 khác bản quen thuộc | Viết theo trí nhớ dễ sai API | Đọc `node_modules/next/dist/docs/` trước (xem `AGENTS.md`) |
 | `@napi-rs/canvas`, `pdfkit` cần đóng gói đặc biệt trên Vercel | Xuất PNG/PDF hỏng trên production | Giữ `serverExternalPackages` và `outputFileTracingIncludes` trong `next.config.ts` |
 
