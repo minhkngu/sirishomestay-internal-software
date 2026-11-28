@@ -1,9 +1,10 @@
 import { and, desc, eq, inArray, sql } from 'drizzle-orm'
-import { leases, rooms, tenants, tenantWalletEntries } from '@/db'
+import { invoices, leases, payments, rooms, tenants, tenantWalletEntries } from '@/db'
 import type { DB } from '@/db/client'
 import { can, type AccessContext } from '@/domain/access'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import type { WalletEntryKind } from '@/domain/statuses'
+import { recordAudit } from '@/modules/platform'
 
 export type WalletEntryInput = {
   tenantId: string
@@ -75,6 +76,100 @@ export async function reverseWalletForPayments(
       rows.map((r) => r.id),
     ),
   )
+}
+
+/** Cách xử lý tiền của phiếu thu bị gỡ: chuyển vào ví khách, trả lại khách, hoặc phiếu nhập nhầm (không có thật). */
+export type PaymentRemoval = { kind: 'to_wallet' } | { kind: 'refund'; refundOn: string } | { kind: 'mistake' }
+
+/**
+ * Xử lý ví cho các phiếu thu sắp bị xoá; chạy TRƯỚC khi xoá phiếu. Phiếu trả bằng ví thì trả lại ví (mọi cách gỡ);
+ * phiếu gộp vào thanh lý không gỡ tay được; phiếu tiền thật: `to_wallet` ghi `reallocate` (giữ ngày thu gốc),
+ * `refund` thêm `refund_out` (chi), `mistake` rút tiền dư (`overpay`) của phiếu, từ chối nếu ví sẽ âm.
+ */
+export async function settleRemovedPayments(
+  tx: DB,
+  ctx: AccessContext,
+  paymentIds: string[],
+  removal: PaymentRemoval,
+  note: string,
+): Promise<void> {
+  if (!paymentIds.length) return
+  const rows = await tx
+    .select({
+      p: payments,
+      facilityId: invoices.facilityId,
+      leaseId: invoices.leaseId,
+      tenantId: leases.tenantId,
+    })
+    .from(payments)
+    .innerJoin(invoices, eq(invoices.id, payments.invoiceId))
+    .innerJoin(leases, eq(leases.id, invoices.leaseId))
+    .where(inArray(payments.id, paymentIds))
+  if (rows.some((r) => r.p.method === 'carry')) throw new ValidationError('Khoản gộp vào thanh lý không gỡ tay được')
+  for (const tenantId of [...new Set(rows.map((r) => r.tenantId))])
+    await tx.execute(sql`select id from tenants where id = ${tenantId} for update`)
+  const delta = new Map<string, number>()
+  const bump = (tenantId: string, n: number) => delta.set(tenantId, (delta.get(tenantId) ?? 0) + n)
+  for (const r of rows) {
+    const entries = await tx.select().from(tenantWalletEntries).where(eq(tenantWalletEntries.paymentId, r.p.id))
+    if (r.p.method === 'wallet') {
+      const used = entries.filter((e) => e.kind === 'use_invoice')
+      for (const e of used) bump(r.tenantId, -e.amount)
+      if (used.length)
+        await tx.delete(tenantWalletEntries).where(
+          inArray(
+            tenantWalletEntries.id,
+            used.map((e) => e.id),
+          ),
+        )
+      continue
+    }
+    if (removal.kind === 'mistake') {
+      const over = entries.filter((e) => e.kind === 'overpay')
+      for (const e of over) bump(r.tenantId, -e.amount)
+      if (over.length)
+        await tx.delete(tenantWalletEntries).where(
+          inArray(
+            tenantWalletEntries.id,
+            over.map((e) => e.id),
+          ),
+        )
+      continue
+    }
+    const base = { tenantId: r.tenantId, facilityId: r.facilityId, leaseId: r.leaseId, invoiceId: r.p.invoiceId }
+    await addWalletEntry(tx, {
+      ...base,
+      amount: r.p.amount,
+      kind: 'reallocate',
+      date: r.p.paidOn,
+      note,
+      sourceKey: `reallocate:${r.p.id}`,
+    })
+    bump(r.tenantId, r.p.amount)
+    if (removal.kind === 'refund') {
+      await addWalletEntry(tx, {
+        ...base,
+        amount: -r.p.amount,
+        kind: 'refund_out',
+        date: removal.refundOn,
+        note,
+        sourceKey: `refund_out:${r.p.id}`,
+      })
+      bump(r.tenantId, -r.p.amount)
+    }
+    // Tiền dư (overpay) của phiếu giữ nguyên; phiếu bị xoá thì cột paymentId của nó tự về rỗng
+    await recordAudit(tx, ctx, {
+      action: 'create',
+      entity: 'wallet',
+      entityId: r.tenantId,
+      facilityId: r.facilityId,
+      summary: `${removal.kind === 'refund' ? 'Trả lại khách' : 'Chuyển vào ví khách'} ${r.p.amount.toLocaleString('vi-VN')} từ phiếu thu bị gỡ`,
+      after: { paymentId: r.p.id, amount: r.p.amount },
+    })
+  }
+  for (const [tenantId, d] of delta)
+    if (d < 0 && (await walletBalance(tx, tenantId)) < 0)
+      throw new ValidationError('Tiền dư của khoản thu này đã được dùng: gỡ các khoản dùng ví trước')
 }
 
 /**
