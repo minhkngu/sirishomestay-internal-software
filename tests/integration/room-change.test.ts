@@ -6,8 +6,11 @@ import {
   handovers,
   invoiceLines,
   invoices,
+  leaseFeeMeters,
+  leaseFeeSnapshots,
   leaseOccupants,
   leases,
+  meters,
   payments,
   pendingAdjustments,
   rooms,
@@ -339,6 +342,38 @@ describe('thanh lý nối ví và chuyển phòng', () => {
       const preview = await previewContractRestore(db, ctx(), 'lease', leaseId)
       expect(preview.roomChange).toBe(true)
       expect(preview.blockedReason).toContain('đã duyệt')
+    })
+
+    it('phí điện theo đồng hồ: phải nhập chỉ số ban đầu phòng mới, có rồi thì gắn đúng đồng hồ phòng mới', async () => {
+      const [oldMeter, newMeter] = await db
+        .insert(meters)
+        .values([
+          { roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 },
+          { roomId: room2Id, utility: 'electric', installedOn: '2026-01-01', startReading: 0 },
+        ])
+        .returning()
+      const [fee] = await db
+        .insert(leaseFeeSnapshots)
+        .values({
+          leaseId,
+          name: 'Điện',
+          unit: 'kWh',
+          quantitySource: 'meter',
+          billing: 'per_occurrence',
+          unitPrice: 3500,
+        })
+        .returning()
+      await db.insert(leaseFeeMeters).values({ leaseFeeId: fee.id, meterId: oldMeter.id })
+      const termination = { forfeit: { mode: 'none' }, readings: [{ meterId: oldMeter.id, value: 120 }] }
+      await expect(change({ termination })).rejects.toThrow(ValidationError)
+      expect((await db.select().from(leases).where(eq(leases.id, leaseId)))[0].status).toBe('active')
+      const r = await change({ termination, newRoomReadings: [{ meterId: newMeter.id, value: 40 }] })
+      const links = await db
+        .select({ meterId: leaseFeeMeters.meterId })
+        .from(leaseFeeMeters)
+        .innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId))
+        .where(eq(leaseFeeSnapshots.leaseId, r.newLeaseId))
+      expect(links.map((l) => l.meterId)).toEqual([newMeter.id])
     })
 
     it('huỷ chuyển phòng thiếu quyền xoá hợp đồng thì từ chối trước khi làm gì', async () => {

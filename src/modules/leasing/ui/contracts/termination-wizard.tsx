@@ -2,7 +2,7 @@
 
 import { DateField } from '@/components/date-field'
 import { useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { useState, useTransition, type ReactNode } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -50,6 +50,9 @@ type PenaltyDraft = {
   amount: string
 }
 
+export type TerminationSubmitResult =
+  { ok: true; data: { handoverItems: { assetId: string; itemId: string }[] } } | { ok: false; error: string }
+
 export function TerminationWizard({
   leaseId,
   meters,
@@ -57,6 +60,7 @@ export function TerminationWizard({
   assets = [],
   depositBalance = 0,
   onCompleted,
+  variant,
 }: {
   leaseId: string
   meters: MeterOption[]
@@ -65,6 +69,18 @@ export function TerminationWizard({
   depositBalance?: number
   defaultOpen?: boolean
   onCompleted?: () => void
+  /**
+   * Dùng lại form thanh lý cho việc khác (chuyển phòng): thêm phần nhập riêng, đổi nhãn ngày và cách gửi.
+   * `submit` nhận phần nhập thanh lý (gồm `endDate`) và trả kết quả giống `createTerminationAction`.
+   */
+  variant?: {
+    dateLabel: string
+    confirmLabel: string
+    successMessage: string
+    extra: ReactNode
+    extraError: string | null
+    submit: (input: Record<string, unknown>) => Promise<TerminationSubmitResult>
+  }
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -152,12 +168,18 @@ export function TerminationWizard({
             ? `Số tiền mất cọc không vượt quá số dư cọc (${formatVND(depositBalance)})`
             : null
       : null
-  const hasLiveError = !!endDateError || !!readingError || !!assetPenaltyError || penaltyIncomplete || !!forfeitError
+  const hasLiveError =
+    !!variant?.extraError ||
+    !!endDateError ||
+    !!readingError ||
+    !!assetPenaltyError ||
+    penaltyIncomplete ||
+    !!forfeitError
 
   const handleConfirm = () => {
     if (hasLiveError) return
     start(async () => {
-      const r = await createTerminationAction(leaseId, input)
+      const r = await (variant ? variant.submit(input) : createTerminationAction(leaseId, input))
       if (!r.ok) {
         toast.error(r.error)
         return
@@ -175,8 +197,11 @@ export function TerminationWizard({
           }
         }
       }
-      if (failedPhotos > 0) toast.warning(`Đã thanh lý hợp đồng, nhưng ${failedPhotos} ảnh kiểm kê chưa tải lên được`)
-      else toast.success('Đã thanh lý hợp đồng')
+      if (failedPhotos > 0)
+        toast.warning(
+          `${variant?.successMessage ?? 'Đã thanh lý hợp đồng'}, nhưng ${failedPhotos} ảnh kiểm kê chưa tải lên được`,
+        )
+      else toast.success(variant?.successMessage ?? 'Đã thanh lý hợp đồng')
       router.refresh()
       onCompleted?.()
     })
@@ -186,10 +211,17 @@ export function TerminationWizard({
     <div className="space-y-5 text-sm">
       {/* 1. Ngày trả & Chỉ số điện nước */}
       <section className="space-y-3 rounded-xl border border-border/80 bg-card p-3.5">
-        <h3 className="text-[13px] font-medium text-muted-foreground">1. Ngày trả phòng & Chỉ số điện nước</h3>
+        <h3 className="text-[13px] font-medium text-muted-foreground">
+          1. {variant ? 'Ngày chuyển' : 'Ngày trả phòng'} & Chỉ số điện nước
+        </h3>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Ngày trả phòng">
-            <DateField id="termination-end" ariaLabel="Ngày trả phòng" value={endDate} onValueChange={setEnd} />
+          <Field label={variant?.dateLabel ?? 'Ngày trả phòng'}>
+            <DateField
+              id="termination-end"
+              ariaLabel={variant?.dateLabel ?? 'Ngày trả phòng'}
+              value={endDate}
+              onValueChange={setEnd}
+            />
             {endDateError && (
               <p role="alert" className="mt-1 text-xs text-destructive">
                 {endDateError}
@@ -198,7 +230,7 @@ export function TerminationWizard({
           </Field>
         </div>
         <ReadingInputs
-          title="Chỉ số tại ngày trả phòng"
+          title={variant ? 'Chỉ số phòng cũ tại ngày chuyển' : 'Chỉ số tại ngày trả phòng'}
           meters={meters}
           values={readings}
           onChange={setReadings}
@@ -211,6 +243,8 @@ export function TerminationWizard({
           </p>
         )}
       </section>
+
+      {variant?.extra}
 
       {/* 2. Kiểm kê & Đền bù tài sản */}
       <section className="space-y-3 rounded-xl border border-border/80 bg-card p-3.5">
@@ -431,7 +465,7 @@ export function TerminationWizard({
         </div>
         <div className="flex items-center gap-2">
           <Button type="button" size="sm" disabled={pending || hasLiveError} onClick={handleConfirm}>
-            Xác nhận thanh lý
+            {variant?.confirmLabel ?? 'Xác nhận thanh lý'}
           </Button>
         </div>
       </div>

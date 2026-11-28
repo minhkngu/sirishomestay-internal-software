@@ -33,6 +33,8 @@ const roomChangeSchema = z.object({
       depositAmount: z.number().int().nonnegative(),
     })
     .catchall(z.unknown()),
+  /** Chỉ số ban đầu của đồng hồ phòng mới tại ngày chuyển (bắt buộc cho mỗi phí theo đồng hồ). */
+  newRoomReadings: z.array(z.object({ meterId: z.uuid(), value: z.number().int().nonnegative() })).default([]),
   /** Các trường của phụ lục thanh lý trừ `endDate` (chỉ số cuối, kiểm kê, hoàn tiền phòng, phạt, mất cọc). */
   termination: z.record(z.string(), z.unknown()).default({}),
 })
@@ -48,7 +50,12 @@ function parse(input: unknown) {
 }
 
 /** Sao chép phí của hợp đồng cũ; phí theo đồng hồ gắn lại vào đồng hồ cùng loại của phòng mới. */
-async function copyFees(tx: DB, oldLeaseId: string, newRoomId: string): Promise<LeaseFeeInput[]> {
+async function copyFees(
+  tx: DB,
+  oldLeaseId: string,
+  newRoomId: string,
+  readings: { meterId: string; value: number }[],
+): Promise<LeaseFeeInput[]> {
   const fees = await tx.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, oldLeaseId))
   const links = fees.length
     ? await tx
@@ -76,7 +83,12 @@ async function copyFees(tx: DB, oldLeaseId: string, newRoomId: string): Promise<
     const utility = links.find((l) => l.leaseFeeId === f.id)?.utility
     const meter = newMeters.find((m) => m.utility === utility)
     if (!meter) throw new ValidationError(`Phòng mới chưa có đồng hồ cho phí ${f.name}`)
-    return { ...base, existingMeterId: meter.id }
+    const initial = readings.find((r) => r.meterId === meter.id)
+    if (!initial)
+      throw new ValidationError(`Nhập chỉ số ban đầu của đồng hồ ${f.name} phòng mới`, {
+        newRoomReadings: `Thiếu chỉ số ban đầu cho ${f.name}`,
+      })
+    return { ...base, existingMeterId: meter.id, initialReading: initial.value }
   })
 }
 
@@ -89,7 +101,11 @@ export async function createRoomChange(
   ctx: AccessContext,
   leaseId: string,
   input: unknown,
-): Promise<{ newLeaseId: string; terminationInvoiceId: string }> {
+): Promise<{
+  newLeaseId: string
+  terminationInvoiceId: string
+  handoverItems: { assetId: string; itemId: string }[]
+}> {
   const data = parse(input)
   return db.transaction(async (tx0) => {
     const tx = tx0 as unknown as DB
@@ -120,7 +136,7 @@ export async function createRoomChange(
       dueRule: old.dueRule,
       proration: old.proration,
       billingCycleMonths: old.billingCycleMonths,
-      fees: lease.fees === undefined ? await copyFees(tx, leaseId, newRoom.id) : undefined,
+      fees: lease.fees === undefined ? await copyFees(tx, leaseId, newRoom.id, data.newRoomReadings) : undefined,
       handover:
         lease.handover === undefined
           ? { expectedRoomAssetIds: roomAssets.map((a) => a.id), addAssetIds: [], newAssets: [], remove: [] }
@@ -145,7 +161,11 @@ export async function createRoomChange(
       .set({ transferFromLeaseId: leaseId, updatedAt: new Date() })
       .where(eq(leases.id, created.lease.id))
     if (!term.invoice) throw new ValidationError('Không tạo được hoá đơn thanh lý')
-    return { newLeaseId: created.lease.id, terminationInvoiceId: term.invoice.id }
+    return {
+      newLeaseId: created.lease.id,
+      terminationInvoiceId: term.invoice.id,
+      handoverItems: term.handoverItems ?? [],
+    }
   })
 }
 
