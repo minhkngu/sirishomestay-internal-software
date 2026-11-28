@@ -923,7 +923,7 @@ export async function createTermination(
       ),
       forfeit: data.forfeit as ForfeitInput,
       rentRefund: data.rentRefund,
-      walletBalance: await walletBalance(tx, l.tenantId, facilityId),
+      walletBalance: await walletBalance(tx, l.tenantId),
       transfer: opts.transfer,
       billedUntil: opts.transfer ? addDays(data.endDate, -1) : undefined,
     })

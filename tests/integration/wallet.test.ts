@@ -28,17 +28,19 @@ describe('sổ ví khách', () => {
   it('số dư là tổng các biến động', async () => {
     await addWalletEntry(db, entry())
     await addWalletEntry(db, entry({ amount: -2_000_000, kind: 'use_invoice' }))
-    expect(await walletBalance(db, tenantId, fA)).toBe(3_000_000)
+    expect(await walletBalance(db, tenantId)).toBe(3_000_000)
   })
 
   it('cùng sourceKey ghi hai lần chỉ tính một', async () => {
     const e = entry({ amount: 1_000_000, sourceKey: 'overpay:dup' })
     expect(await addWalletEntry(db, e)).toBe(true)
     expect(await addWalletEntry(db, e)).toBe(false)
-    expect(await walletBalance(db, tenantId, fA)).toBe(4_000_000)
+    expect(await walletBalance(db, tenantId)).toBe(4_000_000)
   })
 
-  it('ví của cơ sở A không hiện ở cơ sở B', async () => {
-    expect(await walletBalance(db, tenantId, fB)).toBe(0)
+  it('ví nạp ở cơ sở A dùng được ở cơ sở B: số dư theo khách', async () => {
+    await addWalletEntry(db, entry({ facilityId: fA, amount: 1_000_000 }))
+    await addWalletEntry(db, entry({ facilityId: fB, amount: -500_000, kind: 'use_invoice' }))
+    expect(await walletBalance(db, tenantId)).toBe(4_500_000) // 4.000.000 từ hai test trước + 1.000.000 − 500.000
   })
 })

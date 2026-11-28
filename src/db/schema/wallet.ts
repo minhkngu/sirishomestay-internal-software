@@ -5,7 +5,7 @@ import { facilities } from './facilities'
 import { invoices, payments } from './invoices'
 import { tenants } from './tenants'
 
-/** Sổ ví khách theo (người thuê, cơ sở): amount dương là cộng (thu vượt), âm là dùng. Số dư là tổng. */
+/** Sổ ví khách theo người thuê (dùng ở mọi cơ sở; `facility_id` là cơ sở phát sinh): amount dương là cộng (thu vượt), âm là dùng. Số dư là tổng. */
 export const tenantWalletEntries = pgTable(
   'tenant_wallet_entries',
   {
@@ -26,5 +26,5 @@ export const tenantWalletEntries = pgTable(
     sourceKey: text('source_key').notNull().unique(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index('tenant_wallet_entries_tenant_idx').on(t.tenantId, t.facilityId)],
+  (t) => [index('tenant_wallet_entries_tenant_idx').on(t.tenantId)],
 )

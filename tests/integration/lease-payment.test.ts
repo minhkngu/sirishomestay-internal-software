@@ -150,4 +150,60 @@ describe('ghi thu theo hợp đồng', () => {
       ForbiddenError,
     )
   })
+
+  /** Hợp đồng thứ hai của cùng khách ở cơ sở khác, có một hoá đơn tháng 9.000.000 đã duyệt. */
+  const leaseAtOtherFacility = async () => {
+    const [lease] = await db.select({ tenantId: leases.tenantId }).from(leases).where(eq(leases.id, leaseId))
+    const [fB] = await db.insert(facilities).values({ code: 'Q7', name: 'Quận 7' }).returning()
+    const [room] = await db.insert(rooms).values({ facilityId: fB.id, code: '501' }).returning()
+    const [l2] = await db
+      .insert(leases)
+      .values({
+        code: 'HD2',
+        roomId: room.id,
+        tenantId: lease.tenantId,
+        startDate: '2026-01-01',
+        endDate: '2027-12-31',
+        monthlyRent: 9000000,
+        depositAmount: 0,
+      })
+      .returning()
+    const ctxB = context(['billing'], fB.id)
+    const [inv] = await createDrafts(db, ctxB, { facilityId: fB.id, period: '2026-07' })
+    await approveInvoice(db, ctxB, inv.id, {})
+    return { tenantId: lease.tenantId, facilityB: fB.id, leaseB: l2.id, ctxB }
+  }
+  it('dùng ví nạp ở cơ sở khác', async () => {
+    const { tenantId, facilityB, leaseB, ctxB } = await leaseAtOtherFacility()
+    await db.insert(tenantWalletEntries).values({
+      tenantId,
+      facilityId,
+      amount: 3000000,
+      kind: 'overpay',
+      date: '2026-08-01',
+      sourceKey: 'seed:cross-facility',
+    })
+    await recordLeasePayment(db, ctxB, leaseB, { ...pay(0), walletAmount: 3000000 })
+    const [row] = await db.select().from(payments).where(eq(payments.method, 'wallet'))
+    expect(row.amount).toBe(3000000)
+    expect(await leaseWalletBalance(db, ctxB, leaseB)).toBe(0)
+    expect(facilityB).toBeTruthy()
+  })
+  it('hai lần thu cùng lúc ở hai cơ sở không dùng quá số dư ví', async () => {
+    const { tenantId, leaseB, ctxB } = await leaseAtOtherFacility()
+    await db.insert(tenantWalletEntries).values({
+      tenantId,
+      facilityId,
+      amount: 3000000,
+      kind: 'overpay',
+      date: '2026-08-01',
+      sourceKey: 'seed:race',
+    })
+    const results = await Promise.allSettled([
+      recordLeasePayment(db, ctx(), leaseId, { ...pay(0), walletAmount: 3000000 }),
+      recordLeasePayment(db, ctxB, leaseB, { ...pay(0), walletAmount: 3000000 }),
+    ])
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
+    expect(await leaseWalletBalance(db, ctx(), leaseId)).toBe(0)
+  })
 })

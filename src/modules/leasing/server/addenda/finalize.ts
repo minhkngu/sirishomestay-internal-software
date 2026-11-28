@@ -171,7 +171,7 @@ async function settleWalletAndTransfer(
       .from(tenantWalletEntries)
       .where(eq(tenantWalletEntries.sourceKey, sourceKey))
     if (!posted) {
-      const balance = await walletBalance(tx, lease.tenantId, invoice.facilityId)
+      const balance = await walletBalance(tx, lease.tenantId)
       if (balance < -walletLine.amount)
         throw new ValidationError(
           `Số dư ví đã đổi sau khi lập hoá đơn thanh lý (còn ${balance.toLocaleString('vi-VN')}): sửa dòng ví của hoá đơn rồi duyệt lại`,

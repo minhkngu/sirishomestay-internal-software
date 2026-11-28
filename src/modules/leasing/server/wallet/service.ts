@@ -1,8 +1,8 @@
 import { and, desc, eq, inArray, sql } from 'drizzle-orm'
-import { tenantWalletEntries } from '@/db'
+import { leases, rooms, tenants, tenantWalletEntries } from '@/db'
 import type { DB } from '@/db/client'
-import { assertCan, type AccessContext } from '@/domain/access'
-import { ValidationError } from '@/domain/errors'
+import { can, type AccessContext } from '@/domain/access'
+import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import type { WalletEntryKind } from '@/domain/statuses'
 
 export type WalletEntryInput = {
@@ -20,12 +20,12 @@ export type WalletEntryInput = {
   sourceKey: string
 }
 
-/** Số dư ví của khách tại một cơ sở: tổng các biến động. Ví không dùng chéo cơ sở. */
-export async function walletBalance(db: DB, tenantId: string, facilityId: string): Promise<number> {
+/** Số dư ví của khách: tổng các biến động, dùng ở mọi cơ sở. */
+export async function walletBalance(db: DB, tenantId: string): Promise<number> {
   const [row] = await db
     .select({ n: sql<number>`coalesce(sum(${tenantWalletEntries.amount}), 0)::float8` })
     .from(tenantWalletEntries)
-    .where(and(eq(tenantWalletEntries.tenantId, tenantId), eq(tenantWalletEntries.facilityId, facilityId)))
+    .where(eq(tenantWalletEntries.tenantId, tenantId))
   return row?.n ?? 0
 }
 
@@ -67,15 +67,10 @@ export async function reverseWalletForPayments(
   const rows = await tx.select().from(tenantWalletEntries).where(inArray(tenantWalletEntries.paymentId, paymentIds))
   if (!rows.length) return
   if (!opts.allowNegative) {
-    const net = new Map<string, { tenantId: string; facilityId: string; delta: number }>()
-    for (const r of rows) {
-      const key = `${r.tenantId}|${r.facilityId}`
-      const g = net.get(key) ?? { tenantId: r.tenantId, facilityId: r.facilityId, delta: 0 }
-      g.delta -= r.amount
-      net.set(key, g)
-    }
-    for (const g of net.values())
-      if ((await walletBalance(tx, g.tenantId, g.facilityId)) + g.delta < 0)
+    const net = new Map<string, number>()
+    for (const r of rows) net.set(r.tenantId, (net.get(r.tenantId) ?? 0) - r.amount)
+    for (const [tenantId, delta] of net)
+      if ((await walletBalance(tx, tenantId)) + delta < 0)
         throw new ValidationError('Tiền dư của khoản thu này đã được dùng: gỡ các khoản dùng ví trước')
   }
   await tx.delete(tenantWalletEntries).where(
@@ -86,13 +81,24 @@ export async function reverseWalletForPayments(
   )
 }
 
-/** Lịch sử biến động ví của khách tại một cơ sở (mới nhất trước); cần quyền thu tiền ở cơ sở đó. */
-export async function listWalletEntries(db: DB, ctx: AccessContext, tenantId: string, facilityId: string) {
-  assertCan(ctx, 'billing', facilityId)
+/**
+ * Lịch sử biến động ví của khách (mới nhất trước). Cần quyền thu tiền ở cơ sở chính của khách
+ * hoặc ở cơ sở của một hợp đồng của khách.
+ */
+export async function listWalletEntries(db: DB, ctx: AccessContext, tenantId: string) {
+  const [tenant] = await db.select({ home: tenants.homeFacilityId }).from(tenants).where(eq(tenants.id, tenantId))
+  if (!tenant) throw new NotFoundError('Không tìm thấy khách')
+  const leaseFacilities = await db
+    .selectDistinct({ id: rooms.facilityId })
+    .from(leases)
+    .innerJoin(rooms, eq(rooms.id, leases.roomId))
+    .where(eq(leases.tenantId, tenantId))
+  const facilityIds = [tenant.home, ...leaseFacilities.map((f) => f.id)].filter((x): x is string => !!x)
+  if (!facilityIds.some((id) => can(ctx, 'billing', id))) throw new ForbiddenError('Không có quyền xem ví khách')
   return db
     .select()
     .from(tenantWalletEntries)
-    .where(and(eq(tenantWalletEntries.tenantId, tenantId), eq(tenantWalletEntries.facilityId, facilityId)))
+    .where(eq(tenantWalletEntries.tenantId, tenantId))
     .orderBy(desc(tenantWalletEntries.date), desc(tenantWalletEntries.createdAt))
 }
 

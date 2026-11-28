@@ -1861,11 +1861,11 @@ export async function leaseDebt(db: DB, ctx: AccessContext, leaseId: string): Pr
   await facilityOfLease(db, ctx, leaseId)
   return (await openInvoices(db, leaseId)).reduce((n, r) => n + r.owed, 0)
 }
-/** Số dư ví của khách (người thuê chính) tại cơ sở của hợp đồng, để popup thu tiền hiện lựa chọn dùng ví. */
+/** Số dư ví của khách (người thuê chính), để popup thu tiền hiện lựa chọn dùng ví. */
 export async function leaseWalletBalance(db: DB, ctx: AccessContext, leaseId: string): Promise<number> {
   const facilityId = await facilityOfLease(db, ctx, leaseId)
   const [l] = await db.select({ tenantId: leases.tenantId }).from(leases).where(eq(leases.id, leaseId))
-  return l ? walletBalance(db, l.tenantId, facilityId) : 0
+  return l ? walletBalance(db, l.tenantId) : 0
 }
 /**
  * Ghi một khoản thu cho hợp đồng, tự gạch các hoá đơn đã duyệt từ cũ đến mới. Phần ví dùng gạch trước (method `wallet`),
@@ -1896,7 +1896,7 @@ export async function recordLeasePayment(
     const debt = open.reduce((n, r) => n + r.owed, 0)
     if (!open.length) throw new ValidationError('Hợp đồng không có hoá đơn cần thu')
     const walletWanted = data.walletAmount ?? 0
-    const balance = await walletBalance(tx, lease.tenantId, facilityId)
+    const balance = await walletBalance(tx, lease.tenantId)
     if (walletWanted > balance) throw new ValidationError(`Số dư ví không đủ (còn ${balance.toLocaleString('vi-VN')})`)
     if (walletWanted > debt)
       throw new ValidationError(`Số tiền dùng ví vượt tổng dư nợ ${debt.toLocaleString('vi-VN')}`)

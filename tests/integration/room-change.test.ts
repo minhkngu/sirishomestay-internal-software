@@ -149,11 +149,11 @@ describe('thanh lý nối ví và chuyển phòng', () => {
     const r = await terminate({ forfeit: { mode: 'all' } })
     const lines = await linesOf(r.invoice!.id)
     expect(lines.find((l) => (l.meta as { wallet?: number } | null)?.wallet)?.amount).toBe(-5_000_000)
-    expect(await walletBalance(db, tenantId, facilityId)).toBe(5_000_000)
+    expect(await walletBalance(db, tenantId)).toBe(5_000_000)
     await approveInvoice(db, ctx(), r.invoice!.id, {})
-    expect(await walletBalance(db, tenantId, facilityId)).toBe(0)
+    expect(await walletBalance(db, tenantId)).toBe(0)
     await finalizeTermination(db, ctx(), { id: r.invoice!.id, leaseId, facilityId })
-    expect(await walletBalance(db, tenantId, facilityId)).toBe(0)
+    expect(await walletBalance(db, tenantId)).toBe(0)
     expect(
       (await db.select().from(tenantWalletEntries).where(eq(tenantWalletEntries.kind, 'use_termination'))).length,
     ).toBe(1)
@@ -216,7 +216,7 @@ describe('thanh lý nối ví và chuyển phòng', () => {
       sourceKey: 'use_invoice:f1',
     })
     await expect(approveInvoice(db, ctx(), r.invoice!.id, {})).rejects.toThrow(ValidationError)
-    expect(await walletBalance(db, tenantId, facilityId)).toBe(0)
+    expect(await walletBalance(db, tenantId)).toBe(0)
     expect(
       (await db.select().from(tenantWalletEntries).where(eq(tenantWalletEntries.kind, 'use_termination'))).length,
     ).toBe(0)
@@ -236,7 +236,7 @@ describe('thanh lý nối ví và chuyển phòng', () => {
       -2_000_000,
     )
     await approveInvoice(db, ctx(), r.invoice!.id, {})
-    expect(await walletBalance(db, tenantId, facilityId)).toBe(0)
+    expect(await walletBalance(db, tenantId)).toBe(0)
   })
 
   it('chuyển phòng: sửa hoá đơn nháp thì dòng chuyển và điều chỉnh theo số cuối; nợ cũ được đóng bằng khoản carry', async () => {
@@ -467,7 +467,7 @@ describe('thanh lý nối ví và chuyển phòng', () => {
 
       it('admin: hợp đồng cũ hiệu lực lại, hợp đồng mới và khoản chuyển bị xoá, ví và nợ cũ về như trước duyệt', async () => {
         const r = await approvedChange()
-        expect(await walletBalance(db, tenantId, facilityId)).toBe(0)
+        expect(await walletBalance(db, tenantId)).toBe(0)
         expect(await db.select().from(payments).where(eq(payments.method, 'carry'))).toHaveLength(1)
         await cancelRoomChange(db, admin(), leaseId, storage)
         expect((await db.select().from(leases).where(eq(leases.id, leaseId)))[0].status).toBe('active')
@@ -476,7 +476,7 @@ describe('thanh lý nối ví và chuyển phòng', () => {
           await db.select().from(pendingAdjustments).where(eq(pendingAdjustments.leaseId, r.newLeaseId)),
         ).toHaveLength(0)
         expect(await db.select().from(payments).where(eq(payments.method, 'carry'))).toHaveLength(0)
-        expect(await walletBalance(db, tenantId, facilityId)).toBe(5_000_000)
+        expect(await walletBalance(db, tenantId)).toBe(5_000_000)
         expect(await db.select().from(invoices).where(eq(invoices.kind, 'termination'))).toHaveLength(0)
       })
 
@@ -514,7 +514,7 @@ describe('thanh lý nối ví và chuyển phòng', () => {
         await cancelRoomChange(db, admin(), leaseId, storage)
         expect(await db.select().from(invoices).where(eq(invoices.id, inv.id))).toHaveLength(0)
         expect((await db.select().from(leases).where(eq(leases.id, leaseId)))[0].status).toBe('active')
-        expect(await walletBalance(db, tenantId, facilityId)).toBe(5_000_000)
+        expect(await walletBalance(db, tenantId)).toBe(5_000_000)
       })
     })
 
