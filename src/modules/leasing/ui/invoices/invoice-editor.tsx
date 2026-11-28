@@ -1007,9 +1007,9 @@ export function InvoiceEditor(p: Props) {
                 <th className="px-3 py-3 text-left min-w-48 whitespace-nowrap">Mô tả</th>
                 <th className="px-3 py-3 text-left w-52 whitespace-nowrap">Thời gian</th>
                 <th className="px-3 py-3 text-left w-44 whitespace-nowrap">Chỉ số</th>
-                <th className="px-2.5 py-3 text-right w-16 whitespace-nowrap">SL</th>
-                <th className="px-3 py-3 text-right w-32 whitespace-nowrap">Đơn giá</th>
-                <th className="px-3 py-3 text-right w-28 whitespace-nowrap">Thành tiền</th>
+                <th className="px-2.5 py-3 text-right w-20 min-w-20 whitespace-nowrap">SL</th>
+                <th className="px-3 py-3 text-right w-32 min-w-32 whitespace-nowrap">Đơn giá</th>
+                <th className="px-3 py-3 text-right w-28 min-w-28 whitespace-nowrap">Thành tiền</th>
                 <th className="px-1.5 py-3 w-10 text-center"></th>
               </tr>
             </thead>
