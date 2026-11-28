@@ -149,6 +149,9 @@ export function LeaseWizard({
         }))
       : defaultFees(rooms.find((r) => r.id === initial.roomId)?.facilityId),
   )
+  // Hiện sau khi server báo đồng hồ đã có chỉ số bàn giao khác trong ngày bắt đầu: nhân viên tick để ghi đè
+  const [needOverwrite, setNeedOverwrite] = useState(false)
+  const [overwriteReading, setOverwriteReading] = useState(false)
   const [overrideProration, setOverrideProration] = useState('')
   const [dayOfMonth, setDayOfMonth] = useState('')
   const [cycle, setCycle] = useState('1')
@@ -373,6 +376,7 @@ export function LeaseWizard({
         quantity: Number(f.quantity),
         initialReading: f.initialReading.trim() === '' ? undefined : Number(f.initialReading),
         existingMeterId: meterIds[f.key],
+        overwriteReading,
       })),
       proration: overrideProration || null,
       billingCycleMonths: Number(cycle) || 1,
@@ -387,6 +391,7 @@ export function LeaseWizard({
           submitting.current = false
           setError(r.error)
           setFieldErrors(r.fieldErrors ?? {})
+          if (r.error.includes('chỉ số bàn giao')) setNeedOverwrite(true)
           return
         }
         setCreatedId(r.data.id)
@@ -601,6 +606,20 @@ export function LeaseWizard({
             }}
           />
           {fieldError('fees')}
+          {needOverwrite && (
+            <label className="mt-3 flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-2.5 text-xs">
+              <input
+                type="checkbox"
+                className="mt-0.5 size-3.5 accent-destructive"
+                checked={overwriteReading}
+                onChange={(e) => setOverwriteReading(e.target.checked)}
+              />
+              <span>
+                Ghi đè chỉ số bàn giao đã có trong ngày bắt đầu bằng số vừa nhập. Hoá đơn đã tính theo số cũ không tự
+                đổi theo.
+              </span>
+            </label>
+          )}
         </FormSection>
 
         <FormSection title="Thanh toán & lẻ ngày" description="Hạn thanh toán, cách tính lẻ ngày và kỳ hoá đơn.">
