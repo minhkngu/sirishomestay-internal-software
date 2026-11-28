@@ -1018,18 +1018,23 @@ export function InvoiceEditor(p: Props) {
                 extraKind(l) ? null : (
                   <tr key={i} className="transition-colors hover:bg-muted/20">
                     <td className="p-2.5">
-                      <input
-                        value={
-                          isMeterLine(l)
-                            ? (p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId)?.name ?? l.description)
-                            : isLocked(l)
-                              ? l.description.replace(/ — phòng [0-9a-f-]{36}$/i, '')
-                              : l.description
-                        }
-                        disabled={isLocked(l) || isAddedFee(l) || isDepositLine(l) || isTransferIn(l) || sysRC(l)}
-                        onChange={(e) => set(i, { description: e.target.value })}
-                        className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 disabled:cursor-not-allowed disabled:border-transparent disabled:bg-transparent disabled:px-0 disabled:text-foreground"
-                      />
+                      {(() => {
+                        const text = isMeterLine(l)
+                          ? (p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId)?.name ?? l.description)
+                          : isLocked(l)
+                            ? l.description.replace(/ — phòng [0-9a-f-]{36}$/i, '')
+                            : l.description
+                        // Dòng khoá hiện chữ đầy đủ, tự xuống dòng (ô nhập một dòng sẽ cắt mất phần dài)
+                        return isLocked(l) || isAddedFee(l) || isDepositLine(l) || isTransferIn(l) || sysRC(l) ? (
+                          <span className="block break-words py-2 text-xs text-foreground">{text}</span>
+                        ) : (
+                          <input
+                            value={text}
+                            onChange={(e) => set(i, { description: e.target.value })}
+                            className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
+                          />
+                        )
+                      })()}
                     </td>
                     <td className="p-2.5 align-top">
                       {isTimeBased(l) && !isMeterLine(l) ? (
