@@ -565,20 +565,51 @@ describe('thanh lý nối ví và chuyển phòng', () => {
           meta: l.meta as Record<string, unknown> | null,
         }))
 
-      it('khoá toàn bộ dòng: sửa mô tả, đơn giá, số lượng, xoá hoặc thêm dòng đều bị từ chối', async () => {
+      it('dòng hệ thống: sửa mô tả, đơn giá gửi lên bị bỏ qua (giữ số đã lưu), xoá thì bị từ chối', async () => {
         const r = await change()
         const lines = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, r.terminationInvoiceId))
-        const reject = (rows: ReturnType<typeof input>) =>
-          expect(updateLines(db, ctx(), r.terminationInvoiceId, rows)).rejects.toThrow(/không sửa được các dòng/)
         const base = input(lines)
-        await reject(base.map((l, i) => (i === 0 ? { ...l, description: 'Khác' } : l)))
-        await reject(base.map((l, i) => (i === 0 ? { ...l, unitPrice: l.unitPrice + 1 } : l)))
-        await reject(base.map((l, i) => (i === 0 ? { ...l, quantity: l.quantity + 1 } : l)))
-        await reject(base.slice(1))
-        await reject([
-          ...base,
-          { id: crypto.randomUUID(), type: 'one_off', description: 'Thêm', quantity: 1, unitPrice: 1000, meta: null },
-        ])
+        const refund = lines.find((l) => l.type === 'refund')!
+        await updateLines(
+          db,
+          ctx(),
+          r.terminationInvoiceId,
+          base.map((l) => (l.id === refund.id ? { ...l, description: 'Khác', unitPrice: l.unitPrice + 777 } : l)),
+        )
+        const after = (
+          await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, r.terminationInvoiceId))
+        ).filter((l) => l.type === 'refund')
+        expect([after[0].description, after[0].unitPrice]).toEqual([refund.description, refund.unitPrice])
+        await expect(
+          updateLines(
+            db,
+            ctx(),
+            r.terminationInvoiceId,
+            base.filter((l) => l.id !== refund.id),
+          ),
+        ).rejects.toThrow(/không xoá được các dòng hệ thống/)
+      })
+
+      it('số lượng dòng hệ thống và dòng phạt nhập tay sửa được, dòng chuyển tự cân bằng về 0', async () => {
+        const r = await change()
+        const lines = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, r.terminationInvoiceId))
+        const refund = lines.find((l) => l.type === 'refund')!
+        const edited = [
+          ...input(lines).map((l) => (l.id === refund.id ? { ...l, quantity: refund.quantity / 2 } : l)),
+          {
+            id: crypto.randomUUID(),
+            type: 'penalty',
+            description: 'Phạt vệ sinh',
+            quantity: 1,
+            unitPrice: 300_000,
+            meta: null,
+          },
+        ]
+        await updateLines(db, ctx(), r.terminationInvoiceId, edited)
+        const after = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, r.terminationInvoiceId))
+        expect(after.find((l) => l.type === 'refund')?.quantity).toBe(refund.quantity / 2)
+        expect(after.some((l) => l.description === 'Phạt vệ sinh')).toBe(true)
+        expect(after.reduce((n, l) => n + l.amount, 0)).toBe(0)
       })
 
       it('hoá đơn nháp đang lệch (dòng chuyển sai số): lưu lại thì tự cân bằng về 0', async () => {

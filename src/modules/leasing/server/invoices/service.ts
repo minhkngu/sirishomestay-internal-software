@@ -1546,6 +1546,16 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
           .from(leaseFeeSnapshots)
           .where(inArray(leaseFeeSnapshots.id, snapIds))
       : []
+    const roomChangeInvoice =
+      inv.kind === 'termination' && old.some((o) => (o.meta as { transfer?: unknown } | null)?.transfer === true)
+    const isSystemLine = (l: { type: string; meta: unknown }) => {
+      const kind = (l.meta as { kind?: unknown } | null)?.kind
+      return !(
+        l.type === 'penalty' ||
+        l.type === 'one_off' ||
+        (l.type === 'adjustment' && (kind === 'surcharge' || kind === 'discount'))
+      )
+    }
     const initialWrites: Array<{ leaseFeeId: string; value: number }> = []
     const next = data
       .filter((l) => l.type !== 'tax')
@@ -1565,6 +1575,28 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
             amount: savedDeposit.amount,
             meta: savedDeposit.meta,
           }
+        // Hoá đơn thanh lý của chuyển phòng: dòng hệ thống giữ mô tả, đơn giá đã lưu (chỉ số lượng đổi được, trừ dòng chuyển,
+        // ví, cọc); dòng phạt, phát sinh, giảm giá nhập tay sửa tự do
+        const savedSystem = roomChangeInvoice && l.id ? old.find((previous) => previous.id === l.id) : undefined
+        if (savedSystem && isSystemLine(savedSystem)) {
+          const m = (savedSystem.meta ?? {}) as Record<string, unknown>
+          const fixed =
+            m.transfer === true ||
+            typeof m.wallet === 'number' ||
+            typeof m.pendingId === 'string' ||
+            savedSystem.type === 'deposit' ||
+            savedSystem.type === 'deposit_offset'
+          const qty = !fixed && Number.isFinite(l.quantity) && l.quantity >= 0 ? l.quantity : savedSystem.quantity
+          return {
+            invoiceId: id,
+            type: savedSystem.type,
+            description: savedSystem.description,
+            quantity: qty,
+            unitPrice: savedSystem.unitPrice,
+            amount: qty === savedSystem.quantity ? savedSystem.amount : Math.round(qty * savedSystem.unitPrice),
+            meta: savedSystem.meta,
+          }
+        }
         const meta = l.meta as {
           feeTypeId?: unknown
           leaseFeeId?: unknown
@@ -1717,32 +1749,14 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
           'Khoản chuyển từ hợp đồng cũ không sửa hoặc xoá được; muốn bỏ thì hoàn tác chuyển phòng ở hợp đồng cũ',
         )
     }
-    // Hoá đơn thanh lý của chuyển phòng (có dòng "Chuyển sang hợp đồng mới") khoá toàn bộ dòng: số do hệ thống tính từ form
-    // chuyển phòng. Muốn đổi thì hoàn tác chuyển phòng rồi chuyển lại. Chỉ hạn và ghi chú còn lưu được.
-    if (inv.kind === 'termination' && old.some((o) => (o.meta as { transfer?: unknown } | null)?.transfer === true)) {
-      const isOut = (m: unknown) => (m as { transfer?: unknown } | null)?.transfer === true
-      // Dòng "Chuyển sang hợp đồng mới" là số cân bằng, tự tính lại bên dưới nên không so số tiền của nó
-      const key = (l: { type: string; description: string; quantity: number; unitPrice: number; meta: unknown }) =>
-        JSON.stringify(
-          isOut(l.meta)
-            ? [l.type, l.description, l.meta ?? {}]
-            : [l.type, l.description, l.quantity, l.unitPrice, l.meta ?? {}],
-        )
-      const pool = old.map((o) => ({ key: key(o), amount: o.amount, used: false }))
-      for (const l of next) {
-        const hit = pool.find((x) => !x.used && x.key === key(l))
-        if (!hit)
-          throw new ValidationError(
-            'Hoá đơn thanh lý của chuyển phòng không sửa được các dòng; muốn đổi thì hoàn tác chuyển phòng rồi chuyển lại',
-          )
-        hit.used = true
-        l.amount = hit.amount // giữ đúng số đã lưu, không tính lại làm tròn
-      }
-      if (pool.some((x) => !x.used))
+    // Hoá đơn thanh lý của chuyển phòng: không xoá được dòng hệ thống; dòng chuyển luôn cân bằng về 0 khi lưu
+    if (roomChangeInvoice) {
+      const sentIds = new Set(data.map((l) => l.id).filter(Boolean))
+      if (old.some((o) => isSystemLine(o) && !sentIds.has(o.id)))
         throw new ValidationError(
-          'Hoá đơn thanh lý của chuyển phòng không sửa được các dòng; muốn đổi thì hoàn tác chuyển phòng rồi chuyển lại',
+          'Hoá đơn thanh lý của chuyển phòng không xoá được các dòng hệ thống; muốn đổi thì hoàn tác chuyển phòng rồi chuyển lại',
         )
-      // Lưu lại thì dòng chuyển luôn cân bằng về 0 (sửa được cả hoá đơn nháp cũ đang lệch)
+      const isOut = (m: unknown) => (m as { transfer?: unknown } | null)?.transfer === true
       const out = next.find((l) => isOut(l.meta))
       if (out) {
         const others = next.filter((l) => l !== out).reduce((n, l) => n + l.amount, 0)

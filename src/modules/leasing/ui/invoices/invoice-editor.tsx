@@ -904,8 +904,18 @@ export function InvoiceEditor(p: Props) {
     !!p.meterPanels?.some((x) => x.leaseFeeId === l.meta?.leaseFeeId) ||
     !!p.newInvoice?.fixedQtyFeeIds?.includes(String(l.meta?.leaseFeeId))
   const approved = p.status === 'approved'
-  // Hoá đơn thanh lý của chuyển phòng (có dòng chuyển sang hợp đồng mới): các dòng khoá hẳn, muốn sửa thì hoàn tác chuyển phòng
+  // Hoá đơn thanh lý của chuyển phòng (có dòng chuyển sang hợp đồng mới): dòng hệ thống khoá mô tả, đơn giá
   const roomChangeLocked = !!p.id && p.lines.some((l) => l.meta?.transfer === true)
+  // Dòng hệ thống của hoá đơn chuyển phòng: khoá mô tả, đơn giá, xoá; phạt, phát sinh, giảm giá nhập tay thì tự do
+  const sysRC = (l: Line) => roomChangeLocked && !(l.type === 'penalty' || l.type === 'one_off' || extraKind(l))
+  // Số lượng của dòng chuyển, ví, cọc không đổi được
+  const qtyFixed = (l: Line) =>
+    sysRC(l) &&
+    (l.meta?.transfer === true ||
+      typeof l.meta?.wallet === 'number' ||
+      typeof l.meta?.pendingId === 'string' ||
+      l.type === 'deposit' ||
+      l.type === 'deposit_offset')
 
   return (
     <div className="space-y-4">
@@ -973,374 +983,373 @@ export function InvoiceEditor(p: Props) {
           role="note"
           className="rounded-xl border border-border/80 bg-muted/40 px-4 py-3 text-xs text-muted-foreground"
         >
-          Hoá đơn thanh lý của chuyển phòng đã khoá các dòng. Muốn sửa thì hoàn tác chuyển phòng (nút Khôi phục hợp đồng
-          ở hợp đồng cũ) rồi chuyển phòng lại.
+          Hoá đơn thanh lý của chuyển phòng: mô tả và đơn giá các dòng hệ thống đã khoá, vẫn sửa được số lượng và thêm,
+          sửa, xoá các khoản phạt, phát sinh, giảm giá. Muốn đổi dòng khác thì hoàn tác chuyển phòng (nút Khôi phục hợp
+          đồng ở hợp đồng cũ) rồi chuyển lại.
         </p>
       )}
-      <fieldset disabled={roomChangeLocked} className="contents min-w-0">
-        {/* 2. Các dòng */}
-        <section className="space-y-4 rounded-2xl border border-border/80 bg-card p-5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Layers className="size-4 text-primary" />
-              <h2 className="text-sm font-semibold tracking-tight text-foreground">Các dòng</h2>
-              <span className="rounded-full border border-border/70 bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                {lines.filter((l) => !extraKind(l)).length} mục
-              </span>
-            </div>
+      {/* 2. Các dòng */}
+      <section className="space-y-4 rounded-2xl border border-border/80 bg-card p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Layers className="size-4 text-primary" />
+            <h2 className="text-sm font-semibold tracking-tight text-foreground">Các dòng</h2>
+            <span className="rounded-full border border-border/70 bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+              {lines.filter((l) => !extraKind(l)).length} mục
+            </span>
           </div>
+        </div>
 
-          <div className="overflow-x-auto rounded-xl border border-border/80 bg-card">
-            <table className="w-full text-[13px]">
-              <thead className="border-b border-border/70 text-[13px] font-medium text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-3 text-left min-w-48 whitespace-nowrap">Mô tả</th>
-                  <th className="px-3 py-3 text-left w-52 whitespace-nowrap">Thời gian</th>
-                  <th className="px-3 py-3 text-left w-44 whitespace-nowrap">Chỉ số</th>
-                  <th className="px-2.5 py-3 text-right w-16 whitespace-nowrap">SL</th>
-                  <th className="px-3 py-3 text-right w-32 whitespace-nowrap">Đơn giá</th>
-                  <th className="px-3 py-3 text-right w-28 whitespace-nowrap">Thành tiền</th>
-                  <th className="px-1.5 py-3 w-10 text-center"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60">
-                {lines.map((l, i) =>
-                  extraKind(l) ? null : (
-                    <tr key={i} className="transition-colors hover:bg-muted/20">
-                      <td className="p-2.5">
-                        <input
-                          value={
-                            isMeterLine(l)
-                              ? (p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId)?.name ?? l.description)
-                              : isLocked(l)
-                                ? l.description.replace(/ — phòng [0-9a-f-]{36}$/i, '')
-                                : l.description
-                          }
-                          disabled={isLocked(l) || isAddedFee(l) || isDepositLine(l) || isTransferIn(l)}
-                          onChange={(e) => set(i, { description: e.target.value })}
-                          className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 disabled:cursor-not-allowed disabled:border-transparent disabled:bg-transparent disabled:px-0 disabled:text-foreground"
+        <div className="overflow-x-auto rounded-xl border border-border/80 bg-card">
+          <table className="w-full text-[13px]">
+            <thead className="border-b border-border/70 text-[13px] font-medium text-muted-foreground">
+              <tr>
+                <th className="px-3 py-3 text-left min-w-48 whitespace-nowrap">Mô tả</th>
+                <th className="px-3 py-3 text-left w-52 whitespace-nowrap">Thời gian</th>
+                <th className="px-3 py-3 text-left w-44 whitespace-nowrap">Chỉ số</th>
+                <th className="px-2.5 py-3 text-right w-16 whitespace-nowrap">SL</th>
+                <th className="px-3 py-3 text-right w-32 whitespace-nowrap">Đơn giá</th>
+                <th className="px-3 py-3 text-right w-28 whitespace-nowrap">Thành tiền</th>
+                <th className="px-1.5 py-3 w-10 text-center"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60">
+              {lines.map((l, i) =>
+                extraKind(l) ? null : (
+                  <tr key={i} className="transition-colors hover:bg-muted/20">
+                    <td className="p-2.5">
+                      <input
+                        value={
+                          isMeterLine(l)
+                            ? (p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId)?.name ?? l.description)
+                            : isLocked(l)
+                              ? l.description.replace(/ — phòng [0-9a-f-]{36}$/i, '')
+                              : l.description
+                        }
+                        disabled={isLocked(l) || isAddedFee(l) || isDepositLine(l) || isTransferIn(l) || sysRC(l)}
+                        onChange={(e) => set(i, { description: e.target.value })}
+                        className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 disabled:cursor-not-allowed disabled:border-transparent disabled:bg-transparent disabled:px-0 disabled:text-foreground"
+                      />
+                    </td>
+                    <td className="p-2.5 align-top">
+                      {isTimeBased(l) && !isMeterLine(l) ? (
+                        <LineTime
+                          line={l}
+                          defaultFrom={p.start}
+                          defaultTo={p.end}
+                          fullMonth={p.fullMonth}
+                          proration={p.proration}
+                          editable={p.status === 'draft'}
+                          onChange={(meta) => set(i, timePatch(l, meta))}
                         />
-                      </td>
-                      <td className="p-2.5 align-top">
-                        {isTimeBased(l) && !isMeterLine(l) ? (
-                          <LineTime
-                            line={l}
-                            defaultFrom={p.start}
-                            defaultTo={p.end}
-                            fullMonth={p.fullMonth}
-                            proration={p.proration}
+                      ) : (
+                        <span className="text-muted-foreground/60">—</span>
+                      )}
+                    </td>
+                    <td className="p-2.5 align-top">
+                      {(() => {
+                        const panel = p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId)
+                        return panel ? (
+                          <MeterReadingsPanel
+                            panel={panel}
                             editable={p.status === 'draft'}
-                            onChange={(meta) => set(i, timePatch(l, meta))}
-                          />
-                        ) : (
-                          <span className="text-muted-foreground/60">—</span>
-                        )}
-                      </td>
-                      <td className="p-2.5 align-top">
-                        {(() => {
-                          const panel = p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId)
-                          return panel ? (
-                            <MeterReadingsPanel
-                              panel={panel}
-                              editable={p.status === 'draft'}
-                              consumption={l.quantity}
-                              snapshot={
-                                typeof l.meta?.opening === 'number' && typeof l.meta?.closing === 'number'
-                                  ? { opening: l.meta.opening, closing: l.meta.closing }
-                                  : null
-                              }
-                              onSnapshot={(opening, closing) =>
-                                set(i, {
-                                  meta: { ...l.meta, opening, closing },
-                                  quantity: closing - opening,
-                                  amount: Math.round((closing - opening) * l.unitPrice),
-                                })
-                              }
-                              staged={stagedFor(panel.leaseFeeId)}
-                              onStage={(period, value) =>
-                                setStaged((cur) => ({ ...cur, [`${panel.leaseFeeId}|${period}`]: value }))
-                              }
-                              onApply={(readings, openings) => {
-                                if (!p.id) savePreviewReadings(panel.leaseFeeId, readings, openings)
-                                else
-                                  saveAll({
-                                    staged: Object.fromEntries(
-                                      Object.entries(readings).map(([k, v]) => [`${panel.leaseFeeId}|${k}`, v]),
-                                    ),
-                                    opening: Object.fromEntries(
-                                      Object.entries(openings).map(([k, v]) => [`${panel.leaseFeeId}|${k}`, v]),
-                                    ),
-                                  })
-                              }}
-                              stagedOpening={stagedOpeningFor(panel.leaseFeeId)}
-                              onStageOpening={(period, value) =>
-                                setStagedOpening((cur) => ({ ...cur, [`${panel.leaseFeeId}|${period}`]: value }))
-                              }
-                            />
-                          ) : (
-                            (() => {
-                              // Hoá đơn thanh lý không có bảng chốt theo tháng: hiện chỉ số đầu, cuối đã lưu trên dòng
-                              const segs = Array.isArray(l.meta?.segments)
-                                ? (l.meta.segments as { start?: unknown; end?: unknown }[]).filter(
-                                    (x) => typeof x.start === 'number' && typeof x.end === 'number',
-                                  )
-                                : []
-                              return segs.length ? (
-                                <span className="tabular-nums text-foreground">
-                                  {segs
-                                    .map(
-                                      (x) =>
-                                        `${(x.start as number).toLocaleString('vi-VN')} → ${(x.end as number).toLocaleString('vi-VN')}`,
-                                    )
-                                    .join('; ')}
-                                </span>
-                              ) : (
-                                <span className="text-muted-foreground/60">—</span>
-                              )
-                            })()
-                          )
-                        })()}
-                      </td>
-                      <td className="p-2.5 align-top">
-                        {isMeterLine(l) ? (
-                          <span className="text-muted-foreground/60">—</span>
-                        ) : (
-                          <input
-                            type="number"
-                            step="any"
-                            min={0}
-                            aria-label="Số lượng"
-                            disabled={isDepositLine(l) || isTransferIn(l)}
-                            value={l.quantity}
-                            onChange={(e) => set(i, qtyPatch(l, Number(e.target.value)))}
-                            className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
-                          />
-                        )}
-                      </td>
-                      <td className="p-2.5 align-top text-right">
-                        {isLocked(l) || isAddedFee(l) || isDepositLine(l) || isTransferIn(l) ? (
-                          <span className="inline-block py-2 font-medium tabular-nums text-foreground">
-                            {formatVND(l.unitPrice)}
-                          </span>
-                        ) : (
-                          <MoneyInput
-                            allowNegative
-                            aria-label="Đơn giá"
-                            value={l.unitPriceText}
-                            onValueChange={(value) =>
+                            consumption={l.quantity}
+                            snapshot={
+                              typeof l.meta?.opening === 'number' && typeof l.meta?.closing === 'number'
+                                ? { opening: l.meta.opening, closing: l.meta.closing }
+                                : null
+                            }
+                            onSnapshot={(opening, closing) =>
                               set(i, {
-                                unitPriceText: value,
-                                unitPrice: value === '' || value === '-' ? 0 : Number(value),
+                                meta: { ...l.meta, opening, closing },
+                                quantity: closing - opening,
+                                amount: Math.round((closing - opening) * l.unitPrice),
                               })
                             }
-                            className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
+                            staged={stagedFor(panel.leaseFeeId)}
+                            onStage={(period, value) =>
+                              setStaged((cur) => ({ ...cur, [`${panel.leaseFeeId}|${period}`]: value }))
+                            }
+                            onApply={(readings, openings) => {
+                              if (!p.id) savePreviewReadings(panel.leaseFeeId, readings, openings)
+                              else
+                                saveAll({
+                                  staged: Object.fromEntries(
+                                    Object.entries(readings).map(([k, v]) => [`${panel.leaseFeeId}|${k}`, v]),
+                                  ),
+                                  opening: Object.fromEntries(
+                                    Object.entries(openings).map(([k, v]) => [`${panel.leaseFeeId}|${k}`, v]),
+                                  ),
+                                })
+                            }}
+                            stagedOpening={stagedOpeningFor(panel.leaseFeeId)}
+                            onStageOpening={(period, value) =>
+                              setStagedOpening((cur) => ({ ...cur, [`${panel.leaseFeeId}|${period}`]: value }))
+                            }
                           />
-                        )}
-                      </td>
-                      <td className="p-2.5 text-right font-bold tabular-nums text-foreground">
-                        {formatVND(lineAmount(l))}
-                      </td>
-                      <td className="p-2.5 text-center">
-                        <button
-                          type="button"
-                          disabled={(isLocked(l) && lines.some((x) => x.type === 'rent')) || isTransferIn(l)}
-                          onClick={() => setLines(lines.filter((_, j) => j !== i))}
-                          className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-rose-50 hover:text-rose-600"
-                          title={
-                            isTransferIn(l)
-                              ? 'Khoản chuyển từ hợp đồng cũ không xoá được; hoàn tác chuyển phòng ở hợp đồng cũ để bỏ'
-                              : 'Xoá dòng'
+                        ) : (
+                          (() => {
+                            // Hoá đơn thanh lý không có bảng chốt theo tháng: hiện chỉ số đầu, cuối đã lưu trên dòng
+                            const segs = Array.isArray(l.meta?.segments)
+                              ? (l.meta.segments as { start?: unknown; end?: unknown }[]).filter(
+                                  (x) => typeof x.start === 'number' && typeof x.end === 'number',
+                                )
+                              : []
+                            return segs.length ? (
+                              <span className="tabular-nums text-foreground">
+                                {segs
+                                  .map(
+                                    (x) =>
+                                      `${(x.start as number).toLocaleString('vi-VN')} → ${(x.end as number).toLocaleString('vi-VN')}`,
+                                  )
+                                  .join('; ')}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground/60">—</span>
+                            )
+                          })()
+                        )
+                      })()}
+                    </td>
+                    <td className="p-2.5 align-top">
+                      {isMeterLine(l) ? (
+                        <span className="text-muted-foreground/60">—</span>
+                      ) : (
+                        <input
+                          type="number"
+                          step="any"
+                          min={0}
+                          aria-label="Số lượng"
+                          disabled={isDepositLine(l) || isTransferIn(l) || qtyFixed(l)}
+                          value={l.quantity}
+                          onChange={(e) => set(i, qtyPatch(l, Number(e.target.value)))}
+                          className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
+                        />
+                      )}
+                    </td>
+                    <td className="p-2.5 align-top text-right">
+                      {isLocked(l) || isAddedFee(l) || isDepositLine(l) || isTransferIn(l) || sysRC(l) ? (
+                        <span className="inline-block py-2 font-medium tabular-nums text-foreground">
+                          {formatVND(l.unitPrice)}
+                        </span>
+                      ) : (
+                        <MoneyInput
+                          allowNegative
+                          aria-label="Đơn giá"
+                          value={l.unitPriceText}
+                          onValueChange={(value) =>
+                            set(i, {
+                              unitPriceText: value,
+                              unitPrice: value === '' || value === '-' ? 0 : Number(value),
+                            })
                           }
-                        >
-                          <Trash2 className="size-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ),
-                )}
-              </tbody>
-            </table>
-          </div>
+                          className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
+                        />
+                      )}
+                    </td>
+                    <td className="p-2.5 text-right font-bold tabular-nums text-foreground">
+                      {formatVND(lineAmount(l))}
+                    </td>
+                    <td className="p-2.5 text-center">
+                      <button
+                        type="button"
+                        disabled={(isLocked(l) && lines.some((x) => x.type === 'rent')) || isTransferIn(l) || sysRC(l)}
+                        onClick={() => setLines(lines.filter((_, j) => j !== i))}
+                        className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                        title={
+                          isTransferIn(l)
+                            ? 'Khoản chuyển từ hợp đồng cũ không xoá được; hoàn tác chuyển phòng ở hợp đồng cũ để bỏ'
+                            : 'Xoá dòng'
+                        }
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ),
+              )}
+            </tbody>
+          </table>
+        </div>
 
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            {p.addFee && !approved && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setPickingFee(true)}
-                className="gap-1.5 rounded-xl border-border/80 font-medium text-xs"
-              >
-                <Plus className="size-3.5" />
-                <span>Thêm phí</span>
-              </Button>
-            )}
-          </div>
-          {p.addFee && (
-            <FeePickerDialog
-              open={pickingFee}
-              onOpenChange={setPickingFee}
-              feeTypes={[...p.addFee.feeTypes, ...createdFees]}
-              usedTypeIds={
-                new Set(lines.flatMap((l) => (typeof l.meta?.feeTypeId === 'string' ? [l.meta.feeTypeId] : [])))
-              }
-              facilityId={p.addFee.facilityId}
-              description="Các loại phí đã tạo trong Cài đặt. Phí thêm vào hoá đơn dùng giá theo toà, chọn thời gian và hệ số ngay trên dòng."
-              onPick={(feeId) => {
-                const fee = [...p.addFee!.feeTypes, ...createdFees].find((f) => f.id === feeId)
-                if (!fee) return
-                const line = feeLineFromType(fee, p.addFee!.facilityId, p.addFee!.occupantsCount)
-                setLines((cur) => [...cur, { ...line, unitPriceText: String(line.unitPrice) }])
-              }}
-              renderCreateFee={
-                p.addFee.renderCreateFee
-                  ? ({ onDone }) =>
-                      p.addFee!.renderCreateFee!({
-                        onCreated: (fee) => {
-                          setCreatedFees((cur) => [...cur, fee])
-                          onDone()
-                        },
-                      })
-                  : undefined
-              }
-            />
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          {p.addFee && !approved && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setPickingFee(true)}
+              className="gap-1.5 rounded-xl border-border/80 font-medium text-xs"
+            >
+              <Plus className="size-3.5" />
+              <span>Thêm phí</span>
+            </Button>
           )}
-        </section>
+        </div>
+        {p.addFee && (
+          <FeePickerDialog
+            open={pickingFee}
+            onOpenChange={setPickingFee}
+            feeTypes={[...p.addFee.feeTypes, ...createdFees]}
+            usedTypeIds={
+              new Set(lines.flatMap((l) => (typeof l.meta?.feeTypeId === 'string' ? [l.meta.feeTypeId] : [])))
+            }
+            facilityId={p.addFee.facilityId}
+            description="Các loại phí đã tạo trong Cài đặt. Phí thêm vào hoá đơn dùng giá theo toà, chọn thời gian và hệ số ngay trên dòng."
+            onPick={(feeId) => {
+              const fee = [...p.addFee!.feeTypes, ...createdFees].find((f) => f.id === feeId)
+              if (!fee) return
+              const line = feeLineFromType(fee, p.addFee!.facilityId, p.addFee!.occupantsCount)
+              setLines((cur) => [...cur, { ...line, unitPriceText: String(line.unitPrice) }])
+            }}
+            renderCreateFee={
+              p.addFee.renderCreateFee
+                ? ({ onDone }) =>
+                    p.addFee!.renderCreateFee!({
+                      onCreated: (fee) => {
+                        setCreatedFees((cur) => [...cur, fee])
+                        onDone()
+                      },
+                    })
+                : undefined
+            }
+          />
+        )}
+      </section>
 
-        {/* Chi phí phát sinh và giảm giá: nhập tay, có mô tả */}
-        <section className="space-y-4 rounded-2xl border border-border/80 bg-card p-5">
-          <h2 className="text-sm font-semibold tracking-tight text-foreground">Chi phí phát sinh & giảm giá</h2>
-          <div className="grid gap-4 lg:grid-cols-2">
-            {(['surcharge', 'discount'] as const).map((kind) => {
-              const rows = lines.map((l, i) => ({ l, i })).filter(({ l }) => extraKind(l) === kind)
-              const label = kind === 'surcharge' ? 'Chi phí phát sinh' : 'Giảm giá'
-              return (
-                <div key={kind} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-semibold text-foreground">{label}</h3>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() =>
-                        setLines([
-                          ...lines,
-                          {
-                            type: 'adjustment',
-                            description: '',
-                            quantity: 1,
-                            unitPrice: 0,
-                            unitPriceText: '',
-                            meta: { kind },
-                          },
-                        ])
-                      }
-                      className="h-8 gap-1.5 rounded-xl border-border/80 text-xs font-medium"
-                    >
-                      <Plus className="size-3.5" />
-                      <span>Thêm</span>
-                    </Button>
-                  </div>
-                  <div className="overflow-hidden rounded-xl border border-border/80">
-                    <table className="w-full text-[13px]">
-                      <thead className="border-b border-border/70 text-[13px] font-medium text-muted-foreground">
-                        <tr>
-                          <th className="px-3 py-2 text-left">Mô tả</th>
-                          <th className="w-36 px-3 py-2 text-right">Số tiền</th>
-                          <th className="w-10" />
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/60">
-                        {rows.map(({ l, i }) => (
-                          <tr key={i}>
-                            <td className="p-2">
-                              <input
-                                aria-label={`Mô tả ${label.toLowerCase()}`}
-                                placeholder="Nhập mô tả"
-                                value={l.description}
-                                onChange={(e) => set(i, { description: e.target.value })}
-                                className="h-8 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground focus:border-primary focus:outline-none"
-                              />
-                            </td>
-                            <td className="p-2">
-                              <MoneyInput
-                                aria-label={`Số tiền ${label.toLowerCase()}`}
-                                value={l.unitPriceText.replace('-', '')}
-                                onValueChange={(value) => {
-                                  const n = value === '' ? 0 : Math.abs(Number(value))
-                                  set(i, {
-                                    unitPriceText: value === '' ? '' : String(kind === 'discount' ? -n : n),
-                                    unitPrice: kind === 'discount' ? -n : n,
-                                  })
-                                }}
-                                className="h-8 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground focus:border-primary focus:outline-none"
-                              />
-                            </td>
-                            <td className="p-2 text-center">
-                              <button
-                                type="button"
-                                title="Xoá dòng"
-                                onClick={() => setLines(lines.filter((_, j) => j !== i))}
-                                className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-rose-50 hover:text-rose-600"
-                              >
-                                <Trash2 className="size-3.5" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                        {rows.length === 0 && (
-                          <tr>
-                            <td colSpan={3} className="p-3 text-center text-muted-foreground">
-                              Chưa có
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+      {/* Chi phí phát sinh và giảm giá: nhập tay, có mô tả */}
+      <section className="space-y-4 rounded-2xl border border-border/80 bg-card p-5">
+        <h2 className="text-sm font-semibold tracking-tight text-foreground">Chi phí phát sinh & giảm giá</h2>
+        <div className="grid gap-4 lg:grid-cols-2">
+          {(['surcharge', 'discount'] as const).map((kind) => {
+            const rows = lines.map((l, i) => ({ l, i })).filter(({ l }) => extraKind(l) === kind)
+            const label = kind === 'surcharge' ? 'Chi phí phát sinh' : 'Giảm giá'
+            return (
+              <div key={kind} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-semibold text-foreground">{label}</h3>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      setLines([
+                        ...lines,
+                        {
+                          type: 'adjustment',
+                          description: '',
+                          quantity: 1,
+                          unitPrice: 0,
+                          unitPriceText: '',
+                          meta: { kind },
+                        },
+                      ])
+                    }
+                    className="h-8 gap-1.5 rounded-xl border-border/80 text-xs font-medium"
+                  >
+                    <Plus className="size-3.5" />
+                    <span>Thêm</span>
+                  </Button>
                 </div>
-              )
-            })}
-          </div>
-        </section>
+                <div className="overflow-hidden rounded-xl border border-border/80">
+                  <table className="w-full text-[13px]">
+                    <thead className="border-b border-border/70 text-[13px] font-medium text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2 text-left">Mô tả</th>
+                        <th className="w-36 px-3 py-2 text-right">Số tiền</th>
+                        <th className="w-10" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {rows.map(({ l, i }) => (
+                        <tr key={i}>
+                          <td className="p-2">
+                            <input
+                              aria-label={`Mô tả ${label.toLowerCase()}`}
+                              placeholder="Nhập mô tả"
+                              value={l.description}
+                              onChange={(e) => set(i, { description: e.target.value })}
+                              className="h-8 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground focus:border-primary focus:outline-none"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <MoneyInput
+                              aria-label={`Số tiền ${label.toLowerCase()}`}
+                              value={l.unitPriceText.replace('-', '')}
+                              onValueChange={(value) => {
+                                const n = value === '' ? 0 : Math.abs(Number(value))
+                                set(i, {
+                                  unitPriceText: value === '' ? '' : String(kind === 'discount' ? -n : n),
+                                  unitPrice: kind === 'discount' ? -n : n,
+                                })
+                              }}
+                              className="h-8 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground focus:border-primary focus:outline-none"
+                            />
+                          </td>
+                          <td className="p-2 text-center">
+                            <button
+                              type="button"
+                              title="Xoá dòng"
+                              onClick={() => setLines(lines.filter((_, j) => j !== i))}
+                              className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {rows.length === 0 && (
+                        <tr>
+                          <td colSpan={3} className="p-3 text-center text-muted-foreground">
+                            Chưa có
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </section>
 
-        {/* Chi tiết: thành tiền, giảm giá, phát sinh, thuế, tổng */}
-        <section className="space-y-2 rounded-2xl border border-border/80 bg-card p-5">
-          <h2 className="text-sm font-semibold tracking-tight text-foreground">Chi tiết hoá đơn</h2>
-          <dl className="space-y-1.5 text-sm">
-            <div className="flex justify-between gap-3">
-              <dt className="text-muted-foreground">Thành tiền</dt>
-              <dd className="font-medium tabular-nums">{formatVND(subtotal)}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-muted-foreground">Giảm giá</dt>
-              <dd className="font-medium tabular-nums">{formatVND(discount)}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-muted-foreground">Phát sinh</dt>
-              <dd className="font-medium tabular-nums">{formatVND(surcharge)}</dd>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <dt className="flex items-center gap-2 text-muted-foreground">
-                <label htmlFor="invoice-tax-rate">Thuế (%)</label>
-                <input
-                  id="invoice-tax-rate"
-                  inputMode="decimal"
-                  placeholder="0"
-                  value={taxRate}
-                  onChange={(e) => setTaxRate(e.target.value)}
-                  className="h-8 w-20 rounded-lg border border-border/80 bg-background px-2 text-right text-xs tabular-nums text-foreground focus:border-primary focus:outline-none"
-                />
-              </dt>
-              <dd className="font-medium tabular-nums">{formatVND(tax)}</dd>
-            </div>
-            <div className="flex justify-between gap-3 border-t border-border/70 pt-2">
-              <dt className="font-semibold text-foreground">
-                {total < 0 ? 'Siris hoàn trả khách' : total > 0 ? 'Khách phải thanh toán' : 'Tổng tiền'}
-              </dt>
-              <dd className="text-base font-bold tabular-nums text-primary">{formatVND(Math.abs(total))}</dd>
-            </div>
-          </dl>
-        </section>
-      </fieldset>
+      {/* Chi tiết: thành tiền, giảm giá, phát sinh, thuế, tổng */}
+      <section className="space-y-2 rounded-2xl border border-border/80 bg-card p-5">
+        <h2 className="text-sm font-semibold tracking-tight text-foreground">Chi tiết hoá đơn</h2>
+        <dl className="space-y-1.5 text-sm">
+          <div className="flex justify-between gap-3">
+            <dt className="text-muted-foreground">Thành tiền</dt>
+            <dd className="font-medium tabular-nums">{formatVND(subtotal)}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-muted-foreground">Giảm giá</dt>
+            <dd className="font-medium tabular-nums">{formatVND(discount)}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-muted-foreground">Phát sinh</dt>
+            <dd className="font-medium tabular-nums">{formatVND(surcharge)}</dd>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <dt className="flex items-center gap-2 text-muted-foreground">
+              <label htmlFor="invoice-tax-rate">Thuế (%)</label>
+              <input
+                id="invoice-tax-rate"
+                inputMode="decimal"
+                placeholder="0"
+                value={taxRate}
+                onChange={(e) => setTaxRate(e.target.value)}
+                className="h-8 w-20 rounded-lg border border-border/80 bg-background px-2 text-right text-xs tabular-nums text-foreground focus:border-primary focus:outline-none"
+              />
+            </dt>
+            <dd className="font-medium tabular-nums">{formatVND(tax)}</dd>
+          </div>
+          <div className="flex justify-between gap-3 border-t border-border/70 pt-2">
+            <dt className="font-semibold text-foreground">
+              {total < 0 ? 'Siris hoàn trả khách' : total > 0 ? 'Khách phải thanh toán' : 'Tổng tiền'}
+            </dt>
+            <dd className="text-base font-bold tabular-nums text-primary">{formatVND(Math.abs(total))}</dd>
+          </div>
+        </dl>
+      </section>
 
       <section className="space-y-2 rounded-2xl border border-border/80 bg-card p-5">
         <label htmlFor="invoice-note" className="block text-sm font-semibold tracking-tight text-foreground">
