@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import { facilities, tenants } from '@/db'
+import { eq } from 'drizzle-orm'
+import { facilities, tenants, tenantWalletEntries } from '@/db'
 import type { DB } from '@/db/client'
 import { createTestDb } from '../helpers/db'
 import { addWalletEntry, walletBalance } from '@/modules/leasing/server/wallet/service'
@@ -42,5 +43,16 @@ describe('sổ ví khách', () => {
     await addWalletEntry(db, entry({ facilityId: fA, amount: 1_000_000 }))
     await addWalletEntry(db, entry({ facilityId: fB, amount: -500_000, kind: 'use_invoice' }))
     expect(await walletBalance(db, tenantId)).toBe(4_500_000) // 4.000.000 từ hai test trước + 1.000.000 − 500.000
+  })
+
+  it('addWalletEntry trả false khi trùng, kể cả chạy song song', async () => {
+    const e = entry({ amount: 100, sourceKey: 'overpay:parallel' })
+    const results = await Promise.all([addWalletEntry(db, e), addWalletEntry(db, e)])
+    expect(results.sort()).toEqual([false, true])
+    const rows = await db
+      .select()
+      .from(tenantWalletEntries)
+      .where(eq(tenantWalletEntries.sourceKey, 'overpay:parallel'))
+    expect(rows).toHaveLength(1)
   })
 })

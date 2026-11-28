@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input'
 import { summarize, type LedgerRow } from '@/domain/cashbook'
 import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
-import { PAYMENT_METHOD_LABELS, type PaymentMethod } from '@/domain/payment-labels'
+import { PAYMENT_METHOD_DISPLAY_LABELS } from '@/domain/payment-labels'
 import { cn } from '@/lib/utils'
 import { deleteDepositEntryAction } from '@/modules/leasing/actions'
 import { deleteExpenseAction, deletePaymentAction } from '../server/cashbook/actions'
@@ -283,7 +283,7 @@ export function CashbookList({
                   </div>
                   {r.method && (
                     <div className="text-xs text-muted-foreground">
-                      {PAYMENT_METHOD_LABELS[r.method as PaymentMethod] ?? r.method}
+                      {PAYMENT_METHOD_DISPLAY_LABELS[r.method] ?? r.method}
                     </div>
                   )}
                 </td>

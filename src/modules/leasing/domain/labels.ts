@@ -1,3 +1,5 @@
+import type { WalletEntryKind } from '@/domain/statuses'
+
 /** Trạng thái thu tiền của hoá đơn (suy ra từ hoá đơn và các khoản đã thu). */
 export const INVOICE_STATUS_LABELS = {
   draft: 'Nháp',
@@ -17,3 +19,13 @@ export const INVOICE_KIND_LABELS = {
   termination: 'Thanh lý',
   manual: 'Lập tay',
 } as const
+
+/** Nhãn loại biến động ví khách. */
+export const WALLET_ENTRY_LABELS: Record<WalletEntryKind, string> = {
+  overpay: 'Thu dư vào ví',
+  reallocate: 'Chuyển phiếu thu vào ví',
+  refund_out: 'Trả lại khách',
+  carry_surplus: 'Dư chuyển phòng',
+  use_invoice: 'Dùng ví trả hoá đơn',
+  use_termination: 'Ví gạch vào thanh lý',
+}

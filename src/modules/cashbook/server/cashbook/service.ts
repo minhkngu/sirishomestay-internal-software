@@ -6,7 +6,7 @@ import { depositHeld, depositMovement, expenseLabel, type LedgerRow } from '@/do
 import { splitPaymentsDepositFirst } from '@/domain/deposit'
 import { VN_TIME_ZONE } from '@/domain/dates'
 import { NotFoundError, ValidationError } from '@/domain/errors'
-import { listOverpayEntries } from '@/modules/leasing'
+import { listWalletCashEntries, WALLET_ENTRY_LABELS } from '@/modules/leasing'
 import { displayName } from '@/modules/tenants'
 import { recordAudit } from '@/modules/platform'
 import { expenseInput } from './schemas'
@@ -146,8 +146,8 @@ export async function listCashbook(
         : []),
     ]
   })
-  // Tiền khách trả dư vào ví: tiền thật, tính một lần vào ngày khách đưa
-  const overpay = await listOverpayEntries(db, { facilityIds: scope ?? 'all', month })
+  // Biến động ví có tiền thật: thu dư, phiếu chuyển vào ví (thu), trả lại khách (chi)
+  const overpay = await listWalletCashEntries(db, { facilityIds: scope ?? 'all', month })
   const overTenants = overpay.length
     ? await db
         .select()
@@ -176,10 +176,10 @@ export async function listCashbook(
       source: 'wallet',
       id: o.id,
       date: o.date,
-      direction: 'in',
+      direction: o.kind === 'refund_out' ? 'out' : 'in',
       kind: 'rent',
-      label: 'Thu dư vào ví',
-      amount: o.amount,
+      label: WALLET_ENTRY_LABELS[o.kind],
+      amount: o.kind === 'refund_out' ? -o.amount : o.amount,
       counted: true,
       facilityId: o.facilityId,
       roomCode: overRooms.find((r) => r.leaseId === o.leaseId)?.roomCode ?? null,

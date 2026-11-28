@@ -57,7 +57,7 @@ import {
 } from '@/modules/documents'
 import { applyReadings, setLeaseInitialReading, setOpeningValue } from '@/modules/meters'
 import { resolveBankAccount } from '@/domain/vietqr'
-import { PAYMENT_METHOD_LABELS, type PaymentMethod } from '@/domain/payment-labels'
+import { PAYMENT_METHOD_DISPLAY_LABELS } from '@/domain/payment-labels'
 import { addWalletEntry, reverseWalletForPayments, walletBalance } from '../wallet/service'
 import { clampWalletUse, splitReceipt } from '../../domain/wallet'
 
@@ -2191,7 +2191,7 @@ registerPdfLoader('receipt', async (db, ctx, id) => {
         invoiceCode: inv.code,
         paidOn: p.paidOn,
         amount: p.amount,
-        method: PAYMENT_METHOD_LABELS[p.method as PaymentMethod] ?? p.method,
+        method: PAYMENT_METHOD_DISPLAY_LABELS[p.method] ?? p.method,
         receivedBy: ctx.userId === p.receivedBy ? (ctx.fullName ?? '') : '',
         facility: { name: row.facility.name, address: row.facility.address },
         room: row.room.code,

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { auditLogs, depositEntries, facilities, invoiceLines, leases, rooms, tenants } from '@/db'
+import { auditLogs, depositEntries, facilities, invoiceLines, leases, rooms, tenants, tenantWalletEntries } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { summarize } from '@/domain/cashbook'
@@ -113,6 +113,37 @@ describe('sổ quỹ thu chi', () => {
     ;({ rows } = await listCashbook(db, ctx(), {}))
     expect(summarize(rows).income).toBe(21000000)
     expect(rows.some((r) => r.method === 'wallet')).toBe(false)
+  })
+  it('sổ quỹ đọc đúng các loại ví', async () => {
+    const [lease] = await db.select({ tenantId: leases.tenantId }).from(leases).where(eq(leases.id, leaseId))
+    const e = (
+      kind: 'overpay' | 'reallocate' | 'refund_out' | 'carry_surplus' | 'use_invoice',
+      amount: number,
+      date: string,
+    ) => ({
+      tenantId: lease.tenantId,
+      facilityId,
+      kind,
+      amount,
+      date,
+      sourceKey: `seed:${kind}`,
+    })
+    await db
+      .insert(tenantWalletEntries)
+      .values([
+        e('overpay', 3_000_000, '2026-09-01'),
+        e('reallocate', 9_000_000, '2026-09-02'),
+        e('refund_out', -9_000_000, '2026-09-05'),
+        e('carry_surplus', 5_900_000, '2026-09-06'),
+        e('use_invoice', -1_000_000, '2026-09-07'),
+      ])
+    const { rows } = await listCashbook(db, ctx(), {})
+    expect(summarize(rows)).toEqual({ income: 12_000_000, expense: 9_000_000, net: 3_000_000 })
+    expect(rows.find((r) => r.date === '2026-09-05')).toMatchObject({
+      direction: 'out',
+      amount: 9_000_000,
+      label: 'Trả lại khách',
+    })
   })
   it('hoá đơn có dòng cọc: tiền thu trả cọc trước, sổ quỹ tách dòng thu cọc và thu tiền thuê, không tính hai lần', async () => {
     await db

@@ -29,14 +29,9 @@ export async function walletBalance(db: DB, tenantId: string): Promise<number> {
   return row?.n ?? 0
 }
 
-/** Ghi một biến động ví; trùng `sourceKey` thì bỏ qua. Trả true nếu đã ghi mới. */
+/** Ghi một biến động ví; trùng `sourceKey` thì bỏ qua. Trả true chỉ khi thật sự chèn (an toàn khi chạy song song). */
 export async function addWalletEntry(tx: DB, e: WalletEntryInput): Promise<boolean> {
-  const [exists] = await tx
-    .select({ id: tenantWalletEntries.id })
-    .from(tenantWalletEntries)
-    .where(eq(tenantWalletEntries.sourceKey, e.sourceKey))
-  if (exists) return false
-  await tx
+  const rows = await tx
     .insert(tenantWalletEntries)
     .values({
       tenantId: e.tenantId,
@@ -51,7 +46,8 @@ export async function addWalletEntry(tx: DB, e: WalletEntryInput): Promise<boole
       sourceKey: e.sourceKey,
     })
     .onConflictDoNothing({ target: tenantWalletEntries.sourceKey })
-  return true
+    .returning()
+  return rows.length > 0
 }
 
 /**
@@ -102,16 +98,22 @@ export async function listWalletEntries(db: DB, ctx: AccessContext, tenantId: st
     .orderBy(desc(tenantWalletEntries.date), desc(tenantWalletEntries.createdAt))
 }
 
-/** Biến động thu vượt (tiền thật khách đưa) trong phạm vi cơ sở và tháng, cho sổ quỹ. */
-export async function listOverpayEntries(db: DB, filter: { facilityIds: string[] | 'all'; month?: string }) {
-  const rows = await db
+/** Biến động ví có tiền thật đi qua (thu dư, phiếu chuyển vào ví, trả lại khách) trong phạm vi cơ sở và tháng, cho sổ quỹ. */
+export async function listWalletCashEntries(db: DB, filter: { facilityIds: string[] | 'all'; month?: string }) {
+  return db
     .select()
     .from(tenantWalletEntries)
-    .where(eq(tenantWalletEntries.kind, 'overpay'))
+    .where(
+      and(
+        inArray(tenantWalletEntries.kind, ['overpay', 'reallocate', 'refund_out']),
+        filter.facilityIds === 'all'
+          ? undefined
+          : inArray(
+              tenantWalletEntries.facilityId,
+              filter.facilityIds.length ? filter.facilityIds : ['00000000-0000-0000-0000-000000000000'],
+            ),
+        filter.month ? sql`to_char(${tenantWalletEntries.date}, 'YYYY-MM') = ${filter.month}` : undefined,
+      ),
+    )
     .orderBy(desc(tenantWalletEntries.date))
-  return rows.filter(
-    (r) =>
-      (filter.facilityIds === 'all' || filter.facilityIds.includes(r.facilityId)) &&
-      (!filter.month || r.date.startsWith(filter.month)),
-  )
 }
