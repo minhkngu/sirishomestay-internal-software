@@ -2341,13 +2341,21 @@ export async function getInvoiceDetail(db: DB, ctx: AccessContext, id: string) {
     ...row,
   }
 }
-function pdfLine(line: typeof invoiceLines.$inferSelect) {
-  const meta = line.meta as { unit?: unknown; segments?: { start?: unknown; end?: unknown }[] } | null
+export function pdfLine(line: typeof invoiceLines.$inferSelect) {
+  const meta = line.meta as {
+    unit?: unknown
+    segments?: { start?: unknown; end?: unknown }[]
+    opening?: unknown
+    closing?: unknown
+  } | null
+  // Chỉ số điện nước in kèm tên khoản: theo từng đồng hồ (segments) hoặc số đầu, số cuối của dòng kỳ ký hợp đồng
   const segments = Array.isArray(meta?.segments)
     ? meta.segments
         .filter((segment) => typeof segment.start === 'number' && typeof segment.end === 'number')
         .map((segment) => `${segment.start} đến ${segment.end}`)
-    : []
+    : typeof meta?.opening === 'number' && typeof meta?.closing === 'number'
+      ? [`${meta.opening} đến ${meta.closing}`]
+      : []
   return {
     description: segments.length ? `${line.description} (${segments.join('; ')})` : line.description,
     quantity: line.quantity,
