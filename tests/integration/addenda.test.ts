@@ -712,16 +712,16 @@ describe('phụ lục hợp đồng', () => {
         readings: [{ meterId: m.id, value: 220 }],
       })
     }
-    it('thanh lý 20/11, phạt 500.000: không mất cọc → −11.080.000', async () => {
+    it('thanh lý 20/11, phạt 500.000: không mất cọc → −11.380.000', async () => {
       const r = await terminate({ mode: 'none' })
-      expect(r.invoice!.total).toBe(-11080000)
+      expect(r.invoice!.total).toBe(-11380000)
       await approveInvoice(db, ctx(), r.invoice!.id, { dueDate: '2026-11-30' })
       expect((await getInvoiceDetail(db, ctx(), r.invoice!.id)).state).toBe('refund_pending')
       const entries = (await db.select().from(depositEntries)).filter((e) => e.status === 'done')
       expect(entries.reduce((n, e) => n + (['collect', 'topup'].includes(e.type) ? e.amount : -e.amount), 0)).toBe(0)
     })
-    it('thanh lý 20/11, mất cọc toàn bộ → −2.080.000', async () => {
-      expect((await terminate({ mode: 'all' })).invoice!.total).toBe(-2080000)
+    it('thanh lý 20/11, mất cọc toàn bộ → −2.380.000', async () => {
+      expect((await terminate({ mode: 'all' })).invoice!.total).toBe(-2380000)
     })
     it('thanh lý không hoàn tiền phòng: không có dòng hoàn, hoá đơn vẫn duyệt được', async () => {
       const r = await terminate({ mode: 'none' }, { mode: 'none' })
@@ -732,11 +732,11 @@ describe('phụ lục hợp đồng', () => {
       expect((await db.select().from(leases).where(eq(leases.id, leaseId)))[0].status).toBe('ended')
     })
     it('thanh lý hoàn một phần đúng mức tối đa → như hoàn theo ngày', async () => {
-      const r = await terminate({ mode: 'none' }, { mode: 'partial', amount: 3000000 })
-      expect(r.invoice!.total).toBe(-11080000)
+      const r = await terminate({ mode: 'none' }, { mode: 'partial', amount: 3300000 })
+      expect(r.invoice!.total).toBe(-11380000)
     })
     it('thanh lý hoàn một phần vượt mức tối đa 1 đồng bị từ chối', async () => {
-      await expect(terminate({ mode: 'none' }, { mode: 'partial', amount: 3000001 })).rejects.toThrow(
+      await expect(terminate({ mode: 'none' }, { mode: 'partial', amount: 3300001 })).rejects.toThrow(
         'Số tiền hoàn vượt mức tính theo ngày',
       )
     })

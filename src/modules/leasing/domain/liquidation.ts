@@ -44,16 +44,11 @@ export type TerminationInput = {
   walletBalance?: number
   /** Chuyển phòng: thêm dòng "Chuyển sang hợp đồng mới" bằng −T để hoá đơn về 0, không phát sinh hoàn tiền mặt. */
   transfer?: boolean
-  /**
-   * Tính tiền phòng, phí cố định và hoàn theo ngày đến hết ngày này (mặc định `endDate`).
-   * Chuyển phòng: ngày chuyển thuộc phòng mới nên bằng ngày chuyển − 1. Chỉ số đồng hồ vẫn theo `endDate`.
-   */
-  billedUntil?: ISODate
 }
 
 /**
  * Hoá đơn thanh lý. total > 0: khách phải trả thêm; total < 0: hoàn cho khách.
- * Tiền phòng đã trả trước vượt `endDate` → dòng hoàn (âm); dòng trừ cọc = −(số dư cọc − phần mất cọc).
+ * Tiền phòng đã trả trước từ ngày `endDate` trở đi → dòng hoàn (âm); dòng trừ cọc = −(số dư cọc − phần mất cọc).
  */
 export function buildTerminationInvoice(input: TerminationInput): {
   lines: InvoiceLineInput[]
@@ -62,8 +57,9 @@ export function buildTerminationInvoice(input: TerminationInput): {
   maxRefund: number
 } {
   const { terms } = input
-  // Mọi phép tính tiền theo ngày dùng ngày tính tiền cuối (billedUntil), mặc định là ngày kết thúc
-  const endDate = input.billedUntil ?? input.endDate
+  // Ngày trả phòng (hoặc chuyển phòng) thuộc về hôm sau: tiền theo ngày tính đến hết hôm trước, hoàn từ chính ngày trả.
+  // Chỉ số đồng hồ vẫn chốt theo ngày trả (do người gọi tính).
+  const billedTo = addDays(input.endDate, -1)
   const lines: InvoiceLineInput[] = []
 
   // tiền phòng và phí cố định đã trả trước vượt ngày trả → các dòng hoàn theo ngày (ứng viên), áp lựa chọn rentRefund bên dưới;
@@ -72,12 +68,11 @@ export function buildTerminationInvoice(input: TerminationInput): {
     (i) => i.status === 'approved' && i.lines.some((l) => l.type === 'rent'),
   )
   const refundCandidates: InvoiceLineInput[] = []
-  const dayAfterEnd = addDays(endDate, 1)
   let covered: ISODate | null = null
   for (const inv of rentInvoices) {
     if (!covered || inv.periodEnd > covered) covered = inv.periodEnd
-    if (inv.periodEnd > endDate) {
-      const from = dayAfterEnd > inv.periodStart ? dayAfterEnd : inv.periodStart
+    if (inv.periodEnd > billedTo) {
+      const from = input.endDate > inv.periodStart ? input.endDate : inv.periodStart
       const sum = prorateFraction(from, inv.periodEnd, input.proration)
       const amount = -Math.round(terms.monthlyRent * sum)
       if (amount !== 0) {
@@ -93,9 +88,9 @@ export function buildTerminationInvoice(input: TerminationInput): {
       for (const l of inv.lines) {
         const metaFrom = l.meta?.from
         const metaTo = l.meta?.to
-        if (l.type !== 'fee' || typeof metaFrom !== 'string' || typeof metaTo !== 'string' || metaTo <= endDate)
+        if (l.type !== 'fee' || typeof metaFrom !== 'string' || typeof metaTo !== 'string' || metaTo <= billedTo)
           continue
-        const feeFrom = dayAfterEnd > metaFrom ? dayAfterEnd : metaFrom
+        const feeFrom = input.endDate > metaFrom ? input.endDate : metaFrom
         const feeSum = prorateFraction(feeFrom, metaTo, input.proration)
         const feeAmount = -Math.round(l.quantity * l.unitPrice * feeSum)
         if (feeAmount === 0) continue
@@ -126,11 +121,11 @@ export function buildTerminationInvoice(input: TerminationInput): {
       })
     }
   }
-  if (!covered || covered < endDate) {
-    const monthStart = `${endDate.slice(0, 7)}-01`
+  if (!covered || covered < billedTo) {
+    const monthStart = `${billedTo.slice(0, 7)}-01`
     const base = covered ? addDays(covered, 1) : monthStart
     const from = base > terms.startDate ? base : terms.startDate
-    const sum = prorateFraction(from, endDate, input.proration)
+    const sum = prorateFraction(from, billedTo, input.proration)
     if (sum > 0) {
       lines.push({
         type: 'rent',
@@ -139,7 +134,7 @@ export function buildTerminationInvoice(input: TerminationInput): {
         unitPrice: terms.monthlyRent,
         amount: Math.round(terms.monthlyRent * sum),
         // Thời gian nằm ở cột thời gian của dòng, không ghi trong mô tả
-        meta: { from, to: endDate, coefficient: Math.round(sum * 10000) / 10000 },
+        meta: { from, to: billedTo, coefficient: Math.round(sum * 10000) / 10000 },
       })
     }
   }

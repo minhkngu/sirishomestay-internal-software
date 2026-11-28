@@ -679,60 +679,60 @@ describe('buildTerminationInvoice', () => {
     forfeit: { mode: 'none' as const },
     proration: 'days_30' as const,
   })
-  it('không mất cọc → hoàn khách 11.080.000', () => {
+  it('không mất cọc → hoàn khách 11.380.000 (hoàn tiền phòng 20–30/11, 11 ngày)', () => {
     const r = buildTerminationInvoice(input())
-    expect(r.total).toBe(-11_080_000)
-    expect(r.lines.find((l) => l.type === 'refund')?.amount).toBe(-3_000_000)
+    expect(r.total).toBe(-11_380_000)
+    expect(r.lines.find((l) => l.type === 'refund')?.amount).toBe(-3_300_000)
     expect(r.lines.find((l) => l.type === 'deposit_offset')?.amount).toBe(-9_000_000)
   })
-  it('mất cọc toàn bộ → hoàn khách 2.080.000', () => {
-    expect(buildTerminationInvoice({ ...input(), forfeit: { mode: 'all' } }).total).toBe(-2_080_000)
+  it('mất cọc toàn bộ → hoàn khách 2.380.000', () => {
+    expect(buildTerminationInvoice({ ...input(), forfeit: { mode: 'all' } }).total).toBe(-2_380_000)
   })
   it('mất một phần cọc', () => {
     expect(buildTerminationInvoice({ ...input(), forfeit: { mode: 'partial', amount: 4_000_000 } }).total).toBe(
-      -7_080_000,
+      -7_380_000,
     )
   })
   it('nợ cũ làm tăng số khách phải trả', () => {
-    expect(buildTerminationInvoice({ ...input(), unpaidTotal: 2_000_000 }).total).toBe(-9_080_000)
+    expect(buildTerminationInvoice({ ...input(), unpaidTotal: 2_000_000 }).total).toBe(-9_380_000)
   })
-  it('chưa có hoá đơn tiền phòng cho tháng cuối → tính tiền phòng lẻ đến ngày kết thúc', () => {
+  it('chưa có hoá đơn tiền phòng cho tháng cuối → tính tiền phòng lẻ đến hết hôm trước ngày trả', () => {
     const r = buildTerminationInvoice({ ...input(), approvedInvoices: [] })
-    expect(r.lines.find((l) => l.type === 'rent')?.amount).toBe(6_000_000)
-    expect(r.total).toBe(-9_000_000 + 6_000_000 + 920_000)
+    expect(r.lines.find((l) => l.type === 'rent')?.amount).toBe(5_700_000)
+    expect(r.total).toBe(-9_000_000 + 5_700_000 + 920_000)
   })
 
   describe('ví khách và chuyển phòng', () => {
     it('toàn bộ ví gạch vào hoá đơn, kể cả khi phần phải trả nhỏ hơn ví', () => {
-      // Không có cọc, hoàn tiền: tổng trước ví = 6.000.000 (tiền phòng lẻ) + 420.000 (điện nước) + 500.000 (phạt)
+      // Không có cọc, hoàn tiền: tổng trước ví = 5.700.000 (tiền phòng lẻ) + 420.000 (điện nước) + 500.000 (phạt)
       const base = { ...input(), approvedInvoices: [], depositBalance: 0 }
       const r = buildTerminationInvoice({ ...base, walletBalance: 10_000_000 })
       const w = r.lines.find((l) => l.meta?.wallet)
       expect(w?.amount).toBe(-10_000_000)
-      expect(r.total).toBe(-3_080_000)
+      expect(r.total).toBe(-3_380_000)
     })
     it('tổng trước ví âm (hoàn cho khách): ví cộng vào tiền hoàn', () => {
       const r = buildTerminationInvoice({ ...input(), walletBalance: 5_000_000 })
       expect(r.lines.find((l) => l.meta?.wallet)?.amount).toBe(-5_000_000)
-      expect(r.total).toBe(-16_080_000)
+      expect(r.total).toBe(-16_380_000)
     })
-    it('chuyển phòng, T âm (còn số dư cho khách): dòng chuyển +11.080.000, tổng 0', () => {
+    it('chuyển phòng, T âm (còn số dư cho khách): dòng chuyển +11.380.000, tổng 0', () => {
       const r = buildTerminationInvoice({ ...input(), transfer: true })
-      // T = −11.080.000 (như test hoàn khách không mất cọc) → dòng chuyển +11.080.000
-      expect(r.lines.find((l) => l.meta?.transfer)?.amount).toBe(11_080_000)
+      // T = −11.380.000 (như test hoàn khách không mất cọc) → dòng chuyển +11.380.000
+      expect(r.lines.find((l) => l.meta?.transfer)?.amount).toBe(11_380_000)
       expect(r.total).toBe(0)
     })
     it('chuyển phòng, T dương: nợ 2.000.000 sang hợp đồng mới', () => {
-      const r = buildTerminationInvoice({ ...input(), transfer: true, unpaidTotal: 13_080_000 })
-      // T = −11.080.000 + 13.080.000 = 2.000.000
+      const r = buildTerminationInvoice({ ...input(), transfer: true, unpaidTotal: 13_380_000 })
+      // T = −11.380.000 + 13.380.000 = 2.000.000
       expect(r.lines.find((l) => l.meta?.transfer)?.amount).toBe(-2_000_000)
       expect(r.total).toBe(0)
     })
     it('chuyển phòng, T = 0: không có dòng chuyển', () => {
-      const r = buildTerminationInvoice({ ...input(), transfer: true, unpaidTotal: 11_080_000 })
+      const r = buildTerminationInvoice({ ...input(), transfer: true, unpaidTotal: 11_380_000 })
       expect(r.lines.some((l) => l.meta?.transfer)).toBe(false)
     })
-    it('billedUntil: ngày chuyển thuộc phòng mới, hoàn trả trước bắt đầu từ ngày chuyển', () => {
+    it('ngày chuyển thuộc phòng mới: hoàn trả trước bắt đầu từ chính ngày chuyển', () => {
       const dec = invoice({
         periodStart: '2026-12-01',
         periodEnd: '2026-12-31',
@@ -743,7 +743,6 @@ describe('buildTerminationInvoice', () => {
       const r = buildTerminationInvoice({
         ...input(),
         endDate: '2026-12-16',
-        billedUntil: '2026-12-15',
         approvedInvoices: [dec],
         meterFees: [],
         penalties: [],
@@ -788,15 +787,15 @@ describe('buildTerminationInvoice', () => {
 
     it('hoàn theo ngày: hoàn cả phí cố định, không hoàn phí đồng hồ', () => {
       const r = buildTerminationInvoice({ ...input(), approvedInvoices: [paidNovFee] })
-      expect(refunds(r).map((l) => l.amount)).toEqual([-3_000_000, -100_000])
+      expect(refunds(r).map((l) => l.amount)).toEqual([-3_300_000, -110_000])
       expect(refunds(r)[1].description).toMatch(/^Hoàn Wifi/)
-      expect(r.maxRefund).toBe(3_100_000)
-      expect(r.total).toBe(-11_180_000)
+      expect(r.maxRefund).toBe(3_410_000)
+      expect(r.total).toBe(-11_490_000)
     })
     it('hoàn theo ngày: hoàn mọi kỳ trả trước', () => {
       const dec = invoice({ id: 'I2', periodStart: '2026-12-01', periodEnd: '2026-12-31', lines: [rentLine] })
       const r = buildTerminationInvoice({ ...input(), approvedInvoices: [paidNov, dec] })
-      expect(refunds(r).reduce((s, l) => s + l.amount, 0)).toBe(-12_000_000)
+      expect(refunds(r).reduce((s, l) => s + l.amount, 0)).toBe(-12_300_000)
     })
     it('hoá đơn nháp không bị hoàn', () => {
       const r = buildTerminationInvoice({ ...input(), approvedInvoices: [{ ...paidNov, status: 'draft' }] })
@@ -806,7 +805,7 @@ describe('buildTerminationInvoice', () => {
       const r = buildTerminationInvoice({ ...input(), approvedInvoices: [paidNovFee], rentRefund: { mode: 'none' } })
       expect(refunds(r)).toHaveLength(0)
       expect(r.total).toBe(-8_080_000)
-      expect(r.maxRefund).toBe(3_100_000)
+      expect(r.maxRefund).toBe(3_410_000)
     })
     it('hoàn một phần: một dòng gộp', () => {
       const r = buildTerminationInvoice({ ...input(), rentRefund: { mode: 'partial', amount: 1_000_000 } })
@@ -815,24 +814,63 @@ describe('buildTerminationInvoice', () => {
     })
     it('hoàn một phần vượt mức tối đa thì cắt về mức tối đa', () => {
       const r = buildTerminationInvoice({ ...input(), rentRefund: { mode: 'partial', amount: 5_000_000 } })
-      expect(refunds(r).map((l) => l.amount)).toEqual([-3_000_000])
+      expect(refunds(r).map((l) => l.amount)).toEqual([-3_300_000])
     })
     it('hoàn một phần nhập 0 → không có dòng hoàn', () => {
       const r = buildTerminationInvoice({ ...input(), rentRefund: { mode: 'partial', amount: 0 } })
       expect(refunds(r)).toHaveLength(0)
     })
     it('không có kỳ nào vượt ngày trả → không có dòng hoàn ở cả ba chế độ', () => {
-      const base = buildTerminationInvoice({ ...input(), endDate: '2026-11-30' })
+      const base = buildTerminationInvoice({ ...input(), endDate: '2026-12-01' })
       for (const rentRefund of [
         { mode: 'by_days' as const },
         { mode: 'partial' as const, amount: 100 },
         { mode: 'none' as const },
       ]) {
-        const r = buildTerminationInvoice({ ...input(), endDate: '2026-11-30', rentRefund })
+        const r = buildTerminationInvoice({ ...input(), endDate: '2026-12-01', rentRefund })
         expect(refunds(r)).toHaveLength(0)
         expect(r.maxRefund).toBe(0)
         expect(r.total).toBe(base.total)
       }
+    })
+    it('thanh lý thường hoàn từ chính ngày trả', () => {
+      const jan = invoice({
+        periodStart: '2027-01-01',
+        periodEnd: '2027-01-31',
+        lines: [
+          { type: 'rent', description: 'Tiền phòng tháng 1', quantity: 1, unitPrice: 12_000_000, amount: 12_000_000 },
+        ],
+      })
+      const r = buildTerminationInvoice({
+        ...input(),
+        terms: { ...input().terms, monthlyRent: 12_000_000 },
+        endDate: '2027-01-16',
+        proration: 'actual_days',
+        approvedInvoices: [jan],
+        meterFees: [],
+        penalties: [],
+        depositBalance: 0,
+      })
+      expect(refunds(r).map((l) => l.amount)).toEqual([-6_193_548])
+      expect(refunds(r)[0].description).toContain('16/01–31/01')
+    })
+    it('thanh lý ngày 1 của tháng chưa có hoá đơn: không có tiền phòng còn thiếu, không có dòng hoàn', () => {
+      const jan = invoice({
+        periodStart: '2027-01-01',
+        periodEnd: '2027-01-31',
+        lines: [
+          { type: 'rent', description: 'Tiền phòng tháng 1', quantity: 1, unitPrice: 9_000_000, amount: 9_000_000 },
+        ],
+      })
+      const r = buildTerminationInvoice({
+        ...input(),
+        endDate: '2027-02-01',
+        approvedInvoices: [jan],
+        meterFees: [],
+        penalties: [],
+        depositBalance: 0,
+      })
+      expect(r.lines.some((l) => l.type === 'rent' || l.type === 'refund')).toBe(false)
     })
     it('không truyền rentRefund = hoàn theo ngày', () => {
       const a = buildTerminationInvoice(input())

@@ -925,7 +925,6 @@ export async function createTermination(
       rentRefund: data.rentRefund,
       walletBalance: await walletBalance(tx, l.tenantId),
       transfer: opts.transfer,
-      billedUntil: opts.transfer ? addDays(data.endDate, -1) : undefined,
     })
     if (data.rentRefund.mode === 'partial' && (data.rentRefund.amount ?? 0) > built.maxRefund)
       throw new ValidationError('Số tiền hoàn vượt mức tính theo ngày', {
