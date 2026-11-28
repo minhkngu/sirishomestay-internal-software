@@ -986,6 +986,7 @@ export function InvoiceEditor(p: Props) {
                 <th className="px-3 py-3 text-left w-52 whitespace-nowrap">Thời gian</th>
                 <th className="px-3 py-3 text-left w-44 whitespace-nowrap">Chỉ số</th>
                 <th className="px-2.5 py-3 text-right w-16 whitespace-nowrap">SL</th>
+                <th className="px-3 py-3 text-right w-32 whitespace-nowrap">Đơn giá</th>
                 <th className="px-3 py-3 text-right w-28 whitespace-nowrap">Thành tiền</th>
                 <th className="px-1.5 py-3 w-10 text-center"></th>
               </tr>
@@ -1007,24 +1008,6 @@ export function InvoiceEditor(p: Props) {
                         onChange={(e) => set(i, { description: e.target.value })}
                         className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 disabled:cursor-not-allowed disabled:border-transparent disabled:bg-transparent disabled:px-0 disabled:text-foreground"
                       />
-                      <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted-foreground">
-                        <span className="shrink-0">Đơn giá</span>
-                        {isLocked(l) || isAddedFee(l) || isDepositLine(l) || isTransferIn(l) ? (
-                          <span className="font-medium tabular-nums text-foreground">{formatVND(l.unitPrice)}</span>
-                        ) : (
-                          <MoneyInput
-                            allowNegative
-                            value={l.unitPriceText}
-                            onValueChange={(value) =>
-                              set(i, {
-                                unitPriceText: value,
-                                unitPrice: value === '' || value === '-' ? 0 : Number(value),
-                              })
-                            }
-                            className="h-8 w-32 rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
-                          />
-                        )}
-                      </div>
                     </td>
                     <td className="p-2.5 align-top">
                       {isTimeBased(l) && !isMeterLine(l) ? (
@@ -1118,6 +1101,26 @@ export function InvoiceEditor(p: Props) {
                           disabled={isDepositLine(l) || isTransferIn(l)}
                           value={l.quantity}
                           onChange={(e) => set(i, qtyPatch(l, Number(e.target.value)))}
+                          className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
+                        />
+                      )}
+                    </td>
+                    <td className="p-2.5 align-top text-right">
+                      {isLocked(l) || isAddedFee(l) || isDepositLine(l) || isTransferIn(l) ? (
+                        <span className="inline-block py-2 font-medium tabular-nums text-foreground">
+                          {formatVND(l.unitPrice)}
+                        </span>
+                      ) : (
+                        <MoneyInput
+                          allowNegative
+                          aria-label="Đơn giá"
+                          value={l.unitPriceText}
+                          onValueChange={(value) =>
+                            set(i, {
+                              unitPriceText: value,
+                              unitPrice: value === '' || value === '-' ? 0 : Number(value),
+                            })
+                          }
                           className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
                         />
                       )}
