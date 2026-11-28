@@ -53,6 +53,7 @@ export {
   deleteInvoiceAction,
   listInvoiceableLeasesAction,
   previewBatchAction,
+  previewPaymentRemovalAction,
   saveInvoiceFeeQuantitiesAction,
   savePreviewMeterReadingAction,
   savePreviewOpeningReadingAction,

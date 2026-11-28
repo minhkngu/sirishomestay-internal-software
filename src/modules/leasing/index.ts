@@ -21,9 +21,10 @@ export {
   listInvoices,
   nextInvoiceCode,
   previewNewInvoice,
+  previewPaymentRemoval,
   removePayment,
   tenantBalance,
   updatePayment,
 } from './server/invoices/service'
 export { computeDueDate } from './domain/due-date'
-export { addWalletEntry, listWalletCashEntries, listWalletEntries, walletBalance } from './server/wallet/service'
+export { addWalletEntry, type PaymentRemoval, settleRemovedPayments, listWalletCashEntries, listWalletEntries, walletBalance } from './server/wallet/service'

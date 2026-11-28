@@ -22,6 +22,7 @@ import {
   leaseDebt,
   leaseWalletBalance,
   recordLeasePayment,
+  previewPaymentRemoval,
   removePayment,
   setInvoiceDueDate,
   setInvoiceNote,
@@ -134,10 +135,14 @@ export async function addPaymentAction(
     return {}
   })
 }
-export async function removePaymentAction(paymentId: string) {
+export async function previewPaymentRemovalAction(paymentId: string) {
+  const ctx = await getAccessContext()
+  return toActionResult(() => previewPaymentRemoval(db, ctx, paymentId))
+}
+export async function removePaymentAction(paymentId: string, removal?: unknown) {
   const ctx = await getAccessContext()
   return toActionResult(async () => {
-    await removePayment(db, ctx, paymentId)
+    await removePayment(db, ctx, paymentId, removal)
     refresh()
     return {}
   })

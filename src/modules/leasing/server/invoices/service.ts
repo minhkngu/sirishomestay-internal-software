@@ -28,7 +28,7 @@ import { computeDueDate } from '../../domain/due-date'
 import { depositHeld } from '@/domain/cashbook'
 import { daysInMonth, formatDateVN, todayVN } from '@/domain/dates'
 import { displayName } from '@/modules/tenants'
-import { NotFoundError, ValidationError } from '@/domain/errors'
+import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import { midPeriodAdjustments } from '../../domain/adjustments'
 import { fullMonthCoefficient, monthsCoefficient } from '../../domain/proration'
 import { rebalanceTransferLine } from '../../domain/transfer-line'
@@ -59,7 +59,12 @@ import {
 import { applyReadings, setLeaseInitialReading, setOpeningValue } from '@/modules/meters'
 import { resolveBankAccount } from '@/domain/vietqr'
 import { PAYMENT_METHOD_DISPLAY_LABELS } from '@/domain/payment-labels'
-import { addWalletEntry, reverseWalletForPayments, walletBalance } from '../wallet/service'
+import {
+  addWalletEntry,
+  settleRemovedPayments,
+  walletBalance,
+  type PaymentRemoval,
+} from '../wallet/service'
 import { clampWalletUse, splitReceipt } from '../../domain/wallet'
 
 const batchSchema = z.object({ facilityId: z.uuid(), period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) })
@@ -2069,24 +2074,63 @@ export async function updatePayment(db: DB, ctx: AccessContext, id: string, inpu
     await syncDepositWithInvoice(tx, ctx, inv.id)
   })
 }
-export async function removePayment(db: DB, ctx: AccessContext, paymentId: string): Promise<void> {
+const paymentRemovalSchema = z
+  .discriminatedUnion('kind', [
+    z.object({ kind: z.literal('to_wallet') }),
+    z.object({ kind: z.literal('refund'), refundOn: z.iso.date() }),
+    z.object({ kind: z.literal('mistake') }),
+  ])
+  .default({ kind: 'to_wallet' })
+
+/** Phiếu nhập nhầm chỉ admin hoặc chính người lập phiếu trong cùng ngày (giờ Việt Nam) được xoá hẳn. */
+const canDeleteAsMistake = (ctx: AccessContext, row: { receivedBy: string | null; createdAt: Date }) =>
+  ctx.isAdmin || (row.receivedBy === ctx.userId && todayVN(row.createdAt) === todayVN())
+
+/**
+ * Gỡ một khoản thu: chuyển tiền vào ví khách (mặc định), trả lại khách (thu giữ ngày gốc, thêm chi) hoặc nhập nhầm
+ * (xoá hẳn, rút tiền dư của phiếu). Khoản trả bằng ví luôn được trả lại ví; khoản gộp vào thanh lý không gỡ tay được.
+ */
+export async function removePayment(db: DB, ctx: AccessContext, paymentId: string, removal?: unknown): Promise<void> {
+  const how: PaymentRemoval = parse(paymentRemovalSchema, removal)
   await db.transaction(async (tx0) => {
     const tx = tx0 as unknown as DB
     const [row] = await tx.select().from(payments).where(eq(payments.id, paymentId))
     if (!row) throw new NotFoundError()
     const inv = await getInvoice(tx, ctx, row.invoiceId)
-    await reverseWalletForPayments(tx, [paymentId])
+    if (how.kind === 'mistake' && row.method !== 'wallet' && !canDeleteAsMistake(ctx, row))
+      throw new ForbiddenError('Chỉ admin hoặc người lập phiếu trong cùng ngày được xoá phiếu nhập nhầm')
+    await settleRemovedPayments(tx, ctx, [paymentId], how, `Gỡ khoản thu của ${inv.code}`)
     await tx.delete(payments).where(eq(payments.id, paymentId))
     await recordAudit(tx, ctx, {
       action: 'delete',
       entity: 'payment',
       entityId: paymentId,
       facilityId: inv.facilityId,
-      summary: `Gỡ khoản thu của ${inv.code}`,
+      summary: `Gỡ khoản thu của ${inv.code} (${{ to_wallet: 'chuyển vào ví', refund: 'trả lại khách', mistake: 'nhập nhầm' }[how.kind]})`,
       before: row,
     })
     await syncDepositWithInvoice(tx, ctx, row.invoiceId)
   })
+}
+
+/** Thông tin cho popup gỡ phiếu: số dư ví hiện tại của khách, phiếu có gạch cọc không, người dùng có xoá nhập nhầm được không. */
+export async function previewPaymentRemoval(db: DB, ctx: AccessContext, paymentId: string) {
+  const [row] = await db.select().from(payments).where(eq(payments.id, paymentId))
+  if (!row) throw new NotFoundError()
+  const inv = await getInvoice(db, ctx, row.invoiceId)
+  const [lease] = await db.select({ tenantId: leases.tenantId }).from(leases).where(eq(leases.id, inv.leaseId))
+  const [deposit] = await db
+    .select({ id: invoiceLines.id })
+    .from(invoiceLines)
+    .where(and(eq(invoiceLines.invoiceId, inv.id), eq(invoiceLines.type, 'deposit')))
+    .limit(1)
+  return {
+    amount: row.amount,
+    method: row.method,
+    walletBalance: lease ? await walletBalance(db, lease.tenantId) : 0,
+    hasDeposit: !!deposit,
+    canMistake: canDeleteAsMistake(ctx, row),
+  }
 }
 export async function listInvoices(
   db: DB,

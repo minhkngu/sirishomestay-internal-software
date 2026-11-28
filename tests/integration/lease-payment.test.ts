@@ -14,6 +14,8 @@ import {
   removePayment,
   updatePayment,
 } from '@/modules/leasing/server/invoices/service'
+import { listCashbook } from '@/modules/cashbook/server/cashbook/service'
+import { summarize } from '@/domain/cashbook'
 import { createTestDb } from '../helpers/db'
 
 const context = (permissions: Permission[], facilityId: string): AccessContext => ({
@@ -130,7 +132,9 @@ describe('ghi thu theo hợp đồng', () => {
     const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-09' })
     await approveInvoice(db, ctx(), inv.id, {})
     await recordLeasePayment(db, ctx(), leaseId, { ...pay(0), walletAmount: 2000000 })
-    await expect(removePayment(db, ctx(), overpayPayment)).rejects.toThrow(ValidationError)
+    await expect(removePayment(db, { ...ctx(), isAdmin: true }, overpayPayment, { kind: 'mistake' })).rejects.toThrow(
+      ValidationError,
+    )
   })
   it('dùng ví vượt số dư ví hoặc vượt nợ thì từ chối', async () => {
     await expect(recordLeasePayment(db, ctx(), leaseId, { ...pay(1000), walletAmount: 1 })).rejects.toThrow(
@@ -164,6 +168,56 @@ describe('ghi thu theo hợp đồng', () => {
     const [p] = await db.select().from(payments).where(eq(payments.id, over.paymentId!))
     expect(over.amount).toBe(2000000)
     expect(p.invoiceId).toBe((await db.select().from(payments).orderBy(payments.createdAt).limit(10)).at(-1)!.invoiceId)
+  })
+  describe('gỡ phiếu thu: chuyển vào ví, trả lại khách, nhập nhầm', () => {
+    // Thu 20.000.000 cho hoá đơn 7, 8 (mỗi tháng 9.000.000): dư 2.000.000 vào ví, gắn phiếu tháng 8
+    const setup = async (who: AccessContext) => {
+      await recordLeasePayment(db, who, leaseId, pay(20000000))
+      const byMonth = async (m: string) => {
+        const [inv] = (await listInvoices(db, who, {})).filter((i) => i.periodStart.slice(0, 7) === m)
+        const [p] = await db.select().from(payments).where(eq(payments.invoiceId, inv.id))
+        return p
+      }
+      return { july: await byMonth('2026-07'), august: await byMonth('2026-08') }
+    }
+    const totals = async () => summarize((await listCashbook(db, ctx(), {})).rows)
+
+    it('chuyển vào ví: ví cộng cả phiếu, sổ quỹ giữ thu 20.000.000, nợ tháng 7 mở lại; thu lại bằng ví', async () => {
+      const { july } = await setup(ctx())
+      await removePayment(db, ctx(), july.id, { kind: 'to_wallet' })
+      expect(await leaseWalletBalance(db, ctx(), leaseId)).toBe(11000000)
+      expect((await totals()).income).toBe(20000000)
+      expect(await leaseDebt(db, ctx(), leaseId)).toBe(9000000)
+      await recordLeasePayment(db, ctx(), leaseId, { ...pay(0), walletAmount: 9000000 })
+      expect(await leaseWalletBalance(db, ctx(), leaseId)).toBe(2000000)
+      expect((await totals()).income).toBe(20000000)
+    })
+    it('trả lại khách: ví không đổi, sổ quỹ thu 20.000.000 và chi 9.000.000', async () => {
+      const { july } = await setup(ctx())
+      await removePayment(db, ctx(), july.id, { kind: 'refund', refundOn: '2026-08-20' })
+      expect(await leaseWalletBalance(db, ctx(), leaseId)).toBe(2000000)
+      expect(await totals()).toMatchObject({ income: 20000000, expense: 9000000 })
+    })
+    it('nhập nhầm: rút tiền dư của phiếu, dòng thu biến mất', async () => {
+      const me = ctx()
+      const { july, august } = await setup(me)
+      await removePayment(db, me, july.id, { kind: 'mistake' })
+      expect(await leaseWalletBalance(db, ctx(), leaseId)).toBe(2000000)
+      expect((await totals()).income).toBe(11000000)
+      await removePayment(db, me, august.id, { kind: 'mistake' })
+      expect(await leaseWalletBalance(db, ctx(), leaseId)).toBe(0)
+      expect((await totals()).income).toBe(0)
+    })
+    it('người khác (không admin, không lập phiếu) chọn nhập nhầm thì bị từ chối', async () => {
+      const { july } = await setup(ctx())
+      await expect(removePayment(db, ctx(), july.id, { kind: 'mistake' })).rejects.toThrow(ForbiddenError)
+      expect(await db.select().from(payments).where(eq(payments.id, july.id))).toHaveLength(1)
+    })
+    it('mặc định là chuyển vào ví', async () => {
+      const { july } = await setup(ctx())
+      await removePayment(db, ctx(), july.id)
+      expect(await leaseWalletBalance(db, ctx(), leaseId)).toBe(11000000)
+    })
   })
   it('hợp đồng không còn hoá đơn mở thì không thu được', async () => {
     await recordLeasePayment(db, ctx(), leaseId, pay(18000000))

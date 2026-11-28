@@ -160,6 +160,20 @@ describe('sổ quỹ thu chi', () => {
     expect(summarize(rows).income).toBe(10000000)
     expect(depositHeld).toBe(9000000)
   })
+  it('gỡ phiếu từng gạch cọc, trả lại khách: cọc về chờ thu, ví không đổi, sổ quỹ thu rồi chi', async () => {
+    await db
+      .insert(depositEntries)
+      .values({ leaseId, date: '2026-08-01', type: 'collect', amount: 9000000, status: 'pending' })
+    const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-08' })
+    await approveInvoice(db, ctx(), inv.id, {})
+    await recordLeasePayment(db, ctx(), leaseId, { paidOn: '2026-08-10', amount: 18000000, method: 'cash' })
+    const [pay] = (await listCashbook(db, ctx(), {})).rows.filter((r) => r.source === 'payment')
+    await removePayment(db, ctx(), pay.id, { kind: 'refund', refundOn: '2026-08-12' })
+    const [dep] = await db.select().from(depositEntries).where(eq(depositEntries.leaseId, leaseId))
+    expect(dep.status).toBe('pending')
+    const { rows } = await listCashbook(db, ctx(), {})
+    expect(summarize(rows)).toMatchObject({ income: 18000000, expense: 18000000 })
+  })
   it('người chỉ có quyền cơ sở A không thấy cơ sở B', async () => {
     await addExpense(db, context(['billing'], [otherId]), expense({ facilityId: otherId }))
     expect((await listCashbook(db, ctx(), {})).rows).toHaveLength(0)
