@@ -323,6 +323,24 @@ describe('thanh lý nối ví và chuyển phòng', () => {
       await expect(cancelRoomChange(db, ctx(), leaseId, storage)).rejects.toThrow(ValidationError)
     })
 
+    it('khôi phục hợp đồng cũ: hoá đơn thanh lý nháp thì xem trước được và xác nhận huỷ chuyển phòng', async () => {
+      const r = await change()
+      const preview = await previewContractRestore(db, ctx(), 'lease', leaseId)
+      expect(preview).toMatchObject({ roomChange: true, blockedReason: null })
+      expect(preview.items).toContainEqual(expect.objectContaining({ type: 'lease', id: r.newLeaseId }))
+      await cancelRoomChange(db, ctx(), leaseId, storage)
+      expect(await db.select().from(leases).where(eq(leases.id, r.newLeaseId))).toHaveLength(0)
+      expect((await db.select().from(leases).where(eq(leases.id, leaseId)))[0].status).toBe('active')
+    })
+
+    it('khôi phục hợp đồng cũ: hoá đơn thanh lý đã duyệt thì xem trước bị chặn', async () => {
+      const r = await change()
+      await approveInvoice(db, ctx(), r.terminationInvoiceId, {})
+      const preview = await previewContractRestore(db, ctx(), 'lease', leaseId)
+      expect(preview.roomChange).toBe(true)
+      expect(preview.blockedReason).toContain('đã duyệt')
+    })
+
     it('huỷ chuyển phòng thiếu quyền xoá hợp đồng thì từ chối trước khi làm gì', async () => {
       await change()
       await expect(cancelRoomChange(db, context(['tenants_contracts'], facilityId), leaseId, storage)).rejects.toThrow()
