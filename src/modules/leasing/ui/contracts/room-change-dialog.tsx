@@ -2,7 +2,7 @@
 import { DateField } from '@/components/date-field'
 import { MoneyInput } from '@/components/ui/money-input'
 import { useEffect, useState } from 'react'
-import { createRoomChangeAction, roomChangeBlockerAction } from '../../server/addenda/actions'
+import { createRoomChangeAction, roomChangeBlockerAction, roomChangeMetersAction } from '../../server/addenda/actions'
 import { roomChangeBlockerMessage } from '../../domain/room-change-blockers'
 import { Field, inputCls, type MeterOption } from './addendum-shell'
 import { LeaseFees, type FeeDraft, type FeeOption, type RoomFeeMeter } from './lease-fees'
@@ -25,7 +25,6 @@ type FeeData = {
     quantity: number
   }[]
   options: { id: string; name: string; unit: string; price: number; meter: boolean; source: string }[]
-  facilityMeters: RoomFeeMeter[]
 }
 
 const toFeeOption = (o: FeeData['options'][number]): FeeOption => ({
@@ -89,7 +88,20 @@ export function RoomChangeWizard({
   const [fees, setFees] = useState<FeeDraft[]>(() => (feeData?.current ?? []).map(toDraft))
   const [createdTypes, setCreatedTypes] = useState<FeeOption[]>([])
   const feeTypes = [...(feeData?.options ?? []).map(toFeeOption), ...createdTypes]
-  const roomMeters = feeData?.facilityMeters ?? []
+  // Đồng hồ của phòng mới: tải khi chọn phòng (không tải sẵn đồng hồ mọi phòng của cơ sở)
+  const [loadedMeters, setLoadedMeters] = useState<{ roomId: string; meters: RoomFeeMeter[] } | null>(null)
+  useEffect(() => {
+    if (!newRoomId) return
+    let alive = true
+    void roomChangeMetersAction(leaseId, newRoomId).then((r) => {
+      if (alive && r.ok)
+        setLoadedMeters({ roomId: newRoomId, meters: r.data.map((m) => ({ ...m, roomId: newRoomId })) })
+    })
+    return () => {
+      alive = false
+    }
+  }, [leaseId, newRoomId])
+  const roomMeters = loadedMeters?.roomId === newRoomId ? loadedMeters.meters : []
   const pickedMeters = resolveMeterIds({ roomMeters, roomId: newRoomId, fees })
   const feeError =
     fees

@@ -10,6 +10,7 @@ export {
   createTransferAction,
   exportAddendumAction,
   roomChangeBlockerAction,
+  roomChangeMetersAction,
   previewAddendumAction,
   setAddendumSignStatusAction,
 } from './server/addenda/actions'

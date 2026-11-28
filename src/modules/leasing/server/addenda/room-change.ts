@@ -1,4 +1,4 @@
-import { and, eq, inArray, ne } from 'drizzle-orm'
+import { and, eq, inArray, isNull, ne } from 'drizzle-orm'
 import { z } from 'zod'
 import {
   assets,
@@ -37,8 +37,13 @@ const roomChangeSchema = z.object({
       depositAmount: z.number().int().nonnegative(),
     })
     .catchall(z.unknown()),
-  /** Chỉ số ban đầu của đồng hồ phòng mới tại ngày chuyển (bắt buộc cho mỗi phí theo đồng hồ). */
-  newRoomReadings: z.array(z.object({ meterId: z.uuid(), value: z.number().int().nonnegative() })).default([]),
+  /**
+   * Đồng hồ phòng mới và chỉ số ban đầu tại ngày chuyển cho từng phí theo đồng hồ (bắt buộc khi không gửi `lease.fees`);
+   * `leaseFeeId` là phí của hợp đồng cũ.
+   */
+  newRoomReadings: z
+    .array(z.object({ leaseFeeId: z.uuid(), meterId: z.uuid(), value: z.number().int().nonnegative() }))
+    .default([]),
   /** Các trường của phụ lục thanh lý trừ `endDate` (chỉ số cuối, kiểm kê, hoàn tiền phòng, phạt, mất cọc). */
   termination: z.record(z.string(), z.unknown()).default({}),
 })
@@ -53,27 +58,16 @@ function parse(input: unknown) {
   return r.data
 }
 
-/** Sao chép phí của hợp đồng cũ; phí theo đồng hồ gắn lại vào đồng hồ cùng loại của phòng mới. */
+/** Sao chép phí của hợp đồng cũ; phí theo đồng hồ gắn vào đúng đồng hồ phòng mới mà người dùng chọn cho phí đó. */
 async function copyFees(
   tx: DB,
   oldLeaseId: string,
   newRoomId: string,
-  readings: { meterId: string; value: number }[],
+  readings: { leaseFeeId: string; meterId: string; value: number }[],
 ): Promise<LeaseFeeInput[]> {
   const fees = await tx.select().from(leaseFeeSnapshots).where(eq(leaseFeeSnapshots.leaseId, oldLeaseId))
-  const links = fees.length
-    ? await tx
-        .select({ leaseFeeId: leaseFeeMeters.leaseFeeId, utility: meters.utility })
-        .from(leaseFeeMeters)
-        .innerJoin(meters, eq(meters.id, leaseFeeMeters.meterId))
-        .where(
-          inArray(
-            leaseFeeMeters.leaseFeeId,
-            fees.map((f) => f.id),
-          ),
-        )
-    : []
   const newMeters = await tx.select().from(meters).where(eq(meters.roomId, newRoomId))
+  const used = new Set<string>()
   return fees.map((f) => {
     const base: LeaseFeeInput = {
       feeTypeId: f.feeTypeId,
@@ -84,16 +78,49 @@ async function copyFees(
       quantity: f.quantity,
     }
     if (f.quantitySource !== 'meter') return base
-    const utility = links.find((l) => l.leaseFeeId === f.id)?.utility
-    const meter = newMeters.find((m) => m.utility === utility)
-    if (!meter) throw new ValidationError(`Phòng mới chưa có đồng hồ cho phí ${f.name}`)
-    const initial = readings.find((r) => r.meterId === meter.id)
-    if (!initial)
-      throw new ValidationError(`Nhập chỉ số ban đầu của đồng hồ ${f.name} phòng mới`, {
-        newRoomReadings: `Thiếu chỉ số ban đầu cho ${f.name}`,
+    const chosen = readings.find((r) => r.leaseFeeId === f.id)
+    if (!chosen)
+      throw new ValidationError(`Chọn đồng hồ và nhập chỉ số ban đầu của phí ${f.name} ở phòng mới`, {
+        newRoomReadings: `Thiếu đồng hồ cho ${f.name}`,
       })
-    return { ...base, existingMeterId: meter.id, initialReading: initial.value }
+    const meter = newMeters.find((m) => m.id === chosen.meterId)
+    if (!meter) throw new ValidationError(`Đồng hồ của phí ${f.name} không thuộc phòng mới`)
+    if (meter.removedOn) throw new ValidationError(`Đồng hồ của phí ${f.name} đã tháo, chọn đồng hồ khác`)
+    if (used.has(meter.id))
+      throw new ValidationError(`Phí ${f.name} dùng chung đồng hồ với phí khác, chọn đồng hồ riêng`)
+    used.add(meter.id)
+    return { ...base, existingMeterId: meter.id, initialReading: chosen.value }
   })
+}
+
+/** Đồng hồ đang dùng của phòng mới để chọn khi chuyển phòng; `busy` nếu đã gắn phí của hợp đồng đang hiệu lực khác trong cơ sở. */
+export async function roomChangeMeters(db: DB, ctx: AccessContext, leaseId: string, newRoomId: string) {
+  const [old] = await db
+    .select({ facilityId: rooms.facilityId })
+    .from(leases)
+    .innerJoin(rooms, eq(rooms.id, leases.roomId))
+    .where(eq(leases.id, leaseId))
+  const [room] = await db.select({ facilityId: rooms.facilityId }).from(rooms).where(eq(rooms.id, newRoomId))
+  if (!old || !room || old.facilityId !== room.facilityId) throw new NotFoundError()
+  assertCan(ctx, 'tenants_contracts', old.facilityId)
+  const rows = await db
+    .select()
+    .from(meters)
+    .where(and(eq(meters.roomId, newRoomId), isNull(meters.removedOn)))
+  const busy = await db
+    .select({ meterId: leaseFeeMeters.meterId })
+    .from(leaseFeeMeters)
+    .innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId))
+    .innerJoin(leases, eq(leases.id, leaseFeeSnapshots.leaseId))
+    .innerJoin(rooms, eq(rooms.id, leases.roomId))
+    .where(and(eq(leases.status, 'active'), eq(rooms.facilityId, old.facilityId)))
+  const busyIds = new Set(busy.map((b) => b.meterId))
+  return rows.map((m) => ({
+    id: m.id,
+    utility: (m.utility === 'electric' || m.utility === 'water' ? m.utility : 'fee') as 'electric' | 'water' | 'fee',
+    label: `${m.name || (m.utility === 'electric' ? 'Điện' : m.utility === 'water' ? 'Nước' : 'Đồng hồ')}${m.code ? ` · ${m.code}` : ''}${m.serial ? ` · ${m.serial}` : ''}`,
+    busy: busyIds.has(m.id),
+  }))
 }
 
 /** Hoá đơn của hợp đồng cũ cản việc chuyển phòng (nháp, còn nợ), để popup báo ngay khi mở. */

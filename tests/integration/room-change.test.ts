@@ -429,13 +429,114 @@ describe('thanh lý nối ví và chuyển phòng', () => {
       const termination = { forfeit: { mode: 'none' }, readings: [{ meterId: oldMeter.id, value: 120 }] }
       await expect(change({ termination })).rejects.toThrow(ValidationError)
       expect((await db.select().from(leases).where(eq(leases.id, leaseId)))[0].status).toBe('active')
-      const r = await change({ termination, newRoomReadings: [{ meterId: newMeter.id, value: 40 }] })
+      const r = await change({
+        termination,
+        newRoomReadings: [{ leaseFeeId: fee.id, meterId: newMeter.id, value: 40 }],
+      })
       const links = await db
         .select({ meterId: leaseFeeMeters.meterId })
         .from(leaseFeeMeters)
         .innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId))
         .where(eq(leaseFeeSnapshots.leaseId, r.newLeaseId))
       expect(links.map((l) => l.meterId)).toEqual([newMeter.id])
+    })
+
+    describe('chọn đồng hồ phòng mới', () => {
+      // Hai phí điện của hợp đồng cũ, mỗi phí một đồng hồ điện phòng cũ; phòng mới có hai đồng hồ điện
+      const setup = async () => {
+        const [o1, o2, n1, n2] = await db
+          .insert(meters)
+          .values([
+            { roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 },
+            { roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 },
+            { roomId: room2Id, utility: 'electric', installedOn: '2026-01-01', startReading: 0 },
+            { roomId: room2Id, utility: 'electric', installedOn: '2026-01-01', startReading: 0 },
+          ])
+          .returning()
+        const [f1, f2] = await db
+          .insert(leaseFeeSnapshots)
+          .values(
+            ['Điện chính', 'Điện phụ'].map((name) => ({
+              leaseId,
+              name,
+              unit: 'kWh',
+              quantitySource: 'meter',
+              billing: 'per_occurrence',
+              unitPrice: 3500,
+            })),
+          )
+          .returning()
+        await db.insert(leaseFeeMeters).values([
+          { leaseFeeId: f1.id, meterId: o1.id },
+          { leaseFeeId: f2.id, meterId: o2.id },
+        ])
+        const termination = {
+          forfeit: { mode: 'none' },
+          readings: [
+            { meterId: o1.id, value: 120 },
+            { meterId: o2.id, value: 120 },
+          ],
+        }
+        return { f1, f2, n1, n2, termination }
+      }
+      it('hai phí điện gắn cùng một đồng hồ thì báo lỗi theo tên phí thứ hai', async () => {
+        const { f1, f2, n1, termination } = await setup()
+        await expect(
+          change({
+            termination,
+            newRoomReadings: [
+              { leaseFeeId: f1.id, meterId: n1.id, value: 10 },
+              { leaseFeeId: f2.id, meterId: n1.id, value: 10 },
+            ],
+          }),
+        ).rejects.toThrow('Điện phụ')
+        expect((await db.select().from(leases)).map((l) => l.code)).toEqual(['HD1'])
+      })
+      it('đồng hồ không thuộc phòng mới thì từ chối', async () => {
+        const { f1, f2, n2, termination } = await setup()
+        const [foreign] = await db.select().from(meters).where(eq(meters.roomId, roomId)).limit(1)
+        await expect(
+          change({
+            termination,
+            newRoomReadings: [
+              { leaseFeeId: f1.id, meterId: foreign.id, value: 10 },
+              { leaseFeeId: f2.id, meterId: n2.id, value: 10 },
+            ],
+          }),
+        ).rejects.toThrow('không thuộc phòng mới')
+      })
+      it('đồng hồ đã tháo thì từ chối', async () => {
+        const { f1, f2, n1, n2, termination } = await setup()
+        await db.update(meters).set({ removedOn: '2026-10-01' }).where(eq(meters.id, n1.id))
+        await expect(
+          change({
+            termination,
+            newRoomReadings: [
+              { leaseFeeId: f1.id, meterId: n1.id, value: 10 },
+              { leaseFeeId: f2.id, meterId: n2.id, value: 10 },
+            ],
+          }),
+        ).rejects.toThrow('đã tháo')
+      })
+      it('mỗi phí gắn đúng đồng hồ được chọn', async () => {
+        const { f1, f2, n1, n2, termination } = await setup()
+        const r = await change({
+          termination,
+          newRoomReadings: [
+            { leaseFeeId: f1.id, meterId: n2.id, value: 10 },
+            { leaseFeeId: f2.id, meterId: n1.id, value: 20 },
+          ],
+        })
+        const links = await db
+          .select({ name: leaseFeeSnapshots.name, meterId: leaseFeeMeters.meterId })
+          .from(leaseFeeMeters)
+          .innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId))
+          .where(eq(leaseFeeSnapshots.leaseId, r.newLeaseId))
+        expect(Object.fromEntries(links.map((l) => [l.name, l.meterId]))).toEqual({
+          'Điện chính': n2.id,
+          'Điện phụ': n1.id,
+        })
+      })
     })
 
     it('huỷ chuyển phòng rồi chuyển lại với chỉ số khác: không vướng chỉ số bàn giao còn sót của lần trước', async () => {
@@ -459,11 +560,11 @@ describe('thanh lý nối ví và chuyển phòng', () => {
         .returning()
       await db.insert(leaseFeeMeters).values({ leaseFeeId: fee.id, meterId: oldMeter.id })
       const termination = { forfeit: { mode: 'none' }, readings: [{ meterId: oldMeter.id, value: 120 }] }
-      await change({ termination, newRoomReadings: [{ meterId: newMeter.id, value: 40 }] })
+      await change({ termination, newRoomReadings: [{ leaseFeeId: fee.id, meterId: newMeter.id, value: 40 }] })
       await cancelRoomChange(db, ctx(), leaseId, storage)
       expect(await db.select().from(meterReadings).where(eq(meterReadings.meterId, newMeter.id))).toHaveLength(0)
       await expect(
-        change({ termination, newRoomReadings: [{ meterId: newMeter.id, value: 45 }] }),
+        change({ termination, newRoomReadings: [{ leaseFeeId: fee.id, meterId: newMeter.id, value: 45 }] }),
       ).resolves.toBeDefined()
     })
 
@@ -492,7 +593,7 @@ describe('thanh lý nối ví và chuyển phòng', () => {
         .values({ meterId: newMeter.id, period: '2026-11', kind: 'handover', readOn: '2026-11-20', value: 30 })
       await change({
         termination: { forfeit: { mode: 'none' }, readings: [{ meterId: oldMeter.id, value: 120 }] },
-        newRoomReadings: [{ meterId: newMeter.id, value: 40 }],
+        newRoomReadings: [{ leaseFeeId: fee.id, meterId: newMeter.id, value: 40 }],
       })
       const rows = await db.select().from(meterReadings).where(eq(meterReadings.meterId, newMeter.id))
       expect(rows.map((r) => r.value)).toEqual([40])

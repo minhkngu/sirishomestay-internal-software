@@ -289,7 +289,7 @@ export function ContractRowActions({
               currentRoomId={data.form.currentRoomId}
               freeRooms={data.form.freeRooms}
               terminationMeters={data.form.terminationMeters}
-              feeData={data.feeData && 'facilityMeters' in data.feeData ? data.feeData : undefined}
+              feeData={data.feeData && 'current' in data.feeData ? data.feeData : undefined}
               assets={data.form.checkoutAssets}
               depositBalance={data.form.depositBalance}
               today={data.form.today}
