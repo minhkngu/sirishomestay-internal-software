@@ -46,7 +46,10 @@ type EditorLine = Line & { unitPriceText: string }
 /** Dòng "Tiền cọc còn thiếu" tính từ hợp đồng: không sửa mô tả, đơn giá, số lượng (xoá được nếu đã thu cọc riêng). */
 const isDepositLine = (l: Line) => l.type === 'deposit'
 /** Khoản chuyển từ hợp đồng cũ (chuyển phòng): số đã chốt, không sửa hoặc xoá trong hoá đơn */
-const isTransferIn = (l: Line) => typeof l.meta?.sourceKey === 'string' && l.meta.sourceKey.startsWith('transfer:')
+const isTransferIn = (l: Line) =>
+  (typeof l.meta?.sourceKey === 'string' && l.meta.sourceKey.startsWith('transfer:')) ||
+  // Dòng "Chuyển sang hợp đồng mới" của hoá đơn thanh lý chuyển phòng: số cân bằng, tự tính
+  l.meta?.transfer === true
 const isLocked = (l: Line) => l.type === 'rent' || typeof l.meta?.leaseFeeId === 'string'
 /** Phí ngoài hợp đồng thêm vào hoá đơn từ loại phí trong Cài đặt: mô tả cố định theo tên phí, có thời gian và hệ số riêng. */
 const isAddedFee = (l: Line) =>

@@ -554,6 +554,51 @@ describe('thanh lý nối ví và chuyển phòng', () => {
       })
     })
 
+    describe('dòng chuyển sang hợp đồng mới trong hoá đơn thanh lý', () => {
+      const input = (lines: (typeof invoiceLines.$inferSelect)[]) =>
+        lines.map((l) => ({
+          id: l.id,
+          type: l.type,
+          description: l.description,
+          quantity: l.quantity,
+          unitPrice: l.unitPrice,
+          meta: l.meta as Record<string, unknown> | null,
+        }))
+      const isOut = (l: typeof invoiceLines.$inferSelect) =>
+        (l.meta as { transfer?: boolean } | null)?.transfer === true
+
+      it('không sửa mô tả, không xoá được', async () => {
+        const r = await change()
+        const lines = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, r.terminationInvoiceId))
+        await expect(
+          updateLines(
+            db,
+            ctx(),
+            r.terminationInvoiceId,
+            input(lines.map((l) => (isOut(l) ? { ...l, description: 'Khác' } : l))),
+          ),
+        ).rejects.toThrow(/không sửa hoặc xoá được/)
+        await expect(
+          updateLines(db, ctx(), r.terminationInvoiceId, input(lines.filter((l) => !isOut(l)))),
+        ).rejects.toThrow(/không sửa hoặc xoá được/)
+      })
+
+      it('sửa dòng khác: số chuyển tự tính lại, tổng hoá đơn vẫn về 0, kể cả khi gửi đơn giá sai', async () => {
+        const r = await change()
+        const lines = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, r.terminationInvoiceId))
+        const edited = input(lines).map((l) =>
+          l.type === 'refund'
+            ? { ...l, unitPrice: l.unitPrice + 100_000 }
+            : l.meta && (l.meta as { transfer?: boolean }).transfer
+              ? { ...l, unitPrice: 1 }
+              : l,
+        )
+        await updateLines(db, ctx(), r.terminationInvoiceId, edited)
+        const after = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, r.terminationInvoiceId))
+        expect(after.reduce((n, l) => n + l.amount, 0)).toBe(0)
+      })
+    })
+
     it('huỷ chuyển phòng thiếu quyền xoá hợp đồng thì từ chối trước khi làm gì', async () => {
       await change()
       await expect(cancelRoomChange(db, context(['tenants_contracts'], facilityId), leaseId, storage)).rejects.toThrow()

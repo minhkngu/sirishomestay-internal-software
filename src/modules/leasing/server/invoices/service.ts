@@ -1717,6 +1717,21 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
           'Khoản chuyển từ hợp đồng cũ không sửa hoặc xoá được; muốn bỏ thì hoàn tác chuyển phòng ở hợp đồng cũ',
         )
     }
+    // Dòng "Chuyển sang hợp đồng mới" của hoá đơn thanh lý là số cân bằng: không sửa mô tả, không xoá; số tiền tự tính lại
+    // bằng −(tổng các dòng còn lại) để hoá đơn luôn về 0
+    if (inv.kind === 'termination') {
+      const outgoing = (m: unknown) => (m as { transfer?: unknown } | null)?.transfer === true
+      const oldOut = old.find((o) => outgoing(o.meta))
+      const newOut = next.find((x) => outgoing(x.meta))
+      if (oldOut && (!newOut || newOut.description !== oldOut.description))
+        throw new ValidationError('Dòng chuyển sang hợp đồng mới không sửa hoặc xoá được')
+      if (newOut) {
+        const others = next.filter((x) => x !== newOut).reduce((n, x) => n + x.amount, 0)
+        newOut.quantity = 1
+        newOut.unitPrice = -others
+        newOut.amount = -others
+      }
+    }
     // Phí phát sinh / điều chỉnh bị bỏ khỏi hoá đơn thì trả về trạng thái chưa tính
     const keep = new Set(next.map((l) => JSON.stringify(l.meta ?? {})))
     for (const l of old) {
