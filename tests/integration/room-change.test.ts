@@ -29,9 +29,15 @@ import { finalizeTermination } from '@/modules/leasing/server/addenda/finalize'
 import {
   approveInvoice,
   createDraftForLease,
+  leaseDebt,
+  recordLeasePayment,
   unapproveInvoice,
   updateLines,
 } from '@/modules/leasing/server/invoices/service'
+import { listCashbook } from '@/modules/cashbook/server/cashbook/service'
+import { summarize } from '@/domain/cashbook'
+import { depositBalance } from '@/domain/deposit'
+import type { DepositEntry } from '@/domain/types'
 import { addWalletEntry, walletBalance } from '@/modules/leasing/server/wallet/service'
 import { createTestDb } from '../helpers/db'
 
@@ -644,7 +650,82 @@ describe('thanh lý nối ví và chuyển phòng', () => {
         expect(await db.select().from(invoices).where(eq(invoices.kind, 'termination'))).toHaveLength(0)
       })
 
-      it('admin: hợp đồng mới đã có hoá đơn duyệt và khoản thu cũng bị xoá, ví thu vượt rút lại', async () => {
+      // Hợp đồng mới có hoá đơn tháng 11 = 3.100.000 đã duyệt
+      const newInvoice = async (newLeaseId: string) => {
+        const [inv] = await db
+          .insert(invoices)
+          .values({
+            code: 'TD-HD-202611-0077',
+            leaseId: newLeaseId,
+            facilityId,
+            kind: 'monthly',
+            periodStart: '2026-11-01',
+            periodEnd: '2026-11-30',
+            issueDate: '2026-11-20',
+            dueDate: '2026-12-05',
+            status: 'approved',
+          })
+          .returning()
+        await db.insert(invoiceLines).values({
+          invoiceId: inv.id,
+          type: 'rent',
+          description: 'Tiền phòng',
+          quantity: 1,
+          unitPrice: 3_100_000,
+          amount: 3_100_000,
+        })
+        return inv
+      }
+      const cashIncome = async () => summarize((await listCashbook(db, admin(), {})).rows).income
+
+      it('admin: hợp đồng mới đã thu đủ tiền mặt, huỷ chuyển phòng chuyển tiền vào ví và trả ví đã gạch', async () => {
+        const r = await approvedChange() // ví 5.000.000 đã gạch vào thanh lý
+        const inv = await newInvoice(r.newLeaseId)
+        await recordLeasePayment(db, ctx(), r.newLeaseId, {
+          paidOn: '2026-11-25',
+          amount: 3_100_000,
+          method: 'cash',
+        })
+        const before = await cashIncome()
+        await cancelRoomChange(db, admin(), leaseId, storage)
+        expect(await db.select().from(invoices).where(eq(invoices.id, inv.id))).toHaveLength(0)
+        // 5.000.000 ví ban đầu (use_termination được trả) + 3.100.000 tiền mặt chuyển vào ví
+        expect(await walletBalance(db, tenantId)).toBe(8_100_000)
+        expect(await cashIncome()).toBe(before)
+        const entries = await db.select().from(depositEntries).where(eq(depositEntries.leaseId, leaseId))
+        expect(
+          depositBalance(entries.map((e) => ({ ...e, type: e.type, status: e.status }) as unknown as DepositEntry)),
+        ).toBe(9_000_000)
+        expect(await leaseDebt(db, admin(), leaseId)).toBe(0)
+      })
+
+      it('hợp đồng mới trả một phần bằng ví, một phần tiền mặt: ví không bị tính hai lần', async () => {
+        const r = await approvedChange() // ví về 0 sau khi duyệt
+        await addWalletEntry(db, {
+          tenantId,
+          facilityId,
+          amount: 1_000_000,
+          kind: 'overpay',
+          date: '2026-11-22',
+          sourceKey: 'overpay:focus3',
+        })
+        await newInvoice(r.newLeaseId)
+        await recordLeasePayment(db, ctx(), r.newLeaseId, {
+          paidOn: '2026-11-25',
+          amount: 2_100_000,
+          walletAmount: 1_000_000,
+          method: 'cash',
+        })
+        expect(await walletBalance(db, tenantId)).toBe(0)
+        await cancelRoomChange(db, admin(), leaseId, storage)
+        // 1.000.000 (use_invoice trả) + 2.100.000 (reallocate) + 5.000.000 (use_termination trả)
+        expect(await walletBalance(db, tenantId)).toBe(8_100_000)
+        const rows = await db.select().from(tenantWalletEntries)
+        expect(rows.filter((e) => e.kind === 'reallocate').map((e) => e.amount)).toEqual([2_100_000])
+        expect(rows.some((e) => e.kind === 'use_invoice' || e.kind === 'use_termination')).toBe(false)
+      })
+
+      it('admin: hợp đồng mới đã có hoá đơn duyệt và khoản thu cũng bị xoá, tiền đã thu chuyển vào ví', async () => {
         const r = await approvedChange()
         const [inv] = await db
           .insert(invoices)
@@ -678,7 +759,7 @@ describe('thanh lý nối ví và chuyển phòng', () => {
         await cancelRoomChange(db, admin(), leaseId, storage)
         expect(await db.select().from(invoices).where(eq(invoices.id, inv.id))).toHaveLength(0)
         expect((await db.select().from(leases).where(eq(leases.id, leaseId)))[0].status).toBe('active')
-        expect(await walletBalance(db, tenantId)).toBe(5_000_000)
+        expect(await walletBalance(db, tenantId)).toBe(6_000_000)
       })
     })
 

@@ -217,8 +217,8 @@ export async function createRoomChange(
 
 /**
  * Huỷ chuyển phòng: khôi phục thanh lý của hợp đồng cũ rồi xoá hợp đồng mới, trong một giao dịch.
- * Hoá đơn thanh lý còn nháp thì ai có quyền cũng làm được; đã duyệt hoặc hợp đồng mới đã có hoá đơn duyệt, khoản thu thì
- * chỉ admin, và dữ liệu đã chốt (sổ ví, khoản chuyển, thu tiền) bị xoá hết.
+ * Hoá đơn thanh lý còn nháp và hợp đồng mới chưa có hoá đơn duyệt, khoản thu thì ai có quyền cũng làm được; còn lại chỉ admin,
+ * và sổ ví, khoản chuyển bị gỡ. Tiền thật đã thu ở hợp đồng mới không mất: chuyển vào ví khách (giữ ngày thu gốc).
  */
 export async function cancelRoomChange(
   db: DB,
@@ -254,7 +254,7 @@ export async function cancelRoomChange(
       throw new ValidationError('Hợp đồng cũ đã có thay đổi sau thanh lý: không huỷ tự động được')
     await restoreContract(tx, ctx, 'lease', oldLeaseId, preview.token, storage, { allowRoomChange: true })
     await removeStartReadings(tx, next)
-    await deleteContract(tx, ctx, 'lease', next.id, true, storage)
+    await deleteContract(tx, ctx, 'lease', next.id, true, storage, 'to_wallet')
   })
 }
 

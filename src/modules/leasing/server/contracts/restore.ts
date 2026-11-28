@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, ne, notInArray, sql } from 'drizzle-orm'
 import {
   addenda,
   contractVersions,
@@ -305,8 +305,20 @@ export async function previewContractRestore(
       items.push({
         type: 'lease',
         id: moved.id,
-        label: 'Hợp đồng mới ở phòng mới · xoá cùng mọi hoá đơn, khoản thu, ví, điều chỉnh của hợp đồng đó',
+        label: 'Hợp đồng mới ở phòng mới · xoá cùng hoá đơn, điều chỉnh của hợp đồng đó',
       })
+      // Tiền thật đã thu ở hợp đồng mới không mất: chuyển vào ví khách
+      const [newPaid] = await db
+        .select({ n: sql<number>`coalesce(sum(${payments.amount}), 0)::float8` })
+        .from(payments)
+        .innerJoin(invoices, eq(invoices.id, payments.invoiceId))
+        .where(and(eq(invoices.leaseId, moved.id), notInArray(payments.method, ['wallet', 'carry'])))
+      if (newPaid && newPaid.n > 0)
+        items.push({
+          type: 'wallet',
+          id: 'wallet',
+          label: `Chuyển vào ví khách: ${newPaid.n.toLocaleString('vi-VN')}`,
+        })
       // Hoá đơn thanh lý đã duyệt hoặc hợp đồng mới đã có hoá đơn duyệt, khoản thu: chỉ admin hoàn tác được
       if ((await roomChangeNeedsAdmin(db, id, moved.id)) && !ctx.isAdmin)
         blockedReason = 'Chuyển phòng đã duyệt hoặc đã phát sinh thu tiền: chỉ admin hoàn tác được'
