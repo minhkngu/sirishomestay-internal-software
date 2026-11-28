@@ -2,8 +2,9 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { FileImage, Search } from 'lucide-react'
+import { FileImage } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { exportDocumentAction } from '@/modules/documents/actions'
 import { InvoiceRowActions } from './invoice-row-actions'
@@ -34,11 +35,11 @@ export function InvoiceList({
   invoices: InvoiceRow[]
   facilities: { id: string; name: string }[]
 }) {
-  const [query, setQuery] = useState('')
   const rawView = useListParam('view') ?? 'all'
   const view = (VIEWS.some(([k]) => k === rawView) ? rawView : 'all') as InvoiceView
   const rawPeriod = useListParam('period') ?? ''
   const period = /^\d{4}-\d{2}$/.test(rawPeriod) ? rawPeriod : ''
+  const rawRoom = useListParam('phong') ?? ''
   const allowed = useMemo(() => facilities.map((f) => f.id), [facilities])
   const selected = useFacilitySelection(allowed)
   const [pdf, setPdf] = useState<{ url: string; code: string; id: string; kind: string } | null>(null)
@@ -74,30 +75,34 @@ export function InvoiceList({
   }, [invoices])
   const names = useMemo(() => Object.fromEntries(facilities.map((f) => [f.id, f.name])), [facilities])
 
-  const scoped = useMemo(() => {
-    const q = query.trim().toLocaleLowerCase('vi')
-    return invoices.filter(
-      (i) =>
-        matchesPeriod(i.periodStart, period || null) &&
-        (selected.length === 0 || selected.includes(i.facilityId)) &&
-        (!q || [i.roomCode, i.code, i.tenantName].some((p) => p?.toLocaleLowerCase('vi').includes(q))),
-    )
-  }, [invoices, period, selected, query])
+  const inScope = useMemo(
+    () =>
+      invoices.filter(
+        (i) =>
+          matchesPeriod(i.periodStart, period || null) && (selected.length === 0 || selected.includes(i.facilityId)),
+      ),
+    [invoices, period, selected],
+  )
+  // Menu phòng: các phòng có hoá đơn trong phạm vi toà và kỳ đang chọn; phòng đang chọn không còn trong phạm vi thì bỏ lọc
+  const roomOptions = useMemo(() => {
+    const seen = new Map<string, { value: string; label: string }>()
+    for (const i of inScope) {
+      const value = `${i.facilityId}|${i.roomCode}`
+      if (!seen.has(value))
+        seen.set(value, { value, label: facilities.length > 1 ? `${i.roomCode} · ${names[i.facilityId]}` : i.roomCode })
+    }
+    return [...seen.values()].sort((x, y) => x.label.localeCompare(y.label, 'vi', { numeric: true }))
+  }, [inScope, facilities.length, names])
+  const room = roomOptions.some((o) => o.value === rawRoom) ? rawRoom : ''
+  const scoped = useMemo(
+    () => (room ? inScope.filter((i) => `${i.facilityId}|${i.roomCode}` === room) : inScope),
+    [inScope, room],
+  )
   const rows = useMemo(() => scoped.filter((i) => matchesInvoiceView(i.state, view)), [scoped, view])
-  const { pageRows, pager } = usePager(rows, 'invoices', `${view}|${period}|${selected.join(',')}|${query}`)
+  const { pageRows, pager } = usePager(rows, 'invoices', `${view}|${period}|${selected.join(',')}|${room}`)
 
   return (
     <>
-      <label className="relative block min-w-52 sm:max-w-xs">
-        <span className="sr-only">Tìm hoá đơn</span>
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Tìm phòng, mã hoá đơn, bên thuê…"
-          className="h-9 w-full rounded-lg border border-input bg-card pl-9 pr-3 text-[13px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
-        />
-      </label>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <ParamChips
           param="view"
@@ -110,6 +115,23 @@ export function InvoiceList({
         />
         <div className="flex flex-wrap items-center gap-2.5">
           <FacilityFilter facilities={facilities} align="right" />
+          <Select
+            value={room || null}
+            onValueChange={(v) => setListParams({ phong: v ? String(v) : null })}
+            items={roomOptions}
+          >
+            <SelectTrigger aria-label="Phòng" className="h-9 w-36">
+              <SelectValue placeholder="Tất cả phòng" />
+            </SelectTrigger>
+            <SelectContent>
+              {room && <SelectItem value="">Tất cả phòng</SelectItem>}
+              {roomOptions.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <MonthField
             ariaLabel="Kỳ"
             value={period}
