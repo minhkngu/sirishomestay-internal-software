@@ -565,15 +565,7 @@ export async function roomMeterHistory(db: DB, ctx: AccessContext, roomId: strin
 export async function ensureFeeMeter(
   tx: DB,
   ctx: AccessContext,
-  input: {
-    roomId: string
-    leaseFeeId: string
-    existingMeterId?: string
-    initialReading?: number
-    installedOn: string
-    /** Đã được nhân viên xác nhận: ghi đè chỉ số bàn giao cùng ngày bằng số mới thay vì từ chối. */
-    overwriteReading?: boolean
-  },
+  input: { roomId: string; leaseFeeId: string; existingMeterId?: string; initialReading?: number; installedOn: string },
 ): Promise<{ id: string }> {
   const [room] = await tx.select().from(rooms).where(eq(rooms.id, input.roomId)).for('update')
   if (!room) throw new NotFoundError()
@@ -604,7 +596,7 @@ export async function ensureFeeMeter(
   // Chỉ số ban đầu độc lập với mọi lần chốt khác: không ràng buộc với số trước hay số sau (cùng nguyên tắc với updateLeaseFeeMeter)
   // Chỉ số bàn giao cùng ngày (vd. chốt khi thanh lý hợp đồng trước) được nhận lại nếu trùng giá trị
   const sameDay = readings.find((r) => r.kind === 'handover' && r.readOn === input.installedOn)
-  if (sameDay && sameDay.value !== input.initialReading && !input.overwriteReading)
+  if (sameDay && sameDay.value !== input.initialReading)
     throw new ValidationError(`Đồng hồ đã có chỉ số bàn giao ${sameDay.value} trong ngày này`, {
       initialReading: `Nhập đúng chỉ số đã chốt: ${sameDay.value}`,
     })
@@ -616,19 +608,6 @@ export async function ensureFeeMeter(
     summary: 'Dùng lại đồng hồ cho phí hợp đồng',
     after: { leaseFeeId: input.leaseFeeId, initialReading: input.initialReading, readOn: input.installedOn },
   })
-  if (sameDay && sameDay.value !== input.initialReading) {
-    // Ghi đè có xác nhận: hoá đơn đã tính theo số cũ không tự đổi, nên để lại dấu vết
-    await tx.update(meterReadings).set({ value: input.initialReading! }).where(eq(meterReadings.id, sameDay.id))
-    await recordAudit(tx, ctx, {
-      action: 'update',
-      entity: 'meter',
-      entityId: meter.id,
-      facilityId: room.facilityId,
-      summary: 'Ghi đè chỉ số bàn giao cùng ngày khi gắn phí hợp đồng',
-      before: { value: sameDay.value, readOn: input.installedOn },
-      after: { value: input.initialReading, readOn: input.installedOn },
-    })
-  }
   if (!sameDay)
     await tx.insert(meterReadings).values({
       meterId: meter.id,

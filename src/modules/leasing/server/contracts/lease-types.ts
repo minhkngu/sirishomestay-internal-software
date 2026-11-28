@@ -10,8 +10,6 @@ export type LeaseFeeInput = {
   quantity?: number
   initialReading?: number
   existingMeterId?: string
-  /** Nhân viên đã xác nhận ghi đè chỉ số bàn giao cùng ngày của đồng hồ */
-  overwriteReading?: boolean
 }
 export type LeaseInput = {
   roomId: string

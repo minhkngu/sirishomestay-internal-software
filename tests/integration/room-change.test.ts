@@ -406,55 +406,6 @@ describe('thanh lý nối ví và chuyển phòng', () => {
       ).resolves.toBeDefined()
     })
 
-    it('đồng hồ phòng mới đã có chỉ số bàn giao khác trong ngày: từ chối, có xác nhận thì ghi đè', async () => {
-      const [oldMeter, newMeter] = await db
-        .insert(meters)
-        .values([
-          { roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 },
-          { roomId: room2Id, utility: 'electric', installedOn: '2026-01-01', startReading: 0 },
-        ])
-        .returning()
-      const [fee] = await db
-        .insert(leaseFeeSnapshots)
-        .values({
-          leaseId,
-          name: 'Điện',
-          unit: 'kWh',
-          quantitySource: 'meter',
-          billing: 'per_occurrence',
-          unitPrice: 3500,
-        })
-        .returning()
-      await db.insert(leaseFeeMeters).values({ leaseFeeId: fee.id, meterId: oldMeter.id })
-      await db
-        .insert(meterReadings)
-        .values({ meterId: newMeter.id, period: '2026-11', kind: 'handover', readOn: '2026-11-20', value: 30 })
-      const termination = { forfeit: { mode: 'none' }, readings: [{ meterId: oldMeter.id, value: 120 }] }
-      const fees = (overwriteReading: boolean) => [
-        {
-          feeTypeId: null,
-          name: 'Điện',
-          unit: 'kWh',
-          quantitySource: 'meter',
-          unitPrice: 3500,
-          quantity: 1,
-          initialReading: 40,
-          existingMeterId: newMeter.id,
-          overwriteReading,
-        },
-      ]
-      const lease = (overwriteReading: boolean) => ({
-        endDate: '2027-11-19',
-        monthlyRent: 12_000_000,
-        depositAmount: 12_000_000,
-        fees: fees(overwriteReading),
-      })
-      await expect(change({ termination, lease: lease(false) })).rejects.toThrow(/chỉ số bàn giao 30/)
-      await change({ termination, lease: lease(true) })
-      const [reading] = await db.select().from(meterReadings).where(eq(meterReadings.meterId, newMeter.id))
-      expect(reading.value).toBe(40)
-    })
-
     it('huỷ chuyển phòng thiếu quyền xoá hợp đồng thì từ chối trước khi làm gì', async () => {
       await change()
       await expect(cancelRoomChange(db, context(['tenants_contracts'], facilityId), leaseId, storage)).rejects.toThrow()

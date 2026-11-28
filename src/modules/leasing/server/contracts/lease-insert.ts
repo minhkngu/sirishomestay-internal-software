@@ -177,7 +177,6 @@ async function insertLeaseFees(
         leaseFeeId: savedFee.id,
         initialReading: fee.initialReading,
         existingMeterId: fee.existingMeterId,
-        overwriteReading: fee.overwriteReading === true,
         installedOn: input.startDate,
       })
       meterStarts.push({ leaseFeeId: savedFee.id, reading: fee.initialReading! })

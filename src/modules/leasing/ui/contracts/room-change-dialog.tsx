@@ -85,9 +85,6 @@ export function RoomChangeWizard({
   const [rent, setRent] = useState(String(monthlyRent))
   const [deposit, setDeposit] = useState(String(depositAmount))
   const [newEnd, setNewEnd] = useState(endDate)
-  // Hiện sau khi server báo đồng hồ đã có chỉ số bàn giao khác trong ngày: nhân viên tick để ghi đè
-  const [needOverwrite, setNeedOverwrite] = useState(false)
-  const [overwrite, setOverwrite] = useState(false)
   const [fees, setFees] = useState<FeeDraft[]>(() => (feeData?.current ?? []).map(toDraft))
   const [createdTypes, setCreatedTypes] = useState<FeeOption[]>([])
   const feeTypes = [...(feeData?.options ?? []).map(toFeeOption), ...createdTypes]
@@ -173,20 +170,6 @@ export function RoomChangeWizard({
           onCreated={(fee) => setCreatedTypes((prev) => [...prev, fee])}
         />
       </div>
-      {needOverwrite && (
-        <label className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-2.5 text-xs">
-          <input
-            type="checkbox"
-            className="mt-0.5 size-3.5 accent-destructive"
-            checked={overwrite}
-            onChange={(e) => setOverwrite(e.target.checked)}
-          />
-          <span>
-            Ghi đè chỉ số bàn giao đã có trong ngày chuyển bằng số vừa nhập. Hoá đơn đã tính theo số cũ không tự đổi
-            theo.
-          </span>
-        </label>
-      )}
       {extraError && newRoomId && (
         <p role="alert" className="text-xs text-destructive">
           {extraError}
@@ -209,8 +192,8 @@ export function RoomChangeWizard({
         successMessage: 'Đã chuyển phòng, hoá đơn thanh lý đang ở dạng nháp',
         extra,
         extraError,
-        submit: async ({ endDate: moveDate, ...termination }) => {
-          const result = await createRoomChangeAction(leaseId, {
+        submit: ({ endDate: moveDate, ...termination }) =>
+          createRoomChangeAction(leaseId, {
             newRoomId,
             moveDate,
             lease: {
@@ -228,16 +211,12 @@ export function RoomChangeWizard({
                       quantity: Number(f.quantity),
                       initialReading: f.initialReading.trim() === '' ? undefined : Number(f.initialReading),
                       existingMeterId: pickedMeters[f.key],
-                      overwriteReading: overwrite,
                     })),
                   }
                 : {}),
             },
             termination,
-          })
-          if (!result.ok && result.error.includes('chỉ số bàn giao')) setNeedOverwrite(true)
-          return result
-        },
+          }),
       }}
     />
   )
