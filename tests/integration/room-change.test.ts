@@ -581,6 +581,21 @@ describe('thanh lý nối ví và chuyển phòng', () => {
         ])
       })
 
+      it('hoá đơn nháp đang lệch (dòng chuyển sai số): lưu lại thì tự cân bằng về 0', async () => {
+        const r = await change()
+        const lines = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, r.terminationInvoiceId))
+        const out = lines.find((l) => (l.meta as { transfer?: boolean } | null)?.transfer === true)!
+        await db
+          .update(invoiceLines)
+          .set({ unitPrice: out.unitPrice + 1_000_000, amount: out.amount + 1_000_000 })
+          .where(eq(invoiceLines.id, out.id))
+        const skewed = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, r.terminationInvoiceId))
+        expect(skewed.reduce((n, l) => n + l.amount, 0)).toBe(1_000_000)
+        await updateLines(db, ctx(), r.terminationInvoiceId, input(skewed))
+        const after = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, r.terminationInvoiceId))
+        expect(after.reduce((n, l) => n + l.amount, 0)).toBe(0)
+      })
+
       it('lưu lại đúng như cũ (đổi hạn, ghi chú) thì được và giữ nguyên số tiền, tổng vẫn 0', async () => {
         const r = await change()
         const before = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, r.terminationInvoiceId))

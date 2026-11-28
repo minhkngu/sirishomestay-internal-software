@@ -1720,8 +1720,14 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
     // Hoá đơn thanh lý của chuyển phòng (có dòng "Chuyển sang hợp đồng mới") khoá toàn bộ dòng: số do hệ thống tính từ form
     // chuyển phòng. Muốn đổi thì hoàn tác chuyển phòng rồi chuyển lại. Chỉ hạn và ghi chú còn lưu được.
     if (inv.kind === 'termination' && old.some((o) => (o.meta as { transfer?: unknown } | null)?.transfer === true)) {
+      const isOut = (m: unknown) => (m as { transfer?: unknown } | null)?.transfer === true
+      // Dòng "Chuyển sang hợp đồng mới" là số cân bằng, tự tính lại bên dưới nên không so số tiền của nó
       const key = (l: { type: string; description: string; quantity: number; unitPrice: number; meta: unknown }) =>
-        JSON.stringify([l.type, l.description, l.quantity, l.unitPrice, l.meta ?? {}])
+        JSON.stringify(
+          isOut(l.meta)
+            ? [l.type, l.description, l.meta ?? {}]
+            : [l.type, l.description, l.quantity, l.unitPrice, l.meta ?? {}],
+        )
       const pool = old.map((o) => ({ key: key(o), amount: o.amount, used: false }))
       for (const l of next) {
         const hit = pool.find((x) => !x.used && x.key === key(l))
@@ -1736,6 +1742,14 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
         throw new ValidationError(
           'Hoá đơn thanh lý của chuyển phòng không sửa được các dòng; muốn đổi thì hoàn tác chuyển phòng rồi chuyển lại',
         )
+      // Lưu lại thì dòng chuyển luôn cân bằng về 0 (sửa được cả hoá đơn nháp cũ đang lệch)
+      const out = next.find((l) => isOut(l.meta))
+      if (out) {
+        const others = next.filter((l) => l !== out).reduce((n, l) => n + l.amount, 0)
+        out.quantity = 1
+        out.unitPrice = -others
+        out.amount = -others
+      }
     }
     // Phí phát sinh / điều chỉnh bị bỏ khỏi hoá đơn thì trả về trạng thái chưa tính
     const keep = new Set(next.map((l) => JSON.stringify(l.meta ?? {})))
