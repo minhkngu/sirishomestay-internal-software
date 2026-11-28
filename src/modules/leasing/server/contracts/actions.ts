@@ -277,7 +277,9 @@ export async function quickContractDataAction(kind: 'lease' | 'deposit', id: str
               contractTemplates: contractTemplates
                 .filter(isUsableTemplate)
                 .map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault })),
-              invoiceTemplates: templates.map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault })),
+              invoiceTemplates: templates
+                .filter((t) => t.kind === 'standard')
+                .map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault })),
               depositEntries: l.depositEntries.map((e) => ({
                 id: e.id,
                 date: e.date,

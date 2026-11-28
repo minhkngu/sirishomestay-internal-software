@@ -48,17 +48,41 @@ describe('mẫu hoá đơn HTML', () => {
     expect(doc.some((b) => b.type === 'qr')).toBe(true)
   })
 
-  it('khôi phục mẫu mặc định tạo hai mẫu còn thiếu, không ghi đè mẫu đã sửa, không đổi mẫu mặc định', async () => {
-    const defaultBefore = (await db.select().from(invoiceTemplates)).filter((t) => t.isDefault).map((t) => t.id)
-    expect(await restoreDefaultInvoiceTemplates(db, admin)).toBe(2)
+  it('khôi phục mẫu mặc định tạo mẫu còn thiếu của từng loại, không ghi đè mẫu đã sửa, không đổi mẫu mặc định hoá đơn thường', async () => {
+    const standardBefore = (await db.select().from(invoiceTemplates))
+      .filter((t) => t.isDefault && t.kind === 'standard')
+      .map((t) => t.id)
+    expect(await restoreDefaultInvoiceTemplates(db, admin)).toBe(6)
     const [formal] = await db.select().from(invoiceTemplates).where(eq(invoiceTemplates.name, 'Hoá đơn (Trang trọng)'))
     await db.update(invoiceTemplates).set({ body: '<p>Đã sửa</p>' }).where(eq(invoiceTemplates.id, formal.id))
     expect(await restoreDefaultInvoiceTemplates(db, admin)).toBe(0)
     const [after] = await db.select().from(invoiceTemplates).where(eq(invoiceTemplates.id, formal.id))
     expect(after.body).toBe('<p>Đã sửa</p>')
-    expect((await db.select().from(invoiceTemplates)).filter((t) => t.isDefault).map((t) => t.id)).toEqual(
-      defaultBefore,
-    )
+    const defaults = (await db.select().from(invoiceTemplates)).filter((t) => t.isDefault)
+    expect(defaults.filter((t) => t.kind === 'standard').map((t) => t.id)).toEqual(standardBefore)
+    // Loại thanh lý, chuyển phòng chưa có mẫu mặc định thì mẫu Trang trọng mới tạo thành mặc định
+    expect(
+      defaults
+        .filter((t) => t.kind !== 'standard')
+        .map((t) => t.name)
+        .sort(),
+    ).toEqual(['Hoá đơn chuyển phòng (Trang trọng)', 'Hoá đơn thanh lý (Trang trọng)'])
+  })
+
+  it('đặt mặc định chỉ đổi trong cùng loại; xem thử dùng dữ liệu thanh lý, chuyển phòng', async () => {
+    await restoreDefaultInvoiceTemplates(db, admin)
+    const [modernTermination] = await db
+      .select()
+      .from(invoiceTemplates)
+      .where(eq(invoiceTemplates.name, 'Hoá đơn thanh lý (Hiện đại)'))
+    await setDefaultInvoiceTemplate(db, admin, modernTermination.id)
+    const defaults = (await db.select().from(invoiceTemplates)).filter((t) => t.isDefault)
+    expect(defaults.filter((t) => t.kind === 'termination').map((t) => t.id)).toEqual([modernTermination.id])
+    expect(defaults.filter((t) => t.kind === 'standard')).toHaveLength(1)
+    expect(defaults.filter((t) => t.kind === 'room_change')).toHaveLength(1)
+    expect(await textOf(await previewInvoiceTemplateById(db, modernTermination.id))).toContain('Hoàn tiền cọc')
+    const [roomChange] = await db.select().from(invoiceTemplates).where(eq(invoiceTemplates.kind, 'room_change'))
+    expect(await textOf(await previewInvoiceTemplateById(db, roomChange.id))).toContain('Chuyển sang hợp đồng mới')
   })
 
   it('tạo mẫu có nội dung, đặt mặc định thì hoá đơn dùng mẫu HTML; mẫu cũ không có nội dung vẫn dùng bố cục cũ', async () => {

@@ -6,7 +6,12 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { PdfInline } from '@/components/pdf-inline'
 import { Button } from '@/components/ui/button'
-import { DEFAULT_INVOICE_HTML } from '../domain/invoice-template-html'
+import { defaultInvoiceTemplateFor } from '../domain/invoice-template-html'
+import {
+  INVOICE_TEMPLATE_KINDS,
+  INVOICE_TEMPLATE_KIND_LABELS,
+  type InvoiceTemplateKind,
+} from '../domain/invoice-template'
 import type { TemplateStyle } from '../domain/doc-template'
 import {
   deleteInvoiceTemplateAction,
@@ -25,15 +30,16 @@ type Tpl = {
   isDefault: boolean
   isSystem: boolean
   hasBody: boolean
+  kind: InvoiceTemplateKind
   style: TemplateStyle
   body: string | null
   preview: string | null
 }
 
-const ops: TemplateOps = {
-  preview: (body, style) => previewInvoiceTemplateHtmlAction({ body, style }),
-  save: (id, input) => saveInvoiceTemplateAction(id, input),
-}
+const opsFor = (kind: InvoiceTemplateKind): TemplateOps => ({
+  preview: (body, style) => previewInvoiceTemplateHtmlAction({ body, style, kind }),
+  save: (id, input) => saveInvoiceTemplateAction(id, { ...input, kind }),
+})
 
 /** Từ số mẫu này trở lên, mỗi mẫu thu thành một mục bấm để mở (toggle). */
 const TOGGLE_FROM = 2
@@ -44,9 +50,8 @@ export function InvoiceTemplatesManager({ templates }: { templates: Tpl[] }) {
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
-  const [editing, setEditing] = useState<{ template: Tpl | null } | null>(null)
+  const [editing, setEditing] = useState<{ template: Tpl | null; kind: InvoiceTemplateKind } | null>(null)
   const [open, setOpen] = useState<Set<string>>(() => new Set(templates.filter((t) => t.isDefault).map((t) => t.id)))
-  const collapsible = templates.length >= TOGGLE_FROM
   const { previews, loading, ensure } = useLazyPreview(
     Object.fromEntries(templates.map((t) => [t.id, t.preview])),
     getInvoiceTemplatePreviewAction,
@@ -74,9 +79,6 @@ export function InvoiceTemplatesManager({ templates }: { templates: Tpl[] }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" onClick={() => setEditing({ template: null })}>
-          Soạn mẫu mới
-        </Button>
         <Button
           size="sm"
           variant="outline"
@@ -107,89 +109,109 @@ export function InvoiceTemplatesManager({ templates }: { templates: Tpl[] }) {
           {msg}
         </p>
       )}
-      <section className="overflow-hidden rounded-2xl border border-border/80 bg-card">
-        <ul className="divide-y divide-border/60">
-          {templates.map((t) => {
-            const shown = !collapsible || open.has(t.id)
-            return (
-              <li key={t.id} className="space-y-2.5 px-4 py-2.5 text-[13px]">
-                <div className="flex flex-wrap items-center gap-2">
-                  {collapsible ? (
-                    <button
-                      type="button"
-                      aria-expanded={shown}
-                      aria-controls={`preview-${t.id}`}
-                      onClick={() => toggle(t.id)}
-                      className="flex items-center gap-1.5 font-medium text-foreground hover:text-primary"
-                    >
-                      {shown ? (
-                        <ChevronDown className="size-3.5 text-muted-foreground" />
-                      ) : (
-                        <ChevronRight className="size-3.5 text-muted-foreground" />
-                      )}
-                      <span>{t.name}</span>
-                    </button>
-                  ) : (
-                    <span className="font-medium text-foreground">{t.name}</span>
-                  )}
-                  {t.hasBody ? (
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                      {STYLE_LABEL[t.style]}
-                    </span>
-                  ) : (
-                    <span className="rounded-full border border-amber-200/80 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-800">
-                      Mẫu cũ, nên soạn lại
-                    </span>
-                  )}
-                  {t.isDefault && (
-                    <span className="rounded-full border border-emerald-200/80 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
-                      Mặc định
-                    </span>
-                  )}
-                  <div className="ml-auto flex items-center gap-1.5">
-                    <Button size="xs" variant="outline" onClick={() => setEditing({ template: t })}>
-                      {t.hasBody ? 'Sửa' : 'Soạn lại'}
-                    </Button>
-                    {!t.isDefault && (
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        disabled={pending}
-                        onClick={() => act(() => setDefaultInvoiceTemplateAction(t.id))}
-                      >
-                        Đặt mặc định
-                      </Button>
-                    )}
-                    {!t.isDefault && !t.isSystem && (
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        className="text-muted-foreground hover:text-destructive"
-                        onClick={() => setDeleting(t)}
-                      >
-                        Xoá
-                      </Button>
-                    )}
-                  </div>
-                </div>
-                {shown && (
-                  <div id={`preview-${t.id}`}>
-                    {previews[t.id] ? (
-                      <PdfInline base64={previews[t.id]!} title={t.name} />
-                    ) : loading.has(t.id) ? (
-                      <p className="text-xs text-muted-foreground">Đang tải bản xem…</p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        Chưa dựng được bản xem. Bấm “Sửa” rồi lưu lại để dựng lại.
-                      </p>
-                    )}
-                  </div>
+      {INVOICE_TEMPLATE_KINDS.map((kind) => {
+        const group = templates.filter((t) => t.kind === kind)
+        const collapsible = group.length >= TOGGLE_FROM
+        return (
+          <section key={kind} className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-sm font-semibold text-foreground">{INVOICE_TEMPLATE_KIND_LABELS[kind]}</h2>
+              <Button size="xs" variant="outline" onClick={() => setEditing({ template: null, kind })}>
+                Soạn mẫu mới
+              </Button>
+            </div>
+            <div className="overflow-hidden rounded-2xl border border-border/80 bg-card">
+              <ul className="divide-y divide-border/60">
+                {group.length === 0 && (
+                  <li className="px-4 py-3 text-xs text-muted-foreground">
+                    Chưa có mẫu. Hoá đơn loại này tạm dùng mẫu mặc định của hoá đơn thường; bấm “Khôi phục mẫu mặc định”
+                    hoặc soạn mẫu mới.
+                  </li>
                 )}
-              </li>
-            )
-          })}
-        </ul>
-      </section>
+                {group.map((t) => {
+                  const shown = !collapsible || open.has(t.id)
+                  return (
+                    <li key={t.id} className="space-y-2.5 px-4 py-2.5 text-[13px]">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {collapsible ? (
+                          <button
+                            type="button"
+                            aria-expanded={shown}
+                            aria-controls={`preview-${t.id}`}
+                            onClick={() => toggle(t.id)}
+                            className="flex items-center gap-1.5 font-medium text-foreground hover:text-primary"
+                          >
+                            {shown ? (
+                              <ChevronDown className="size-3.5 text-muted-foreground" />
+                            ) : (
+                              <ChevronRight className="size-3.5 text-muted-foreground" />
+                            )}
+                            <span>{t.name}</span>
+                          </button>
+                        ) : (
+                          <span className="font-medium text-foreground">{t.name}</span>
+                        )}
+                        {t.hasBody ? (
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                            {STYLE_LABEL[t.style]}
+                          </span>
+                        ) : (
+                          <span className="rounded-full border border-amber-200/80 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-800">
+                            Mẫu cũ, nên soạn lại
+                          </span>
+                        )}
+                        {t.isDefault && (
+                          <span className="rounded-full border border-emerald-200/80 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
+                            Mặc định
+                          </span>
+                        )}
+                        <div className="ml-auto flex items-center gap-1.5">
+                          <Button size="xs" variant="outline" onClick={() => setEditing({ template: t, kind })}>
+                            {t.hasBody ? 'Sửa' : 'Soạn lại'}
+                          </Button>
+                          {!t.isDefault && (
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              disabled={pending}
+                              onClick={() => act(() => setDefaultInvoiceTemplateAction(t.id))}
+                            >
+                              Đặt mặc định
+                            </Button>
+                          )}
+                          {!t.isDefault && !t.isSystem && (
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              className="text-muted-foreground hover:text-destructive"
+                              onClick={() => setDeleting(t)}
+                            >
+                              Xoá
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      {shown && (
+                        <div id={`preview-${t.id}`}>
+                          {previews[t.id] ? (
+                            <PdfInline base64={previews[t.id]!} title={t.name} />
+                          ) : loading.has(t.id) ? (
+                            <p className="text-xs text-muted-foreground">Đang tải bản xem…</p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              Chưa dựng được bản xem. Bấm “Sửa” rồi lưu lại để dựng lại.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          </section>
+        )
+      })}
       <ConfirmDialog
         open={deleting !== null}
         onOpenChange={(o) => {
@@ -205,12 +227,12 @@ export function InvoiceTemplatesManager({ templates }: { templates: Tpl[] }) {
       />
       {editing && (
         <TemplateDialog
-          key={editing.template?.id ?? 'new'}
+          key={editing.template?.id ?? `new-${editing.kind}`}
           docType="invoice_termination"
-          label="hoá đơn"
-          starter={DEFAULT_INVOICE_HTML.formal}
+          label={INVOICE_TEMPLATE_KIND_LABELS[editing.kind].toLowerCase()}
+          starter={defaultInvoiceTemplateFor(editing.kind, 'formal').html}
           template={editing.template}
-          ops={ops}
+          ops={opsFor(editing.kind)}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null)

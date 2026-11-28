@@ -55,7 +55,7 @@ describe('bản xem mẫu hoá đơn dựng sẵn', () => {
   it('restoreDefaultInvoiceTemplates lưu bản xem cho mẫu mới tạo', async () => {
     await restoreDefaultInvoiceTemplates(db, admin)
     const rows = (await db.select().from(invoiceTemplates)).filter((r) => !r.isSystem) // mẫu hệ thống có sẵn từ migration, không do restore tạo
-    expect(rows).toHaveLength(2)
+    expect(rows).toHaveLength(6)
     expect(rows.every((r) => r.previewPdf && r.previewVersion === INVOICE_PREVIEW_VERSION)).toBe(true)
   })
 

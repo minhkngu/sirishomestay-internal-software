@@ -8,6 +8,7 @@ import { toActionResult } from '@/lib/action-result'
 import { assertCan } from '@/domain/access'
 import { getAccessContext } from '@/modules/platform'
 import type { TemplateStyle } from '../../domain/doc-template'
+import type { InvoiceTemplateKind } from '../../domain/invoice-template'
 import { restoreDefaultInvoiceTemplates } from './defaults'
 import {
   createInvoiceTemplate,
@@ -33,7 +34,7 @@ export async function previewInvoiceTemplateAction(config: unknown) {
 }
 export async function saveInvoiceTemplateAction(
   id: string | null,
-  input: { name: string; config?: unknown; body?: string; style?: TemplateStyle },
+  input: { name: string; config?: unknown; body?: string; style?: TemplateStyle; kind?: InvoiceTemplateKind },
 ) {
   const ctx = await getAccessContext()
   return toActionResult(async () => {
@@ -58,7 +59,11 @@ export async function deleteInvoiceTemplateAction(id: string) {
     return {}
   })
 }
-export async function previewInvoiceTemplateHtmlAction(input: { body: string; style: TemplateStyle }) {
+export async function previewInvoiceTemplateHtmlAction(input: {
+  body: string
+  style: TemplateStyle
+  kind?: InvoiceTemplateKind
+}) {
   const ctx = await getAccessContext()
   return toActionResult(async () => ({
     base64: Buffer.from(await previewInvoiceTemplateHtml(ctx, input)).toString('base64'),
