@@ -27,7 +27,7 @@ import { assertCan, can, facilityKey, type AccessContext } from '@/domain/access
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { formatDateVN, todayVN } from '@/domain/dates'
 import { recordAudit } from '@/modules/platform'
-import { reverseWalletForPayments } from '../wallet/service'
+import { settleRemovedPayments } from '../wallet/service'
 import type { StorageAdapter } from '@/modules/platform'
 
 type Kind = 'lease' | 'deposit'
@@ -169,6 +169,14 @@ export async function previewContractRestore(
       id: x.id,
       label: `${formatDateVN(x.paidOn)} · ${x.amount}`,
     })),
+    ...(() => {
+      const moved = added(payRows, snapshot.payments)
+        .filter((x) => x.method !== 'wallet' && x.method !== 'carry')
+        .reduce((n, x) => n + x.amount, 0)
+      return moved > 0
+        ? [{ type: 'wallet', id: 'wallet', label: `Chuyển vào ví khách: ${moved.toLocaleString('vi-VN')}` }]
+        : []
+    })(),
     ...added(entries, snapshot.entries).map((x) => ({
       type: 'deposit',
       id: x.id,
@@ -482,7 +490,21 @@ export async function restoreContract(
               affectedFiles.map((f) => f.id),
             ),
           )
-      await reverseWalletForPayments(tx, paymentIds, { allowNegative: true })
+      // Khôi phục không có nghĩa là tiền chưa từng thu: tiền thật chuyển vào ví khách; khoản gộp vào thanh lý chỉ là bút toán nội bộ
+      if (paymentIds.length) {
+        const methods = await tx
+          .select({ id: payments.id, method: payments.method })
+          .from(payments)
+          .where(inArray(payments.id, paymentIds))
+        await settleRemovedPayments(
+          tx,
+          ctx,
+          methods.filter((p) => p.method !== 'carry').map((p) => p.id),
+          { kind: 'to_wallet' },
+          'Khôi phục hợp đồng',
+          { allowNegative: true },
+        )
+      }
       if (paymentIds.length) await tx.delete(payments).where(inArray(payments.id, paymentIds))
       if (invoiceIds.length) {
         await tx.update(oneOffCharges).set({ invoiceId: null }).where(inArray(oneOffCharges.invoiceId, invoiceIds))

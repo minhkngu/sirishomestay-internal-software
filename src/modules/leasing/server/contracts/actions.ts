@@ -155,10 +155,15 @@ export async function updateDepositContractAction(id: string, input: DepositInpu
     return {}
   })
 }
-export async function deleteContractAction(kind: 'lease' | 'deposit', id: string, confirmed: boolean) {
+export async function deleteContractAction(
+  kind: 'lease' | 'deposit',
+  id: string,
+  confirmed: boolean,
+  paymentRemoval?: 'to_wallet' | 'mistake',
+) {
   const ctx = await getAccessContext()
   return toActionResult(async () => {
-    const result = await deleteContract(db, ctx, kind, id, confirmed, getStorage())
+    const result = await deleteContract(db, ctx, kind, id, confirmed, getStorage(), paymentRemoval)
     refresh()
     return result
   })

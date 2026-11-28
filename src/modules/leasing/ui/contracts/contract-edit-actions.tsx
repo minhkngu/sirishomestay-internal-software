@@ -423,10 +423,11 @@ export function ContractEditActions({
     })
   }
   const deleteWarning = `${signed ? 'Hợp đồng đã ký. ' : ''}Xoá vĩnh viễn hợp đồng này cùng các hoá đơn, khoản tiền cọc, thanh toán, phụ lục, biên bản bàn giao và tệp đính kèm liên quan. Thao tác không thể hoàn tác. Bạn có chắc chắn muốn xoá?`
+  const [paymentRemoval, setPaymentRemoval] = useState<'to_wallet' | 'mistake'>('mistake')
   function remove() {
     setError('')
     start(async () => {
-      const result = await deleteContractAction(contract.kind, contract.id, true)
+      const result = await deleteContractAction(contract.kind, contract.id, true, paymentRemoval)
       if (!result.ok) {
         setError(result.error)
         return
@@ -510,6 +511,27 @@ export function ContractEditActions({
           aria-label="Xác nhận xoá hợp đồng"
         >
           <p className="text-sm">{deleteWarning}</p>
+          {contract.kind === 'lease' && (
+            <fieldset className="space-y-1.5 text-sm">
+              <legend className="font-medium">Nếu hợp đồng đã có khoản thu tiền thật</legend>
+              {(
+                [
+                  ['mistake', 'Nhập nhầm, xoá luôn (khoản thu biến mất khỏi sổ quỹ)'],
+                  ['to_wallet', 'Chuyển tiền đã thu vào ví khách (sổ quỹ giữ nguyên)'],
+                ] as const
+              ).map(([value, label]) => (
+                <label key={value} className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="payment-removal"
+                    checked={paymentRemoval === value}
+                    onChange={() => setPaymentRemoval(value)}
+                  />
+                  {label}
+                </label>
+              ))}
+            </fieldset>
+          )}
           <div className="flex gap-2">
             <Button type="button" size="sm" variant="destructive" disabled={pending} onClick={remove}>
               Xác nhận xoá

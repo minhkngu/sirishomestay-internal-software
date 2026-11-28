@@ -40,6 +40,7 @@ import {
 import { MemoryStorage } from '@/modules/platform/server/storage/memory'
 import { createExtension, createTermination } from '@/modules/leasing/server/addenda/service'
 import { approveInvoice } from '@/modules/leasing/server/invoices/service'
+import { walletBalance } from '@/modules/leasing/server/wallet/service'
 
 describe('khôi phục hợp đồng', () => {
   let db: DB, ctx: AccessContext, roomId: string, tenantId: string, facilityId: string
@@ -123,6 +124,54 @@ describe('khôi phục hợp đồng', () => {
     expect(await db.select().from(payments)).toHaveLength(0)
     expect(await db.select().from(addenda)).toHaveLength(0)
     expect(await db.select().from(depositEntries).where(eq(depositEntries.id, entry.id))).toHaveLength(0)
+  })
+  it('khôi phục gỡ phiếu thu tiền thật: tiền chuyển vào ví khách, xem trước báo trước', async () => {
+    const input = {
+      roomId,
+      tenantId,
+      startDate: '2026-01-01',
+      endDate: '2026-12-31',
+      monthlyRent: 1000,
+      depositAmount: 500,
+    }
+    const { lease } = await createLease(db, ctx, input)
+    await updateLease(db, ctx, lease.id, { ...input, monthlyRent: 2000 }, false)
+    const [invoice] = await db
+      .insert(invoices)
+      .values({
+        code: 'NEW9',
+        leaseId: lease.id,
+        facilityId,
+        kind: 'monthly',
+        periodStart: '2026-02-01',
+        periodEnd: '2026-02-28',
+        issueDate: '2026-02-01',
+        status: 'approved',
+      })
+      .returning()
+    await db.insert(invoiceLines).values({
+      invoiceId: invoice.id,
+      type: 'rent',
+      description: 'Tiền phòng',
+      quantity: 1,
+      unitPrice: 9_000_000,
+      amount: 9_000_000,
+    })
+    await db
+      .insert(payments)
+      .values({
+        invoiceId: invoice.id,
+        paidOn: '2026-02-05',
+        amount: 9_000_000,
+        method: 'cash',
+        receivedBy: ctx.userId,
+      })
+    const preview = await previewContractRestore(db, ctx, 'lease', lease.id)
+    expect(preview.items).toContainEqual(
+      expect.objectContaining({ type: 'wallet', label: 'Chuyển vào ví khách: 9.000.000' }),
+    )
+    await restoreContract(db, ctx, 'lease', lease.id, preview.token, new MemoryStorage())
+    expect(await walletBalance(db, tenantId)).toBe(9_000_000)
   })
   it('chặn người không có quyền sửa hoặc ngoài cơ sở', async () => {
     const input = {

@@ -51,33 +51,6 @@ export async function addWalletEntry(tx: DB, e: WalletEntryInput): Promise<boole
   return rows.length > 0
 }
 
-/**
- * Gỡ các biến động ví gắn với khoản thu sắp bị xoá: dùng ví (−) được trả lại, thu vượt (+) bị rút lại.
- * Mặc định từ chối nếu rút lại làm ví âm (tiền dư đã được dùng); `allowNegative` dùng khi xoá cả hợp đồng.
- */
-export async function reverseWalletForPayments(
-  tx: DB,
-  paymentIds: string[],
-  opts: { allowNegative?: boolean } = {},
-): Promise<void> {
-  if (!paymentIds.length) return
-  const rows = await tx.select().from(tenantWalletEntries).where(inArray(tenantWalletEntries.paymentId, paymentIds))
-  if (!rows.length) return
-  if (!opts.allowNegative) {
-    const net = new Map<string, number>()
-    for (const r of rows) net.set(r.tenantId, (net.get(r.tenantId) ?? 0) - r.amount)
-    for (const [tenantId, delta] of net)
-      if ((await walletBalance(tx, tenantId)) + delta < 0)
-        throw new ValidationError('Tiền dư của khoản thu này đã được dùng: gỡ các khoản dùng ví trước')
-  }
-  await tx.delete(tenantWalletEntries).where(
-    inArray(
-      tenantWalletEntries.id,
-      rows.map((r) => r.id),
-    ),
-  )
-}
-
 /** Cách xử lý tiền của phiếu thu bị gỡ: chuyển vào ví khách, trả lại khách, hoặc phiếu nhập nhầm (không có thật). */
 export type PaymentRemoval = { kind: 'to_wallet' } | { kind: 'refund'; refundOn: string } | { kind: 'mistake' }
 
@@ -92,6 +65,7 @@ export async function settleRemovedPayments(
   paymentIds: string[],
   removal: PaymentRemoval,
   note: string,
+  opts: { allowNegative?: boolean } = {},
 ): Promise<void> {
   if (!paymentIds.length) return
   const rows = await tx
@@ -168,7 +142,7 @@ export async function settleRemovedPayments(
     })
   }
   for (const [tenantId, d] of delta)
-    if (d < 0 && (await walletBalance(tx, tenantId)) < 0)
+    if (!opts.allowNegative && d < 0 && (await walletBalance(tx, tenantId)) < 0)
       throw new ValidationError('Tiền dư của khoản thu này đã được dùng: gỡ các khoản dùng ví trước')
 }
 
