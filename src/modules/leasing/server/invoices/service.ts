@@ -1182,6 +1182,7 @@ export async function approveInvoice(
       .returning()
     if (before.kind === 'termination') await finalizeTermination(tx, ctx, before)
     else await settleTransferSurplus(tx, before, valid.approvedOn ?? todayVN())
+    await syncDepositWithInvoice(tx, ctx, id)
     await syncPendingAdjustments(tx, lease, await loadAddenda(tx, lease.id), settings.proration)
     await recordAudit(tx, ctx, {
       action: 'update',
@@ -1346,6 +1347,7 @@ export async function unapproveInvoice(db: DB, ctx: AccessContext, id: string): 
       .set({ status: 'draft', updatedAt: new Date() })
       .where(eq(invoices.id, id))
       .returning()
+    await syncDepositWithInvoice(tx, ctx, id)
     const [lease, settings] = await Promise.all([leaseData(tx, before.leaseId), getSettings(tx)])
     await syncPendingAdjustments(tx, lease, await loadAddenda(tx, lease.id), settings.proration)
     await recordAudit(tx, ctx, {

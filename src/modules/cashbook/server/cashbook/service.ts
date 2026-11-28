@@ -3,7 +3,7 @@ import { depositEntries, expenses, invoiceLines, invoices, leases, payments, roo
 import type { DB } from '@/db/client'
 import { assertCan, can, type AccessContext } from '@/domain/access'
 import { depositHeld, depositMovement, expenseLabel, type LedgerRow } from '@/domain/cashbook'
-import { splitPaymentsDepositFirst } from '@/domain/deposit'
+import { splitPaymentsDepositFirst, transferCredit } from '@/domain/deposit'
 import { VN_TIME_ZONE } from '@/domain/dates'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { listWalletCashEntries, WALLET_ENTRY_LABELS } from '@/modules/leasing'
@@ -105,6 +105,15 @@ export async function listCashbook(
         .groupBy(invoiceLines.invoiceId)
     : []
   const depositDueOf = new Map(depositLines.map((l) => [l.invoiceId, l.amount]))
+  // Khoản chuyển từ hợp đồng cũ đã trả cọc trước tiền thu
+  const creditOf = new Map<string, number>()
+  if (depositDueOf.size) {
+    const lineRows = await db
+      .select({ invoiceId: invoiceLines.invoiceId, amount: invoiceLines.amount, meta: invoiceLines.meta })
+      .from(invoiceLines)
+      .where(inArray(invoiceLines.invoiceId, [...depositDueOf.keys()]))
+    for (const id of depositDueOf.keys()) creditOf.set(id, transferCredit(lineRows.filter((l) => l.invoiceId === id)))
+  }
   const splitOf = new Map<string, { deposit: number; rent: number }>()
   if (depositDueOf.size) {
     const allPays = await db
@@ -116,6 +125,7 @@ export async function listCashbook(
       for (const [id, split] of splitPaymentsDepositFirst(
         allPays.filter((p) => p.invoiceId === invoiceId),
         depositDueOf.get(invoiceId)!,
+        creditOf.get(invoiceId) ?? 0,
       ))
         splitOf.set(id, split)
   }

@@ -42,12 +42,14 @@ export function depositDiffEntry(oldAmount: number, newAmount: number, date: ISO
 /**
  * Chia các khoản thu của một hoá đơn có dòng cọc thành phần cọc và phần tiền thuê: tiền thu trước hết trả hết cọc, phần còn lại là tiền thuê.
  * `payments` đã xếp theo thứ tự thu; khoản âm (hoàn tiền) không chia, tính hết vào tiền thuê.
+ * `credit` là khoản chuyển từ hợp đồng cũ (chuyển phòng) đã trừ vào hoá đơn: tính trước tiền thu, trả cọc trước.
  */
 export function splitPaymentsDepositFirst(
   payments: { id: string; amount: number }[],
   depositDue: number,
+  credit = 0,
 ): Map<string, { deposit: number; rent: number }> {
-  let remaining = Math.max(depositDue, 0)
+  let remaining = Math.max(depositDue - Math.max(credit, 0), 0)
   const out = new Map<string, { deposit: number; rent: number }>()
   for (const p of payments) {
     const deposit = p.amount > 0 ? Math.min(p.amount, remaining) : 0
@@ -55,4 +57,12 @@ export function splitPaymentsDepositFirst(
     out.set(p.id, { deposit, rent: p.amount - deposit })
   }
   return out
+}
+
+/** Khoản chuyển từ hợp đồng cũ đã trừ vào hoá đơn: tổng các dòng âm có `meta.sourceKey` bắt đầu bằng `transfer:`. */
+export function transferCredit(lines: { amount: number; meta: unknown }[]): number {
+  return lines.reduce((n, l) => {
+    const key = (l.meta as { sourceKey?: unknown } | null)?.sourceKey
+    return typeof key === 'string' && key.startsWith('transfer:') && l.amount < 0 ? n - l.amount : n
+  }, 0)
 }

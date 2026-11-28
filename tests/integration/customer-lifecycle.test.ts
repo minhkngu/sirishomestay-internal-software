@@ -377,18 +377,8 @@ describe('vòng đời một khách: cọc → hợp đồng → thu, ví → ch
     expect(await leaseDebt(db, ctx(), leaseB)).toBe(0)
   })
 
-  // Đã biết: cọc của hợp đồng mới chỉ được hoàn tất khi tiền mặt thu đủ phần cọc; khoản chuyển từ hợp đồng cũ (gồm cọc cũ hoàn về)
-  // chưa được tính, nên hoá đơn đã thu đủ mà sổ cọc HĐ-B vẫn chờ. Test này đang "fails" có chủ đích: khi sửa, đổi thành it thường.
-  it.fails('5.2b cọc HĐ-B đủ 12.000.000 khi hoá đơn đầu đã thu đủ', async () => {
-    expect(await depositOf(leaseB)).toBe(12_000_000)
-  })
-
-  it('5.2c mô phỏng kết quả mong muốn: nhân viên hoàn tất dòng thu cọc HĐ-B (thu cùng hoá đơn, không tính sổ quỹ hai lần)', async () => {
-    const [inv] = await db.select().from(invoices).where(eq(invoices.id, novInvoiceB))
-    await db
-      .update(depositEntries)
-      .set({ status: 'done', note: `Thu cùng hoá đơn ${inv.code}`, date: '2026-11-25' })
-      .where(and(eq(depositEntries.leaseId, leaseB), eq(depositEntries.status, 'pending')))
+  // Khoản chuyển từ hợp đồng cũ (gồm cọc cũ hoàn về) trả cọc trước tiền thu: duyệt hoá đơn đầu là cọc HĐ-B đủ
+  it('5.2b cọc HĐ-B đủ 12.000.000 khi hoá đơn đầu đã thu đủ', async () => {
     expect(await depositOf(leaseB)).toBe(12_000_000)
   })
 
