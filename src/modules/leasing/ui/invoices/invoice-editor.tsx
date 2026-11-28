@@ -1102,15 +1102,23 @@ export function InvoiceEditor(p: Props) {
                                   (x) => typeof x.start === 'number' && typeof x.end === 'number',
                                 )
                               : []
-                            return segs.length ? (
-                              <span className="tabular-nums text-foreground">
-                                {segs
-                                  .map(
-                                    (x) =>
-                                      `${(x.start as number).toLocaleString('vi-VN')} → ${(x.end as number).toLocaleString('vi-VN')}`,
-                                  )
-                                  .join('; ')}
-                              </span>
+                            const unit = typeof l.meta?.unit === 'string' ? l.meta.unit : ''
+                            const fmt = (n: number) => n.toLocaleString('vi-VN')
+                            // Dòng đã lưu chỉ số đầu, cuối (kỳ ký hợp đồng, đã sửa tay) cũng hiện như đoạn đơn
+                            const ranges = segs.length
+                              ? segs.map((x) => `${fmt(x.start as number)} → ${fmt(x.end as number)}`)
+                              : typeof l.meta?.opening === 'number' && typeof l.meta?.closing === 'number'
+                                ? [`${fmt(l.meta.opening)} → ${fmt(l.meta.closing)}`]
+                                : []
+                            return ranges.length ? (
+                              <div className="space-y-0.5 py-1.5">
+                                <span className="block tabular-nums text-foreground">{ranges.join('; ')}</span>
+                                <span className="block text-[11px] text-muted-foreground">
+                                  Tiêu thụ:{' '}
+                                  <span className="font-medium tabular-nums text-foreground">{fmt(l.quantity)}</span>
+                                  {unit ? ` ${unit}` : ''}
+                                </span>
+                              </div>
                             ) : (
                               <span className="inline-flex h-8.5 items-center text-muted-foreground/60">—</span>
                             )
