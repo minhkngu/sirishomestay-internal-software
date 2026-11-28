@@ -1026,7 +1026,9 @@ export function InvoiceEditor(p: Props) {
                             : l.description
                         // Dòng khoá hiện chữ đầy đủ, tự xuống dòng (ô nhập một dòng sẽ cắt mất phần dài)
                         return isLocked(l) || isAddedFee(l) || isDepositLine(l) || isTransferIn(l) || sysRC(l) ? (
-                          <span className="block break-words py-2 text-xs text-foreground">{text}</span>
+                          <span className="flex min-h-8.5 items-center break-words text-xs text-foreground">
+                            {text}
+                          </span>
                         ) : (
                           <input
                             value={text}
@@ -1048,7 +1050,7 @@ export function InvoiceEditor(p: Props) {
                           onChange={(meta) => set(i, timePatch(l, meta))}
                         />
                       ) : (
-                        <span className="text-muted-foreground/60">—</span>
+                        <span className="inline-flex h-8.5 items-center text-muted-foreground/60">—</span>
                       )}
                     </td>
                     <td className="p-2.5 align-top">
@@ -1110,7 +1112,7 @@ export function InvoiceEditor(p: Props) {
                                   .join('; ')}
                               </span>
                             ) : (
-                              <span className="text-muted-foreground/60">—</span>
+                              <span className="inline-flex h-8.5 items-center text-muted-foreground/60">—</span>
                             )
                           })()
                         )
@@ -1118,7 +1120,7 @@ export function InvoiceEditor(p: Props) {
                     </td>
                     <td className="p-2.5 align-top">
                       {isMeterLine(l) ? (
-                        <span className="text-muted-foreground/60">—</span>
+                        <span className="inline-flex h-8.5 items-center text-muted-foreground/60">—</span>
                       ) : (
                         <input
                           type="number"
@@ -1134,7 +1136,7 @@ export function InvoiceEditor(p: Props) {
                     </td>
                     <td className="p-2.5 align-top text-right">
                       {isLocked(l) || isAddedFee(l) || isDepositLine(l) || isTransferIn(l) || sysRC(l) ? (
-                        <span className="inline-block py-2 font-medium tabular-nums text-foreground">
+                        <span className="inline-flex h-8.5 items-center font-medium tabular-nums text-foreground">
                           {formatVND(l.unitPrice)}
                         </span>
                       ) : (
@@ -1152,23 +1154,27 @@ export function InvoiceEditor(p: Props) {
                         />
                       )}
                     </td>
-                    <td className="p-2.5 text-right font-bold tabular-nums text-foreground">
-                      {formatVND(lineAmount(l))}
+                    <td className="p-2.5 align-top text-right font-bold tabular-nums text-foreground">
+                      <span className="inline-flex h-8.5 items-center">{formatVND(lineAmount(l))}</span>
                     </td>
-                    <td className="p-2.5 text-center">
-                      <button
-                        type="button"
-                        disabled={(isLocked(l) && lines.some((x) => x.type === 'rent')) || isTransferIn(l) || sysRC(l)}
-                        onClick={() => setLines(lines.filter((_, j) => j !== i))}
-                        className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-rose-50 hover:text-rose-600"
-                        title={
-                          isTransferIn(l)
-                            ? 'Khoản chuyển từ hợp đồng cũ không xoá được; hoàn tác chuyển phòng ở hợp đồng cũ để bỏ'
-                            : 'Xoá dòng'
-                        }
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
+                    <td className="p-2.5 text-center align-top">
+                      <span className="inline-flex h-8.5 items-center">
+                        <button
+                          type="button"
+                          disabled={
+                            (isLocked(l) && lines.some((x) => x.type === 'rent')) || isTransferIn(l) || sysRC(l)
+                          }
+                          onClick={() => setLines(lines.filter((_, j) => j !== i))}
+                          className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                          title={
+                            isTransferIn(l)
+                              ? 'Khoản chuyển từ hợp đồng cũ không xoá được; hoàn tác chuyển phòng ở hợp đồng cũ để bỏ'
+                              : 'Xoá dòng'
+                          }
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </span>
                     </td>
                   </tr>
                 ),
