@@ -127,7 +127,7 @@
 - Test: `tests/unit/leasing/liquidation.test.ts` (hoặc file test liquidation hiện có, tìm bằng `ls tests/unit`)
 
 **Interfaces:**
-- Produces: `TerminationInput` thêm `walletBalance?: number`, `transfer?: boolean` và `billedUntil?: ISODate` (mặc định `endDate`; tiền phòng, phí cố định và hoàn theo ngày dùng `billedUntil` thay `endDate`; chỉ số đồng hồ vẫn theo `endDate`). Khi `walletBalance > 0`: thêm dòng `adjustment` "Số dư ví" amount `−min(walletBalance, max(0, tổng trước ví))`, `meta: { wallet: true }`. Khi `transfer`: sau cùng thêm dòng `adjustment` "Chuyển sang hợp đồng mới" amount `−T` với `T` là tổng các dòng trước nó, `meta: { transfer: true }`, nên tổng hoá đơn bằng 0.
+- Produces: `TerminationInput` thêm `walletBalance?: number`, `transfer?: boolean` và (không còn `billedUntil`: mọi thanh lý tính đến `endDate − 1`, hoàn từ `endDate`; chỉ số đồng hồ theo `endDate`). Khi `walletBalance > 0`: thêm dòng `adjustment` "Số dư ví" amount `−walletBalance` (**toàn bộ** ví, phần thừa thành tiền hoàn), `meta: { wallet: <số> }`. Khi `transfer`: sau cùng thêm dòng `adjustment` "Chuyển sang hợp đồng mới" amount `−T` với `T` là tổng các dòng trước nó, `meta: { transfer: true }`, nên tổng hoá đơn bằng 0.
 
 - [ ] **Step 1:** Viết test với số cụ thể: tổng trước ví `4_000_000`, `walletBalance 5_000_000` → dòng ví `−4_000_000`; tổng trước ví `−3_000_000` thì không có dòng ví; `transfer` với `T = −3_000_000` → dòng chuyển `+3_000_000`, tổng `0`; `T = 2_000_000` → dòng `−2_000_000`; với `endDate = 2026-12-16`, `billedUntil = 2026-12-15` và hoá đơn tháng 12 đã trả trước, dòng hoàn bắt đầu từ 16/12; `T = 0` → không có dòng chuyển.
 - [ ] **Step 2:** Cài trong `buildTerminationInvoice`; các nơi gọi cũ không truyền hai trường mới thì không đổi kết quả.

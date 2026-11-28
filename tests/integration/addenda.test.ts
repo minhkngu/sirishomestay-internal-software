@@ -799,10 +799,10 @@ describe('phụ lục hợp đồng', () => {
           meta: l.meta,
         }))
       await updateLines(db, ctx(), r.invoice!.id, send(rows, 2))
-      expect((await termLines(r.invoice!.id)).find((l) => l.id === unpaid.id)).toMatchObject({
-        quantity: 1,
-        amount: 9000000,
-      })
+      // Lưu lại thì các dòng được ghi mới (id đổi): tìm theo dấu unpaid
+      expect(
+        (await termLines(r.invoice!.id)).find((l) => (l.meta as { unpaid?: boolean } | null)?.unpaid),
+      ).toMatchObject({ quantity: 1, amount: 9000000 })
       await expect(updateLines(db, ctx(), r.invoice!.id, send(rows.filter((l) => l.id !== unpaid.id)))).rejects.toThrow(
         ValidationError,
       )

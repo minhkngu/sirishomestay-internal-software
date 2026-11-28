@@ -157,15 +157,13 @@ describe('khôi phục hợp đồng', () => {
       unitPrice: 9_000_000,
       amount: 9_000_000,
     })
-    await db
-      .insert(payments)
-      .values({
-        invoiceId: invoice.id,
-        paidOn: '2026-02-05',
-        amount: 9_000_000,
-        method: 'cash',
-        receivedBy: ctx.userId,
-      })
+    await db.insert(payments).values({
+      invoiceId: invoice.id,
+      paidOn: '2026-02-05',
+      amount: 9_000_000,
+      method: 'cash',
+      receivedBy: ctx.userId,
+    })
     const preview = await previewContractRestore(db, ctx, 'lease', lease.id)
     expect(preview.items).toContainEqual(
       expect.objectContaining({ type: 'wallet', label: 'Chuyển vào ví khách: 9.000.000' }),

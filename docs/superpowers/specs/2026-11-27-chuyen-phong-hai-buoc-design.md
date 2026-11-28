@@ -21,7 +21,7 @@ Không phải mục tiêu:
 - Không nạp trước vào ví. Ví chỉ có tiền từ thu vượt.
 - Không chuyển dữ liệu của phụ lục `transfer` cũ (vẫn đọc được như lịch sử).
 - Không chuyển phòng giữa hai cơ sở.
-- Không khôi phục được sau khi hoá đơn đầu tiên của hợp đồng phòng mới đã có thanh toán (xem 5.3, "Khi có lỗi"); lúc đó sửa tay.
+- Không nạp ví trước và không rút ví ra tiền mặt trực tiếp: ví chỉ đổi qua thu tiền, gỡ phiếu, thanh lý, chuyển phòng.
 - Không đổi tài sản, không đổi cách tính điện nước.
 
 Phản mục tiêu:
@@ -56,11 +56,23 @@ Phản mục tiêu:
 - Phạm vi sửa: `buildTerminationInvoice` (`leasing/domain/liquidation.ts`: tiền phòng còn thiếu, hoàn tiền phòng và phí cố định, phí đồng hồ tới ngày trả, tiền thuê lẻ), chỗ ghi `endDate`/`dayAfterEnd` liên quan trong `addenda/service.ts` và `finalize.ts`, và nhãn trên hoá đơn ("trả phòng ngày …"). Không đổi `prorateFraction`.
 - Test cần cập nhật: `tests/unit/domain/billing.test.ts`, `tests/integration/addenda.test.ts`, `contract-restore.test.ts`, `contract-history.test.ts`.
 - Hoá đơn thanh lý đã duyệt trước đây không tính lại.
+- Đã áp cho **mọi** thanh lý (thường và chuyển phòng): `buildTerminationInvoice` luôn tính đến `ngày trả − 1` và hoàn từ chính ngày trả; không còn tham số `billedUntil`.
 
 ### 5.1 Ví khách
 
-- Ví gắn với người thuê chính của hợp đồng (`leases.tenantId`) và **tách theo cơ sở**. Người ở cùng không có ví. Công ty thuê thì ví của công ty.
-- Ví là sổ biến động có dấu, bảng mới (ví dụ `tenant_wallet_entries`): người thuê, cơ sở, số tiền (dương là cộng, âm là dùng hoặc hoàn), loại (`overpay`, `use_invoice`, `use_termination`, `carry_surplus`), tham chiếu hoá đơn hoặc khoản thu, ngày, ghi chú, `sourceKey` duy nhất để chống ghi trùng. Số dư là tổng.
+- Ví gắn với người thuê chính của hợp đồng (`leases.tenantId`) và **dùng chung mọi cơ sở** (một ví cho mỗi khách; `facility_id` của biến động là cơ sở phát sinh, để sổ quỹ đặt dòng thu, chi đúng cơ sở). Người ở cùng không có ví. Công ty thuê thì ví của công ty.
+- Ví là sổ biến động có dấu, bảng mới (ví dụ `tenant_wallet_entries`): người thuê, cơ sở, số tiền (dương là cộng, âm là dùng hoặc hoàn), loại theo bảng dưới, tham chiếu hoá đơn hoặc khoản thu, ngày, ghi chú, `sourceKey` duy nhất để chống ghi trùng. Số dư là tổng.
+| Loại | Dấu | Sổ quỹ |
+|---|---|---|
+| `overpay` (thu dư vào ví) | + | thu, ngày khách đưa |
+| `reallocate` (chuyển phiếu thu vào ví) | + | thu, ngày thu gốc |
+| `refund_out` (trả lại khách) | − | chi, ngày trả |
+| `carry_surplus` (dư chuyển phòng) | + | không tính |
+| `use_invoice` (dùng ví trả hoá đơn) | − | không tính |
+| `use_termination` (ví gạch vào thanh lý) | − | không tính |
+
+Sổ quỹ xem theo từng cơ sở có thể không khớp từng nơi (tiền dư ghi thu ở cơ sở A, dùng trả nợ ở cơ sở B); tổng toàn công ty khớp.
+
 - Chi tiết khách và hợp đồng hiện số dư ví và lịch sử biến động. Mọi biến động có nhật ký kiểm toán.
 
 ### 5.2 Thu tiền và thu vượt
@@ -73,6 +85,8 @@ Phản mục tiêu:
 ### 5.3 Popup "Chuyển phòng"
 
 **Điểm vào.** Nút "Chuyển phòng" ở hợp đồng đang hiệu lực.
+
+**Điều kiện.** Hợp đồng cũ phải sạch nợ và không còn hoá đơn tháng nháp: popup báo ngay khi mở và khoá nút xác nhận; duyệt hoá đơn thanh lý cũng kiểm lại. Nhờ vậy hoá đơn thanh lý chuyển phòng không có dòng "Nợ cũ".
 
 **Form.** Phòng mới (cùng cơ sở), ngày chuyển, điều khoản hợp đồng mới, chỉ số cuối phòng cũ và chỉ số đầu phòng mới, biên bản check-out, tuỳ chọn hoàn tiền phòng như thanh lý (mặc định hoàn theo ngày), phạt hoặc mất cọc nếu có. Cạnh đó là bảng xem trước kết quả thanh lý.
 
@@ -108,9 +122,10 @@ Phản mục tiêu:
 **Đồng hồ, tài sản.** Phòng luôn có đồng hồ nên không có kiểm tra chặn thiếu đồng hồ. Chốt chỉ số cuối phòng cũ vào ngày kết thúc, ghi chỉ số đầu phòng mới vào ngày bắt đầu. Tài sản không đổi: hợp đồng cũ làm biên bản check-out, hợp đồng mới tạo biên bản check-in từ tài sản phòng mới.
 
 **Khi có lỗi.**
-- Trước khi duyệt: sửa hoá đơn thanh lý nháp, số tự cập nhật; hoặc "Huỷ chuyển phòng": khôi phục thanh lý và xoá hợp đồng mới bằng `deleteContract` (có xác nhận), chỉ khi hợp đồng mới chưa có hoá đơn duyệt hay thu tiền.
+- Trước khi duyệt: sửa hoá đơn thanh lý nháp, số tự cập nhật; hoặc "Huỷ chuyển phòng": khôi phục thanh lý và xoá hợp đồng mới bằng `deleteContract` (có xác nhận), ai có quyền cũng làm được khi hợp đồng mới chưa có hoá đơn duyệt hay thu tiền; còn lại chỉ admin.
+- Tiền thật đã thu ở hợp đồng mới **không mất**: chuyển vào ví khách (`reallocate`, giữ ngày thu gốc); phần trả bằng ví trả lại ví.
 - Sau khi duyệt: dùng **khôi phục** (`restore.ts`) của hợp đồng cũ, mở rộng để cuốn theo hợp đồng mới. Khôi phục đưa hợp đồng cũ về `active`, đảo sổ cọc cũ, đảo biến động ví `use_termination`, xoá điều chỉnh chờ `transfer:<mã>`, **xoá hoá đơn thanh lý** cùng phụ lục thanh lý (làm lại thì tạo thanh lý mới), và xoá hợp đồng mới cùng các hoá đơn của nó.
-- **Chặn khôi phục** chỉ khi **hoá đơn đầu tiên được tạo sau chuyển phòng** (hoá đơn hút số dư hoặc nợ `T`) **đã có thanh toán**, kể cả phần trả bằng ví; báo rõ lý do. Chưa có hoá đơn, hoặc hoá đơn đó chưa thanh toán (nháp hay đã duyệt) thì không chặn: khôi phục xoá các hoá đơn của hợp đồng mới cùng hợp đồng mới.
+- Không còn chặn khi hoá đơn đầu của hợp đồng mới đã có thanh toán: admin hoàn tác được, tiền đã thu vào ví như trên.
 - Nút "Bỏ duyệt" bị **chặn** với hoá đơn thanh lý thuộc chuyển phòng, báo "dùng Khôi phục". Lý do: `unapproveInvoice` chỉ đưa hoá đơn về nháp, không mở lại hợp đồng hay đảo sổ cọc.
 
 **Bỏ phụ lục chuyển phòng.** Bỏ giao diện tạo phụ lục `transfer`; phụ lục đã tạo vẫn đọc được. Xoá `createTransfer` nếu không còn nơi gọi khác.
@@ -137,7 +152,7 @@ Cập nhật trong `tests/`, chạy khi chuẩn bị PR:
 
 ## 7. Quyết định do tôi tự đặt, bạn chưa xác nhận hết
 
-- Ví tách theo cơ sở; chỉ chuyển phòng trong cùng một cơ sở.
+- Chuyển phòng chỉ trong cùng một cơ sở (phạm vi việc làm).
 - Ví gắn với người thuê chính, không có ví cho người ở cùng.
-- Duyệt thanh lý không đòi khách đã trả đủ; nợ `T` đi sang hợp đồng mới.
-- Khôi phục sau duyệt chỉ chặn khi hoá đơn đầu tiên của hợp đồng mới đã có thanh toán.
+- Chuyển phòng yêu cầu hợp đồng cũ sạch nợ; `T` chỉ còn phần phát sinh trong hoá đơn thanh lý (hoàn tiền, cọc, ví, phạt).
+- Huỷ chuyển phòng sau duyệt chỉ admin làm được.

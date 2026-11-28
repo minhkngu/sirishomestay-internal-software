@@ -728,15 +728,13 @@ describe('sửa và xoá hợp đồng', () => {
         unitPrice: 9_000_000,
         amount: 9_000_000,
       })
-      await db
-        .insert(payments)
-        .values({
-          invoiceId: inv.id,
-          paidOn: '2026-02-05',
-          amount: 9_000_000,
-          method: 'cash',
-          receivedBy: admin.userId,
-        })
+      await db.insert(payments).values({
+        invoiceId: inv.id,
+        paidOn: '2026-02-05',
+        amount: 9_000_000,
+        method: 'cash',
+        receivedBy: admin.userId,
+      })
       return lease
     }
     const income = async () => summarize((await listCashbook(db, context(['billing'], [facilityId]), {})).rows).income

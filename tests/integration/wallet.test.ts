@@ -124,16 +124,14 @@ describe('settleRemovedPayments', () => {
         status: 'approved',
       })
       .returning()
-    await db
-      .insert(invoiceLines)
-      .values({
-        invoiceId,
-        type: 'rent',
-        description: 'Tiền phòng',
-        quantity: 1,
-        unitPrice: 9_000_000,
-        amount: 9_000_000,
-      })
+    await db.insert(invoiceLines).values({
+      invoiceId,
+      type: 'rent',
+      description: 'Tiền phòng',
+      quantity: 1,
+      unitPrice: 9_000_000,
+      amount: 9_000_000,
+    })
   })
 
   it('to_wallet: ví cộng cả phiếu, tiền dư còn', async () => {

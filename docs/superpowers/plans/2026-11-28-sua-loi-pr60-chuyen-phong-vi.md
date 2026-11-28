@@ -18,25 +18,25 @@ Mức ưu tiên:
 
 | # | Vấn đề (lời thường) | Hướng giải quyết | Quyết định | Trạng thái |
 |---|---|---|---|---|
-| A1 | Chuyển phòng lúc còn nợ thì nợ cũ có thể bị đòi hai lần | Chặn chuyển phòng khi hợp đồng cũ còn hoá đơn nháp hoặc còn nợ; popup báo ngay khi mở | Đã chọn | Chờ |
-| A2 | Thanh lý thường không đóng hoá đơn cũ, nên thu nợ được hai lần | Lúc duyệt thanh lý, tính lại dòng "Nợ cũ" theo nợ thật rồi đóng các hoá đơn cũ (khoản "Gộp vào thanh lý"); bỏ duyệt thì mở lại | Đề xuất | Chờ |
-| A3 | Huỷ chuyển phòng làm mất tiền khách đã trả ở hợp đồng mới | Tiền thật đã thu ở hợp đồng mới chuyển vào ví khách (giữ ngày thu gốc); là một trường hợp của B2 | Đã chọn (PA 3) | Chờ |
-| A4 | Số dư mang sang lớn hơn hoá đơn đầu thì hoá đơn ra số âm | Duyệt hoá đơn đó thì đưa về 0, phần dư vào ví (`carry_surplus`) | Đề xuất | Chờ |
-| A5 | Thanh lý tính dư ngày trả phòng | Mọi thanh lý tính tiền đến hết hôm trước, hoàn từ chính ngày trả; bỏ tham số `billedUntil` | Đã chọn (PA 1) | Chờ |
-| B1 | Vừa trả bằng ví vừa đưa tiền mặt thì tiền vào ví mà không có phiếu thu | Từ chối trường hợp này; mọi khoản thu dư gắn với một phiếu thu | Đề xuất | Chờ |
-| B2 | Gỡ phiếu thu làm mất tiền hoặc rút hết tiền dư | Gỡ phiếu hỏi: **chuyển vào ví** / **trả lại khách** / **nhập nhầm** | Đã chọn | Chờ |
-| B3 | Chuyển phòng có thể gắn hai phí vào một đồng hồ, hoặc vào đồng hồ đã tháo | Dùng đồng hồ người dùng chọn trong popup; bỏ đồng hồ đã tháo; cấm trùng | Đề xuất | Chờ |
-| B4 | Huỷ chuyển phòng kiểm quyền trước khi khoá dữ liệu | Đưa phần kiểm vào trong giao dịch, khoá hai hợp đồng | Đề xuất | Chờ |
-| B5 | Dòng "Nợ cũ" trên hoá đơn thanh lý sửa được số lượng | Khoá dòng này ở mọi hoá đơn thanh lý (đi cùng A2) | Đề xuất | Chờ |
-| B6 | Plan và spec nói khác nhau về số ví trừ khi thanh lý | Trừ toàn bộ ví như code; sửa plan | Đề xuất | Chờ |
-| B7 | Phiếu trả bằng ví, gộp vào thanh lý chưa có tên tiếng Việt | Thêm nhãn hiển thị | Đề xuất | Chờ |
-| C1 | Dòng "Chuyển sang hợp đồng mới" cân bằng ở hai nơi | Gom về một hàm | Đề xuất | Chờ |
-| C2 | Ghi ví kiểm trùng hai lần, có thể báo sai | Một lệnh ghi có chống trùng | Đề xuất | Chờ |
-| C3 | Sổ quỹ tải hết dòng ví rồi mới lọc | Lọc ngay khi truy vấn | Đề xuất | Chờ |
-| C4 | Mở popup hợp đồng là tải đồng hồ mọi cơ sở | Chỉ tải khi mở popup chuyển phòng | Đề xuất | Chờ |
-| C5 | Kiểm "đã có hoá đơn thanh lý chưa" đặt sai chỗ | Chuyển lên ngay sau bước thanh lý | Đề xuất | Chờ |
-| D1 | Ví đang tách theo cơ sở | Một ví cho mỗi khách, dùng ở mọi cơ sở | Đã chọn | Chờ |
-| D2 | Chưa có giao diện xem ví | Khối "Ví khách" ở chi tiết khách; số dư ở chi tiết hợp đồng | Đã chọn | Chờ |
+| A1 | Chuyển phòng lúc còn nợ thì nợ cũ có thể bị đòi hai lần | Chặn chuyển phòng khi hợp đồng cũ còn hoá đơn nháp hoặc còn nợ; popup báo ngay khi mở | Đã chọn | Xong |
+| A2 | Thanh lý thường không đóng hoá đơn cũ, nên thu nợ được hai lần | Lúc duyệt thanh lý, tính lại dòng "Nợ cũ" theo nợ thật rồi đóng các hoá đơn cũ (khoản "Gộp vào thanh lý"); bỏ duyệt thì mở lại | Đề xuất | Xong |
+| A3 | Huỷ chuyển phòng làm mất tiền khách đã trả ở hợp đồng mới | Tiền thật đã thu ở hợp đồng mới chuyển vào ví khách (giữ ngày thu gốc); là một trường hợp của B2 | Đã chọn (PA 3) | Xong |
+| A4 | Số dư mang sang lớn hơn hoá đơn đầu thì hoá đơn ra số âm | Duyệt hoá đơn đó thì đưa về 0, phần dư vào ví (`carry_surplus`) | Đề xuất | Xong |
+| A5 | Thanh lý tính dư ngày trả phòng | Mọi thanh lý tính tiền đến hết hôm trước, hoàn từ chính ngày trả; bỏ tham số `billedUntil` | Đã chọn (PA 1) | Xong |
+| B1 | Vừa trả bằng ví vừa đưa tiền mặt thì tiền vào ví mà không có phiếu thu | Từ chối trường hợp này; mọi khoản thu dư gắn với một phiếu thu | Đề xuất | Xong |
+| B2 | Gỡ phiếu thu làm mất tiền hoặc rút hết tiền dư | Gỡ phiếu hỏi: **chuyển vào ví** / **trả lại khách** / **nhập nhầm** | Đã chọn | Xong |
+| B3 | Chuyển phòng có thể gắn hai phí vào một đồng hồ, hoặc vào đồng hồ đã tháo | Dùng đồng hồ người dùng chọn trong popup; bỏ đồng hồ đã tháo; cấm trùng | Đề xuất | Xong |
+| B4 | Huỷ chuyển phòng kiểm quyền trước khi khoá dữ liệu | Đưa phần kiểm vào trong giao dịch, khoá hai hợp đồng | Đề xuất | Xong |
+| B5 | Dòng "Nợ cũ" trên hoá đơn thanh lý sửa được số lượng | Khoá dòng này ở mọi hoá đơn thanh lý (đi cùng A2) | Đề xuất | Xong |
+| B6 | Plan và spec nói khác nhau về số ví trừ khi thanh lý | Trừ toàn bộ ví như code; sửa plan | Đề xuất | Xong |
+| B7 | Phiếu trả bằng ví, gộp vào thanh lý chưa có tên tiếng Việt | Thêm nhãn hiển thị | Đề xuất | Xong |
+| C1 | Dòng "Chuyển sang hợp đồng mới" cân bằng ở hai nơi | Gom về một hàm | Đề xuất | Xong |
+| C2 | Ghi ví kiểm trùng hai lần, có thể báo sai | Một lệnh ghi có chống trùng | Đề xuất | Xong |
+| C3 | Sổ quỹ tải hết dòng ví rồi mới lọc | Lọc ngay khi truy vấn | Đề xuất | Xong |
+| C4 | Mở popup hợp đồng là tải đồng hồ mọi cơ sở | Chỉ tải khi mở popup chuyển phòng | Đề xuất | Xong |
+| C5 | Kiểm "đã có hoá đơn thanh lý chưa" đặt sai chỗ | Chuyển lên ngay sau bước thanh lý | Đề xuất | Xong |
+| D1 | Ví đang tách theo cơ sở | Một ví cho mỗi khách, dùng ở mọi cơ sở | Đã chọn | Xong |
+| D2 | Chưa có giao diện xem ví | Khối "Ví khách" ở chi tiết khách; số dư ở chi tiết hợp đồng | Đã chọn | Xong |
 
 ---
 

@@ -1884,7 +1884,7 @@ export async function leaseDebt(db: DB, ctx: AccessContext, leaseId: string): Pr
 }
 /** Số dư ví của khách (người thuê chính), để popup thu tiền hiện lựa chọn dùng ví. */
 export async function leaseWalletBalance(db: DB, ctx: AccessContext, leaseId: string): Promise<number> {
-  const facilityId = await facilityOfLease(db, ctx, leaseId)
+  await facilityOfLease(db, ctx, leaseId)
   const [l] = await db.select({ tenantId: leases.tenantId }).from(leases).where(eq(leases.id, leaseId))
   return l ? walletBalance(db, l.tenantId) : 0
 }
