@@ -128,23 +128,6 @@ export function InvoiceList({
         <div className="flex min-w-0 flex-wrap items-center gap-2.5 xl:justify-end">
           <FacilityFilter facilities={facilities} align="left" />
           <Select
-            value={kind || null}
-            onValueChange={(v) => setListParams({ loai: v ? String(v) : null })}
-            items={kindOptions}
-          >
-            <SelectTrigger aria-label="Loại hoá đơn" className="h-9 w-32">
-              <SelectValue placeholder="Tất cả loại" />
-            </SelectTrigger>
-            <SelectContent>
-              {kind && <SelectItem value="">Tất cả loại</SelectItem>}
-              {kindOptions.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
             value={room || null}
             onValueChange={(v) => setListParams({ phong: v ? String(v) : null })}
             items={roomOptions}
@@ -156,6 +139,23 @@ export function InvoiceList({
             <SelectContent>
               {room && <SelectItem value="">Tất cả phòng</SelectItem>}
               {roomOptions.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={kind || null}
+            onValueChange={(v) => setListParams({ loai: v ? String(v) : null })}
+            items={kindOptions}
+          >
+            <SelectTrigger aria-label="Loại hoá đơn" className="h-9 w-32">
+              <SelectValue placeholder="Tất cả loại" />
+            </SelectTrigger>
+            <SelectContent>
+              {kind && <SelectItem value="">Tất cả loại</SelectItem>}
+              {kindOptions.map((o) => (
                 <SelectItem key={o.value} value={o.value}>
                   {o.label}
                 </SelectItem>
