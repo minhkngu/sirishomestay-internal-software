@@ -338,8 +338,40 @@ export async function quickContractDataAction(kind: 'lease' | 'deposit', id: str
               busy: busyIds.has(m.id),
             }))
             const canEditMeters = can(ctx, 'meters', l.facilityId)
+            // Đồng hồ mọi phòng của cơ sở (đang dùng), cho form chuyển phòng chọn đồng hồ phòng mới
+            const { rooms } = await import('@/db')
+            const [facilityMeterRows, facilityBusy] = await Promise.all([
+              db
+                .select({
+                  id: meters.id,
+                  roomId: meters.roomId,
+                  utility: meters.utility,
+                  name: meters.name,
+                  code: meters.code,
+                  serial: meters.serial,
+                })
+                .from(meters)
+                .innerJoin(rooms, eq(rooms.id, meters.roomId))
+                .where(and(eq(rooms.facilityId, l.facilityId), isNull(meters.removedOn))),
+              db
+                .select({ meterId: leaseFeeMeters.meterId })
+                .from(leaseFeeMeters)
+                .innerJoin(leaseFeeSnapshots, eq(leaseFeeSnapshots.id, leaseFeeMeters.leaseFeeId))
+                .innerJoin(leases, eq(leases.id, leaseFeeSnapshots.leaseId))
+                .where(eq(leases.status, 'active')),
+            ])
+            const facilityBusyIds = new Set(facilityBusy.map((r) => r.meterId))
+            const facilityMeters = facilityMeterRows.map((m) => ({
+              id: m.id,
+              roomId: m.roomId,
+              utility: (m.utility === 'electric' || m.utility === 'water' ? m.utility : 'fee') as
+                'electric' | 'water' | 'fee',
+              label: `${m.name || (m.utility === 'electric' ? 'Điện' : m.utility === 'water' ? 'Nước' : 'Đồng hồ')}${m.code ? ` · ${m.code}` : ''}${m.serial ? ` · ${m.serial}` : ''}`,
+              busy: facilityBusyIds.has(m.id),
+            }))
             return {
               editable: true,
+              facilityMeters,
               units: units.map((u) => ({ id: u.id, name: u.name })),
               current: l.fees.map((f) => {
                 const meterId = canEditMeters && f.leaseFeeId ? (linkOf.get(f.leaseFeeId) ?? null) : null
