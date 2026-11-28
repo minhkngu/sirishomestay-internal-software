@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input'
 import { MoneyInput } from '@/components/ui/money-input'
 import { Label } from '@/components/ui/label'
 import { previewInvoiceTemplateByIdAction, previewTemplateByIdAction } from '@/modules/documents/actions'
-import { ConfirmDialog } from '@/components/confirm-dialog'
 import { FormDialog } from '@/components/form-dialog'
 import { formatVND } from '@/domain/money'
 import { formatDateVN } from '@/domain/dates'
@@ -267,13 +266,8 @@ export function ContractEditActions({
     .join(',')
   const addable = (people ?? []).filter((p) => !occ.some((o) => o.id === p.id))
 
-  const [confirmingSave, setConfirmingSave] = useState(false)
   function save(e: React.FormEvent) {
     e.preventDefault()
-    if (signed) {
-      setConfirmingSave(true)
-      return
-    }
     doSave()
   }
   function doSave() {
@@ -1040,14 +1034,6 @@ export function ContractEditActions({
         )}
       </FormDialog>
       {tplPdf && <PdfBlobDialog base64={tplPdf.base64} title={tplPdf.title} onClose={() => setTplPdf(null)} />}
-      <ConfirmDialog
-        open={confirmingSave}
-        onOpenChange={setConfirmingSave}
-        title="Lưu thay đổi hợp đồng đã ký?"
-        description="Hợp đồng đã ký. Hãy kiểm tra lại bản đã ký trước khi lưu."
-        confirmLabel="Lưu thay đổi"
-        onConfirm={doSave}
-      />
       {(() => {
         const repError =
           editOccupants && !occ.some((o) => o.id === tenantId) ? 'Người đại diện phải nằm trong danh sách người ở' : ''

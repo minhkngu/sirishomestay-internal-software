@@ -3,6 +3,10 @@
 import { useMemo, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { FileImage } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Checkbox } from '@/components/ui/checkbox'
+import { ConfirmDialog } from '@/components/confirm-dialog'
+import { approveInvoiceAction, deleteInvoiceAction } from '../../actions'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
@@ -110,6 +114,38 @@ export function InvoiceList({
   const rows = useMemo(() => scoped.filter((i) => matchesInvoiceView(i.state, view)), [scoped, view])
   const { pageRows, pager } = usePager(rows, 'invoices', `${view}|${period}|${selected.join(',')}|${room}|${kind}`)
 
+  // Chọn nhiều: thao tác nhanh áp cho các hoá đơn nháp trong phần đã chọn
+  const router = useRouter()
+  const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [bulkBusy, startBulk] = useTransition()
+  const pickedDrafts = rows.filter((i) => picked.has(i.id) && i.state === 'draft')
+  const pageIds = pageRows.map((i) => i.id)
+  const allPageChecked = pageIds.length > 0 && pageIds.every((id) => picked.has(id))
+  const toggle = (ids: string[], on: boolean) =>
+    setPicked((prev) => {
+      const next = new Set(prev)
+      for (const id of ids) {
+        if (on) next.add(id)
+        else next.delete(id)
+      }
+      return next
+    })
+  const runBulk = (fn: (id: string) => Promise<{ ok: boolean; error?: string }>, done: string) =>
+    startBulk(async () => {
+      let ok = 0
+      const failed: string[] = []
+      for (const i of pickedDrafts) {
+        const r = await fn(i.id)
+        if (r.ok) ok++
+        else failed.push(`${i.code}: ${r.error ?? 'lỗi'}`)
+      }
+      if (ok) toast.success(`${done} ${ok} hoá đơn`)
+      if (failed.length) toast.error(failed.slice(0, 3).join('\n'))
+      setPicked(new Set())
+      router.refresh()
+    })
+
   return (
     <>
       <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
@@ -172,11 +208,54 @@ export function InvoiceList({
         </div>
       </div>
 
+      {picked.size > 0 && (
+        <div className="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-2xl flex-wrap items-center gap-2 rounded-xl border border-border/80 bg-card px-3 py-2 text-[13px] shadow-lg">
+          <span className="font-medium">Đã chọn {picked.size} hoá đơn</span>
+          <span className="text-muted-foreground">({pickedDrafts.length} hoá đơn nháp)</span>
+          <div className="ml-auto flex gap-2">
+            <Button
+              size="sm"
+              disabled={bulkBusy || pickedDrafts.length === 0}
+              onClick={() => runBulk((id) => approveInvoiceAction(id, {}), 'Đã duyệt')}
+            >
+              Duyệt nháp
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={bulkBusy || pickedDrafts.length === 0}
+              onClick={() => setConfirmDelete(true)}
+            >
+              Xoá nháp
+            </Button>
+            <Button size="sm" variant="ghost" disabled={bulkBusy} onClick={() => setPicked(new Set())}>
+              Bỏ chọn
+            </Button>
+          </div>
+        </div>
+      )}
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title={`Xoá ${pickedDrafts.length} hoá đơn nháp?`}
+        description="Không thể hoàn tác."
+        confirmLabel="Xoá"
+        destructive
+        onConfirm={() => runBulk((id) => deleteInvoiceAction(id), 'Đã xoá')}
+      />
+
       {/* Invoices Table */}
       <div className="overflow-x-auto rounded-2xl border border-border/80 bg-card">
         <table className="w-full text-[13px]">
           <thead className="border-b border-border/70 text-left">
             <tr>
+              <th className="w-px px-1.5 py-2.5 text-[13px] font-medium text-muted-foreground whitespace-nowrap">
+                <Checkbox
+                  aria-label="Chọn cả trang"
+                  checked={allPageChecked}
+                  onCheckedChange={(v) => toggle(pageIds, !!v)}
+                />
+              </th>
               <th className="w-px px-1.5 py-2.5 text-[13px] font-medium text-muted-foreground whitespace-nowrap">
                 <span className="sr-only">Thao tác</span>
               </th>
@@ -201,6 +280,13 @@ export function InvoiceList({
           <tbody className="divide-y divide-border/50">
             {pageRows.map((i) => (
               <tr key={i.id} className="transition-colors hover:bg-muted/30">
+                <td className="px-1.5 py-2.5">
+                  <Checkbox
+                    aria-label={`Chọn ${i.code}`}
+                    checked={picked.has(i.id)}
+                    onCheckedChange={(v) => toggle([i.id], !!v)}
+                  />
+                </td>
                 <td className="px-1.5 py-2.5 whitespace-nowrap">
                   <InvoiceRowActions
                     id={i.id}
@@ -268,7 +354,7 @@ export function InvoiceList({
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={facilities.length > 1 ? 9 : 8} className="p-8 text-center text-xs text-muted-foreground">
+                <td colSpan={facilities.length > 1 ? 10 : 9} className="p-8 text-center text-xs text-muted-foreground">
                   Không có hoá đơn nào
                 </td>
               </tr>

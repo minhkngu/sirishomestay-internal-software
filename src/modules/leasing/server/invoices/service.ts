@@ -2174,7 +2174,7 @@ export async function listInvoices(
         input.period ? like(invoices.periodStart, `${input.period}%`) : undefined,
       ),
     )
-    .orderBy(desc(invoices.periodStart), asc(invoices.code))
+    .orderBy(desc(invoices.createdAt), asc(invoices.code))
   const allowed = rows.filter(
     (r) => ctx.isAdmin || (ctx.permissions.has('billing') && ctx.facilityIds.has(r.inv.facilityId)),
   )
