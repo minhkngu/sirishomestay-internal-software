@@ -564,37 +564,31 @@ describe('thanh lý nối ví và chuyển phòng', () => {
           unitPrice: l.unitPrice,
           meta: l.meta as Record<string, unknown> | null,
         }))
-      const isOut = (l: typeof invoiceLines.$inferSelect) =>
-        (l.meta as { transfer?: boolean } | null)?.transfer === true
 
-      it('không sửa mô tả, không xoá được', async () => {
+      it('khoá toàn bộ dòng: sửa mô tả, đơn giá, số lượng, xoá hoặc thêm dòng đều bị từ chối', async () => {
         const r = await change()
         const lines = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, r.terminationInvoiceId))
-        await expect(
-          updateLines(
-            db,
-            ctx(),
-            r.terminationInvoiceId,
-            input(lines.map((l) => (isOut(l) ? { ...l, description: 'Khác' } : l))),
-          ),
-        ).rejects.toThrow(/không sửa hoặc xoá được/)
-        await expect(
-          updateLines(db, ctx(), r.terminationInvoiceId, input(lines.filter((l) => !isOut(l)))),
-        ).rejects.toThrow(/không sửa hoặc xoá được/)
+        const reject = (rows: ReturnType<typeof input>) =>
+          expect(updateLines(db, ctx(), r.terminationInvoiceId, rows)).rejects.toThrow(/không sửa được các dòng/)
+        const base = input(lines)
+        await reject(base.map((l, i) => (i === 0 ? { ...l, description: 'Khác' } : l)))
+        await reject(base.map((l, i) => (i === 0 ? { ...l, unitPrice: l.unitPrice + 1 } : l)))
+        await reject(base.map((l, i) => (i === 0 ? { ...l, quantity: l.quantity + 1 } : l)))
+        await reject(base.slice(1))
+        await reject([
+          ...base,
+          { id: crypto.randomUUID(), type: 'one_off', description: 'Thêm', quantity: 1, unitPrice: 1000, meta: null },
+        ])
       })
 
-      it('sửa dòng khác: số chuyển tự tính lại, tổng hoá đơn vẫn về 0, kể cả khi gửi đơn giá sai', async () => {
+      it('lưu lại đúng như cũ (đổi hạn, ghi chú) thì được và giữ nguyên số tiền, tổng vẫn 0', async () => {
         const r = await change()
-        const lines = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, r.terminationInvoiceId))
-        const edited = input(lines).map((l) =>
-          l.type === 'refund'
-            ? { ...l, unitPrice: l.unitPrice + 100_000 }
-            : l.meta && (l.meta as { transfer?: boolean }).transfer
-              ? { ...l, unitPrice: 1 }
-              : l,
-        )
-        await updateLines(db, ctx(), r.terminationInvoiceId, edited)
+        const before = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, r.terminationInvoiceId))
+        await updateLines(db, ctx(), r.terminationInvoiceId, input(before))
         const after = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, r.terminationInvoiceId))
+        expect(after.map((l) => [l.type, l.description, l.amount]).sort()).toEqual(
+          before.map((l) => [l.type, l.description, l.amount]).sort(),
+        )
         expect(after.reduce((n, l) => n + l.amount, 0)).toBe(0)
       })
     })

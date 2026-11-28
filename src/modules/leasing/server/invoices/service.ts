@@ -1717,20 +1717,25 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
           'Khoản chuyển từ hợp đồng cũ không sửa hoặc xoá được; muốn bỏ thì hoàn tác chuyển phòng ở hợp đồng cũ',
         )
     }
-    // Dòng "Chuyển sang hợp đồng mới" của hoá đơn thanh lý là số cân bằng: không sửa mô tả, không xoá; số tiền tự tính lại
-    // bằng −(tổng các dòng còn lại) để hoá đơn luôn về 0
-    if (inv.kind === 'termination') {
-      const outgoing = (m: unknown) => (m as { transfer?: unknown } | null)?.transfer === true
-      const oldOut = old.find((o) => outgoing(o.meta))
-      const newOut = next.find((x) => outgoing(x.meta))
-      if (oldOut && (!newOut || newOut.description !== oldOut.description))
-        throw new ValidationError('Dòng chuyển sang hợp đồng mới không sửa hoặc xoá được')
-      if (newOut) {
-        const others = next.filter((x) => x !== newOut).reduce((n, x) => n + x.amount, 0)
-        newOut.quantity = 1
-        newOut.unitPrice = -others
-        newOut.amount = -others
+    // Hoá đơn thanh lý của chuyển phòng (có dòng "Chuyển sang hợp đồng mới") khoá toàn bộ dòng: số do hệ thống tính từ form
+    // chuyển phòng. Muốn đổi thì hoàn tác chuyển phòng rồi chuyển lại. Chỉ hạn và ghi chú còn lưu được.
+    if (inv.kind === 'termination' && old.some((o) => (o.meta as { transfer?: unknown } | null)?.transfer === true)) {
+      const key = (l: { type: string; description: string; quantity: number; unitPrice: number; meta: unknown }) =>
+        JSON.stringify([l.type, l.description, l.quantity, l.unitPrice, l.meta ?? {}])
+      const pool = old.map((o) => ({ key: key(o), amount: o.amount, used: false }))
+      for (const l of next) {
+        const hit = pool.find((x) => !x.used && x.key === key(l))
+        if (!hit)
+          throw new ValidationError(
+            'Hoá đơn thanh lý của chuyển phòng không sửa được các dòng; muốn đổi thì hoàn tác chuyển phòng rồi chuyển lại',
+          )
+        hit.used = true
+        l.amount = hit.amount // giữ đúng số đã lưu, không tính lại làm tròn
       }
+      if (pool.some((x) => !x.used))
+        throw new ValidationError(
+          'Hoá đơn thanh lý của chuyển phòng không sửa được các dòng; muốn đổi thì hoàn tác chuyển phòng rồi chuyển lại',
+        )
     }
     // Phí phát sinh / điều chỉnh bị bỏ khỏi hoá đơn thì trả về trạng thái chưa tính
     const keep = new Set(next.map((l) => JSON.stringify(l.meta ?? {})))
