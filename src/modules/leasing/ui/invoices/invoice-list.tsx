@@ -113,24 +113,27 @@ export function InvoiceList({
 
   return (
     <>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <ParamChips
-          param="view"
-          defaultValue="all"
-          items={VIEWS.map(([value, label]) => ({
-            value,
-            label,
-            count: scoped.filter((i) => matchesInvoiceView(i.state, value)).length,
-          }))}
-        />
-        <div className="flex flex-wrap items-center gap-2.5">
-          <FacilityFilter facilities={facilities} align="right" />
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+        {/* Các chip trạng thái giữ một hàng; thiếu chỗ thì các menu lọc bên phải tự xuống dòng */}
+        <div className="shrink-0">
+          <ParamChips
+            param="view"
+            defaultValue="all"
+            items={VIEWS.map(([value, label]) => ({
+              value,
+              label,
+              count: scoped.filter((i) => matchesInvoiceView(i.state, value)).length,
+            }))}
+          />
+        </div>
+        <div className="flex min-w-0 flex-wrap items-center gap-2.5 xl:justify-end">
+          <FacilityFilter facilities={facilities} align="left" />
           <Select
             value={kind || null}
             onValueChange={(v) => setListParams({ loai: v ? String(v) : null })}
             items={kindOptions}
           >
-            <SelectTrigger aria-label="Loại hoá đơn" className="h-9 w-36">
+            <SelectTrigger aria-label="Loại hoá đơn" className="h-9 w-32">
               <SelectValue placeholder="Tất cả loại" />
             </SelectTrigger>
             <SelectContent>
@@ -147,7 +150,7 @@ export function InvoiceList({
             onValueChange={(v) => setListParams({ phong: v ? String(v) : null })}
             items={roomOptions}
           >
-            <SelectTrigger aria-label="Phòng" className="h-9 w-36">
+            <SelectTrigger aria-label="Phòng" className="h-9 w-32">
               <SelectValue placeholder="Tất cả phòng" />
             </SelectTrigger>
             <SelectContent>
@@ -164,7 +167,7 @@ export function InvoiceList({
             value={period}
             onValueChange={(next) => setListParams({ period: next || null })}
             placeholder="Tất cả kỳ"
-            className="w-40"
+            className="w-36"
           />
         </div>
       </div>
