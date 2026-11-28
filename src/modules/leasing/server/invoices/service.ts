@@ -1698,8 +1698,8 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
         meta: { rate: taxRate },
       })
     }
-    // Khoản chuyển từ hợp đồng cũ (chuyển phòng) là số đã chốt ở hoá đơn thanh lý: chỉ admin sửa hoặc xoá, vì xoá dòng
-    // này là bỏ hẳn khoản chuyển, không dồn sang hoá đơn khác
+    // Khoản chuyển từ hợp đồng cũ (chuyển phòng) là số đã chốt ở hoá đơn thanh lý: không ai sửa hoặc xoá được, kể cả admin.
+    // Muốn bỏ thì hoàn tác chuyển phòng (nút Khôi phục hợp đồng cũ, chỉ admin khi đã duyệt)
     const transferKey = (m: unknown) => {
       const meta = (m ?? {}) as { pendingId?: unknown; sourceKey?: unknown }
       return typeof meta.pendingId === 'string' &&
@@ -1708,24 +1708,15 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
         ? meta.pendingId
         : null
     }
-    const droppedTransfers: string[] = []
-    const changedTransfers: { id: string; amount: number; description: string }[] = []
     for (const o of old) {
       const pendingId = transferKey(o.meta)
       if (!pendingId) continue
       const n = next.find((x) => transferKey(x.meta) === pendingId)
-      if (!n) droppedTransfers.push(pendingId)
-      else if (n.amount !== o.amount || n.description !== o.description)
-        changedTransfers.push({ id: pendingId, amount: n.amount, description: n.description })
+      if (!n || n.amount !== o.amount || n.description !== o.description)
+        throw new ValidationError(
+          'Khoản chuyển từ hợp đồng cũ không sửa hoặc xoá được; muốn bỏ thì hoàn tác chuyển phòng ở hợp đồng cũ',
+        )
     }
-    if ((droppedTransfers.length || changedTransfers.length) && !ctx.isAdmin)
-      throw new ValidationError('Khoản chuyển từ hợp đồng cũ chỉ admin được sửa hoặc xoá')
-    for (const id of droppedTransfers) await tx.delete(pendingAdjustments).where(eq(pendingAdjustments.id, id))
-    for (const c of changedTransfers)
-      await tx
-        .update(pendingAdjustments)
-        .set({ amount: c.amount, description: c.description, updatedAt: new Date() })
-        .where(eq(pendingAdjustments.id, c.id))
     // Phí phát sinh / điều chỉnh bị bỏ khỏi hoá đơn thì trả về trạng thái chưa tính
     const keep = new Set(next.map((l) => JSON.stringify(l.meta ?? {})))
     for (const l of old) {

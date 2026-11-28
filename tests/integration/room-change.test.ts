@@ -541,25 +541,16 @@ describe('thanh lý nối ví và chuyển phòng', () => {
       }
       const admin = (): AccessContext => ({ ...ctx(), isAdmin: true })
 
-      it('không phải admin: không xoá, không sửa được', async () => {
-        const { inv, asInput } = await draftWithTransfer()
-        await expect(updateLines(db, ctx(), inv.id, asInput())).rejects.toThrow(/chỉ admin/)
-        await expect(updateLines(db, ctx(), inv.id, asInput({ unitPrice: -1_000_000 }))).rejects.toThrow(/chỉ admin/)
-      })
-
-      it('admin xoá dòng: khoản chuyển bị bỏ hẳn, không dồn sang hoá đơn sau', async () => {
+      it('không ai xoá hoặc sửa được, kể cả admin', async () => {
         const { r, inv, asInput } = await draftWithTransfer()
-        await updateLines(db, admin(), inv.id, asInput())
-        expect(
-          await db.select().from(pendingAdjustments).where(eq(pendingAdjustments.leaseId, r.newLeaseId)),
-        ).toHaveLength(0)
-      })
-
-      it('admin sửa số tiền: khoản chuyển đổi theo', async () => {
-        const { r, inv, asInput } = await draftWithTransfer()
-        await updateLines(db, admin(), inv.id, asInput({ unitPrice: -1_000_000 }))
+        for (const who of [ctx(), admin()]) {
+          await expect(updateLines(db, who, inv.id, asInput())).rejects.toThrow(/không sửa hoặc xoá được/)
+          await expect(updateLines(db, who, inv.id, asInput({ unitPrice: -1_000_000 }))).rejects.toThrow(
+            /không sửa hoặc xoá được/,
+          )
+        }
         const adj = await db.select().from(pendingAdjustments).where(eq(pendingAdjustments.leaseId, r.newLeaseId))
-        expect(adj.map((a) => a.amount)).toEqual([-1_000_000])
+        expect(adj.map((a) => a.amount)).toEqual([-3_300_000])
       })
     })
 
