@@ -31,6 +31,7 @@ import { displayName } from '@/modules/tenants'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { midPeriodAdjustments } from '../../domain/adjustments'
 import { fullMonthCoefficient, monthsCoefficient } from '../../domain/proration'
+import { rebalanceTransferLine } from '../../domain/transfer-line'
 import { buildMonthlyInvoice, nextBillingPeriod, rentPeriodOf, settlementState } from '../../domain/invoice-builder'
 import type {
   Addendum,
@@ -1333,6 +1334,8 @@ export async function unapproveInvoice(db: DB, ctx: AccessContext, id: string): 
         })
       )
         throw new ValidationError('Hoá đơn thanh lý chuyển phòng hoặc đã gạch ví không bỏ duyệt được')
+      // Khoản "Gộp vào thanh lý" do lần duyệt này ghi ở các hoá đơn cũ: xoá để nợ cũ mở lại, duyệt lại sẽ tính lại
+      await tx.delete(payments).where(and(eq(payments.method, 'carry'), like(payments.note, `%${before.code}`)))
     }
     if ((await tx.select({ id: payments.id }).from(payments).where(eq(payments.invoiceId, id)).limit(1)).length)
       throw new ValidationError('Gỡ các khoản đã thu trước khi bỏ duyệt')
@@ -1557,7 +1560,7 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
       )
     }
     const initialWrites: Array<{ leaseFeeId: string; value: number }> = []
-    const next = data
+    let next = data
       .filter((l) => l.type !== 'tax')
       .map((l) => {
         // Dòng cọc còn thiếu giữ mô tả, đơn giá, số lượng đã lưu
@@ -1574,6 +1577,23 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
             unitPrice: savedDeposit.unitPrice,
             amount: savedDeposit.amount,
             meta: savedDeposit.meta,
+          }
+        // Dòng "Nợ cũ" của hoá đơn thanh lý do hệ thống tính lại khi duyệt: giữ nguyên đã lưu
+        const savedUnpaid =
+          inv.kind === 'termination' && l.id
+            ? old.find(
+                (previous) => previous.id === l.id && (previous.meta as { unpaid?: unknown } | null)?.unpaid === true,
+              )
+            : undefined
+        if (savedUnpaid)
+          return {
+            invoiceId: id,
+            type: savedUnpaid.type,
+            description: savedUnpaid.description,
+            quantity: savedUnpaid.quantity,
+            unitPrice: savedUnpaid.unitPrice,
+            amount: savedUnpaid.amount,
+            meta: savedUnpaid.meta,
           }
         // Hoá đơn thanh lý của chuyển phòng: dòng hệ thống giữ mô tả, đơn giá đã lưu (chỉ số lượng đổi được, trừ dòng chuyển,
         // ví, cọc); dòng phạt, phát sinh, giảm giá nhập tay sửa tự do
@@ -1756,14 +1776,12 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
         throw new ValidationError(
           'Hoá đơn thanh lý của chuyển phòng không xoá được các dòng hệ thống; muốn đổi thì hoàn tác chuyển phòng rồi chuyển lại',
         )
-      const isOut = (m: unknown) => (m as { transfer?: unknown } | null)?.transfer === true
-      const out = next.find((l) => isOut(l.meta))
-      if (out) {
-        const others = next.filter((l) => l !== out).reduce((n, l) => n + l.amount, 0)
-        out.quantity = 1
-        out.unitPrice = -others
-        out.amount = -others
-      }
+      next = rebalanceTransferLine(next)
+    }
+    if (inv.kind === 'termination') {
+      const sent = new Set(data.map((l) => l.id).filter(Boolean))
+      if (old.some((o) => (o.meta as { unpaid?: unknown } | null)?.unpaid === true && !sent.has(o.id)))
+        throw new ValidationError('Dòng Nợ cũ do hệ thống tính theo nợ lúc duyệt, không xoá được')
     }
     // Phí phát sinh / điều chỉnh bị bỏ khỏi hoá đơn thì trả về trạng thái chưa tính
     const keep = new Set(next.map((l) => JSON.stringify(l.meta ?? {})))

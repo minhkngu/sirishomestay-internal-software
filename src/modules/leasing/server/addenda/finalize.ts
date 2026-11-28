@@ -22,6 +22,7 @@ import { addDays } from '@/domain/dates'
 import { depositBalance } from '@/domain/deposit'
 import type { DepositEntry, ForfeitInput } from '@/domain/types'
 import { recordAudit, getSettings } from '@/modules/platform'
+import { rebalanceTransferLine } from '../../domain/transfer-line'
 import { addWalletEntry, walletBalance } from '../wallet/service'
 
 /**
@@ -148,10 +149,70 @@ export async function applyTerminationClosure(
 }
 
 /**
- * Duyệt hoá đơn thanh lý: trừ ví khách thật bằng dòng ví của hoá đơn (kiểm lại số dư dưới khoá khách), và nếu hợp đồng này
- * được chuyển phòng (có hợp đồng mới trỏ về nó): tính lại dòng chuyển bằng −(tổng các dòng khác) vì hoá đơn nháp có thể đã được sửa,
- * đóng các hoá đơn còn nợ của hợp đồng cũ bằng khoản "carry" (không phải tiền thu; nợ đó đã nằm trong T) rồi cộng dồn T
- * (dương là nợ, âm là số dư) sang hợp đồng mới thành điều chỉnh chờ. Mọi bút toán có `sourceKey` nên chạy lại không ghi trùng.
+ * Đóng nợ cũ của hợp đồng khi duyệt hoá đơn thanh lý (mọi loại): tính lại dòng "Nợ cũ" (meta.unpaid) theo nợ thật của các hoá đơn
+ * tháng đã duyệt (khoản thu nhập trễ giữa lúc lập nháp và lúc duyệt làm số nợ giảm), rồi ghi khoản `carry` cho từng hoá đơn còn nợ
+ * để không đòi hai lần. Chạy lại không ghi trùng: hoá đơn đã hết nợ thì bỏ qua. Bỏ duyệt hoá đơn thanh lý xoá các khoản `carry` này.
+ */
+export async function settleOldInvoices(
+  tx: DB,
+  ctx: AccessContext,
+  terminationInvoiceId: string,
+  paidOn?: string,
+): Promise<void> {
+  const [term] = await tx.select().from(invoices).where(eq(invoices.id, terminationInvoiceId))
+  if (!term) return
+  const old = await tx
+    .select({ id: invoices.id })
+    .from(invoices)
+    .where(and(eq(invoices.leaseId, term.leaseId), eq(invoices.status, 'approved'), ne(invoices.kind, 'termination')))
+  const debts: { id: string; owed: number }[] = []
+  for (const inv of old) {
+    const [t] = await tx
+      .select({ n: sql<number>`coalesce(sum(${invoiceLines.amount}), 0)::float8` })
+      .from(invoiceLines)
+      .where(eq(invoiceLines.invoiceId, inv.id))
+    const [p] = await tx
+      .select({ n: sql<number>`coalesce(sum(${payments.amount}), 0)::float8` })
+      .from(payments)
+      .where(eq(payments.invoiceId, inv.id))
+    if (t.n > 0 && t.n - p.n > 0) debts.push({ id: inv.id, owed: t.n - p.n })
+  }
+  const debt = debts.reduce((n, d) => n + d.owed, 0)
+  const lines = await tx.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, term.id))
+  const unpaid = lines.find((l) => ((l.meta ?? {}) as Record<string, unknown>).unpaid === true)
+  if (unpaid && debt === 0) await tx.delete(invoiceLines).where(eq(invoiceLines.id, unpaid.id))
+  else if (unpaid) {
+    if (unpaid.amount !== debt)
+      await tx
+        .update(invoiceLines)
+        .set({ quantity: 1, unitPrice: debt, amount: debt })
+        .where(eq(invoiceLines.id, unpaid.id))
+  } else if (debt > 0)
+    await tx.insert(invoiceLines).values({
+      invoiceId: term.id,
+      type: 'adjustment',
+      description: 'Nợ cũ chưa thanh toán',
+      quantity: 1,
+      unitPrice: debt,
+      amount: debt,
+      meta: { unpaid: true },
+    })
+  for (const d of debts)
+    await tx.insert(payments).values({
+      invoiceId: d.id,
+      paidOn: paidOn ?? term.periodEnd,
+      amount: d.owed,
+      method: 'carry',
+      note: `Gộp vào thanh lý ${term.code}`,
+      receivedBy: ctx.userId,
+    })
+}
+
+/**
+ * Duyệt hoá đơn thanh lý: đóng nợ cũ (`settleOldInvoices`), nếu hợp đồng này được chuyển phòng (có hợp đồng mới trỏ về nó)
+ * thì tính lại dòng chuyển bằng −(tổng các dòng khác) vì hoá đơn nháp có thể đã được sửa; trừ ví khách thật bằng dòng ví
+ * của hoá đơn (kiểm lại số dư dưới khoá khách), rồi cộng dồn T (dương là nợ, âm là số dư) sang hợp đồng mới thành điều chỉnh chờ.
+ * Mọi bút toán có `sourceKey` hoặc kiểm trùng nên chạy lại không ghi trùng.
  */
 async function settleWalletAndTransfer(
   tx: DB,
@@ -161,8 +222,22 @@ async function settleWalletAndTransfer(
   endDate: string,
 ): Promise<void> {
   await tx.execute(sql`select id from tenants where id = ${lease.tenantId} for update`)
-  const lines = await tx.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, invoice.id))
+  await settleOldInvoices(tx, ctx, invoice.id, endDate)
+  const [next] = await tx.select({ id: leases.id }).from(leases).where(eq(leases.transferFromLeaseId, lease.id))
+  let lines = await tx.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, invoice.id))
   const meta = (l: (typeof lines)[number]) => (l.meta ?? {}) as Record<string, unknown>
+  if (next && lines.some((l) => meta(l).transfer === true)) {
+    const rebalanced = rebalanceTransferLine(lines)
+    const out = lines.find((l) => meta(l).transfer === true)!
+    const kept = rebalanced.find((l) => l.id === out.id)
+    if (!kept) await tx.delete(invoiceLines).where(eq(invoiceLines.id, out.id))
+    else if (kept.amount !== out.amount)
+      await tx
+        .update(invoiceLines)
+        .set({ quantity: 1, unitPrice: kept.unitPrice, amount: kept.amount })
+        .where(eq(invoiceLines.id, out.id))
+    lines = rebalanced
+  }
   const walletLine = lines.find((l) => typeof meta(l).wallet === 'number')
   if (walletLine && walletLine.amount < 0) {
     const sourceKey = `use_termination:${invoice.id}`
@@ -189,42 +264,8 @@ async function settleWalletAndTransfer(
       })
     }
   }
-  const transferLine = lines.find((l) => meta(l).transfer === true)
-  if (!transferLine) return
-  const [next] = await tx.select({ id: leases.id }).from(leases).where(eq(leases.transferFromLeaseId, lease.id))
-  if (!next) return
-  const carried = lines.filter((l) => l.id !== transferLine.id).reduce((n, l) => n + l.amount, 0)
-  if (carried === 0) await tx.delete(invoiceLines).where(eq(invoiceLines.id, transferLine.id))
-  else
-    await tx
-      .update(invoiceLines)
-      .set({ unitPrice: -carried, amount: -carried })
-      .where(eq(invoiceLines.id, transferLine.id))
-  // Nợ cũ đã nằm trong T: đóng các hoá đơn còn nợ của hợp đồng cũ để không đòi hai lần
-  const old = await tx
-    .select({ id: invoices.id })
-    .from(invoices)
-    .where(and(eq(invoices.leaseId, lease.id), eq(invoices.status, 'approved'), ne(invoices.kind, 'termination')))
-  for (const inv of old) {
-    const [t] = await tx
-      .select({ n: sql<number>`coalesce(sum(${invoiceLines.amount}), 0)::float8` })
-      .from(invoiceLines)
-      .where(eq(invoiceLines.invoiceId, inv.id))
-    const [p] = await tx
-      .select({ n: sql<number>`coalesce(sum(${payments.amount}), 0)::float8` })
-      .from(payments)
-      .where(eq(payments.invoiceId, inv.id))
-    const owed = t.n - p.n
-    if (t.n > 0 && owed > 0)
-      await tx.insert(payments).values({
-        invoiceId: inv.id,
-        paidOn: endDate,
-        amount: owed,
-        method: 'carry',
-        note: 'Chuyển sang hợp đồng mới (đã tính trong hoá đơn thanh lý)',
-        receivedBy: ctx.userId,
-      })
-  }
+  if (!next || !lines.some((l) => meta(l).transfer === true)) return
+  const carried = lines.filter((l) => meta(l).transfer !== true).reduce((n, l) => n + l.amount, 0)
   if (carried === 0) return
   await tx
     .insert(pendingAdjustments)

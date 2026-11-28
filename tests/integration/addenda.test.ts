@@ -741,6 +741,73 @@ describe('phụ lục hợp đồng', () => {
       )
     })
   })
+  describe('đóng nợ cũ ở thanh lý thường', () => {
+    // Mất cọc toàn bộ, không hoàn tiền phòng: hoá đơn thanh lý chỉ còn dòng "Nợ cũ" 9.000.000
+    const terminateOwing = () =>
+      createTermination(db, ctx(), leaseId, {
+        endDate: '2026-11-20',
+        forfeit: { mode: 'all' },
+        rentRefund: { mode: 'none' },
+        readings: [],
+      })
+    const carryRows = () => db.select().from(payments).where(eq(payments.method, 'carry'))
+    const termLines = (id: string) => db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, id))
+
+    it('duyệt thanh lý thường đóng nợ cũ bằng khoản gộp', async () => {
+      const r = await terminateOwing()
+      expect(r.invoice!.total).toBe(9000000)
+      await approveInvoice(db, ctx(), r.invoice!.id, { dueDate: '2026-11-30' })
+      const carry = await carryRows()
+      expect(carry.map((p) => [p.invoiceId, p.amount, p.note])).toEqual([
+        [invoiceId, 9000000, `Gộp vào thanh lý ${r.invoice!.code}`],
+      ])
+      const { leaseDebt } = await import('@/modules/leasing/server/invoices/service')
+      expect(await leaseDebt(db, ctx(), leaseId)).toBe(9000000) // đúng tổng hoá đơn thanh lý, hoá đơn tháng 11 hết nợ
+    })
+    it('khoản thu nhập trễ giữa lập nháp và duyệt: không còn dòng Nợ cũ, không có khoản gộp', async () => {
+      const r = await terminateOwing()
+      await db
+        .insert(payments)
+        .values({ invoiceId, paidOn: '2026-11-18', amount: 9000000, method: 'cash', receivedBy: crypto.randomUUID() })
+      await approveInvoice(db, ctx(), r.invoice!.id, { dueDate: '2026-11-30' })
+      const lines = await termLines(r.invoice!.id)
+      expect(lines.some((l) => (l.meta as { unpaid?: boolean } | null)?.unpaid)).toBe(false)
+      expect(await carryRows()).toHaveLength(0)
+      expect(lines.reduce((n, l) => n + l.amount, 0)).toBe(0) // giảm đúng 9.000.000
+    })
+    it('bỏ duyệt rồi duyệt lại không ghi trùng khoản gộp', async () => {
+      const { unapproveInvoice, leaseDebt } = await import('@/modules/leasing/server/invoices/service')
+      const r = await terminateOwing()
+      await approveInvoice(db, ctx(), r.invoice!.id, { dueDate: '2026-11-30' })
+      await unapproveInvoice(db, ctx(), r.invoice!.id)
+      expect(await carryRows()).toHaveLength(0)
+      expect(await leaseDebt(db, ctx(), leaseId)).toBe(9000000) // nợ tháng 11 mở lại
+      await approveInvoice(db, ctx(), r.invoice!.id, { dueDate: '2026-11-30' })
+      expect((await carryRows()).map((p) => p.amount)).toEqual([9000000])
+    })
+    it('dòng Nợ cũ không sửa, không xoá được', async () => {
+      const r = await terminateOwing()
+      const rows = await termLines(r.invoice!.id)
+      const unpaid = rows.find((l) => (l.meta as { unpaid?: boolean } | null)?.unpaid)!
+      const send = (list: typeof rows, quantity = 1) =>
+        list.map((l) => ({
+          id: l.id,
+          type: l.type,
+          description: l.description,
+          quantity: l.id === unpaid.id ? quantity : l.quantity,
+          unitPrice: l.unitPrice,
+          meta: l.meta,
+        }))
+      await updateLines(db, ctx(), r.invoice!.id, send(rows, 2))
+      expect((await termLines(r.invoice!.id)).find((l) => l.id === unpaid.id)).toMatchObject({
+        quantity: 1,
+        amount: 9000000,
+      })
+      await expect(updateLines(db, ctx(), r.invoice!.id, send(rows.filter((l) => l.id !== unpaid.id)))).rejects.toThrow(
+        ValidationError,
+      )
+    })
+  })
   it('khách còn hợp đồng khác đang hiệu lực → ảnh giấy tờ không bị đặt delete_after', async () => {
     await db.insert(leases).values({
       code: 'HD2',

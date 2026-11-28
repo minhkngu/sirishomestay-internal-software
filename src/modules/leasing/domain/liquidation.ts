@@ -179,6 +179,8 @@ export function buildTerminationInvoice(input: TerminationInput): {
       quantity: 1,
       unitPrice: input.unpaidTotal,
       amount: input.unpaidTotal,
+      // Hệ thống tính lại theo nợ thật lúc duyệt: người dùng không sửa, không xoá
+      meta: { unpaid: true },
     })
   }
 
