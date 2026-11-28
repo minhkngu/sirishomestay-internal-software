@@ -226,23 +226,28 @@ export async function cancelRoomChange(
   oldLeaseId: string,
   storage: StorageAdapter,
 ): Promise<void> {
-  const [next] = await db.select().from(leases).where(eq(leases.transferFromLeaseId, oldLeaseId))
-  if (!next) throw new ValidationError('Hợp đồng này không có chuyển phòng nào để huỷ')
-  // Kiểm quyền cả hai bước trước khi làm bước nào, để không dừng nửa chừng vì thiếu quyền xoá
-  const [oldRoom] = await db
-    .select({ facilityId: rooms.facilityId })
-    .from(leases)
-    .innerJoin(rooms, eq(rooms.id, leases.roomId))
-    .where(eq(leases.id, oldLeaseId))
-  if (!oldRoom) throw new NotFoundError()
-  assertCan(ctx, 'tenants_contracts', oldRoom.facilityId)
-  assertCan(ctx, 'delete_contracts', oldRoom.facilityId)
-  // Đã duyệt hoặc đã phát sinh thu tiền: chỉ admin, và hoàn tác xoá cả dữ liệu đã chốt (sổ ví, khoản chuyển, thu tiền)
-  const force = await roomChangeNeedsAdmin(db, oldLeaseId, next.id)
-  if (force && !ctx.isAdmin)
-    throw new ValidationError('Chuyển phòng đã duyệt hoặc đã phát sinh thu tiền: chỉ admin hoàn tác được')
   await db.transaction(async (raw) => {
     const tx = raw as unknown as DB
+    const [linked] = await tx.select({ id: leases.id }).from(leases).where(eq(leases.transferFromLeaseId, oldLeaseId))
+    if (!linked) throw new ValidationError('Hợp đồng này không có chuyển phòng nào để huỷ')
+    // Khoá hai hợp đồng (theo id tăng dần) rồi mới đọc và kiểm quyền: hoá đơn vừa được duyệt ở nơi khác không lọt qua kiểm quyền cũ
+    for (const id of [oldLeaseId, linked.id].sort())
+      await tx.select({ id: leases.id }).from(leases).where(eq(leases.id, id)).for('update')
+    const [next] = await tx.select().from(leases).where(eq(leases.transferFromLeaseId, oldLeaseId))
+    if (!next) throw new ValidationError('Hợp đồng này không có chuyển phòng nào để huỷ')
+    // Kiểm quyền cả hai bước trước khi làm bước nào, để không dừng nửa chừng vì thiếu quyền xoá
+    const [oldRoom] = await tx
+      .select({ facilityId: rooms.facilityId })
+      .from(leases)
+      .innerJoin(rooms, eq(rooms.id, leases.roomId))
+      .where(eq(leases.id, oldLeaseId))
+    if (!oldRoom) throw new NotFoundError()
+    assertCan(ctx, 'tenants_contracts', oldRoom.facilityId)
+    assertCan(ctx, 'delete_contracts', oldRoom.facilityId)
+    // Đã duyệt hoặc đã phát sinh thu tiền: chỉ admin, và hoàn tác xoá cả dữ liệu đã chốt (sổ ví, khoản chuyển, thu tiền)
+    const force = await roomChangeNeedsAdmin(tx, oldLeaseId, next.id)
+    if (force && !ctx.isAdmin)
+      throw new ValidationError('Chuyển phòng đã duyệt hoặc đã phát sinh thu tiền: chỉ admin hoàn tác được')
     if (force) await undoApprovedTransfer(tx, oldLeaseId)
     const preview = await previewContractRestore(tx, ctx, 'lease', oldLeaseId, { allowRoomChange: true })
     if (preview.operation !== 'termination')

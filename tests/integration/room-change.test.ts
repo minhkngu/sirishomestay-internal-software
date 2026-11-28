@@ -388,6 +388,14 @@ describe('thanh lý nối ví và chuyển phòng', () => {
       await expect(cancelRoomChange(db, ctx(), leaseId, storage)).rejects.toThrow(ValidationError)
     })
 
+    it('huỷ chuyển phòng: người không phải admin bị từ chối khi hoá đơn thanh lý vừa được duyệt, hợp đồng mới còn', async () => {
+      const r = await change()
+      await approveInvoice(db, ctx(), r.terminationInvoiceId, {})
+      await expect(cancelRoomChange(db, ctx(), leaseId, storage)).rejects.toThrow(ValidationError)
+      expect(await db.select().from(leases).where(eq(leases.id, r.newLeaseId))).toHaveLength(1)
+      expect((await db.select().from(leases).where(eq(leases.id, leaseId)))[0].status).toBe('ended')
+    })
+
     it('khôi phục hợp đồng cũ: hoá đơn thanh lý nháp thì xem trước được và xác nhận huỷ chuyển phòng', async () => {
       const r = await change()
       const preview = await previewContractRestore(db, ctx(), 'lease', leaseId)
