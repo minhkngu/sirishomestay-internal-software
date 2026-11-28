@@ -1358,6 +1358,11 @@ export function InvoiceEditor(p: Props) {
             </dt>
             <dd className="text-base font-bold tabular-nums text-primary">{formatVND(Math.abs(total))}</dd>
           </div>
+          {p.status === 'draft' && total < 0 && lines.some(isTransferIn) && (
+            <p className="text-xs text-muted-foreground">
+              Khi duyệt, {formatVND(Math.abs(total))} đ vào ví khách và hoá đơn về 0.
+            </p>
+          )}
         </dl>
       </section>
 

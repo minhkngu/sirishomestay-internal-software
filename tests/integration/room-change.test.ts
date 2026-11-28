@@ -763,6 +763,55 @@ describe('thanh lý nối ví và chuyển phòng', () => {
       })
     })
 
+    describe('số dư chuyển phòng vượt hoá đơn đầu: phần dư vào ví khi duyệt', () => {
+      const admin = (): AccessContext => ({ ...ctx(), isAdmin: true })
+      // Hợp đồng mới cọc 3.000.000; hoá đơn đầu tháng 11 có khoản chuyển âm lớn hơn tiền phải trả
+      const firstInvoice = async () => {
+        const r = await change({
+          lease: { endDate: '2027-11-19', monthlyRent: 12_000_000, depositAmount: 3_000_000 },
+        })
+        await approveInvoice(db, ctx(), r.terminationInvoiceId, {})
+        const inv = await createDraftForLease(db, ctx(), { leaseId: r.newLeaseId, period: '2026-11' })
+        const sum = async () =>
+          (await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, inv.id))).reduce(
+            (n, l) => n + l.amount,
+            0,
+          )
+        return { r, inv, sum }
+      }
+
+      it('duyệt đưa hoá đơn về 0 và ví nhận phần dư; huỷ chuyển phòng gỡ biến động này', async () => {
+        const { r, inv, sum } = await firstInvoice()
+        const draftTotal = await sum()
+        expect(draftTotal).toBeLessThan(0)
+        await approveInvoice(db, ctx(), inv.id, {})
+        expect(await sum()).toBe(0)
+        expect(await walletBalance(db, tenantId)).toBe(-draftTotal)
+        await cancelRoomChange(db, admin(), leaseId, storage)
+        expect(
+          await db.select().from(tenantWalletEntries).where(eq(tenantWalletEntries.kind, 'carry_surplus')),
+        ).toHaveLength(0)
+        expect(await db.select().from(leases).where(eq(leases.id, r.newLeaseId))).toHaveLength(0)
+      })
+
+      it('phần dư đã được dùng rồi mà bỏ duyệt hoá đơn đầu thì từ chối, ví không âm', async () => {
+        const { r, inv, sum } = await firstInvoice()
+        const surplus = -(await sum())
+        await approveInvoice(db, ctx(), inv.id, {})
+        const dec = await createDraftForLease(db, ctx(), { leaseId: r.newLeaseId, period: '2026-12' })
+        await approveInvoice(db, ctx(), dec.id, {})
+        await recordLeasePayment(db, ctx(), r.newLeaseId, {
+          paidOn: '2026-12-05',
+          amount: 0,
+          walletAmount: surplus,
+          method: 'cash',
+        })
+        expect(await walletBalance(db, tenantId)).toBe(0)
+        await expect(unapproveInvoice(db, ctx(), inv.id)).rejects.toThrow('đã được dùng')
+        expect(await walletBalance(db, tenantId)).toBe(0)
+      })
+    })
+
     describe('khoản chuyển từ hợp đồng cũ trong hoá đơn mới', () => {
       // Hoá đơn tháng 12 của hợp đồng mới có dòng "Chuyển từ hợp đồng HD1" −12.300.000
       const draftWithTransfer = async () => {

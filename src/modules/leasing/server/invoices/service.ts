@@ -46,7 +46,7 @@ import type {
   PendingAdjustment,
   Proration,
 } from '@/domain/types'
-import { finalizeTermination } from '../addenda/finalize'
+import { finalizeTermination, settleTransferSurplus, undoTransferSurplus } from '../addenda/finalize'
 import { recordAudit, recordAuditBatch, registerExportOwnerResolver, getSettings } from '@/modules/platform'
 import {
   exportDocument,
@@ -59,12 +59,7 @@ import {
 import { applyReadings, setLeaseInitialReading, setOpeningValue } from '@/modules/meters'
 import { resolveBankAccount } from '@/domain/vietqr'
 import { PAYMENT_METHOD_DISPLAY_LABELS } from '@/domain/payment-labels'
-import {
-  addWalletEntry,
-  settleRemovedPayments,
-  walletBalance,
-  type PaymentRemoval,
-} from '../wallet/service'
+import { addWalletEntry, settleRemovedPayments, walletBalance, type PaymentRemoval } from '../wallet/service'
 import { clampWalletUse, splitReceipt } from '../../domain/wallet'
 
 const batchSchema = z.object({ facilityId: z.uuid(), period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) })
@@ -1186,6 +1181,7 @@ export async function approveInvoice(
       .where(eq(invoices.id, id))
       .returning()
     if (before.kind === 'termination') await finalizeTermination(tx, ctx, before)
+    else await settleTransferSurplus(tx, before, valid.approvedOn ?? todayVN())
     await syncPendingAdjustments(tx, lease, await loadAddenda(tx, lease.id), settings.proration)
     await recordAudit(tx, ctx, {
       action: 'update',
@@ -1344,6 +1340,7 @@ export async function unapproveInvoice(db: DB, ctx: AccessContext, id: string): 
     }
     if ((await tx.select({ id: payments.id }).from(payments).where(eq(payments.invoiceId, id)).limit(1)).length)
       throw new ValidationError('Gỡ các khoản đã thu trước khi bỏ duyệt')
+    if (before.kind !== 'termination') await undoTransferSurplus(tx, id)
     const [after] = await tx
       .update(invoices)
       .set({ status: 'draft', updatedAt: new Date() })
@@ -1399,6 +1396,7 @@ export async function deleteInvoice(db: DB, ctx: AccessContext, id: string): Pro
     const inv = await getInvoice(tx, ctx, id)
     if ((await tx.select({ id: payments.id }).from(payments).where(eq(payments.invoiceId, id))).length)
       throw new ValidationError('Gỡ các khoản đã thu trước khi xoá')
+    if (inv.kind !== 'termination') await undoTransferSurplus(tx, id)
     if (inv.kind === 'termination')
       await tx.delete(oneOffCharges).where(and(eq(oneOffCharges.invoiceId, id), eq(oneOffCharges.kind, 'penalty')))
     await tx.update(oneOffCharges).set({ invoiceId: null }).where(eq(oneOffCharges.invoiceId, id))

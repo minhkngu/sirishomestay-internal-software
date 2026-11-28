@@ -248,7 +248,7 @@ export async function cancelRoomChange(
     const force = await roomChangeNeedsAdmin(tx, oldLeaseId, next.id)
     if (force && !ctx.isAdmin)
       throw new ValidationError('Chuyển phòng đã duyệt hoặc đã phát sinh thu tiền: chỉ admin hoàn tác được')
-    if (force) await undoApprovedTransfer(tx, oldLeaseId)
+    if (force) await undoApprovedTransfer(tx, oldLeaseId, next.id)
     const preview = await previewContractRestore(tx, ctx, 'lease', oldLeaseId, { allowRoomChange: true })
     if (preview.operation !== 'termination')
       throw new ValidationError('Hợp đồng cũ đã có thay đổi sau thanh lý: không huỷ tự động được')
@@ -262,7 +262,11 @@ export async function cancelRoomChange(
  * Gỡ những gì duyệt hoá đơn thanh lý chuyển phòng đã ghi ngoài hợp đồng cũ: dòng dùng ví (trả lại số dư) và các khoản
  * `carry` đóng hoá đơn cũ (mở lại nợ). Khoản điều chỉnh sang hợp đồng mới bị xoá cùng hợp đồng mới.
  */
-async function undoApprovedTransfer(tx: DB, oldLeaseId: string): Promise<void> {
+async function undoApprovedTransfer(tx: DB, oldLeaseId: string, nextLeaseId: string): Promise<void> {
+  // Số dư đẩy vào ví khi duyệt hoá đơn đầu của hợp đồng mới
+  await tx
+    .delete(tenantWalletEntries)
+    .where(and(eq(tenantWalletEntries.leaseId, nextLeaseId), eq(tenantWalletEntries.kind, 'carry_surplus')))
   await tx
     .delete(tenantWalletEntries)
     .where(and(eq(tenantWalletEntries.leaseId, oldLeaseId), eq(tenantWalletEntries.kind, 'use_termination')))

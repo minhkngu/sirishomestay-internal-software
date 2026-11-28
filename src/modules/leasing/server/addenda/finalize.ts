@@ -303,6 +303,63 @@ async function settleWalletAndTransfer(
 }
 
 /**
+ * Duyệt hoá đơn có khoản chuyển từ hợp đồng cũ (`transfer:*`) mà tổng âm: đưa hoá đơn về 0 bằng dòng "Số dư chuyển vào ví"
+ * và ghi phần dư (`carry_surplus`) vào ví khách. Duyệt lại sau khi bỏ duyệt không ghi trùng.
+ */
+export async function settleTransferSurplus(
+  tx: DB,
+  invoice: { id: string; leaseId: string; facilityId: string },
+  date: string,
+): Promise<void> {
+  const lines = await tx.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, invoice.id))
+  const meta = (l: (typeof lines)[number]) => (l.meta ?? {}) as Record<string, unknown>
+  const hasTransfer = lines.some(
+    (l) => typeof meta(l).sourceKey === 'string' && String(meta(l).sourceKey).startsWith('transfer:'),
+  )
+  if (!hasTransfer || lines.some((l) => meta(l).surplus === true)) return
+  const total = lines.reduce((n, l) => n + l.amount, 0)
+  if (total >= 0) return
+  const [lease] = await tx.select({ tenantId: leases.tenantId }).from(leases).where(eq(leases.id, invoice.leaseId))
+  if (!lease) return
+  await tx.insert(invoiceLines).values({
+    invoiceId: invoice.id,
+    type: 'adjustment',
+    description: 'Số dư chuyển vào ví',
+    quantity: 1,
+    unitPrice: -total,
+    amount: -total,
+    meta: { surplus: true },
+  })
+  await addWalletEntry(tx, {
+    tenantId: lease.tenantId,
+    facilityId: invoice.facilityId,
+    amount: -total,
+    kind: 'carry_surplus',
+    leaseId: invoice.leaseId,
+    invoiceId: invoice.id,
+    date,
+    note: 'Số dư chuyển phòng vượt hoá đơn đầu',
+    sourceKey: `carry_surplus:${invoice.id}`,
+  })
+}
+
+/** Bỏ duyệt hoặc xoá hoá đơn đã đẩy dư vào ví: xoá dòng và biến động ví; từ chối nếu ví đã dùng tới phần đó. */
+export async function undoTransferSurplus(tx: DB, invoiceId: string): Promise<void> {
+  const [entry] = await tx
+    .select()
+    .from(tenantWalletEntries)
+    .where(eq(tenantWalletEntries.sourceKey, `carry_surplus:${invoiceId}`))
+  if (entry) {
+    if ((await walletBalance(tx, entry.tenantId)) - entry.amount < 0)
+      throw new ValidationError('Số dư chuyển vào ví đã được dùng: gỡ các khoản dùng ví trước')
+    await tx.delete(tenantWalletEntries).where(eq(tenantWalletEntries.id, entry.id))
+  }
+  await tx
+    .delete(invoiceLines)
+    .where(and(eq(invoiceLines.invoiceId, invoiceId), sql`${invoiceLines.meta} ->> 'surplus' = 'true'`))
+}
+
+/**
  * Chạy khi hoá đơn thanh lý được duyệt: chốt hợp đồng nếu chưa chốt (dữ liệu cũ);
  * ghi sổ cọc `forfeit` (mất cọc) và `deduct` (phần cọc đã trừ vào hoá đơn) ở trạng thái done để số dư về 0.
  */
