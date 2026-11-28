@@ -16,7 +16,7 @@ import { setListParams, useFacilitySelection, useListParam, usePager } from '@/c
 import { formatDateVN } from '@/domain/dates'
 import { matchesInvoiceView, matchesPeriod, type InvoiceView } from '@/domain/list-filters'
 import { formatVND } from '@/domain/money'
-import { INVOICE_STATUS_LABELS } from '../../domain/labels'
+import { INVOICE_KIND_LABELS, INVOICE_STATUS_LABELS } from '../../domain/labels'
 import type { listInvoices } from '../../server/invoices/service'
 
 type InvoiceRow = Awaited<ReturnType<typeof listInvoices>>[number]
@@ -40,6 +40,7 @@ export function InvoiceList({
   const rawPeriod = useListParam('period') ?? ''
   const period = /^\d{4}-\d{2}$/.test(rawPeriod) ? rawPeriod : ''
   const rawRoom = useListParam('phong') ?? ''
+  const rawKind = useListParam('loai') ?? ''
   const allowed = useMemo(() => facilities.map((f) => f.id), [facilities])
   const selected = useFacilitySelection(allowed)
   const [pdf, setPdf] = useState<{ url: string; code: string; id: string; kind: string } | null>(null)
@@ -94,12 +95,21 @@ export function InvoiceList({
     return [...seen.values()].sort((x, y) => x.label.localeCompare(y.label, 'vi', { numeric: true }))
   }, [inScope, facilities.length, names])
   const room = roomOptions.some((o) => o.value === rawRoom) ? rawRoom : ''
+  // Menu loại: chỉ các loại đang có hoá đơn trong phạm vi Toà và Kỳ
+  const kindOptions = useMemo(
+    () =>
+      (Object.keys(INVOICE_KIND_LABELS) as (keyof typeof INVOICE_KIND_LABELS)[])
+        .filter((k) => inScope.some((i) => i.kind === k))
+        .map((k) => ({ value: k, label: INVOICE_KIND_LABELS[k] })),
+    [inScope],
+  )
+  const kind = kindOptions.some((o) => o.value === rawKind) ? rawKind : ''
   const scoped = useMemo(
-    () => (room ? inScope.filter((i) => `${i.facilityId}|${i.roomCode}` === room) : inScope),
-    [inScope, room],
+    () => inScope.filter((i) => (!room || `${i.facilityId}|${i.roomCode}` === room) && (!kind || i.kind === kind)),
+    [inScope, room, kind],
   )
   const rows = useMemo(() => scoped.filter((i) => matchesInvoiceView(i.state, view)), [scoped, view])
-  const { pageRows, pager } = usePager(rows, 'invoices', `${view}|${period}|${selected.join(',')}|${room}`)
+  const { pageRows, pager } = usePager(rows, 'invoices', `${view}|${period}|${selected.join(',')}|${room}|${kind}`)
 
   return (
     <>
@@ -115,6 +125,23 @@ export function InvoiceList({
         />
         <div className="flex flex-wrap items-center gap-2.5">
           <FacilityFilter facilities={facilities} align="right" />
+          <Select
+            value={kind || null}
+            onValueChange={(v) => setListParams({ loai: v ? String(v) : null })}
+            items={kindOptions}
+          >
+            <SelectTrigger aria-label="Loại hoá đơn" className="h-9 w-36">
+              <SelectValue placeholder="Tất cả loại" />
+            </SelectTrigger>
+            <SelectContent>
+              {kind && <SelectItem value="">Tất cả loại</SelectItem>}
+              {kindOptions.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select
             value={room || null}
             onValueChange={(v) => setListParams({ phong: v ? String(v) : null })}

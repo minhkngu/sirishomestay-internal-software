@@ -9,3 +9,11 @@ export const INVOICE_STATUS_LABELS = {
   refunded: 'Đã hoàn',
 } as const
 export type InvoiceState = keyof typeof INVOICE_STATUS_LABELS
+
+/** Loại hoá đơn, dùng cho bộ lọc danh sách hoá đơn. */
+export const INVOICE_KIND_LABELS = {
+  monthly: 'Hàng tháng',
+  first: 'Kỳ đầu',
+  termination: 'Thanh lý',
+  manual: 'Lập tay',
+} as const
