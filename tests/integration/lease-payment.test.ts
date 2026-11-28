@@ -141,6 +141,30 @@ describe('ghi thu theo hợp đồng', () => {
       ValidationError,
     )
   })
+  it('ví đã đủ trả nợ mà còn đưa tiền mặt thì từ chối, ví giữ nguyên', async () => {
+    await db.delete(payments)
+    const { tenantId } = await leaseAtOtherFacility()
+    await db.insert(tenantWalletEntries).values({
+      tenantId,
+      facilityId,
+      amount: 20000000,
+      kind: 'overpay',
+      date: '2026-08-01',
+      sourceKey: 'seed:b1',
+    })
+    // nợ 18.000.000 (hai hoá đơn); ví dùng hết 18.000.000 mà còn đưa 1.000.000 tiền mặt
+    await expect(recordLeasePayment(db, ctx(), leaseId, { ...pay(1000000), walletAmount: 18000000 })).rejects.toThrow(
+      'Ví đã đủ trả nợ',
+    )
+    expect(await leaseWalletBalance(db, ctx(), leaseId)).toBe(20000000)
+  })
+  it('thu vượt: phần dư gắn với phiếu tiền mặt cuối của lần thu', async () => {
+    await recordLeasePayment(db, ctx(), leaseId, pay(20000000))
+    const [over] = await db.select().from(tenantWalletEntries).where(eq(tenantWalletEntries.kind, 'overpay'))
+    const [p] = await db.select().from(payments).where(eq(payments.id, over.paymentId!))
+    expect(over.amount).toBe(2000000)
+    expect(p.invoiceId).toBe((await db.select().from(payments).orderBy(payments.createdAt).limit(10)).at(-1)!.invoiceId)
+  })
   it('hợp đồng không còn hoá đơn mở thì không thu được', async () => {
     await recordLeasePayment(db, ctx(), leaseId, pay(18000000))
     await expect(recordLeasePayment(db, ctx(), leaseId, pay(1000))).rejects.toThrow('Hợp đồng không có hoá đơn cần thu')

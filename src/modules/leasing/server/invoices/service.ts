@@ -1919,6 +1919,9 @@ export async function recordLeasePayment(
     if (walletWanted > debt)
       throw new ValidationError(`Số tiền dùng ví vượt tổng dư nợ ${debt.toLocaleString('vi-VN')}`)
     const walletUse = clampWalletUse(walletWanted, balance, debt)
+    // Ví đã đủ trả hết nợ mà còn đưa tiền mặt: phần dư sẽ không có phiếu thu nào để gắn, nên từ chối
+    if (walletUse >= debt && data.amount > 0)
+      throw new ValidationError('Ví đã đủ trả nợ: bỏ phần tiền mặt hoặc giảm số dùng ví')
     const { toWallet } = splitReceipt(data.amount, debt - walletUse)
     const created: (typeof payments.$inferSelect)[] = []
     const walletEntries: { paymentId: string; invoiceId: string; amount: number }[] = []
@@ -1956,17 +1959,18 @@ export async function recordLeasePayment(
         sourceKey: `use_invoice:${w.paymentId}`,
       })
     if (toWallet > 0) {
-      const firstCash = created.find((p) => p.method !== 'wallet')
+      // Phiếu tiền mặt cuối cùng của lần thu là phiếu chạm trần nợ; tiền dư gắn với phiếu đó
+      const lastCash = created.filter((p) => p.method !== 'wallet').at(-1)!
       await addWalletEntry(tx, {
         tenantId: lease.tenantId,
         facilityId,
         amount: toWallet,
         kind: 'overpay',
         leaseId,
-        paymentId: firstCash?.id,
+        paymentId: lastCash.id,
         date: data.paidOn,
         note: 'Tiền khách trả dư vào ví',
-        sourceKey: `overpay:${firstCash?.id ?? crypto.randomUUID()}`,
+        sourceKey: `overpay:${lastCash.id}`,
       })
     }
     await recordAuditBatch(tx, ctx, [
