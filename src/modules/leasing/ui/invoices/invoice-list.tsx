@@ -84,16 +84,15 @@ export function InvoiceList({
       ),
     [invoices, period, selected],
   )
-  // Menu phòng: các phòng có hoá đơn trong phạm vi toà và kỳ đang chọn; phòng đang chọn không còn trong phạm vi thì bỏ lọc
+  // Menu phòng đi sau menu Toà: chọn đúng một toà (hoặc chỉ có một toà) mới hiện các phòng của toà đó, chỉ ghi mã phòng
+  const roomFacilityId = selected.length === 1 ? selected[0] : facilities.length === 1 ? facilities[0].id : null
   const roomOptions = useMemo(() => {
-    const seen = new Map<string, { value: string; label: string }>()
-    for (const i of inScope) {
-      const value = `${i.facilityId}|${i.roomCode}`
-      if (!seen.has(value))
-        seen.set(value, { value, label: facilities.length > 1 ? `${i.roomCode} · ${names[i.facilityId]}` : i.roomCode })
-    }
-    return [...seen.values()].sort((x, y) => x.label.localeCompare(y.label, 'vi', { numeric: true }))
-  }, [inScope, facilities.length, names])
+    if (!roomFacilityId) return []
+    const codes = new Set(inScope.filter((i) => i.facilityId === roomFacilityId).map((i) => i.roomCode))
+    return [...codes]
+      .sort((x, y) => x.localeCompare(y, 'vi', { numeric: true }))
+      .map((code) => ({ value: `${roomFacilityId}|${code}`, label: code }))
+  }, [inScope, roomFacilityId])
   const room = roomOptions.some((o) => o.value === rawRoom) ? rawRoom : ''
   // Menu loại: chỉ các loại đang có hoá đơn trong phạm vi Toà và Kỳ
   const kindOptions = useMemo(
@@ -149,9 +148,10 @@ export function InvoiceList({
             value={room || null}
             onValueChange={(v) => setListParams({ phong: v ? String(v) : null })}
             items={roomOptions}
+            disabled={!roomFacilityId}
           >
             <SelectTrigger aria-label="Phòng" className="h-9 w-32">
-              <SelectValue placeholder="Tất cả phòng" />
+              <SelectValue placeholder={roomFacilityId ? 'Tất cả phòng' : 'Chọn toà trước'} />
             </SelectTrigger>
             <SelectContent>
               {room && <SelectItem value="">Tất cả phòng</SelectItem>}
