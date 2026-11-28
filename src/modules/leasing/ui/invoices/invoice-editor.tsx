@@ -1236,9 +1236,8 @@ export function InvoiceEditor(p: Props) {
             return (
               <div key={kind} className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-semibold text-foreground">{label}</h3>
+                  <h3 className="text-[13px] font-medium text-foreground">{label}</h3>
                   <Button
-                    size="sm"
                     variant="outline"
                     onClick={() =>
                       setLines([
@@ -1253,7 +1252,7 @@ export function InvoiceEditor(p: Props) {
                         },
                       ])
                     }
-                    className="h-8 gap-1.5 rounded-xl border-border/80 text-xs font-medium"
+                    className="gap-1.5 border-border/80"
                   >
                     <Plus className="size-3.5" />
                     <span>Thêm</span>
@@ -1263,8 +1262,8 @@ export function InvoiceEditor(p: Props) {
                   <table className="w-full text-[13px]">
                     <thead className="border-b border-border/70 text-[13px] font-medium text-muted-foreground">
                       <tr>
-                        <th className="px-3 py-2 text-left">Mô tả</th>
-                        <th className="w-36 px-3 py-2 text-right">Số tiền</th>
+                        <th className="px-3 py-2.5 text-left">Mô tả</th>
+                        <th className="w-40 px-3 py-2.5 text-right">Số tiền</th>
                         <th className="w-10" />
                       </tr>
                     </thead>
@@ -1277,7 +1276,7 @@ export function InvoiceEditor(p: Props) {
                               placeholder="Nhập mô tả"
                               value={l.description}
                               onChange={(e) => set(i, { description: e.target.value })}
-                              className="h-8 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground focus:border-primary focus:outline-none"
+                              className="h-9 w-full rounded-lg border border-border/80 bg-background px-2.5 text-sm text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
                             />
                           </td>
                           <td className="p-2">
@@ -1291,7 +1290,7 @@ export function InvoiceEditor(p: Props) {
                                   unitPrice: kind === 'discount' ? -n : n,
                                 })
                               }}
-                              className="h-8 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground focus:border-primary focus:outline-none"
+                              className="h-9 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-sm tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
                             />
                           </td>
                           <td className="p-2 text-center">
@@ -1300,6 +1299,7 @@ export function InvoiceEditor(p: Props) {
                               title="Xoá dòng"
                               onClick={() => setLines(lines.filter((_, j) => j !== i))}
                               className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                              aria-label="Xoá dòng"
                             >
                               <Trash2 className="size-3.5" />
                             </button>
@@ -1308,7 +1308,7 @@ export function InvoiceEditor(p: Props) {
                       ))}
                       {rows.length === 0 && (
                         <tr>
-                          <td colSpan={3} className="p-3 text-center text-muted-foreground">
+                          <td colSpan={3} className="p-4 text-center text-[13px] text-muted-foreground">
                             Chưa có
                           </td>
                         </tr>
