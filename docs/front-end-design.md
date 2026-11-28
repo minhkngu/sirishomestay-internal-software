@@ -7,7 +7,7 @@
 - Số trong dải tổng quan và bảng luôn tính từ dữ liệu đang lọc, không viết cứng.
 
 ### Bộ lọc
-- Dùng `Select` trong `src/components/ui/select.tsx` cho mọi menu lọc và ô "Số dòng"; không dùng `<select>` native cho menu nổi vì menu native theo hệ điều hành, lệch thiết kế. Select trong form hộp thoại có thể còn native cho tới khi form đó được chuyển.
+- Dùng `Select` trong `src/components/ui/select.tsx` cho mọi menu lọc và ô "Số dòng"; không dùng `<select>` native cho menu nổi vì menu native theo hệ điều hành, lệch thiết kế. Mọi chỗ chọn một giá trị đều dùng `Select`; không còn `<select>` native. Trong form, dùng `OptionSelect` (`src/components/option-select.tsx`): có kiểm soát hoặc `defaultValue`, có `name` thì gửi kèm form qua ô ẩn.
 - Các bộ lọc cùng chiều cao 36px (`h-9`), cùng bo góc; mũi tên do `Select` vẽ, không tự thêm mũi tên native.
 - Lọc vị trí là hai dropdown phẳng, phụ thuộc: **Toà → Vị trí**. Chưa chọn toà chỉ có Tất cả, Kho, Khu chung, Chưa xếp trên toàn bộ toà; chọn toà mới hiện danh sách phòng. Đổi toà phải reset vị trí.
 - Không dựng lại cây vị trí; không lặp cùng một bộ lọc ở nhiều nơi.

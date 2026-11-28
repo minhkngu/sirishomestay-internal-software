@@ -9,6 +9,7 @@ import type { DepositEntryStatus, DepositEntryType } from '@/domain/statuses'
 import { MoneyInput } from '@/components/ui/money-input'
 import { StatusChip } from '@/components/contract-ui'
 import { addDepositEntryAction, markDepositDoneAction } from '../../server/charges/actions'
+import { OptionSelect } from '@/components/option-select'
 
 type Entry = { id: string; date: string; type: DepositEntryType; amount: number; status: DepositEntryStatus }
 
@@ -77,15 +78,17 @@ export function DepositLedger({ entries, canEdit, leaseId }: { entries: Entry[];
                           defaultValue={todayVN()}
                           className="w-36"
                         />
-                        <select
-                          aria-label="Hình thức"
+                        <OptionSelect
+                          ariaLabel="Hình thức"
                           name="method"
-                          className="h-8 rounded-lg border border-border/80 bg-card px-2 text-xs"
-                        >
-                          <option value="cash">Tiền mặt</option>
-                          <option value="transfer">Chuyển khoản</option>
-                          <option value="other">Khác</option>
-                        </select>
+                          defaultValue="cash"
+                          className="w-36"
+                          options={[
+                            { value: 'cash', label: 'Tiền mặt' },
+                            { value: 'transfer', label: 'Chuyển khoản' },
+                            { value: 'other', label: 'Khác' },
+                          ]}
+                        />
                         <button
                           disabled={pending}
                           className="h-8 rounded-lg px-2 text-xs font-medium text-primary hover:bg-primary/10"
@@ -164,16 +167,15 @@ export function DepositLedger({ entries, canEdit, leaseId }: { entries: Entry[];
           <FormDateField id="deposit-entry-date" name="date" label="Ngày" defaultValue={todayVN()} />
           <label className="grid gap-1 text-xs text-muted-foreground">
             Loại
-            <select
+            <OptionSelect
               name="type"
-              className="h-9 rounded-lg border border-border/80 bg-card px-2 text-[13px] text-foreground"
-            >
-              {(['topup', 'collect', 'deduct', 'refund', 'forfeit'] as const).map((type) => (
-                <option key={type} value={type}>
-                  {DEPOSIT_ENTRY_LABELS[type]}
-                </option>
-              ))}
-            </select>
+              ariaLabel="Loại"
+              defaultValue="topup"
+              options={(['topup', 'collect', 'deduct', 'refund', 'forfeit'] as const).map((type) => ({
+                value: type,
+                label: DEPOSIT_ENTRY_LABELS[type],
+              }))}
+            />
           </label>
           <label className="grid gap-1 text-xs text-muted-foreground">
             Số tiền

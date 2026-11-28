@@ -4,6 +4,7 @@ import { assertCan } from '@/domain/access'
 import { VN_TIME_ZONE } from '@/domain/dates'
 import { getAccessContext, listAuditLogs } from '@/modules/platform'
 import { listUsers } from '@/modules/users'
+import { OptionSelect } from '@/components/option-select'
 
 export default async function AuditPage({
   searchParams,
@@ -27,22 +28,23 @@ export default async function AuditPage({
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Nhật ký thao tác</h1>
       <form className="flex flex-wrap items-center gap-2" method="get">
-        <select name="user" defaultValue={sp.user ?? ''}>
-          <option value="">Mọi người</option>
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.fullName}
-            </option>
-          ))}
-        </select>
-        <select name="entity" defaultValue={sp.entity ?? ''}>
-          <option value="">Mọi đối tượng</option>
-          {[...new Set([...entities, sp.entity].filter(Boolean) as string[])].map((e) => (
-            <option key={e} value={e}>
-              {e}
-            </option>
-          ))}
-        </select>
+        <OptionSelect
+          name="user"
+          ariaLabel="Người thao tác"
+          className="w-48"
+          defaultValue={sp.user ?? ''}
+          options={[{ value: '', label: 'Mọi người' }, ...users.map((u) => ({ value: u.id, label: u.fullName }))]}
+        />
+        <OptionSelect
+          name="entity"
+          ariaLabel="Đối tượng"
+          className="w-48"
+          defaultValue={sp.entity ?? ''}
+          options={[
+            { value: '', label: 'Mọi đối tượng' },
+            ...[...new Set([...entities, sp.entity].filter(Boolean) as string[])].map((e) => ({ value: e, label: e })),
+          ]}
+        />
         <button
           className="h-9 rounded-lg border border-input bg-card px-3.5 text-[13px] font-medium hover:bg-muted/60"
           type="submit"

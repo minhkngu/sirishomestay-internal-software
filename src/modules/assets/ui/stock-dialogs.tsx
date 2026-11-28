@@ -11,6 +11,7 @@ import { createStockAction, stockMoveAction } from '../server/stock/actions'
 import type { Location } from '../server/assets/service'
 import type { TreeFacility } from './location-types'
 import type { StockRow } from './stock-table'
+import { OptionSelect } from '@/components/option-select'
 
 const toLocation = (value: string): Location => {
   const [kind, id] = value.split(':')
@@ -62,18 +63,13 @@ function AddStockItemBody({ facilities, onClose }: { facilities: TreeFacility[];
       <div className="grid gap-3">
         <div className="grid gap-1.5">
           <Label htmlFor="stock-facility">Cơ sở</Label>
-          <select
+          <OptionSelect
             id="stock-facility"
+            ariaLabel="Cơ sở"
             value={facilityId}
-            onChange={(e) => setFacility(e.target.value)}
-            className="h-9 w-full rounded-xl border border-border/80 bg-card px-2.5 text-sm outline-none focus:border-primary"
-          >
-            {facilities.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </select>
+            onValueChange={setFacility}
+            options={facilities.map((f) => ({ value: f.id, label: f.name }))}
+          />
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="stock-name">Tên vật tư</Label>
@@ -222,60 +218,48 @@ function StockMoveBody({
 
         <div className="grid gap-1.5">
           <Label htmlFor="stock-item">Vật tư</Label>
-          <select
+          <OptionSelect
             id="stock-item"
+            ariaLabel="Vật tư"
             value={itemId}
-            onChange={(e) => {
-              setItemId(e.target.value)
+            onValueChange={(next) => {
+              setItemId(next)
               setFrom('')
               setTo('')
             }}
-            className="h-9 w-full rounded-xl border border-border/80 bg-card px-2.5 text-sm outline-none focus:border-primary"
-          >
-            <option value="">— chọn vật tư —</option>
-            {items.map((r) => (
-              <option key={r.itemId} value={r.itemId}>
-                {r.name} — {facilities.find((f) => f.id === r.facilityId)?.name}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: '', label: '— chọn vật tư —' },
+              ...items.map((r) => ({
+                value: r.itemId,
+                label: `${r.name} — ${facilities.find((f) => f.id === r.facilityId)?.name}`,
+              })),
+            ]}
+          />
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
           {mode !== 'receive' && (
             <div className="grid gap-1.5">
               <Label htmlFor="stock-from">Từ vị trí</Label>
-              <select
+              <OptionSelect
                 id="stock-from"
+                ariaLabel="Từ vị trí"
                 value={from}
-                onChange={(e) => setFrom(e.target.value)}
-                className="h-9 w-full rounded-xl border border-border/80 bg-card px-2.5 text-sm outline-none focus:border-primary"
-              >
-                <option value="">— chọn nguồn —</option>
-                {locations.map((l) => (
-                  <option key={l.value} value={l.value}>
-                    {l.label}
-                  </option>
-                ))}
-              </select>
+                onValueChange={setFrom}
+                options={[{ value: '', label: '— chọn nguồn —' }, ...locations]}
+              />
             </div>
           )}
           {mode !== 'consume' && (
             <div className="grid gap-1.5">
               <Label htmlFor="stock-to">Đến vị trí</Label>
-              <select
+              <OptionSelect
                 id="stock-to"
+                ariaLabel="Đến vị trí"
                 value={to}
-                onChange={(e) => setTo(e.target.value)}
-                className="h-9 w-full rounded-xl border border-border/80 bg-card px-2.5 text-sm outline-none focus:border-primary"
-              >
-                <option value="">— chọn đích —</option>
-                {locations.map((l) => (
-                  <option key={l.value} value={l.value}>
-                    {l.label}
-                  </option>
-                ))}
-              </select>
+                onValueChange={setTo}
+                options={[{ value: '', label: '— chọn đích —' }, ...locations]}
+              />
             </div>
           )}
           <div className="grid gap-1.5">

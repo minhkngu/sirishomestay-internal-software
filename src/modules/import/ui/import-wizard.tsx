@@ -10,6 +10,7 @@ import {
 } from '../server/import/actions'
 import { IMPORT_TARGETS, suggestMapping, type ImportTarget } from '../domain/targets'
 import type { ImportError } from '../server/import/validate'
+import { OptionSelect } from '@/components/option-select'
 
 type Sheet = { name: string; headers: string[]; rows: Record<string, unknown>[] }
 
@@ -153,18 +154,16 @@ export function ImportWizard() {
             <label htmlFor="target" className="text-sm font-medium">
               Loại dữ liệu
             </label>
-            <select
+            <OptionSelect
               id="target"
+              ariaLabel="Loại dữ liệu"
               value={target}
-              onChange={(e) => setTarget(e.target.value as ImportTarget)}
-              className="h-8 w-full rounded-lg border px-2 text-sm"
-            >
-              {(Object.keys(IMPORT_TARGETS) as ImportTarget[]).map((t) => (
-                <option key={t} value={t}>
-                  {IMPORT_TARGETS[t].label}
-                </option>
-              ))}
-            </select>
+              onValueChange={(next) => setTarget(next as ImportTarget)}
+              options={(Object.keys(IMPORT_TARGETS) as ImportTarget[]).map((t) => ({
+                value: t,
+                label: IMPORT_TARGETS[t].label,
+              }))}
+            />
           </div>
           <Button variant="outline" size="sm" onClick={downloadSample}>
             Tải file mẫu
@@ -177,21 +176,17 @@ export function ImportWizard() {
       {step === 2 && sheet && (
         <div className="space-y-3">
           {sheets.length > 1 && (
-            <select
-              value={sheetIdx}
-              onChange={(e) => {
-                const i = Number(e.target.value)
+            <OptionSelect
+              ariaLabel="Trang tính"
+              className="w-64"
+              value={String(sheetIdx)}
+              onValueChange={(next) => {
+                const i = Number(next)
                 setSheetIdx(i)
                 setMapping(suggestMapping(sheets[i].headers, target))
               }}
-              className="h-8 rounded-lg border px-2 text-sm"
-            >
-              {sheets.map((s, i) => (
-                <option key={s.name} value={i}>
-                  {s.name} ({s.rows.length} dòng)
-                </option>
-              ))}
-            </select>
+              options={sheets.map((s, i) => ({ value: String(i), label: `${s.name} (${s.rows.length} dòng)` }))}
+            />
           )}
           <div className="grid gap-2 sm:grid-cols-2">
             {fields.map((f) => (
@@ -200,18 +195,15 @@ export function ImportWizard() {
                   {f.label}
                   {f.required && ' *'}
                 </span>
-                <select
+                <OptionSelect
+                  ariaLabel={f.label}
                   value={mapping[f.key] ?? ''}
-                  onChange={(e) => setMapping({ ...mapping, [f.key]: e.target.value || null })}
-                  className="h-8 w-full rounded-lg border px-2 text-sm"
-                >
-                  <option value="">— không ghép —</option>
-                  {sheet.headers.map((h) => (
-                    <option key={h} value={h}>
-                      {h}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={(next) => setMapping({ ...mapping, [f.key]: next || null })}
+                  options={[
+                    { value: '', label: '— không ghép —' },
+                    ...sheet.headers.map((h) => ({ value: h, label: h })),
+                  ]}
+                />
               </label>
             ))}
           </div>

@@ -12,7 +12,8 @@ test('Admin tạo nhanh phòng từ trang Phòng, ô mới màu xám và không 
   await login(page, /^Admin/)
   await page.goto('/rooms')
   await page.getByRole('button', { name: 'Tạo nhanh nhiều phòng' }).click()
-  await page.getByLabel('Cơ sở').selectOption({ label: 'Thảo Điền' })
+  await page.getByLabel('Cơ sở').click()
+  await page.getByRole('option', { name: 'Thảo Điền' }).click()
   const prefix = `E2E${Date.now()}-`
   await page.getByLabel('Tiền tố mã (tuỳ chọn)').fill(prefix)
   await page.getByLabel('Tầng', { exact: true }).fill('9')

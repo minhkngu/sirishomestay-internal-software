@@ -9,6 +9,7 @@ import type { DocType } from '@/domain/template-fields'
 import { editorExtensions } from './editor-extensions'
 import { decodeFieldDrag, encodeFieldDrag, FIELD_DRAG_MIME, type FieldDrag } from './field-drag'
 import { fieldGroups, fieldPlacement, type FieldGroups } from './field-palette'
+import { OptionSelect } from '@/components/option-select'
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
@@ -146,24 +147,21 @@ function Toolbar({ editor, groups, qr }: { editor: Editor; groups: FieldGroups; 
       {groups.loops.length > 0 && (
         <label className="ml-1 flex items-center gap-1 text-xs text-muted-foreground">
           Hàng lặp theo
-          <select
-            aria-label="Hàng lặp theo"
+          <OptionSelect
+            ariaLabel="Hàng lặp theo"
             disabled={!inTable}
             value={rowLoop ?? ''}
-            className="h-8 rounded-md border bg-background px-1 text-sm disabled:opacity-50"
-            onChange={(e) =>
+            className="w-44"
+            onValueChange={(next) =>
               run()
-                .updateAttributes('tableRow', { loop: e.target.value || null })
+                .updateAttributes('tableRow', { loop: next || null })
                 .run()
             }
-          >
-            <option value="">(không lặp)</option>
-            {groups.loops.map((l) => (
-              <option key={l.key} value={l.key}>
-                {l.label}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: '', label: '(không lặp)' },
+              ...groups.loops.map((l) => ({ value: l.key, label: l.label })),
+            ]}
+          />
         </label>
       )}
     </div>
