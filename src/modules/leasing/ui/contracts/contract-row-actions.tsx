@@ -114,7 +114,8 @@ export function ContractRowActions({
   }
   const label = ACTIONS.find((item) => item.key === action)?.label ?? ''
   // Menu nổi: cần đục hoàn toàn, không dùng backdrop blur của component dùng chung.
-  const menuClass = 'w-56 border-border/80 bg-popover shadow-lg backdrop-blur-none' // taste-skill-ignore
+  const menuClass =
+    'w-max min-w-56 [&_[role=menuitem]]:whitespace-nowrap border-border/80 bg-popover shadow-lg backdrop-blur-none' // taste-skill-ignore
   const available = ACTIONS.filter(
     (item) =>
       (item.key !== 'delete' || canDelete) &&
@@ -155,7 +156,7 @@ export function ContractRowActions({
             >
               <MoreHorizontal className="size-4" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-52">
+            <DropdownMenuContent align="start" className="w-max min-w-52 [&_[role=menuitem]]:whitespace-nowrap">
               {(canEdit ? rest : available).map((item) => (
                 <DropdownMenuItem
                   key={item.key}
