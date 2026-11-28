@@ -406,6 +406,37 @@ describe('thanh lý nối ví và chuyển phòng', () => {
       ).resolves.toBeDefined()
     })
 
+    it('đồng hồ phòng mới đã có chỉ số bàn giao khác trong ngày: ghi đè bằng số mới', async () => {
+      const [oldMeter, newMeter] = await db
+        .insert(meters)
+        .values([
+          { roomId, utility: 'electric', installedOn: '2026-01-01', startReading: 0 },
+          { roomId: room2Id, utility: 'electric', installedOn: '2026-01-01', startReading: 0 },
+        ])
+        .returning()
+      const [fee] = await db
+        .insert(leaseFeeSnapshots)
+        .values({
+          leaseId,
+          name: 'Điện',
+          unit: 'kWh',
+          quantitySource: 'meter',
+          billing: 'per_occurrence',
+          unitPrice: 3500,
+        })
+        .returning()
+      await db.insert(leaseFeeMeters).values({ leaseFeeId: fee.id, meterId: oldMeter.id })
+      await db
+        .insert(meterReadings)
+        .values({ meterId: newMeter.id, period: '2026-11', kind: 'handover', readOn: '2026-11-20', value: 30 })
+      await change({
+        termination: { forfeit: { mode: 'none' }, readings: [{ meterId: oldMeter.id, value: 120 }] },
+        newRoomReadings: [{ meterId: newMeter.id, value: 40 }],
+      })
+      const rows = await db.select().from(meterReadings).where(eq(meterReadings.meterId, newMeter.id))
+      expect(rows.map((r) => r.value)).toEqual([40])
+    })
+
     it('huỷ chuyển phòng thiếu quyền xoá hợp đồng thì từ chối trước khi làm gì', async () => {
       await change()
       await expect(cancelRoomChange(db, context(['tenants_contracts'], facilityId), leaseId, storage)).rejects.toThrow()
