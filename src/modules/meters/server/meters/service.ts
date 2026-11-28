@@ -731,10 +731,9 @@ export async function updateLeaseFeeMeter(
   }
 
   // Đổi đồng hồ: giữ dòng chốt của đồng hồ cũ làm lịch sử, ghi/khớp chỉ số đầu cho đồng hồ mới tại cùng ngày chốt
+  // Chỉ số bàn giao cùng ngày là một con số duy nhất của đồng hồ: nhập số mới thì ghi đè, hoá đơn đã lập không đổi
   if (sameDay && sameDay.value !== input.initialReading)
-    throw new ValidationError(`Đồng hồ đã có chỉ số bàn giao ${sameDay.value} trong ngày này`, {
-      initialReading: `Nhập đúng chỉ số đã chốt: ${sameDay.value}`,
-    })
+    await tx.update(meterReadings).set({ value: input.initialReading }).where(eq(meterReadings.id, sameDay.id))
   if (link)
     await tx.update(leaseFeeMeters).set({ meterId: meter.id }).where(eq(leaseFeeMeters.leaseFeeId, input.leaseFeeId))
   else await tx.insert(leaseFeeMeters).values({ leaseFeeId: input.leaseFeeId, meterId: meter.id })
