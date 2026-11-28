@@ -7,7 +7,7 @@ import { db } from '@/db/client'
 import { toActionResult } from '@/lib/action-result'
 import { getAccessContext } from '@/modules/platform'
 import type { ExpenseInput } from './schemas'
-import { removePayment, updatePayment } from '@/modules/leasing'
+import { removePayment, updatePayment, type PaymentRemoval } from '@/modules/leasing'
 import { addExpense, deleteExpense, updateExpense } from './service'
 
 const refresh = () => revalidatePath('/cashbook')
@@ -35,10 +35,10 @@ export async function deleteExpenseAction(id: string) {
     return {}
   })
 }
-export async function deletePaymentAction(id: string) {
+export async function deletePaymentAction(id: string, removal?: PaymentRemoval) {
   const ctx = await getAccessContext()
   return toActionResult(async () => {
-    await removePayment(db, ctx, id)
+    await removePayment(db, ctx, id, removal)
     refresh()
     revalidatePath('/invoices', 'layout')
     return {}

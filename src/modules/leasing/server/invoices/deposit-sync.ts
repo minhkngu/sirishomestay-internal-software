@@ -2,7 +2,7 @@ import { and, asc, eq } from 'drizzle-orm'
 import { depositEntries, invoiceLines, invoices, payments } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext } from '@/domain/access'
-import { splitPaymentsDepositFirst } from '@/domain/deposit'
+import { splitPaymentsDepositFirst, transferCredit } from '@/domain/deposit'
 import { recordAudit } from '@/modules/platform'
 
 /**
@@ -23,9 +23,12 @@ export async function syncDepositWithInvoice(tx: DB, ctx: AccessContext, invoice
   ])
   const marker = `Thu cùng hoá đơn ${inv.code}`
   const depositDue = lines.filter((l) => l.type === 'deposit').reduce((n, l) => n + l.amount, 0)
+  // Khoản chuyển từ hợp đồng cũ (cọc cũ hoàn về nằm trong đó) trả cọc trước tiền thu
+  const credit = transferCredit(lines)
   const covered =
     inv.status === 'approved' && depositDue > 0
-      ? [...splitPaymentsDepositFirst(pays, depositDue).values()].reduce((n, x) => n + x.deposit, 0)
+      ? Math.min(depositDue, credit) +
+        [...splitPaymentsDepositFirst(pays, depositDue, credit).values()].reduce((n, x) => n + x.deposit, 0)
       : 0
   const entries = await tx.select().from(depositEntries).where(eq(depositEntries.leaseId, inv.leaseId))
   const strip = (note: string) => note.replace(` · ${marker}`, '').replace(marker, '').trim()
@@ -43,8 +46,8 @@ export async function syncDepositWithInvoice(tx: DB, ctx: AccessContext, invoice
       .where(eq(depositEntries.id, e.id))
   }
   let remaining = keep
-  if (remaining <= 0 || pays.length === 0) return
-  const last = pays.at(-1)!
+  if (remaining <= 0) return
+  const last = pays.at(-1) ?? { paidOn: inv.periodStart, method: null }
   const pending = entries
     .filter((x) => x.status === 'pending' && (x.type === 'collect' || x.type === 'topup'))
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.createdAt.getTime() - b.createdAt.getTime()))

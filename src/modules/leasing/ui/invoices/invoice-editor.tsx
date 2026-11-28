@@ -42,9 +42,17 @@ type Line = {
 }
 
 type EditorLine = Line & { unitPriceText: string }
+/** Lưới một dòng hoá đơn: khoản | SL | đơn giá | thành tiền | xoá; dưới lg xếp thành hai tầng, không tràn ngang */
+const LINE_GRID =
+  'grid grid-cols-3 items-start gap-x-3 gap-y-2.5 px-4 lg:grid-cols-[minmax(0,1fr)_5.5rem_8.5rem_8rem_2rem]'
 /** Dòng tiền phòng và phí hợp đồng lấy từ hợp đồng nên không sửa mô tả, SL, đơn giá và không xoá ở đây. */
 /** Dòng "Tiền cọc còn thiếu" tính từ hợp đồng: không sửa mô tả, đơn giá, số lượng (xoá được nếu đã thu cọc riêng). */
 const isDepositLine = (l: Line) => l.type === 'deposit'
+/** Khoản chuyển từ hợp đồng cũ (chuyển phòng): số đã chốt, không sửa hoặc xoá trong hoá đơn */
+const isTransferIn = (l: Line) =>
+  (typeof l.meta?.sourceKey === 'string' && l.meta.sourceKey.startsWith('transfer:')) ||
+  // Dòng "Chuyển sang hợp đồng mới" của hoá đơn thanh lý chuyển phòng: số cân bằng, tự tính
+  l.meta?.transfer === true
 const isLocked = (l: Line) => l.type === 'rent' || typeof l.meta?.leaseFeeId === 'string'
 /** Phí ngoài hợp đồng thêm vào hoá đơn từ loại phí trong Cài đặt: mô tả cố định theo tên phí, có thời gian và hệ số riêng. */
 const isAddedFee = (l: Line) =>
@@ -899,6 +907,18 @@ export function InvoiceEditor(p: Props) {
     !!p.meterPanels?.some((x) => x.leaseFeeId === l.meta?.leaseFeeId) ||
     !!p.newInvoice?.fixedQtyFeeIds?.includes(String(l.meta?.leaseFeeId))
   const approved = p.status === 'approved'
+  // Hoá đơn thanh lý của chuyển phòng (có dòng chuyển sang hợp đồng mới): dòng hệ thống khoá mô tả, đơn giá
+  const roomChangeLocked = !!p.id && p.lines.some((l) => l.meta?.transfer === true)
+  // Dòng hệ thống của hoá đơn chuyển phòng: khoá mô tả, đơn giá, xoá; phạt, phát sinh, giảm giá nhập tay thì tự do
+  const sysRC = (l: Line) => roomChangeLocked && !(l.type === 'penalty' || l.type === 'one_off' || extraKind(l))
+  // Số lượng của dòng chuyển, ví, cọc không đổi được
+  const qtyFixed = (l: Line) =>
+    sysRC(l) &&
+    (l.meta?.transfer === true ||
+      typeof l.meta?.wallet === 'number' ||
+      typeof l.meta?.pendingId === 'string' ||
+      l.type === 'deposit' ||
+      l.type === 'deposit_offset')
 
   return (
     <div className="space-y-4">
@@ -961,6 +981,16 @@ export function InvoiceEditor(p: Props) {
       </section>
       {p.beforeLines}
 
+      {roomChangeLocked && (
+        <p
+          role="note"
+          className="rounded-xl border border-border/80 bg-muted/40 px-4 py-3 text-xs text-muted-foreground"
+        >
+          Hoá đơn thanh lý của chuyển phòng: mô tả và đơn giá các dòng hệ thống đã khoá, vẫn sửa được số lượng và thêm,
+          sửa, xoá các khoản phạt, phát sinh, giảm giá. Muốn đổi dòng khác thì hoàn tác chuyển phòng (nút Khôi phục hợp
+          đồng ở hợp đồng cũ) rồi chuyển lại.
+        </p>
+      )}
       {/* 2. Các dòng */}
       <section className="space-y-4 rounded-2xl border border-border/80 bg-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -973,169 +1003,183 @@ export function InvoiceEditor(p: Props) {
           </div>
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-border/80 bg-card">
-          <table className="w-full text-[13px]">
-            <thead className="border-b border-border/70 text-[13px] font-medium text-muted-foreground">
-              <tr>
-                <th className="px-3 py-3 text-left min-w-48 whitespace-nowrap">Mô tả</th>
-                <th className="px-3 py-3 text-left w-52 whitespace-nowrap">Thời gian</th>
-                <th className="px-3 py-3 text-left w-44 whitespace-nowrap">Chỉ số</th>
-                <th className="px-2.5 py-3 text-right w-16 whitespace-nowrap">SL</th>
-                <th className="px-3 py-3 text-right w-28 whitespace-nowrap">Thành tiền</th>
-                <th className="px-1.5 py-3 w-10 text-center"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/60">
-              {lines.map((l, i) =>
-                extraKind(l) ? null : (
-                  <tr key={i} className="transition-colors hover:bg-muted/20">
-                    <td className="p-2.5">
+        <div className="overflow-hidden rounded-xl border border-border/80 bg-card">
+          <div
+            className={`${LINE_GRID} hidden border-b border-border/70 py-2.5 text-[13px] font-medium text-muted-foreground lg:grid`}
+          >
+            <span>Khoản</span>
+            <span className="text-right">SL</span>
+            <span className="text-right">Đơn giá</span>
+            <span className="text-right">Thành tiền</span>
+            <span />
+          </div>
+          <div className="divide-y divide-border/60">
+            {lines.map((l, i) => {
+              if (extraKind(l)) return null
+              const frozen = isLocked(l) || isAddedFee(l) || isDepositLine(l) || isTransferIn(l) || sysRC(l)
+              const text = isMeterLine(l)
+                ? (p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId)?.name ?? l.description)
+                : isLocked(l)
+                  ? l.description.replace(/ — phòng [0-9a-f-]{36}$/i, '')
+                  : l.description
+              return (
+                <div key={i} className={`${LINE_GRID} py-3 transition-colors hover:bg-muted/20`}>
+                  {/* Khoản: tên, bên dưới là thời gian tính tiền và chỉ số điện nước của chính dòng đó */}
+                  <div className="col-span-3 min-w-0 space-y-1 lg:col-span-1">
+                    {frozen ? (
+                      <p className="flex min-h-9 items-center break-words text-sm font-medium leading-snug text-foreground">
+                        {text}
+                      </p>
+                    ) : (
                       <input
-                        value={
-                          isMeterLine(l)
-                            ? (p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId)?.name ?? l.description)
-                            : isLocked(l)
-                              ? l.description.replace(/ — phòng [0-9a-f-]{36}$/i, '')
-                              : l.description
-                        }
-                        disabled={isLocked(l) || isAddedFee(l) || isDepositLine(l)}
+                        value={text}
+                        aria-label="Mô tả"
                         onChange={(e) => set(i, { description: e.target.value })}
-                        className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 disabled:cursor-not-allowed disabled:border-transparent disabled:bg-transparent disabled:px-0 disabled:text-foreground"
+                        className="h-9 w-full rounded-lg border border-border/80 bg-background px-2.5 text-sm text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
                       />
-                      <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted-foreground">
-                        <span className="shrink-0">Đơn giá</span>
-                        {isLocked(l) || isAddedFee(l) || isDepositLine(l) ? (
-                          <span className="font-medium tabular-nums text-foreground">{formatVND(l.unitPrice)}</span>
-                        ) : (
-                          <MoneyInput
-                            allowNegative
-                            value={l.unitPriceText}
-                            onValueChange={(value) =>
-                              set(i, {
-                                unitPriceText: value,
-                                unitPrice: value === '' || value === '-' ? 0 : Number(value),
-                              })
-                            }
-                            className="h-8 w-32 rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
-                          />
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-2.5 align-top">
-                      {isTimeBased(l) && !isMeterLine(l) ? (
-                        <LineTime
-                          line={l}
-                          defaultFrom={p.start}
-                          defaultTo={p.end}
-                          fullMonth={p.fullMonth}
-                          proration={p.proration}
+                    )}
+                    {isTimeBased(l) && !isMeterLine(l) && (
+                      <LineTime
+                        line={l}
+                        defaultFrom={p.start}
+                        defaultTo={p.end}
+                        fullMonth={p.fullMonth}
+                        proration={p.proration}
+                        editable={p.status === 'draft'}
+                        onChange={(meta) => set(i, timePatch(l, meta))}
+                      />
+                    )}
+                    {(() => {
+                      const panel = p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId)
+                      return panel ? (
+                        <MeterReadingsPanel
+                          panel={panel}
                           editable={p.status === 'draft'}
-                          onChange={(meta) => set(i, timePatch(l, meta))}
-                        />
-                      ) : (
-                        <span className="text-muted-foreground/60">—</span>
-                      )}
-                    </td>
-                    <td className="p-2.5 align-top">
-                      {(() => {
-                        const panel = p.meterPanels?.find((x) => x.leaseFeeId === l.meta?.leaseFeeId)
-                        return panel ? (
-                          <MeterReadingsPanel
-                            panel={panel}
-                            editable={p.status === 'draft'}
-                            consumption={l.quantity}
-                            snapshot={
-                              typeof l.meta?.opening === 'number' && typeof l.meta?.closing === 'number'
-                                ? { opening: l.meta.opening, closing: l.meta.closing }
-                                : null
-                            }
-                            onSnapshot={(opening, closing) =>
-                              set(i, {
-                                meta: { ...l.meta, opening, closing },
-                                quantity: closing - opening,
-                                amount: Math.round((closing - opening) * l.unitPrice),
+                          consumption={l.quantity}
+                          snapshot={
+                            typeof l.meta?.opening === 'number' && typeof l.meta?.closing === 'number'
+                              ? { opening: l.meta.opening, closing: l.meta.closing }
+                              : null
+                          }
+                          onSnapshot={(opening, closing) =>
+                            set(i, {
+                              meta: { ...l.meta, opening, closing },
+                              quantity: closing - opening,
+                              amount: Math.round((closing - opening) * l.unitPrice),
+                            })
+                          }
+                          staged={stagedFor(panel.leaseFeeId)}
+                          onStage={(period, value) =>
+                            setStaged((cur) => ({ ...cur, [`${panel.leaseFeeId}|${period}`]: value }))
+                          }
+                          onApply={(readings, openings) => {
+                            if (!p.id) savePreviewReadings(panel.leaseFeeId, readings, openings)
+                            else
+                              saveAll({
+                                staged: Object.fromEntries(
+                                  Object.entries(readings).map(([k, v]) => [`${panel.leaseFeeId}|${k}`, v]),
+                                ),
+                                opening: Object.fromEntries(
+                                  Object.entries(openings).map(([k, v]) => [`${panel.leaseFeeId}|${k}`, v]),
+                                ),
                               })
-                            }
-                            staged={stagedFor(panel.leaseFeeId)}
-                            onStage={(period, value) =>
-                              setStaged((cur) => ({ ...cur, [`${panel.leaseFeeId}|${period}`]: value }))
-                            }
-                            onApply={(readings, openings) => {
-                              if (!p.id) savePreviewReadings(panel.leaseFeeId, readings, openings)
-                              else
-                                saveAll({
-                                  staged: Object.fromEntries(
-                                    Object.entries(readings).map(([k, v]) => [`${panel.leaseFeeId}|${k}`, v]),
-                                  ),
-                                  opening: Object.fromEntries(
-                                    Object.entries(openings).map(([k, v]) => [`${panel.leaseFeeId}|${k}`, v]),
-                                  ),
-                                })
-                            }}
-                            stagedOpening={stagedOpeningFor(panel.leaseFeeId)}
-                            onStageOpening={(period, value) =>
-                              setStagedOpening((cur) => ({ ...cur, [`${panel.leaseFeeId}|${period}`]: value }))
-                            }
-                          />
-                        ) : (
-                          (() => {
-                            // Hoá đơn thanh lý không có bảng chốt theo tháng: hiện chỉ số đầu, cuối đã lưu trên dòng
-                            const segs = Array.isArray(l.meta?.segments)
-                              ? (l.meta.segments as { start?: unknown; end?: unknown }[]).filter(
-                                  (x) => typeof x.start === 'number' && typeof x.end === 'number',
-                                )
-                              : []
-                            return segs.length ? (
-                              <span className="tabular-nums text-foreground">
-                                {segs
-                                  .map(
-                                    (x) =>
-                                      `${(x.start as number).toLocaleString('vi-VN')} → ${(x.end as number).toLocaleString('vi-VN')}`,
-                                  )
-                                  .join('; ')}
-                              </span>
-                            ) : (
-                              <span className="text-muted-foreground/60">—</span>
-                            )
-                          })()
-                        )
-                      })()}
-                    </td>
-                    <td className="p-2.5 align-top">
-                      {isMeterLine(l) ? (
-                        <span className="text-muted-foreground/60">—</span>
-                      ) : (
-                        <input
-                          type="number"
-                          step="any"
-                          min={0}
-                          aria-label="Số lượng"
-                          disabled={isDepositLine(l)}
-                          value={l.quantity}
-                          onChange={(e) => set(i, qtyPatch(l, Number(e.target.value)))}
-                          className="h-8.5 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
+                          }}
+                          stagedOpening={stagedOpeningFor(panel.leaseFeeId)}
+                          onStageOpening={(period, value) =>
+                            setStagedOpening((cur) => ({ ...cur, [`${panel.leaseFeeId}|${period}`]: value }))
+                          }
                         />
-                      )}
-                    </td>
-                    <td className="p-2.5 text-right font-bold tabular-nums text-foreground">
+                      ) : (
+                        (() => {
+                          // Hoá đơn thanh lý không có bảng chốt theo tháng: hiện chỉ số đầu, cuối đã lưu trên dòng
+                          const segs = Array.isArray(l.meta?.segments)
+                            ? (l.meta.segments as { start?: unknown; end?: unknown }[]).filter(
+                                (x) => typeof x.start === 'number' && typeof x.end === 'number',
+                              )
+                            : []
+                          const unit = typeof l.meta?.unit === 'string' ? l.meta.unit : ''
+                          const fmt = (n: number) => n.toLocaleString('vi-VN')
+                          // Dòng đã lưu chỉ số đầu, cuối (kỳ ký hợp đồng, đã sửa tay) cũng hiện như đoạn đơn
+                          const ranges = segs.length
+                            ? segs.map((x) => `${fmt(x.start as number)} → ${fmt(x.end as number)}`)
+                            : typeof l.meta?.opening === 'number' && typeof l.meta?.closing === 'number'
+                              ? [`${fmt(l.meta.opening)} → ${fmt(l.meta.closing)}`]
+                              : []
+                          return ranges.length ? (
+                            <p className="text-xs tabular-nums text-muted-foreground">
+                              Chỉ số <span className="text-foreground">{ranges.join('; ')}</span> · Tiêu thụ{' '}
+                              <span className="font-medium text-foreground">{fmt(l.quantity)}</span>
+                              {unit ? ` ${unit}` : ''}
+                            </p>
+                          ) : null
+                        })()
+                      )
+                    })()}
+                  </div>
+                  <label className="space-y-1 lg:space-y-0">
+                    <span className="block text-[11px] text-muted-foreground lg:hidden">Số lượng</span>
+                    {isMeterLine(l) ? (
+                      <span className="hidden h-9 items-center justify-end text-muted-foreground/60 lg:flex">—</span>
+                    ) : (
+                      <input
+                        type="number"
+                        step="any"
+                        min={0}
+                        aria-label="Số lượng"
+                        disabled={isDepositLine(l) || isTransferIn(l) || qtyFixed(l)}
+                        value={l.quantity}
+                        onChange={(e) => set(i, qtyPatch(l, Number(e.target.value)))}
+                        className="h-9 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-sm tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none disabled:border-transparent disabled:bg-muted/40"
+                      />
+                    )}
+                  </label>
+                  <div className="space-y-1 lg:space-y-0">
+                    <span className="block text-[11px] text-muted-foreground lg:hidden">Đơn giá</span>
+                    {frozen ? (
+                      <span className="flex h-9 items-center justify-end text-sm tabular-nums text-foreground">
+                        {formatVND(l.unitPrice)}
+                      </span>
+                    ) : (
+                      <MoneyInput
+                        allowNegative
+                        aria-label="Đơn giá"
+                        value={l.unitPriceText}
+                        onValueChange={(value) =>
+                          set(i, {
+                            unitPriceText: value,
+                            unitPrice: value === '' || value === '-' ? 0 : Number(value),
+                          })
+                        }
+                        className="h-9 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-sm tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
+                      />
+                    )}
+                  </div>
+                  <div className="space-y-1 lg:space-y-0">
+                    <span className="block text-[11px] text-muted-foreground lg:hidden">Thành tiền</span>
+                    <span className="flex h-9 items-center justify-end text-sm font-semibold tabular-nums text-foreground">
                       {formatVND(lineAmount(l))}
-                    </td>
-                    <td className="p-2.5 text-center">
-                      <button
-                        type="button"
-                        disabled={isLocked(l) && lines.some((x) => x.type === 'rent')}
-                        onClick={() => setLines(lines.filter((_, j) => j !== i))}
-                        className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-rose-50 hover:text-rose-600"
-                        title="Xoá dòng"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ),
-              )}
-            </tbody>
-          </table>
+                    </span>
+                  </div>
+                  <div className="col-span-3 flex h-9 items-center justify-end lg:col-span-1">
+                    <button
+                      type="button"
+                      disabled={(isLocked(l) && lines.some((x) => x.type === 'rent')) || isTransferIn(l) || sysRC(l)}
+                      onClick={() => setLines(lines.filter((_, j) => j !== i))}
+                      className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:pointer-events-none disabled:opacity-40"
+                      aria-label="Xoá dòng"
+                      title={
+                        isTransferIn(l) || sysRC(l)
+                          ? 'Dòng này không xoá được; hoàn tác chuyển phòng ở hợp đồng cũ để đổi'
+                          : 'Xoá dòng'
+                      }
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -1192,9 +1236,8 @@ export function InvoiceEditor(p: Props) {
             return (
               <div key={kind} className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-semibold text-foreground">{label}</h3>
+                  <h3 className="text-[13px] font-medium text-foreground">{label}</h3>
                   <Button
-                    size="sm"
                     variant="outline"
                     onClick={() =>
                       setLines([
@@ -1209,7 +1252,7 @@ export function InvoiceEditor(p: Props) {
                         },
                       ])
                     }
-                    className="h-8 gap-1.5 rounded-xl border-border/80 text-xs font-medium"
+                    className="gap-1.5 border-border/80"
                   >
                     <Plus className="size-3.5" />
                     <span>Thêm</span>
@@ -1219,8 +1262,8 @@ export function InvoiceEditor(p: Props) {
                   <table className="w-full text-[13px]">
                     <thead className="border-b border-border/70 text-[13px] font-medium text-muted-foreground">
                       <tr>
-                        <th className="px-3 py-2 text-left">Mô tả</th>
-                        <th className="w-36 px-3 py-2 text-right">Số tiền</th>
+                        <th className="px-3 py-2.5 text-left">Mô tả</th>
+                        <th className="w-40 px-3 py-2.5 text-right">Số tiền</th>
                         <th className="w-10" />
                       </tr>
                     </thead>
@@ -1233,7 +1276,7 @@ export function InvoiceEditor(p: Props) {
                               placeholder="Nhập mô tả"
                               value={l.description}
                               onChange={(e) => set(i, { description: e.target.value })}
-                              className="h-8 w-full rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground focus:border-primary focus:outline-none"
+                              className="h-9 w-full rounded-lg border border-border/80 bg-background px-2.5 text-sm text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
                             />
                           </td>
                           <td className="p-2">
@@ -1247,7 +1290,7 @@ export function InvoiceEditor(p: Props) {
                                   unitPrice: kind === 'discount' ? -n : n,
                                 })
                               }}
-                              className="h-8 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground focus:border-primary focus:outline-none"
+                              className="h-9 w-full rounded-lg border border-border/80 bg-background px-2 text-right text-sm tabular-nums text-foreground transition-colors focus:border-primary focus:outline-none"
                             />
                           </td>
                           <td className="p-2 text-center">
@@ -1256,6 +1299,7 @@ export function InvoiceEditor(p: Props) {
                               title="Xoá dòng"
                               onClick={() => setLines(lines.filter((_, j) => j !== i))}
                               className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                              aria-label="Xoá dòng"
                             >
                               <Trash2 className="size-3.5" />
                             </button>
@@ -1264,7 +1308,7 @@ export function InvoiceEditor(p: Props) {
                       ))}
                       {rows.length === 0 && (
                         <tr>
-                          <td colSpan={3} className="p-3 text-center text-muted-foreground">
+                          <td colSpan={3} className="p-4 text-center text-[13px] text-muted-foreground">
                             Chưa có
                           </td>
                         </tr>
@@ -1314,6 +1358,11 @@ export function InvoiceEditor(p: Props) {
             </dt>
             <dd className="text-base font-bold tabular-nums text-primary">{formatVND(Math.abs(total))}</dd>
           </div>
+          {p.status === 'draft' && total < 0 && lines.some(isTransferIn) && (
+            <p className="text-xs text-muted-foreground">
+              Khi duyệt, {formatVND(Math.abs(total))} đ vào ví khách và hoá đơn về 0.
+            </p>
+          )}
         </dl>
       </section>
 

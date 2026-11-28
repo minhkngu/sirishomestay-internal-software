@@ -16,10 +16,11 @@ import { Input } from '@/components/ui/input'
 import { summarize, type LedgerRow } from '@/domain/cashbook'
 import { formatDateVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
-import { PAYMENT_METHOD_LABELS, type PaymentMethod } from '@/domain/payment-labels'
+import { PAYMENT_METHOD_DISPLAY_LABELS } from '@/domain/payment-labels'
 import { cn } from '@/lib/utils'
 import { deleteDepositEntryAction } from '@/modules/leasing/actions'
-import { deleteExpenseAction, deletePaymentAction } from '../server/cashbook/actions'
+import { deleteExpenseAction } from '../server/cashbook/actions'
+import { RemovePaymentDialog } from './remove-payment-dialog'
 import { DepositDialog, CollectRentDialog, type LeaseTarget } from './lease-dialogs'
 import { ExpenseDialog, type ExpenseDraft, type RoomOption } from './expense-dialog'
 import { EditEntryDialog } from './edit-entry-dialog'
@@ -100,28 +101,17 @@ export function CashbookList({
   const { pageRows, pager } = usePager(filtered, 'cashbook', `${kind}|${month}|${text}|${selected.join(',')}`)
 
   const remove = async (row: LedgerRow) => {
-    const r =
-      row.source === 'payment'
-        ? await deletePaymentAction(row.id)
-        : row.source === 'deposit'
-          ? await deleteDepositEntryAction(row.id)
-          : await deleteExpenseAction(row.id)
+    const r = row.source === 'deposit' ? await deleteDepositEntryAction(row.id) : await deleteExpenseAction(row.id)
     if (!r.ok) {
       toast.error(r.error)
       return
     }
-    toast.success(
-      row.source === 'payment'
-        ? 'Đã xoá khoản thu'
-        : row.source === 'deposit'
-          ? 'Đã xoá khoản cọc'
-          : 'Đã xoá khoản chi',
-    )
+    toast.success(row.source === 'deposit' ? 'Đã xoá khoản cọc' : 'Đã xoá khoản chi')
     router.refresh()
   }
 
   const actions = (r: LedgerRow) =>
-    r.source === 'expense' ? (
+    r.source === 'wallet' ? null : r.source === 'expense' ? (
       <div className="flex justify-end gap-1">
         <Button
           type="button"
@@ -283,7 +273,7 @@ export function CashbookList({
                   </div>
                   {r.method && (
                     <div className="text-xs text-muted-foreground">
-                      {PAYMENT_METHOD_LABELS[r.method as PaymentMethod] ?? r.method}
+                      {PAYMENT_METHOD_DISPLAY_LABELS[r.method] ?? r.method}
                     </div>
                   )}
                 </td>
@@ -341,22 +331,17 @@ export function CashbookList({
       {dialog === 'rent' && <CollectRentDialog open onOpenChange={(o) => !o && setDialog(null)} leases={leases} />}
       {dialog === 'deposit' && <DepositDialog open onOpenChange={(o) => !o && setDialog(null)} leases={leases} />}
       {editingEntry && <EditEntryDialog row={editingEntry} open onOpenChange={(o) => !o && setEditingEntry(null)} />}
+      {removing?.source === 'payment' && (
+        <RemovePaymentDialog paymentId={removing.id} open onOpenChange={(o) => !o && setRemoving(null)} />
+      )}
       <ConfirmDialog
-        open={!!removing}
+        open={!!removing && removing.source !== 'payment'}
         onOpenChange={(o) => !o && setRemoving(null)}
-        title={
-          removing?.source === 'payment'
-            ? 'Xoá khoản thu?'
-            : removing?.source === 'deposit'
-              ? 'Xoá khoản cọc?'
-              : 'Xoá khoản chi?'
-        }
+        title={removing?.source === 'deposit' ? 'Xoá khoản cọc?' : 'Xoá khoản chi?'}
         description={
-          removing?.source === 'payment'
-            ? 'Khoản thu bị gỡ, dư nợ hoá đơn tăng lại. Có ghi nhật ký.'
-            : removing?.source === 'deposit'
-              ? 'Dòng sổ cọc bị gỡ, cọc đang giữ được tính lại. Có ghi nhật ký.'
-              : 'Khoản chi sẽ bị gỡ khỏi sổ quỹ, có ghi nhật ký.'
+          removing?.source === 'deposit'
+            ? 'Dòng sổ cọc bị gỡ, cọc đang giữ được tính lại. Có ghi nhật ký.'
+            : 'Khoản chi sẽ bị gỡ khỏi sổ quỹ, có ghi nhật ký.'
         }
         confirmLabel="Xoá"
         destructive

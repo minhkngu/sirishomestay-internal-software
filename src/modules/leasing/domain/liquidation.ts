@@ -40,11 +40,15 @@ export type TerminationInput = {
   /** thiếu = hoàn theo ngày */
   rentRefund?: RentRefundInput
   proration: Proration
+  /** Số dư ví của khách tại cơ sở: toàn bộ ví gạch vào hoá đơn (dòng giảm), tăng tiền hoàn hoặc giảm phần phải trả. */
+  walletBalance?: number
+  /** Chuyển phòng: thêm dòng "Chuyển sang hợp đồng mới" bằng −T để hoá đơn về 0, không phát sinh hoàn tiền mặt. */
+  transfer?: boolean
 }
 
 /**
  * Hoá đơn thanh lý. total > 0: khách phải trả thêm; total < 0: hoàn cho khách.
- * Tiền phòng đã trả trước vượt `endDate` → dòng hoàn (âm); dòng trừ cọc = −(số dư cọc − phần mất cọc).
+ * Tiền phòng đã trả trước từ ngày `endDate` trở đi → dòng hoàn (âm); dòng trừ cọc = −(số dư cọc − phần mất cọc).
  */
 export function buildTerminationInvoice(input: TerminationInput): {
   lines: InvoiceLineInput[]
@@ -52,7 +56,10 @@ export function buildTerminationInvoice(input: TerminationInput): {
   /** tổng tiền hoàn theo ngày (tiền phòng + phí cố định), tính cả khi chọn không hoàn hoặc hoàn một phần */
   maxRefund: number
 } {
-  const { terms, endDate } = input
+  const { terms } = input
+  // Ngày trả phòng (hoặc chuyển phòng) thuộc về hôm sau: tiền theo ngày tính đến hết hôm trước, hoàn từ chính ngày trả.
+  // Chỉ số đồng hồ vẫn chốt theo ngày trả (do người gọi tính).
+  const billedTo = addDays(input.endDate, -1)
   const lines: InvoiceLineInput[] = []
 
   // tiền phòng và phí cố định đã trả trước vượt ngày trả → các dòng hoàn theo ngày (ứng viên), áp lựa chọn rentRefund bên dưới;
@@ -61,12 +68,11 @@ export function buildTerminationInvoice(input: TerminationInput): {
     (i) => i.status === 'approved' && i.lines.some((l) => l.type === 'rent'),
   )
   const refundCandidates: InvoiceLineInput[] = []
-  const dayAfterEnd = addDays(endDate, 1)
   let covered: ISODate | null = null
   for (const inv of rentInvoices) {
     if (!covered || inv.periodEnd > covered) covered = inv.periodEnd
-    if (inv.periodEnd > endDate) {
-      const from = dayAfterEnd > inv.periodStart ? dayAfterEnd : inv.periodStart
+    if (inv.periodEnd > billedTo) {
+      const from = input.endDate > inv.periodStart ? input.endDate : inv.periodStart
       const sum = prorateFraction(from, inv.periodEnd, input.proration)
       const amount = -Math.round(terms.monthlyRent * sum)
       if (amount !== 0) {
@@ -82,9 +88,9 @@ export function buildTerminationInvoice(input: TerminationInput): {
       for (const l of inv.lines) {
         const metaFrom = l.meta?.from
         const metaTo = l.meta?.to
-        if (l.type !== 'fee' || typeof metaFrom !== 'string' || typeof metaTo !== 'string' || metaTo <= endDate)
+        if (l.type !== 'fee' || typeof metaFrom !== 'string' || typeof metaTo !== 'string' || metaTo <= billedTo)
           continue
-        const feeFrom = dayAfterEnd > metaFrom ? dayAfterEnd : metaFrom
+        const feeFrom = input.endDate > metaFrom ? input.endDate : metaFrom
         const feeSum = prorateFraction(feeFrom, metaTo, input.proration)
         const feeAmount = -Math.round(l.quantity * l.unitPrice * feeSum)
         if (feeAmount === 0) continue
@@ -115,11 +121,11 @@ export function buildTerminationInvoice(input: TerminationInput): {
       })
     }
   }
-  if (!covered || covered < endDate) {
-    const monthStart = `${endDate.slice(0, 7)}-01`
+  if (!covered || covered < billedTo) {
+    const monthStart = `${billedTo.slice(0, 7)}-01`
     const base = covered ? addDays(covered, 1) : monthStart
     const from = base > terms.startDate ? base : terms.startDate
-    const sum = prorateFraction(from, endDate, input.proration)
+    const sum = prorateFraction(from, billedTo, input.proration)
     if (sum > 0) {
       lines.push({
         type: 'rent',
@@ -128,7 +134,7 @@ export function buildTerminationInvoice(input: TerminationInput): {
         unitPrice: terms.monthlyRent,
         amount: Math.round(terms.monthlyRent * sum),
         // Thời gian nằm ở cột thời gian của dòng, không ghi trong mô tả
-        meta: { from, to: endDate, coefficient: Math.round(sum * 10000) / 10000 },
+        meta: { from, to: billedTo, coefficient: Math.round(sum * 10000) / 10000 },
       })
     }
   }
@@ -173,6 +179,8 @@ export function buildTerminationInvoice(input: TerminationInput): {
       quantity: 1,
       unitPrice: input.unpaidTotal,
       amount: input.unpaidTotal,
+      // Hệ thống tính lại theo nợ thật lúc duyệt: người dùng không sửa, không xoá
+      meta: { unpaid: true },
     })
   }
 
@@ -203,6 +211,28 @@ export function buildTerminationInvoice(input: TerminationInput): {
       meta: { forfeit: forfeited },
     })
   }
+  // Ví khách tự gạch vào hoá đơn: toàn bộ số dư, để khách không rời đi mà còn ví không ai hoàn được
+  const walletUse = Math.max(0, input.walletBalance ?? 0)
+  if (walletUse > 0)
+    lines.push({
+      type: 'adjustment',
+      description: `Số dư ví khách: ${walletUse.toLocaleString('vi-VN')}`,
+      quantity: 1,
+      unitPrice: -walletUse,
+      amount: -walletUse,
+      meta: { wallet: walletUse },
+    })
+  // Chuyển phòng: T = tổng trước dòng chuyển; dòng chuyển = −T đưa hoá đơn về 0 (T > 0 nợ, T < 0 còn số dư, sang hợp đồng mới)
+  const carried = lines.reduce((s, l) => s + l.amount, 0)
+  if (input.transfer && carried !== 0)
+    lines.push({
+      type: 'adjustment',
+      description: 'Chuyển sang hợp đồng mới',
+      quantity: 1,
+      unitPrice: -carried,
+      amount: -carried,
+      meta: { transfer: true },
+    })
   return { lines, total: lines.reduce((s, l) => s + l.amount, 0), maxRefund }
 }
 

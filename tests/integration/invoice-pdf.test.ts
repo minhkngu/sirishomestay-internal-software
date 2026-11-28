@@ -48,7 +48,7 @@ describe('PDF hoá đơn và phiếu thu', () => {
     expect(text).toContain('THUONG HIEU MOI')
     expect(text).toContain('PHIEU THU TIEN')
     expect(text).toContain('CAM ON QUY KHACH')
-    expect(text).not.toContain('Quét mã để chuyển khoản')
+    expect(text).not.toContain('Quét để chuyển khoản')
     expect(text.indexOf('Tiền phòng')).toBeLessThan(text.indexOf('Khách thuê'))
   })
   it('đưa logo PNG vào bản PDF', async () => {
@@ -84,7 +84,7 @@ describe('PDF hoá đơn và phiếu thu', () => {
       'Hoá đơn tháng 12/2026',
       '9.380.000',
       'Chín triệu ba trăm tám mươi nghìn đồng',
-      'Quét mã để chuyển khoản',
+      'Quét để chuyển khoản',
       'TD-HD-202612-0001',
       'Nguyễn Thị Thu',
     ])
@@ -111,11 +111,11 @@ describe('PDF hoá đơn và phiếu thu', () => {
   it('không có tài khoản vẫn xuất PDF', async () => {
     const text = await textOf(await renderInvoicePdf({ ...invoice, bank: null }))
     expect(text).toContain('Hoá đơn tháng 12/2026')
-    expect(text).not.toContain('Quét mã để chuyển khoản')
+    expect(text).not.toContain('Quét để chuyển khoản')
   })
   it('thanh lý dương đầy đủ nội dung và có QR', async () => {
     const text = await textOf(await renderInvoicePdf({ ...invoice, kind: 'termination' }))
-    for (const value of ['Hoá đơn thanh lý', 'Tiền phòng', '9.380.000', 'Quét mã để chuyển khoản', 'Vietcombank'])
+    for (const value of ['Hoá đơn thanh lý', 'Tiền phòng', '9.380.000', 'Quét để chuyển khoản', 'Vietcombank'])
       expect(text).toContain(value)
   })
   it('thanh lý âm có khoản hoàn và thông tin tài khoản, không QR', async () => {

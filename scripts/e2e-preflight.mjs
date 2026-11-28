@@ -24,7 +24,7 @@ try {
   fail(`không kết nối được ${baseURL}/login (${e.cause?.code ?? e.message})`)
 }
 if (!res.ok) fail(`${baseURL}/login trả về HTTP ${res.status}`)
-if (!(await res.text()).includes('Môi trường thử'))
+if (!(await res.text()).includes('Đăng nhập nhanh bằng tài khoản mẫu'))
   fail(`${baseURL} không bật chế độ thử (NEXT_PUBLIC_DEMO_MODE=1), test đăng nhập nhanh sẽ hỏng`)
 
 console.log(`e2e preflight: ok (${baseURL})`)

@@ -9,7 +9,8 @@ import { formatPhoneDisplay } from '@/domain/phone'
 import { TENANT_KIND_LABELS } from '@/domain/tenant-kind'
 import { orNotFound } from '@/lib/or-not-found'
 import { cn } from '@/lib/utils'
-import { listLeases } from '@/modules/leasing'
+import { listLeases, listWalletView } from '@/modules/leasing'
+import { WalletPanel } from '@/modules/leasing/ui'
 import { getAccessContext, listFiles } from '@/modules/platform'
 import { getTenant } from '@/modules/tenants'
 import { TenantDeleteButton, TenantDocuments, TenantEditButton } from '@/modules/tenants/ui'
@@ -31,9 +32,14 @@ export default async function TenantDetail({ id, embedded = false }: { id: strin
       throw e
     }),
   )
-  const [docs, contracts] = await Promise.all([
+  const [docs, contracts, wallet] = await Promise.all([
     listFiles(db, ctx, 'tenant_document', id),
     listLeases(db, ctx, { tenantId: id }),
+    // Không có quyền thu tiền thì không hiện khối ví
+    listWalletView(db, ctx, id).catch((e) => {
+      if (e instanceof ForbiddenError) return null
+      throw e
+    }),
   ])
 
   const displayName = tenant.fullName || tenant.companyName || 'Khách thuê'
@@ -139,6 +145,8 @@ export default async function TenantDetail({ id, embedded = false }: { id: strin
           </div>
         )}
       </section>
+
+      {wallet && <WalletPanel balance={wallet.balance} entries={wallet.entries} />}
 
       {/* Contracts Section */}
       <section className="space-y-3 rounded-2xl border border-border/80 bg-card p-5">

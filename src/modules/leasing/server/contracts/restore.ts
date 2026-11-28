@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, ne, notInArray, sql } from 'drizzle-orm'
 import {
   addenda,
   contractVersions,
@@ -20,12 +20,14 @@ import {
   pendingAdjustments,
   rooms,
   tenants,
+  tenantWalletEntries,
 } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, can, facilityKey, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { formatDateVN, todayVN } from '@/domain/dates'
 import { recordAudit } from '@/modules/platform'
+import { settleRemovedPayments } from '../wallet/service'
 import type { StorageAdapter } from '@/modules/platform'
 
 type Kind = 'lease' | 'deposit'
@@ -51,7 +53,38 @@ export type RestorePreview = {
   operation: string
   items: { type: string; id: string; label: string }[]
   blockedReason: string | null
+  /** Hợp đồng đã chuyển phòng: xác nhận khôi phục sẽ huỷ chuyển phòng (khôi phục thanh lý + xoá hợp đồng mới) */
+  roomChange: boolean
   token: string
+}
+
+/**
+ * Chuyển phòng đã duyệt hoá đơn thanh lý, hoặc hợp đồng mới đã có hoá đơn duyệt / khoản thu: hoàn tác phải xoá cả dữ liệu
+ * đã chốt (sổ ví, khoản chuyển, thu tiền), nên chỉ admin được làm.
+ */
+export async function roomChangeNeedsAdmin(db: DB, oldLeaseId: string, nextLeaseId: string): Promise<boolean> {
+  const [termination] = await db
+    .select({ status: invoices.status })
+    .from(invoices)
+    .where(and(eq(invoices.leaseId, oldLeaseId), eq(invoices.kind, 'termination')))
+  if (termination && termination.status !== 'draft') return true
+  const nextInvoices = await db
+    .select({ id: invoices.id, status: invoices.status })
+    .from(invoices)
+    .where(eq(invoices.leaseId, nextLeaseId))
+  if (nextInvoices.some((i) => i.status === 'approved')) return true
+  if (!nextInvoices.length) return false
+  const [paid] = await db
+    .select({ id: payments.id })
+    .from(payments)
+    .where(
+      inArray(
+        payments.invoiceId,
+        nextInvoices.map((i) => i.id),
+      ),
+    )
+    .limit(1)
+  return !!paid
 }
 
 /** Read-only preview. A later mutation must re-read it under locks and compare the token. */
@@ -60,6 +93,7 @@ export async function previewContractRestore(
   ctx: AccessContext,
   kind: Kind,
   id: string,
+  opts: { allowRoomChange?: boolean } = {},
 ): Promise<RestorePreview> {
   if (kind !== 'lease' && kind !== 'deposit') throw new ValidationError('Loại hợp đồng không hợp lệ')
   const table = kind === 'lease' ? leases : depositContracts
@@ -135,6 +169,14 @@ export async function previewContractRestore(
       id: x.id,
       label: `${formatDateVN(x.paidOn)} · ${x.amount}`,
     })),
+    ...(() => {
+      const moved = added(payRows, snapshot.payments)
+        .filter((x) => x.method !== 'wallet' && x.method !== 'carry')
+        .reduce((n, x) => n + x.amount, 0)
+      return moved > 0
+        ? [{ type: 'wallet', id: 'wallet', label: `Chuyển vào ví khách: ${moved.toLocaleString('vi-VN')}` }]
+        : []
+    })(),
     ...added(entries, snapshot.entries).map((x) => ({
       type: 'deposit',
       id: x.id,
@@ -250,10 +292,46 @@ export async function previewContractRestore(
     })
   items.sort((a, b) => a.type.localeCompare(b.type) || a.id.localeCompare(b.id))
   let blockedReason: string | null = null
+  let roomChange = false
   if (version.operation !== 'termination' && contract.status !== snapshot.contract.status)
     blockedReason = 'Trạng thái hợp đồng đã thay đổi sau lần sửa; không thể khôi phục tự động'
   if (added(addons, snapshot.addenda).some((addon) => addon.type === 'transfer' || addon.type === 'occupants'))
     blockedReason = 'Có phụ lục chuyển phòng hoặc thay đổi người ở chưa hỗ trợ hoàn tác tự động'
+  if (kind === 'lease') {
+    // Chuyển phòng: hợp đồng mới và ví khách đã đi theo; chỉ "Huỷ chuyển phòng" (hoá đơn còn nháp) được khôi phục
+    const [moved] = await db.select({ id: leases.id }).from(leases).where(eq(leases.transferFromLeaseId, id)).limit(1)
+    if (moved && !opts.allowRoomChange) {
+      roomChange = true
+      items.push({
+        type: 'lease',
+        id: moved.id,
+        label: 'Hợp đồng mới ở phòng mới · xoá cùng hoá đơn, điều chỉnh của hợp đồng đó',
+      })
+      // Tiền thật đã thu ở hợp đồng mới không mất: chuyển vào ví khách
+      const [newPaid] = await db
+        .select({ n: sql<number>`coalesce(sum(${payments.amount}), 0)::float8` })
+        .from(payments)
+        .innerJoin(invoices, eq(invoices.id, payments.invoiceId))
+        .where(and(eq(invoices.leaseId, moved.id), notInArray(payments.method, ['wallet', 'carry'])))
+      if (newPaid && newPaid.n > 0)
+        items.push({
+          type: 'wallet',
+          id: 'wallet',
+          label: `Chuyển vào ví khách: ${newPaid.n.toLocaleString('vi-VN')}`,
+        })
+      // Hoá đơn thanh lý đã duyệt hoặc hợp đồng mới đã có hoá đơn duyệt, khoản thu: chỉ admin hoàn tác được
+      if ((await roomChangeNeedsAdmin(db, id, moved.id)) && !ctx.isAdmin)
+        blockedReason = 'Chuyển phòng đã duyệt hoặc đã phát sinh thu tiền: chỉ admin hoàn tác được'
+    } else {
+      const [walletUsed] = await db
+        .select({ id: tenantWalletEntries.id })
+        .from(tenantWalletEntries)
+        .where(and(eq(tenantWalletEntries.leaseId, id), eq(tenantWalletEntries.kind, 'use_termination')))
+        .limit(1)
+      if (walletUsed && !opts.allowRoomChange)
+        blockedReason = 'Hoá đơn thanh lý đã trừ ví khách; không thể khôi phục tự động'
+    }
+  }
   if (kind === 'lease' && snapshot.contract.status === 'active') {
     const [busy] = await db
       .select({ id: leases.id })
@@ -314,7 +392,7 @@ export async function previewContractRestore(
       }),
     )
     .digest('hex')
-  return { versionId: version.id, operation: version.operation, items, blockedReason, token }
+  return { versionId: version.id, operation: version.operation, items, blockedReason, roomChange, token }
 }
 
 /** Hoàn lại phí dịch vụ và đồng hồ gắn phí về như lúc chụp: xoá phí đã thêm, thêm lại phí đã bỏ, trả đơn giá cũ. */
@@ -364,6 +442,7 @@ export async function restoreContract(
   id: string,
   previewToken: string,
   storage: StorageAdapter,
+  opts: { allowRoomChange?: boolean } = {},
 ): Promise<{ pendingFiles: number }> {
   const fileIds = await db.transaction(
     async (raw) => {
@@ -371,7 +450,7 @@ export async function restoreContract(
       const table = kind === 'lease' ? leases : depositContracts
       const [current] = await tx.select().from(table).where(eq(table.id, id)).for('update')
       if (!current) throw new NotFoundError()
-      const preview = await previewContractRestore(tx, ctx, kind, id)
+      const preview = await previewContractRestore(tx, ctx, kind, id, opts)
       if (preview.token !== previewToken)
         throw new ValidationError('Dữ liệu đã thay đổi; hãy xem lại trước khi xác nhận')
       if (preview.blockedReason) throw new ValidationError(preview.blockedReason)
@@ -423,6 +502,21 @@ export async function restoreContract(
               affectedFiles.map((f) => f.id),
             ),
           )
+      // Khôi phục không có nghĩa là tiền chưa từng thu: tiền thật chuyển vào ví khách; khoản gộp vào thanh lý chỉ là bút toán nội bộ
+      if (paymentIds.length) {
+        const methods = await tx
+          .select({ id: payments.id, method: payments.method })
+          .from(payments)
+          .where(inArray(payments.id, paymentIds))
+        await settleRemovedPayments(
+          tx,
+          ctx,
+          methods.filter((p) => p.method !== 'carry').map((p) => p.id),
+          { kind: 'to_wallet' },
+          'Khôi phục hợp đồng',
+          { allowNegative: true },
+        )
+      }
       if (paymentIds.length) await tx.delete(payments).where(inArray(payments.id, paymentIds))
       if (invoiceIds.length) {
         await tx.update(oneOffCharges).set({ invoiceId: null }).where(inArray(oneOffCharges.invoiceId, invoiceIds))

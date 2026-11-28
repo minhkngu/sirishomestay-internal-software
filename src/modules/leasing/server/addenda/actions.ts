@@ -17,6 +17,7 @@ import {
   setAddendumSignStatus,
   type AddendumKind,
 } from './service'
+import { cancelRoomChange, createRoomChange, roomChangeBlockers, roomChangeMeters } from './room-change'
 
 const refresh = () => {
   revalidatePath('/contracts', 'layout')
@@ -64,6 +65,30 @@ export async function createAssignmentAction(leaseId: string, input: unknown) {
     const r = summary(await createAssignment(db, ctx, leaseId, input))
     refresh()
     return r
+  })
+}
+export async function createRoomChangeAction(leaseId: string, input: unknown) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => {
+    const r = await createRoomChange(db, ctx, leaseId, input)
+    refresh()
+    return r
+  })
+}
+export async function roomChangeBlockerAction(leaseId: string) {
+  const ctx = await getAccessContext()
+  return toActionResult(() => roomChangeBlockers(db, ctx, leaseId))
+}
+export async function roomChangeMetersAction(leaseId: string, newRoomId: string) {
+  const ctx = await getAccessContext()
+  return toActionResult(() => roomChangeMeters(db, ctx, leaseId, newRoomId))
+}
+export async function cancelRoomChangeAction(oldLeaseId: string) {
+  const ctx = await getAccessContext()
+  return toActionResult(async () => {
+    await cancelRoomChange(db, ctx, oldLeaseId, getStorage())
+    refresh()
+    return { pendingFiles: 0 }
   })
 }
 export async function createTerminationAction(leaseId: string, input: unknown) {

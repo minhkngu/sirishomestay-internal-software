@@ -32,14 +32,17 @@ export const invoiceTemplates = pgTable(
     /** Bản xem PDF dựng sẵn (base64) và phiên bản bộ dựng đã dùng; null nghĩa là chưa dựng. */
     previewPdf: text('preview_pdf'),
     previewVersion: integer('preview_version'),
+    /** Loại hoá đơn dùng mẫu: 'standard' (tháng, kỳ đầu, lập tay), 'termination' (thanh lý), 'room_change' (chuyển phòng). */
+    kind: text('kind').notNull().default('standard'),
     isDefault: boolean('is_default').notNull().default(false),
     isSystem: boolean('is_system').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    // Mỗi loại hoá đơn có tối đa một mẫu mặc định
     uniqueIndex('invoice_templates_one_default')
-      .on(t.isDefault)
+      .on(t.kind, t.isDefault)
       .where(sql`${t.isDefault}`),
   ],
 ).enableRLS()

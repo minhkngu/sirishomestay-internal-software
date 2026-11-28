@@ -70,6 +70,21 @@ Luật:
 - **Phí hợp đồng:** lưu ở `lease_fee_snapshots` (chụp giá lúc ký). Điện, nước là dòng phí gắn đúng một đồng hồ của phòng (bảng `lease_fee_meters`; mức dùng tính ở `src/modules/leasing/domain/meter-fee-usage.ts`), đơn giá lấy từ hợp đồng; không còn kiểu cũ (`lease_fees`, `feeModel`, bảng giá cơ sở `utility_rates`).
 - **Hợp đồng cọc → hợp đồng thuê:** mỗi phòng tối đa 1 hợp đồng cọc `pending` và 1 hợp đồng `active` (unique index có điều kiện trong `src/db/schema/contracts.ts`).
 - **Lịch sử/khôi phục hợp đồng:** mỗi lần sửa/xoá chụp bản ghi vào `contract_versions` (`server/contracts/history.ts`, `restore.ts`).
+- **Ví khách** (`tenant_wallet_entries`, `leasing/server/wallet/service.ts`): một ví cho mỗi khách (người thuê chính), dùng ở mọi cơ sở; `facility_id` của biến động là cơ sở phát sinh. Sáu loại biến động (`WalletEntryKind`, nhãn ở `leasing/domain/labels.ts`):
+
+  | Loại | Dấu | Sổ quỹ |
+  |---|---|---|
+  | `overpay` thu dư vào ví | + | thu, ngày khách đưa |
+  | `reallocate` chuyển phiếu thu vào ví | + | thu, ngày thu gốc |
+  | `refund_out` trả lại khách | − | chi, ngày trả |
+  | `carry_surplus` dư chuyển phòng | + | không tính |
+  | `use_invoice` dùng ví trả hoá đơn | − | không tính |
+  | `use_termination` ví gạch vào thanh lý | − | không tính |
+
+  Sổ quỹ (`cashbook`, tầng 5) chỉ **đọc** ví qua `listWalletCashEntries`; `leasing` không ghi bảng `expenses`, nên "trả lại khách" là `refund_out`. Khoản thu `method = wallet` ("Trừ ví") và `carry` ("Gộp vào thanh lý") không phải tiền thật, không vào sổ quỹ. Sổ quỹ xem theo từng cơ sở có thể không khớp từng nơi (dư ghi thu ở cơ sở A, dùng trả nợ ở cơ sở B); tổng toàn công ty khớp. Thu vượt: phần dư vào ví, gắn phiếu tiền mặt cuối của lần thu; ví đã đủ trả nợ mà còn đưa tiền mặt thì từ chối.
+- **Gỡ phiếu thu** (`removePayment` → `settleRemovedPayments`): hỏi **chuyển vào ví** (mặc định, `reallocate` giữ ngày thu gốc, sổ quỹ không đổi), **trả lại khách** (thêm `refund_out`) hoặc **nhập nhầm** (rút tiền dư của phiếu; chỉ admin hoặc người lập phiếu trong cùng ngày). Phiếu `wallet` gỡ thì trả lại ví; phiếu `carry` không gỡ tay được. Xoá hợp đồng chọn chuyển vào ví hoặc nhập nhầm (mặc định); khôi phục hợp đồng luôn chuyển vào ví.
+- **Đóng nợ cũ ở mọi thanh lý** (`settleOldInvoices`): duyệt hoá đơn thanh lý tính lại dòng "Nợ cũ" (`meta.unpaid`, khoá không sửa) theo nợ thật rồi ghi khoản `carry` đóng các hoá đơn tháng; bỏ duyệt xoá các khoản này. Mọi thanh lý tính tiền đến hết ngày trước ngày trả, hoàn từ chính ngày trả.
+- **Chuyển phòng hai bước** (`leasing/server/addenda/room-change.ts`): thanh lý hợp đồng cũ rồi tạo hợp đồng mới trong một giao dịch, gắn bằng `leases.transferFromLeaseId`. Chỉ chuyển được khi hợp đồng cũ hết nợ và không còn hoá đơn tháng nháp (`roomChangeBlockers`, popup báo ngay khi mở, duyệt thanh lý kiểm lại). Cả hai hợp đồng bắt đầu/kết thúc đúng ngày chuyển, ngày chuyển thuộc phòng mới. Hoá đơn thanh lý có dòng "Chuyển sang hợp đồng mới" (`rebalanceTransferLine`) đưa tổng về 0; duyệt thì kết quả T cộng dồn sang hợp đồng mới thành điều chỉnh chờ `transfer:<mã hợp đồng cũ>`; nếu T âm lớn hơn hoá đơn đầu thì duyệt hoá đơn đó đưa về 0 và phần dư vào ví (`carry_surplus`). Đồng hồ phòng mới do người dùng chọn cho từng phí (`newRoomReadings`). Huỷ chuyển phòng chuyển tiền thật đã thu ở hợp đồng mới vào ví khách. Phụ lục `transfer` cũ vẫn đọc được, không còn tạo mới từ giao diện.
 - **Ghi chéo trong một transaction:** hàm hậu tố `InTransaction` (`createAssetInTransaction`, `moveAssetsInTransaction`, `setAssetStatusInTransaction`, `startHandoverInTransaction`) nhận `tx` để module khác gọi trong cùng transaction. Giữ mẫu này khi cần ghi qua module.
 - **Phòng mới có sẵn đồng hồ điện, nước:** `createRoom`/`createRoomsBulk` (facilities, tầng 2) không import meters (tầng 3); facilities mở điểm móc `registerRoomsCreatedHook(name, hook)`, chạy mọi hook trong cùng transaction tạo phòng (`hook(tx, roomIds, ngày)`), meters đăng ký `createDefaultMeters` vào đó. Hook lỗi thì phòng cũng không được tạo. Gọi service tạo phòng mà chưa nạp `src/modules/registrations.ts` (vd trong test) thì phòng không có đồng hồ; test `tests/integration/rooms-created-hook.test.ts`.
 - **Dữ liệu demo:** cột `isDemo` đánh dấu dữ liệu giả của `npm run db:seed`.
@@ -83,6 +98,7 @@ Luật:
 | `cascade-delete.ts` (xoá cơ sở/phòng) ghi bảng của hợp đồng, hoá đơn… | Vi phạm luật "ghi bảng module khác" | Ngoại lệ có chủ ý vì DB không có `ON DELETE CASCADE`; không "sửa" bằng cách thêm cascade trong schema nếu chưa bàn |
 | `NEXT_PUBLIC_*` đọc kiểu `process.env[name]` | Không được nhúng vào bundle trình duyệt, đăng nhập hỏng | Luôn viết literal `process.env.NEXT_PUBLIC_X` (gom ở `src/lib/env.ts`) |
 | Lưu trữ: `STORAGE_DRIVER` mặc định `supabase`; thiếu biến Supabase thì rơi về **bộ nhớ trong** (tệp mất khi khởi động lại) | Tưởng đã lưu ảnh nhưng không | Kiểm biến khi chạy thật; `r2` thiếu biến thì báo lỗi |
+| `unapproveInvoice` chỉ đưa hoá đơn về nháp, không mở lại hợp đồng và không đảo sổ cọc, ví | Bỏ duyệt hoá đơn thanh lý làm hợp đồng ended mà hoá đơn nháp | Hoá đơn thanh lý có dòng ví hoặc chuyển phòng bị chặn bỏ duyệt; chuyển phòng chưa duyệt thì dùng Huỷ chuyển phòng (nút Khôi phục hợp đồng cũ); đã duyệt hoặc hợp đồng mới đã có hoá đơn duyệt, khoản thu thì chỉ admin hoàn tác được: xoá hợp đồng mới cùng hoá đơn, tiền thật đã thu chuyển vào ví, trả ví đã gạch, nợ cũ về như trước duyệt |
 | Next.js 16 khác bản quen thuộc | Viết theo trí nhớ dễ sai API | Đọc `node_modules/next/dist/docs/` trước (xem `AGENTS.md`) |
 | `@napi-rs/canvas`, `pdfkit` cần đóng gói đặc biệt trên Vercel | Xuất PNG/PDF hỏng trên production | Giữ `serverExternalPackages` và `outputFileTracingIncludes` trong `next.config.ts` |
 

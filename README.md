@@ -18,7 +18,8 @@ Công nghệ: Next.js 16 (App Router), React 19, TypeScript, Tailwind v4 + shadc
 - Phí theo số người ở thêm vào hoá đơn lấy số người ở hiện có của hợp đồng làm số lượng ban đầu; hoá đơn đã có không tự đổi khi hợp đồng đổi người ở.
 - **Hoá đơn thanh lý**: mã dạng `<cơ sở>-TL-<YYYYMM>-<số>`. Dòng hoàn tiền phòng và phí đã trả trước chỉ có khi thật sự có tiền hoàn. Cọc ghi rõ "Hoàn cọc cho khách (trừ vào hoá đơn)" và "Mất cọc (Siris giữ, không hoàn khách)". Dòng phạt do thanh lý tạo chỉ thuộc hoá đơn đó (bỏ dòng hoặc hoàn tác thì xoá luôn). Dòng điện nước ghi số đầu, số cuối và in vào mô tả trên PDF.
 - Thu tiền hoá đơn có dòng tiền cọc: tiền thu trả cọc trước, phần cọc thu đủ thì dòng thu cọc chờ trong sổ cọc chuyển Đã xong. Hoá đơn đã thu từ trước khi có cách này chạy `npm run db:sync-invoice-deposits` một lần.
-- Xem PDF, tải ảnh hoá đơn ngay trong popup; mẫu hoá đơn HTML.
+- Xem PDF, tải ảnh hoá đơn ngay trong popup. Danh sách xếp theo ngày tạo mới nhất; chọn nhiều hoá đơn thì thanh nổi ở đáy có Duyệt nháp, Xoá nháp (xoá có hỏi lại). Duyệt, bỏ duyệt và lưu không hỏi xác nhận.
+- **Mẫu hoá đơn theo loại** (trang Mẫu giấy tờ): hoá đơn thường (tháng, kỳ đầu, lập tay), thanh lý, chuyển phòng; mỗi loại có mẫu và mẫu mặc định riêng, xem thử bằng dữ liệu của loại đó. Hoá đơn dùng mẫu chọn riêng, rồi mẫu của hợp đồng (cùng loại), rồi mặc định của loại, rồi mặc định hoá đơn thường. "Khôi phục mẫu mặc định" tạo đủ các mẫu còn thiếu.
 
 **Chỉ số điện nước**
 - Trang **Chỉ số** một danh sách các lần chốt: lọc Toà, Phòng, Loại đồng hồ, Năm → Tháng. Mặc định hiện 15 lần chốt mới nhất; chọn Tất cả hoặc một năm thì xem hết, có phân trang. Sửa, xoá (một hoặc nhiều dòng). Chỉ số ban đầu của hợp đồng hiện cùng danh sách, có nhãn riêng.
@@ -35,9 +36,13 @@ Công nghệ: Next.js 16 (App Router), React 19, TypeScript, Tailwind v4 + shadc
 5. Một đồng hồ có thể có nhiều lần chốt; số đầu của lần sau lấy số cuối của lần chốt gần nhất theo ngày (cùng ngày thì số lớn hơn). Chỉ số ban đầu khi tạo hợp đồng mới không bị so với các lần chốt trước.
 6. **Chốt thanh lý** là một lần chốt loại riêng, có nhãn "chốt thanh lý" ở trang Chỉ số; số đầu mặc định là lần chốt gần nhất và sửa được, hiện 3 lần chốt gần nhất để tham khảo (số đầu đổi thì tô đỏ). Không ghi đè chỉ số đầu hợp đồng, hoàn tác thanh lý xoá lần chốt này.
 
+**Chuyển phòng và ví khách**
+- Chuyển phòng hai bước trong một popup: thanh lý hợp đồng phòng cũ (hoá đơn thanh lý nháp để xem, sửa trước khi duyệt) và tạo hợp đồng mới cho phòng mới. Chặn khi hợp đồng cũ còn hoá đơn nháp hoặc còn nợ; đồng hồ phòng mới chọn ngay trong popup. Còn nợ hay dư của hợp đồng cũ chuyển sang hoá đơn đầu của hợp đồng mới; khoản chuyển tính vào cọc đã thu của hợp đồng mới.
+- Mỗi khách một ví dùng được ở mọi cơ sở (khối "Ví khách" ở trang khách và hợp đồng). Tiền dư (thu thừa, chuyển phòng dư, hoàn thu nhầm) vào ví; ví trừ vào hoá đơn hoặc hoàn lại khách. Gỡ khoản thu chọn chuyển vào ví, hoàn khách hoặc nhập nhầm. Chi tiết quy tắc: [docs/architecture.md](docs/architecture.md).
+
 **Hợp đồng:** sửa người ở ngay trong popup sửa hợp đồng, không tạo phụ lục; sổ cọc trong popup sửa chỉ xem; phụ lục có nút Xem trước (popup PDF); ngày thanh lý không bị ràng buộc với ngày bắt đầu; form tạo và popup sửa dùng chung khối phí; phí theo đồng hồ chọn đồng hồ của phòng và điền chỉ số ban đầu, sửa được; biên bản bàn giao không còn chỉ số đồng hồ. Loại phí: bỏ "Nhập tay"; xoá được trừ khi đang dùng trong hợp đồng còn hiệu lực (hoặc gắn đồng hồ), đơn vị tính sửa tên, xoá được ở Cài đặt, phí đã lưu trữ xoá được.
 
-**Thu chi** (`/cashbook`): sổ chung các khoản thực thu, thực chi (thu tiền thuê, thu và hoàn cọc, chi sửa chữa, điện nước, lương, khác) với dải tổng quan Thu, Chi, Chênh lệch, Cọc đang giữ; lọc theo tháng, cơ sở. Mọi khoản đều sửa, xoá được và có nhật ký; sửa thu tiền thuê không vượt phần còn nợ. Khoản thu hoá đơn có dòng cọc hiện thành hai dòng riêng: Thu cọc và Thu tiền thuê. Khoản chờ thu không hiện; trừ cọc, mất cọc không tính vào thu chi.
+**Thu chi** (`/cashbook`): sổ chung các khoản thực thu, thực chi (thu tiền thuê, thu và hoàn cọc, chi sửa chữa, điện nước, lương, khác) với dải tổng quan Thu, Chi, Chênh lệch, Cọc đang giữ; lọc theo tháng, cơ sở. Mọi khoản đều sửa, xoá được và có nhật ký; sửa thu tiền thuê không vượt phần còn nợ. Khoản thu hoá đơn có dòng cọc hiện thành hai dòng riêng: Thu cọc và Thu tiền thuê. Khoản chờ thu không hiện; trừ cọc, mất cọc, dùng ví và gộp vào thanh lý không tính vào thu chi.
 
 ## Yêu cầu
 
@@ -65,7 +70,7 @@ Công nghệ: Next.js 16 (App Router), React 19, TypeScript, Tailwind v4 + shadc
    npm run dev
    ```
 
-   Mở http://localhost:3000 và đăng nhập. Đặt `NEXT_PUBLIC_DEMO_MODE=1` và `DEMO_PASSWORD` để thấy dải "Môi trường thử" và nút đăng nhập nhanh (Admin, Lan, Minh, Hùng, Vy).
+   Mở http://localhost:3000 và đăng nhập. Đặt `NEXT_PUBLIC_DEMO_MODE=1` và `DEMO_PASSWORD` để thấy khối "Đăng nhập nhanh bằng tài khoản mẫu" (Admin, Lan, Minh, Hùng, Vy).
 
 ## Cấu trúc mã nguồn
 
@@ -123,6 +128,9 @@ Quy tắc (ESLint và `tests/unit/architecture` kiểm, CI chặn PR vi phạm):
 | `npm run build` | build production |
 | `npm run db:generate` / `db:migrate` | sinh / chạy migration |
 | `npm run db:seed` | nạp dữ liệu mẫu |
+| `npm run db:regen` | sinh lại toàn bộ migration từ schema, **xoá thư mục `drizzle/`**; chỉ dùng khi chưa triển khai ở đâu |
+| `npm run db:ensure-utility-fees` | bảo đảm loại phí điện, nước có sẵn |
+| `npm run test:e2e` / `test:perf` | Playwright (cần `E2E_BASE_URL`) / đo tốc độ chuyển trang |
 | `npm run db:sync-invoice-deposits` | đồng bộ sổ cọc với các hoá đơn đã thu có dòng cọc (chạy lại an toàn) |
 
 ## Kiểm thử
@@ -143,12 +151,14 @@ Bố cục: `tests/unit` (quy tắc thuần ở `src/domain` và `src/modules/<m
 | Sửa phí hợp đồng, chỉ số ban đầu | — | `contract-edit-delete` (không ràng buộc với lần chốt, migration `0043`) | `contract-edit-fees` |
 | Thu chi | `domain/cashbook` | `cashbook` (nguồn, hướng, cọc, quyền, sửa, xoá, nhật ký), `lease-payment` | `cashbook` |
 | Loại phí | — | `fees` | — |
+| Chuyển phòng, ví khách | `domain/transfer-line` | `room-change`, `wallet`, `addenda`, `customer-lifecycle` (vòng đời khách từ cọc đến thanh lý) | `addenda` |
+| Mẫu hoá đơn theo loại | `invoice-template` | `invoice-html-templates`, `invoice-template-preview`, `invoice-templates` | `invoice-templates` |
 
-End-to-end chạy trên một môi trường thử có `NEXT_PUBLIC_DEMO_MODE=1` (bản preview Vercel hoặc `npm run dev` với dữ liệu mẫu):
+End-to-end chạy trên một môi trường thử có `NEXT_PUBLIC_DEMO_MODE=1` và dữ liệu mẫu (bản preview Vercel, hoặc `NEXT_PUBLIC_DEMO_MODE=1 npm run dev` sau `npm run db:seed`). Test tạo thêm dữ liệu ở môi trường đó:
 
 ```bash
 node scripts/e2e-preflight.mjs
-E2E_BASE_URL=https://<preview> npm run test:e2e
+E2E_BASE_URL=https://<preview> npm run test:e2e   # hoặc http://localhost:3000
 ```
 
 ## Đóng góp
@@ -157,6 +167,7 @@ E2E_BASE_URL=https://<preview> npm run test:e2e
 - CI (`.github/workflows/ci.yml`) chạy định dạng, lint, typecheck, test, kiểm migration, build trên mỗi PR; PR chỉ merge khi xanh.
 - Commit theo Conventional Commits, viết tiếng Việt: `feat:` `fix:` `docs:` `perf:` `refactor:` `test:` `chore:` `ci:`.
 - Quy tắc giao diện: [docs/front-end-design.md](docs/front-end-design.md).
+- Vận hành: [docs/operations/](docs/operations/) (Supabase, sao lưu, tốc độ); checklist review: [docs/review/checklist.md](docs/review/checklist.md).
 - Kiến trúc chi tiết, quy tắc nghiệp vụ, bẫy đã biết: [docs/architecture.md](docs/architecture.md). Đổi cấu trúc thì cập nhật file đó trong cùng PR.
 
 ## Triển khai Vercel

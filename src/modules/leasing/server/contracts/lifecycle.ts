@@ -29,6 +29,7 @@ import { getLease } from './leases'
 import { listLeaseMeterInitials } from '@/modules/meters'
 import { SIGN_RANK } from '../../domain/sign-status'
 import { loadRoom, type SignStatus } from './shared'
+import { settleRemovedPayments } from '../wallet/service'
 
 export async function deleteContract(
   db: DB,
@@ -37,6 +38,8 @@ export async function deleteContract(
   id: string,
   confirmed: boolean,
   storage: StorageAdapter,
+  /** Tiền thật đã thu của hợp đồng: `mistake` (mặc định) xoá luôn như nhập nhầm, `to_wallet` chuyển vào ví khách. */
+  paymentRemoval: 'to_wallet' | 'mistake' = 'mistake',
 ): Promise<{ pendingFiles: number }> {
   if (kind !== 'lease' && kind !== 'deposit') throw new ValidationError('Loại hợp đồng không hợp lệ')
   if (confirmed !== true) throw new ValidationError('Cần xác nhận xoá hợp đồng')
@@ -194,6 +197,19 @@ export async function deleteContract(
           .update(pendingAdjustments)
           .set({ invoiceId: null })
           .where(inArray(pendingAdjustments.invoiceId, invoiceIds))
+        const paid = await tx
+          .select({ id: payments.id, method: payments.method })
+          .from(payments)
+          .where(inArray(payments.invoiceId, invoiceIds))
+        // Khoản gộp vào thanh lý chỉ là bút toán nội bộ nên xoá thẳng; còn lại xử lý ví theo lựa chọn
+        await settleRemovedPayments(
+          tx,
+          ctx,
+          paid.filter((p) => p.method !== 'carry').map((p) => p.id),
+          { kind: paymentRemoval },
+          'Xoá hợp đồng',
+          { allowNegative: true },
+        )
         await tx.delete(payments).where(inArray(payments.invoiceId, invoiceIds))
         await tx.delete(invoices).where(inArray(invoices.id, invoiceIds))
       }

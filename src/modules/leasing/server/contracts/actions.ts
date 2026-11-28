@@ -155,10 +155,15 @@ export async function updateDepositContractAction(id: string, input: DepositInpu
     return {}
   })
 }
-export async function deleteContractAction(kind: 'lease' | 'deposit', id: string, confirmed: boolean) {
+export async function deleteContractAction(
+  kind: 'lease' | 'deposit',
+  id: string,
+  confirmed: boolean,
+  paymentRemoval?: 'to_wallet' | 'mistake',
+) {
   const ctx = await getAccessContext()
   return toActionResult(async () => {
-    const result = await deleteContract(db, ctx, kind, id, confirmed, getStorage())
+    const result = await deleteContract(db, ctx, kind, id, confirmed, getStorage(), paymentRemoval)
     refresh()
     return result
   })
@@ -272,7 +277,9 @@ export async function quickContractDataAction(kind: 'lease' | 'deposit', id: str
               contractTemplates: contractTemplates
                 .filter(isUsableTemplate)
                 .map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault })),
-              invoiceTemplates: templates.map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault })),
+              invoiceTemplates: templates
+                .filter((t) => t.kind === 'standard')
+                .map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault })),
               depositEntries: l.depositEntries.map((e) => ({
                 id: e.id,
                 date: e.date,

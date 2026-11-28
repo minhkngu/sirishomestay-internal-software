@@ -1,18 +1,27 @@
-import { asc, eq, getTableColumns } from 'drizzle-orm'
-import { invoiceTemplates, invoices, leases } from '@/db'
+import { and, asc, eq, getTableColumns, sql } from 'drizzle-orm'
+import { invoiceLines, invoiceTemplates, invoices, leases } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, type AccessContext } from '@/domain/access'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import type { TemplateStyle } from '../../domain/doc-template'
 import {
   defaultInvoiceTemplate,
+  invoiceTemplateKindOf,
   invoiceTemplateSchema,
-  resolveInvoiceTemplateId,
+  isInvoiceTemplateKind,
+  pickInvoiceTemplateId,
   type InvoiceTemplateConfig,
+  type InvoiceTemplateKind,
 } from '../../domain/invoice-template'
 import { recordAudit } from '@/modules/platform'
 
-type TemplateInput = { name: string; config?: unknown; body?: string; style?: TemplateStyle }
+type TemplateInput = {
+  name: string
+  config?: unknown
+  body?: string
+  style?: TemplateStyle
+  kind?: InvoiceTemplateKind
+}
 function checked(input: TemplateInput) {
   const name = input.name?.trim()
   const config = invoiceTemplateSchema.safeParse(input.config ?? defaultInvoiceTemplate)
@@ -33,9 +42,11 @@ function checked(input: TemplateInput) {
         : bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255
     if (!valid || bytes.length > 300_000) throw new ValidationError('Logo phải là ảnh PNG hoặc JPEG không quá 300 KB')
   }
+  if (input.kind !== undefined && !isInvoiceTemplateKind(input.kind)) throw new ValidationError('Loại mẫu không hợp lệ')
   return {
     name,
     config: config.data,
+    kind: input.kind ?? ('standard' as InvoiceTemplateKind),
     ...(input.body !== undefined && { body: input.body, style: input.style ?? 'formal' }),
   }
 }
@@ -68,8 +79,7 @@ export async function previewInvoiceTemplate(ctx: AccessContext, config: unknown
     { sample: true },
   )
 }
-const SAMPLE_INVOICE = {
-  kind: 'monthly' as const,
+const SAMPLE_BASE = {
   code: 'MAU-KHONG-THANH-TOAN',
   issueDate: '2026-11-01',
   periodStart: '2026-11-01',
@@ -78,35 +88,66 @@ const SAMPLE_INVOICE = {
   facility: { name: 'Siris Residences (dữ liệu mẫu)', address: 'Địa chỉ cơ sở mẫu' },
   room: '301',
   tenant: { name: 'Nguyễn Văn An', phone: '0900000000' },
-  lines: [
-    { description: 'Tiền phòng', quantity: 1, unitLabel: 'tháng', unitPrice: 9000000, amount: 9000000 },
-    { description: 'Phí dịch vụ', quantity: 2, unitLabel: 'người', unitPrice: 200000, amount: 400000 },
-    { description: 'Điện', quantity: 100, unitLabel: 'kWh', unitPrice: 3500, amount: 350000 },
-  ],
-  total: 9750000,
   paid: 0,
   bank: { bankBin: '970436', bankName: 'Ngân hàng mẫu', accountNumber: '123456789', accountName: 'TAI KHOAN MAU' },
+}
+const line = (description: string, quantity: number, unitLabel: string, unitPrice: number) => ({
+  description,
+  quantity,
+  unitLabel,
+  unitPrice,
+  amount: quantity * unitPrice,
+})
+const SAMPLE_LINES: Record<InvoiceTemplateKind, ReturnType<typeof line>[]> = {
+  standard: [
+    line('Tiền phòng', 1, 'tháng', 9000000),
+    line('Phí dịch vụ', 2, 'người', 200000),
+    line('Điện', 100, 'kWh', 3500),
+  ],
+  termination: [
+    line('Tiền phòng đến ngày trả phòng', 1, 'tháng', 4500000),
+    line('Điện', 100, 'kWh', 3500),
+    line('Phạt trả phòng trước hạn', 1, '', 500000),
+    line('Hoàn tiền cọc', 1, '', -9000000),
+  ],
+  room_change: [
+    line('Tiền phòng đến ngày chuyển', 1, 'tháng', 4500000),
+    line('Điện', 100, 'kWh', 3500),
+    line('Hoàn tiền cọc', 1, '', -9000000),
+    line('Chuyển sang hợp đồng mới', 1, '', 4150000),
+  ],
+}
+/** Hoá đơn mẫu theo loại, để xem thử mẫu thường, thanh lý, chuyển phòng. */
+export function sampleInvoiceFor(kind: InvoiceTemplateKind) {
+  const lines = SAMPLE_LINES[kind]
+  return {
+    ...SAMPLE_BASE,
+    kind: (kind === 'standard' ? 'monthly' : 'termination') as 'monthly' | 'termination',
+    lines,
+    total: lines.reduce((n, l) => n + l.amount, 0),
+  }
 }
 /** Xem mẫu HTML chưa lưu với dữ liệu mẫu (có mã QR minh hoạ). */
 export async function previewInvoiceTemplateHtml(
   ctx: AccessContext,
-  input: { body: string; style: TemplateStyle },
+  input: { body: string; style: TemplateStyle; kind?: InvoiceTemplateKind },
 ): Promise<Uint8Array> {
   assertCan(ctx, 'settings')
   if (!input.body.trim()) throw new ValidationError('Nhập nội dung mẫu')
   if (input.body.length > 200_000) throw new ValidationError('Nội dung mẫu quá dài')
   const { renderInvoiceFromTemplate } = await import('../pdf')
-  return renderInvoiceFromTemplate(SAMPLE_INVOICE, input, { sample: true })
+  return renderInvoiceFromTemplate(sampleInvoiceFor(input.kind ?? 'standard'), input, { sample: true })
 }
 /** Phiên bản bộ dựng bản xem; đổi số này khi cách dựng PDF thay đổi để bản xem đã lưu được dựng lại. */
 export const INVOICE_PREVIEW_VERSION = 1
 
 type TemplateRow = typeof invoiceTemplates.$inferSelect
-async function renderPreview(t: Pick<TemplateRow, 'body' | 'style' | 'config'>): Promise<Uint8Array> {
+async function renderPreview(t: Pick<TemplateRow, 'body' | 'style' | 'config' | 'kind'>): Promise<Uint8Array> {
   const pdf = await import('../pdf')
+  const sample = sampleInvoiceFor(isInvoiceTemplateKind(t.kind) ? t.kind : 'standard')
   return t.body
-    ? pdf.renderInvoiceFromTemplate(SAMPLE_INVOICE, { body: t.body, style: t.style as TemplateStyle }, { sample: true })
-    : pdf.renderInvoicePdf(SAMPLE_INVOICE, invoiceTemplateSchema.parse(t.config), { sample: true })
+    ? pdf.renderInvoiceFromTemplate(sample, { body: t.body, style: t.style as TemplateStyle }, { sample: true })
+    : pdf.renderInvoicePdf(sample, invoiceTemplateSchema.parse(t.config), { sample: true })
 }
 /** Xem nhanh một mẫu hoá đơn đã lưu với dữ liệu mẫu, để chọn mẫu cho hợp đồng; mẫu cũ dựng theo khối vẫn xem được. */
 export async function previewInvoiceTemplateById(db: Pick<DB, 'select'>, templateId: string): Promise<Uint8Array> {
@@ -183,7 +224,8 @@ export async function createInvoiceTemplate(db: DB, ctx: AccessContext, input: T
 }
 export async function updateInvoiceTemplate(db: DB, ctx: AccessContext, id: string, input: TemplateInput) {
   assertCan(ctx, 'settings')
-  const data = checked(input)
+  const { kind: _kind, ...data } = checked(input)
+  void _kind
   const updated = await db.transaction(async (tx) => {
     const [row] = await tx
       .update(invoiceTemplates)
@@ -206,8 +248,13 @@ export async function setDefaultInvoiceTemplate(db: DB, ctx: AccessContext, id: 
   assertCan(ctx, 'settings')
   await db.transaction(async (tx) => {
     const rows = await tx.select().from(invoiceTemplates).orderBy(asc(invoiceTemplates.id)).for('update')
-    if (!rows.some((r) => r.id === id)) throw new NotFoundError()
-    await tx.update(invoiceTemplates).set({ isDefault: false }).where(eq(invoiceTemplates.isDefault, true))
+    const target = rows.find((r) => r.id === id)
+    if (!target) throw new NotFoundError()
+    // Mặc định đặt riêng cho từng loại hoá đơn
+    await tx
+      .update(invoiceTemplates)
+      .set({ isDefault: false })
+      .where(and(eq(invoiceTemplates.isDefault, true), eq(invoiceTemplates.kind, target.kind)))
     await tx.update(invoiceTemplates).set({ isDefault: true, updatedAt: new Date() }).where(eq(invoiceTemplates.id, id))
     await recordAudit(tx, ctx, {
       action: 'update',
@@ -244,13 +291,30 @@ export async function resolveInvoiceTemplate(
   invoiceId: string,
 ): Promise<{ id: string | null; config: InvoiceTemplateConfig; html: { body: string; style: TemplateStyle } | null }> {
   const [row] = await db
-    .select({ invoice: invoices.invoiceTemplateId, lease: leases.invoiceTemplateId })
+    .select({ invoice: invoices.invoiceTemplateId, lease: leases.invoiceTemplateId, kind: invoices.kind })
     .from(invoices)
     .innerJoin(leases, eq(leases.id, invoices.leaseId))
     .where(eq(invoices.id, invoiceId))
   if (!row) throw new NotFoundError()
-  const [fallback] = await db.select().from(invoiceTemplates).where(eq(invoiceTemplates.isDefault, true))
-  const id = resolveInvoiceTemplateId(row.invoice, row.lease, fallback?.id ?? null)
+  const [transfer] =
+    row.kind === 'termination'
+      ? await db
+          .select({ id: invoiceLines.id })
+          .from(invoiceLines)
+          .where(and(eq(invoiceLines.invoiceId, invoiceId), sql`${invoiceLines.meta} ->> 'transfer' = 'true'`))
+          .limit(1)
+      : []
+  const kind = invoiceTemplateKindOf(row.kind, !!transfer)
+  const [leaseTemplate] = row.lease
+    ? await db
+        .select({ id: invoiceTemplates.id, kind: invoiceTemplates.kind })
+        .from(invoiceTemplates)
+        .where(eq(invoiceTemplates.id, row.lease))
+    : []
+  const defaults = Object.fromEntries(
+    (await db.select().from(invoiceTemplates).where(eq(invoiceTemplates.isDefault, true))).map((t) => [t.kind, t.id]),
+  ) as Partial<Record<InvoiceTemplateKind, string>>
+  const id = pickInvoiceTemplateId({ invoice: row.invoice, lease: leaseTemplate ?? null, kind, defaults })
   const [template] = id ? await db.select().from(invoiceTemplates).where(eq(invoiceTemplates.id, id)) : []
   if (id && !template) throw new ValidationError('Mẫu hóa đơn đã chọn không tồn tại')
   return {

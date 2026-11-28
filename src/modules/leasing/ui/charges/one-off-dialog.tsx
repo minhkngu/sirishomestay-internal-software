@@ -10,6 +10,7 @@ import { addOneOffAction, removeOneOffAction } from '../../server/charges/action
 import { todayVN } from '@/domain/dates'
 import { formatVND } from '@/domain/money'
 import { MoneyInput } from '@/components/ui/money-input'
+import { OptionSelect } from '@/components/option-select'
 
 type Charge = { id: string; description: string; quantity: number; unitPrice: number; invoiceId: string | null }
 export function OneOffDialog({
@@ -65,10 +66,15 @@ export function OneOffDialog({
                   <Label htmlFor="oneoff-kind" className="text-[13px] font-medium">
                     Loại
                   </Label>
-                  <select id="oneoff-kind" name="kind" className="w-full">
-                    <option value="service">Dịch vụ</option>
-                    <option value="penalty">Phạt</option>
-                  </select>
+                  <OptionSelect
+                    id="oneoff-kind"
+                    name="kind"
+                    defaultValue="service"
+                    options={[
+                      { value: 'service', label: 'Dịch vụ' },
+                      { value: 'penalty', label: 'Phạt' },
+                    ]}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <FormDateField id="oneoff-date" name="date" label="Ngày" defaultValue={todayVN()} />

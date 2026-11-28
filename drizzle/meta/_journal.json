@@ -323,6 +323,27 @@
       "when": 1795774201310,
       "tag": "0045_small_quicksilver",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1795793032974,
+      "tag": "0046_smart_shadow_king",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1795851924077,
+      "tag": "0047_misty_la_nuit",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1795862791408,
+      "tag": "0048_adorable_fantastic_four",
+      "breakpoints": true
     }
   ]
 }

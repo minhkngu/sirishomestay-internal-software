@@ -23,11 +23,11 @@ import {
   previewContractRestoreAction,
   restoreContractAction,
 } from '../../server/contracts/actions'
-import { createAssignmentAction } from '../../server/addenda/actions'
+import { cancelRoomChangeAction, createAssignmentAction } from '../../server/addenda/actions'
 import { ContractEditActions, type RenderCreateFee, type RenderCreatePerson } from './contract-edit-actions'
 import { ExtensionDialog } from './extension-dialog'
 import { TerminationWizard } from './termination-wizard'
-import { TransferWizard } from './transfer-wizard'
+import { RoomChangeWizard } from './room-change-dialog'
 import { BareSelect } from './contract-form-ui'
 
 type Action = 'edit' | 'delete' | 'termination' | 'assignment' | 'extension' | 'transfer' | 'restore'
@@ -114,7 +114,8 @@ export function ContractRowActions({
   }
   const label = ACTIONS.find((item) => item.key === action)?.label ?? ''
   // Menu nổi: cần đục hoàn toàn, không dùng backdrop blur của component dùng chung.
-  const menuClass = 'w-56 border-border/80 bg-popover shadow-lg backdrop-blur-none' // taste-skill-ignore
+  const menuClass =
+    'w-max min-w-56 [&_[role=menuitem]]:whitespace-nowrap border-border/80 bg-popover shadow-lg backdrop-blur-none' // taste-skill-ignore
   const available = ACTIONS.filter(
     (item) =>
       (item.key !== 'delete' || canDelete) &&
@@ -155,7 +156,7 @@ export function ContractRowActions({
             >
               <MoreHorizontal className="size-4" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-52">
+            <DropdownMenuContent align="start" className="w-max min-w-52 [&_[role=menuitem]]:whitespace-nowrap">
               {(canEdit ? rest : available).map((item) => (
                 <DropdownMenuItem
                   key={item.key}
@@ -283,12 +284,18 @@ export function ContractRowActions({
             />
           )}
           {data?.form && action === 'transfer' && (
-            <TransferWizard
+            <RoomChangeWizard
               leaseId={id}
               currentRoomId={data.form.currentRoomId}
               freeRooms={data.form.freeRooms}
-              meters={data.form.meters}
+              terminationMeters={data.form.terminationMeters}
+              feeData={data.feeData && 'current' in data.feeData ? data.feeData : undefined}
+              assets={data.form.checkoutAssets}
+              depositBalance={data.form.depositBalance}
               today={data.form.today}
+              endDate={data.form.endDate}
+              monthlyRent={data.form.monthlyRent}
+              depositAmount={data.form.depositAmount}
               defaultOpen
               onCompleted={close}
             />
@@ -360,6 +367,7 @@ export function ContractRowActions({
                         meter_reading: 'Chỉ số',
                         adjustment: 'Điều chỉnh',
                         invoice_line: 'Dòng hóa đơn',
+                        lease: 'Hợp đồng',
                       } as Record<string, string>
                     )[item.type] ?? item.type}
                     : {item.label}
@@ -377,7 +385,9 @@ export function ContractRowActions({
                 disabled={pending || !!preview.blockedReason}
                 onClick={() =>
                   start(async () => {
-                    const result = await restoreContractAction(kind, id, preview.token)
+                    const result = preview.roomChange
+                      ? await cancelRoomChangeAction(id)
+                      : await restoreContractAction(kind, id, preview.token)
                     if (!result.ok) {
                       setError(result.error)
                       setPreview(null)

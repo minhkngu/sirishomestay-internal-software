@@ -16,6 +16,7 @@ import {
   meters,
   oneOffCharges,
   payments,
+  tenantWalletEntries,
   pendingAdjustments,
   rooms,
   tenants,
@@ -27,9 +28,10 @@ import { computeDueDate } from '../../domain/due-date'
 import { depositHeld } from '@/domain/cashbook'
 import { daysInMonth, formatDateVN, todayVN } from '@/domain/dates'
 import { displayName } from '@/modules/tenants'
-import { NotFoundError, ValidationError } from '@/domain/errors'
+import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import { midPeriodAdjustments } from '../../domain/adjustments'
 import { fullMonthCoefficient, monthsCoefficient } from '../../domain/proration'
+import { rebalanceTransferLine } from '../../domain/transfer-line'
 import { buildMonthlyInvoice, nextBillingPeriod, rentPeriodOf, settlementState } from '../../domain/invoice-builder'
 import type {
   Addendum,
@@ -44,7 +46,7 @@ import type {
   PendingAdjustment,
   Proration,
 } from '@/domain/types'
-import { finalizeTermination } from '../addenda/finalize'
+import { finalizeTermination, settleTransferSurplus, undoTransferSurplus } from '../addenda/finalize'
 import { recordAudit, recordAuditBatch, registerExportOwnerResolver, getSettings } from '@/modules/platform'
 import {
   exportDocument,
@@ -56,7 +58,9 @@ import {
 } from '@/modules/documents'
 import { applyReadings, setLeaseInitialReading, setOpeningValue } from '@/modules/meters'
 import { resolveBankAccount } from '@/domain/vietqr'
-import { PAYMENT_METHOD_LABELS, type PaymentMethod } from '@/domain/payment-labels'
+import { PAYMENT_METHOD_DISPLAY_LABELS } from '@/domain/payment-labels'
+import { addWalletEntry, settleRemovedPayments, walletBalance, type PaymentRemoval } from '../wallet/service'
+import { clampWalletUse, splitReceipt } from '../../domain/wallet'
 
 const batchSchema = z.object({ facilityId: z.uuid(), period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) })
 const periodSchema = z
@@ -1177,6 +1181,8 @@ export async function approveInvoice(
       .where(eq(invoices.id, id))
       .returning()
     if (before.kind === 'termination') await finalizeTermination(tx, ctx, before)
+    else await settleTransferSurplus(tx, before, valid.approvedOn ?? todayVN())
+    await syncDepositWithInvoice(tx, ctx, id)
     await syncPendingAdjustments(tx, lease, await loadAddenda(tx, lease.id), settings.proration)
     await recordAudit(tx, ctx, {
       action: 'update',
@@ -1317,13 +1323,31 @@ export async function unapproveInvoice(db: DB, ctx: AccessContext, id: string): 
     await tx.select({ id: invoices.id }).from(invoices).where(eq(invoices.id, id)).for('update')
     const before = await getInvoice(tx, ctx, id)
     if (before.status !== 'approved') throw new ValidationError('Chỉ bỏ duyệt hoá đơn đã duyệt')
+    if (before.kind === 'termination') {
+      // Hoá đơn thanh lý đã gạch ví hoặc chuyển phòng: duyệt đã ghi sổ ví/điều chỉnh nên không bỏ duyệt được
+      const lineMeta = await tx
+        .select({ meta: invoiceLines.meta })
+        .from(invoiceLines)
+        .where(eq(invoiceLines.invoiceId, id))
+      if (
+        lineMeta.some((l) => {
+          const m = (l.meta ?? {}) as Record<string, unknown>
+          return m.transfer === true || typeof m.wallet === 'number'
+        })
+      )
+        throw new ValidationError('Hoá đơn thanh lý chuyển phòng hoặc đã gạch ví không bỏ duyệt được')
+      // Khoản "Gộp vào thanh lý" do lần duyệt này ghi ở các hoá đơn cũ: xoá để nợ cũ mở lại, duyệt lại sẽ tính lại
+      await tx.delete(payments).where(and(eq(payments.method, 'carry'), like(payments.note, `%${before.code}`)))
+    }
     if ((await tx.select({ id: payments.id }).from(payments).where(eq(payments.invoiceId, id)).limit(1)).length)
       throw new ValidationError('Gỡ các khoản đã thu trước khi bỏ duyệt')
+    if (before.kind !== 'termination') await undoTransferSurplus(tx, id)
     const [after] = await tx
       .update(invoices)
       .set({ status: 'draft', updatedAt: new Date() })
       .where(eq(invoices.id, id))
       .returning()
+    await syncDepositWithInvoice(tx, ctx, id)
     const [lease, settings] = await Promise.all([leaseData(tx, before.leaseId), getSettings(tx)])
     await syncPendingAdjustments(tx, lease, await loadAddenda(tx, lease.id), settings.proration)
     await recordAudit(tx, ctx, {
@@ -1374,6 +1398,7 @@ export async function deleteInvoice(db: DB, ctx: AccessContext, id: string): Pro
     const inv = await getInvoice(tx, ctx, id)
     if ((await tx.select({ id: payments.id }).from(payments).where(eq(payments.invoiceId, id))).length)
       throw new ValidationError('Gỡ các khoản đã thu trước khi xoá')
+    if (inv.kind !== 'termination') await undoTransferSurplus(tx, id)
     if (inv.kind === 'termination')
       await tx.delete(oneOffCharges).where(and(eq(oneOffCharges.invoiceId, id), eq(oneOffCharges.kind, 'penalty')))
     await tx.update(oneOffCharges).set({ invoiceId: null }).where(eq(oneOffCharges.invoiceId, id))
@@ -1529,8 +1554,18 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
           .from(leaseFeeSnapshots)
           .where(inArray(leaseFeeSnapshots.id, snapIds))
       : []
+    const roomChangeInvoice =
+      inv.kind === 'termination' && old.some((o) => (o.meta as { transfer?: unknown } | null)?.transfer === true)
+    const isSystemLine = (l: { type: string; meta: unknown }) => {
+      const kind = (l.meta as { kind?: unknown } | null)?.kind
+      return !(
+        l.type === 'penalty' ||
+        l.type === 'one_off' ||
+        (l.type === 'adjustment' && (kind === 'surcharge' || kind === 'discount'))
+      )
+    }
     const initialWrites: Array<{ leaseFeeId: string; value: number }> = []
-    const next = data
+    let next = data
       .filter((l) => l.type !== 'tax')
       .map((l) => {
         // Dòng cọc còn thiếu giữ mô tả, đơn giá, số lượng đã lưu
@@ -1548,6 +1583,45 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
             amount: savedDeposit.amount,
             meta: savedDeposit.meta,
           }
+        // Dòng "Nợ cũ" của hoá đơn thanh lý do hệ thống tính lại khi duyệt: giữ nguyên đã lưu
+        const savedUnpaid =
+          inv.kind === 'termination' && l.id
+            ? old.find(
+                (previous) => previous.id === l.id && (previous.meta as { unpaid?: unknown } | null)?.unpaid === true,
+              )
+            : undefined
+        if (savedUnpaid)
+          return {
+            invoiceId: id,
+            type: savedUnpaid.type,
+            description: savedUnpaid.description,
+            quantity: savedUnpaid.quantity,
+            unitPrice: savedUnpaid.unitPrice,
+            amount: savedUnpaid.amount,
+            meta: savedUnpaid.meta,
+          }
+        // Hoá đơn thanh lý của chuyển phòng: dòng hệ thống giữ mô tả, đơn giá đã lưu (chỉ số lượng đổi được, trừ dòng chuyển,
+        // ví, cọc); dòng phạt, phát sinh, giảm giá nhập tay sửa tự do
+        const savedSystem = roomChangeInvoice && l.id ? old.find((previous) => previous.id === l.id) : undefined
+        if (savedSystem && isSystemLine(savedSystem)) {
+          const m = (savedSystem.meta ?? {}) as Record<string, unknown>
+          const fixed =
+            m.transfer === true ||
+            typeof m.wallet === 'number' ||
+            typeof m.pendingId === 'string' ||
+            savedSystem.type === 'deposit' ||
+            savedSystem.type === 'deposit_offset'
+          const qty = !fixed && Number.isFinite(l.quantity) && l.quantity >= 0 ? l.quantity : savedSystem.quantity
+          return {
+            invoiceId: id,
+            type: savedSystem.type,
+            description: savedSystem.description,
+            quantity: qty,
+            unitPrice: savedSystem.unitPrice,
+            amount: qty === savedSystem.quantity ? savedSystem.amount : Math.round(qty * savedSystem.unitPrice),
+            meta: savedSystem.meta,
+          }
+        }
         const meta = l.meta as {
           feeTypeId?: unknown
           leaseFeeId?: unknown
@@ -1681,6 +1755,39 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
         meta: { rate: taxRate },
       })
     }
+    // Khoản chuyển từ hợp đồng cũ (chuyển phòng) là số đã chốt ở hoá đơn thanh lý: không ai sửa hoặc xoá được, kể cả admin.
+    // Muốn bỏ thì hoàn tác chuyển phòng (nút Khôi phục hợp đồng cũ, chỉ admin khi đã duyệt)
+    const transferKey = (m: unknown) => {
+      const meta = (m ?? {}) as { pendingId?: unknown; sourceKey?: unknown }
+      return typeof meta.pendingId === 'string' &&
+        typeof meta.sourceKey === 'string' &&
+        meta.sourceKey.startsWith('transfer:')
+        ? meta.pendingId
+        : null
+    }
+    for (const o of old) {
+      const pendingId = transferKey(o.meta)
+      if (!pendingId) continue
+      const n = next.find((x) => transferKey(x.meta) === pendingId)
+      if (!n || n.amount !== o.amount || n.description !== o.description)
+        throw new ValidationError(
+          'Khoản chuyển từ hợp đồng cũ không sửa hoặc xoá được; muốn bỏ thì hoàn tác chuyển phòng ở hợp đồng cũ',
+        )
+    }
+    // Hoá đơn thanh lý của chuyển phòng: không xoá được dòng hệ thống; dòng chuyển luôn cân bằng về 0 khi lưu
+    if (roomChangeInvoice) {
+      const sentIds = new Set(data.map((l) => l.id).filter(Boolean))
+      if (old.some((o) => isSystemLine(o) && !sentIds.has(o.id)))
+        throw new ValidationError(
+          'Hoá đơn thanh lý của chuyển phòng không xoá được các dòng hệ thống; muốn đổi thì hoàn tác chuyển phòng rồi chuyển lại',
+        )
+      next = rebalanceTransferLine(next)
+    }
+    if (inv.kind === 'termination') {
+      const sent = new Set(data.map((l) => l.id).filter(Boolean))
+      if (old.some((o) => (o.meta as { unpaid?: unknown } | null)?.unpaid === true && !sent.has(o.id)))
+        throw new ValidationError('Dòng Nợ cũ do hệ thống tính theo nợ lúc duyệt, không xoá được')
+    }
     // Phí phát sinh / điều chỉnh bị bỏ khỏi hoá đơn thì trả về trạng thái chưa tính
     const keep = new Set(next.map((l) => JSON.stringify(l.meta ?? {})))
     for (const l of old) {
@@ -1733,12 +1840,17 @@ export async function updateLines(db: DB, ctx: AccessContext, id: string, input:
     return rows
   })
 }
-const leasePaymentSchema = z.object({
-  paidOn: z.iso.date(),
-  amount: z.number().int().safe().positive('Số tiền phải lớn hơn 0'),
-  method: z.enum(['cash', 'transfer', 'other']),
-  note: z.string().max(500).optional(),
-})
+const leasePaymentSchema = z
+  .object({
+    paidOn: z.iso.date(),
+    /** Tiền khách đưa. Phần vượt tổng dư nợ không bị chặn: tự vào ví khách. */
+    amount: z.number().int().safe().nonnegative('Số tiền không được âm'),
+    /** Số dùng từ ví khách để gạch nợ; không vượt số dư ví và dư nợ. */
+    walletAmount: z.number().int().safe().nonnegative('Số tiền dùng ví không được âm').optional(),
+    method: z.enum(['cash', 'transfer', 'other']),
+    note: z.string().max(500).optional(),
+  })
+  .refine((v) => v.amount + (v.walletAmount ?? 0) > 0, { message: 'Số tiền phải lớn hơn 0', path: ['amount'] })
 /** Hoá đơn đã duyệt của hợp đồng còn thiếu tiền (tổng dương), cũ nhất trước, kèm số còn thiếu. */
 async function openInvoices(tx: Pick<DB, 'select'>, leaseId: string) {
   const rows = await tx
@@ -1772,53 +1884,122 @@ export async function leaseDebt(db: DB, ctx: AccessContext, leaseId: string): Pr
   await facilityOfLease(db, ctx, leaseId)
   return (await openInvoices(db, leaseId)).reduce((n, r) => n + r.owed, 0)
 }
-/** Ghi một khoản thu cho hợp đồng, tự gạch các hoá đơn đã duyệt từ cũ đến mới; không thu quá tổng dư nợ. */
+/** Số dư ví của khách (người thuê chính), để popup thu tiền hiện lựa chọn dùng ví. */
+export async function leaseWalletBalance(db: DB, ctx: AccessContext, leaseId: string): Promise<number> {
+  await facilityOfLease(db, ctx, leaseId)
+  const [l] = await db.select({ tenantId: leases.tenantId }).from(leases).where(eq(leases.id, leaseId))
+  return l ? walletBalance(db, l.tenantId) : 0
+}
+/**
+ * Ghi một khoản thu cho hợp đồng, tự gạch các hoá đơn đã duyệt từ cũ đến mới. Phần ví dùng gạch trước (method `wallet`),
+ * rồi tiền khách đưa; tiền vượt tổng dư nợ không bị chặn mà vào ví khách (loại `overpay`).
+ */
 export async function recordLeasePayment(
   db: DB,
   ctx: AccessContext,
   leaseId: string,
-  input: { paidOn: string; amount: number; method: 'cash' | 'transfer' | 'other'; note?: string },
+  input: {
+    paidOn: string
+    amount: number
+    walletAmount?: number
+    method: 'cash' | 'transfer' | 'other'
+    note?: string
+  },
 ) {
   const data = parse(leasePaymentSchema, input)
   const facilityId = await facilityOfLease(db, ctx, leaseId)
   return db.transaction(async (tx0) => {
     const tx = tx0 as unknown as DB
     await tx.execute(sql`select id from leases where id = ${leaseId} for update`)
+    const [lease] = await tx.select({ tenantId: leases.tenantId }).from(leases).where(eq(leases.id, leaseId))
+    if (!lease) throw new NotFoundError()
+    // Khoá người thuê để hai lần thu cùng lúc không dùng quá số dư ví
+    await tx.execute(sql`select id from tenants where id = ${lease.tenantId} for update`)
     const open = await openInvoices(tx, leaseId)
     const debt = open.reduce((n, r) => n + r.owed, 0)
-    if (data.amount > debt) throw new ValidationError(`Số tiền vượt tổng dư nợ ${debt.toLocaleString('vi-VN')}`)
-    let left = data.amount
+    if (!open.length) throw new ValidationError('Hợp đồng không có hoá đơn cần thu')
+    const walletWanted = data.walletAmount ?? 0
+    const balance = await walletBalance(tx, lease.tenantId)
+    if (walletWanted > balance) throw new ValidationError(`Số dư ví không đủ (còn ${balance.toLocaleString('vi-VN')})`)
+    if (walletWanted > debt)
+      throw new ValidationError(`Số tiền dùng ví vượt tổng dư nợ ${debt.toLocaleString('vi-VN')}`)
+    const walletUse = clampWalletUse(walletWanted, balance, debt)
+    // Ví đã đủ trả hết nợ mà còn đưa tiền mặt: phần dư sẽ không có phiếu thu nào để gắn, nên từ chối
+    if (walletUse >= debt && data.amount > 0)
+      throw new ValidationError('Ví đã đủ trả nợ: bỏ phần tiền mặt hoặc giảm số dùng ví')
+    const { toWallet } = splitReceipt(data.amount, debt - walletUse)
     const created: (typeof payments.$inferSelect)[] = []
-    for (const inv of open) {
-      if (left <= 0) break
-      const part = Math.min(left, inv.owed)
-      const [row] = await tx
-        .insert(payments)
-        .values({
-          invoiceId: inv.id,
-          paidOn: data.paidOn,
-          amount: part,
-          method: data.method,
-          note: data.note ?? '',
-          receivedBy: ctx.userId,
-        })
-        .returning()
-      created.push(row)
-      left -= part
-      await syncDepositWithInvoice(tx, ctx, inv.id)
+    const walletEntries: { paymentId: string; invoiceId: string; amount: number }[] = []
+    const owedLeft = new Map(open.map((r) => [r.id, r.owed]))
+    const allocate = async (total: number, method: string, note: string, isWallet: boolean) => {
+      let left = total
+      for (const inv of open) {
+        if (left <= 0) break
+        const part = Math.min(left, owedLeft.get(inv.id) ?? 0)
+        if (part <= 0) continue
+        const [row] = await tx
+          .insert(payments)
+          .values({ invoiceId: inv.id, paidOn: data.paidOn, amount: part, method, note, receivedBy: ctx.userId })
+          .returning()
+        created.push(row)
+        owedLeft.set(inv.id, (owedLeft.get(inv.id) ?? 0) - part)
+        left -= part
+        if (isWallet) walletEntries.push({ paymentId: row.id, invoiceId: inv.id, amount: part })
+        await syncDepositWithInvoice(tx, ctx, inv.id)
+      }
     }
-    await recordAuditBatch(
-      tx,
-      ctx,
-      created.map((row) => ({
+    await allocate(walletUse, 'wallet', 'Dùng số dư ví', true)
+    await allocate(data.amount - toWallet, data.method, data.note ?? '', false)
+    for (const w of walletEntries)
+      await addWalletEntry(tx, {
+        tenantId: lease.tenantId,
+        facilityId,
+        amount: -w.amount,
+        kind: 'use_invoice',
+        leaseId,
+        invoiceId: w.invoiceId,
+        paymentId: w.paymentId,
+        date: data.paidOn,
+        note: 'Dùng ví để gạch hoá đơn',
+        sourceKey: `use_invoice:${w.paymentId}`,
+      })
+    if (toWallet > 0) {
+      // Phiếu tiền mặt cuối cùng của lần thu là phiếu chạm trần nợ; tiền dư gắn với phiếu đó
+      const lastCash = created.filter((p) => p.method !== 'wallet').at(-1)!
+      await addWalletEntry(tx, {
+        tenantId: lease.tenantId,
+        facilityId,
+        amount: toWallet,
+        kind: 'overpay',
+        leaseId,
+        paymentId: lastCash.id,
+        date: data.paidOn,
+        note: 'Tiền khách trả dư vào ví',
+        sourceKey: `overpay:${lastCash.id}`,
+      })
+    }
+    await recordAuditBatch(tx, ctx, [
+      ...created.map((row) => ({
         action: 'create' as const,
         entity: 'payment',
         entityId: row.id,
         facilityId,
-        summary: 'Ghi nhận thanh toán theo hợp đồng',
+        summary: row.method === 'wallet' ? 'Dùng số dư ví gạch hoá đơn' : 'Ghi nhận thanh toán theo hợp đồng',
         after: row,
       })),
-    )
+      ...(toWallet > 0
+        ? [
+            {
+              action: 'create' as const,
+              entity: 'wallet',
+              entityId: lease.tenantId,
+              facilityId,
+              summary: `Tiền dư ${toWallet.toLocaleString('vi-VN')} vào ví khách`,
+              after: { amount: toWallet },
+            },
+          ]
+        : []),
+    ])
     return created
   })
 }
@@ -1865,6 +2046,13 @@ export async function updatePayment(db: DB, ctx: AccessContext, id: string, inpu
       .from(payments)
       .where(and(eq(payments.invoiceId, inv.id), sql`${payments.id} <> ${id}`))
     const owed = total - others
+    const [linked] = await tx
+      .select({ id: tenantWalletEntries.id })
+      .from(tenantWalletEntries)
+      .where(eq(tenantWalletEntries.paymentId, id))
+      .limit(1)
+    if (before.method === 'wallet' || linked)
+      throw new ValidationError('Khoản thu có liên quan đến ví khách: gỡ khoản thu rồi ghi lại, không sửa trực tiếp')
     if (data.amount > owed)
       throw new ValidationError(`Số tiền vượt phần còn nợ ${Math.max(owed, 0).toLocaleString('vi-VN')}`, {
         amount: 'Vượt phần còn nợ của hoá đơn',
@@ -1886,23 +2074,63 @@ export async function updatePayment(db: DB, ctx: AccessContext, id: string, inpu
     await syncDepositWithInvoice(tx, ctx, inv.id)
   })
 }
-export async function removePayment(db: DB, ctx: AccessContext, paymentId: string): Promise<void> {
+const paymentRemovalSchema = z
+  .discriminatedUnion('kind', [
+    z.object({ kind: z.literal('to_wallet') }),
+    z.object({ kind: z.literal('refund'), refundOn: z.iso.date() }),
+    z.object({ kind: z.literal('mistake') }),
+  ])
+  .default({ kind: 'to_wallet' })
+
+/** Phiếu nhập nhầm chỉ admin hoặc chính người lập phiếu trong cùng ngày (giờ Việt Nam) được xoá hẳn. */
+const canDeleteAsMistake = (ctx: AccessContext, row: { receivedBy: string | null; createdAt: Date }) =>
+  ctx.isAdmin || (row.receivedBy === ctx.userId && todayVN(row.createdAt) === todayVN())
+
+/**
+ * Gỡ một khoản thu: chuyển tiền vào ví khách (mặc định), trả lại khách (thu giữ ngày gốc, thêm chi) hoặc nhập nhầm
+ * (xoá hẳn, rút tiền dư của phiếu). Khoản trả bằng ví luôn được trả lại ví; khoản gộp vào thanh lý không gỡ tay được.
+ */
+export async function removePayment(db: DB, ctx: AccessContext, paymentId: string, removal?: unknown): Promise<void> {
+  const how: PaymentRemoval = parse(paymentRemovalSchema, removal)
   await db.transaction(async (tx0) => {
     const tx = tx0 as unknown as DB
     const [row] = await tx.select().from(payments).where(eq(payments.id, paymentId))
     if (!row) throw new NotFoundError()
     const inv = await getInvoice(tx, ctx, row.invoiceId)
+    if (how.kind === 'mistake' && row.method !== 'wallet' && !canDeleteAsMistake(ctx, row))
+      throw new ForbiddenError('Chỉ admin hoặc người lập phiếu trong cùng ngày được xoá phiếu nhập nhầm')
+    await settleRemovedPayments(tx, ctx, [paymentId], how, `Gỡ khoản thu của ${inv.code}`)
     await tx.delete(payments).where(eq(payments.id, paymentId))
     await recordAudit(tx, ctx, {
       action: 'delete',
       entity: 'payment',
       entityId: paymentId,
       facilityId: inv.facilityId,
-      summary: `Gỡ khoản thu của ${inv.code}`,
+      summary: `Gỡ khoản thu của ${inv.code} (${{ to_wallet: 'chuyển vào ví', refund: 'trả lại khách', mistake: 'nhập nhầm' }[how.kind]})`,
       before: row,
     })
     await syncDepositWithInvoice(tx, ctx, row.invoiceId)
   })
+}
+
+/** Thông tin cho popup gỡ phiếu: số dư ví hiện tại của khách, phiếu có gạch cọc không, người dùng có xoá nhập nhầm được không. */
+export async function previewPaymentRemoval(db: DB, ctx: AccessContext, paymentId: string) {
+  const [row] = await db.select().from(payments).where(eq(payments.id, paymentId))
+  if (!row) throw new NotFoundError()
+  const inv = await getInvoice(db, ctx, row.invoiceId)
+  const [lease] = await db.select({ tenantId: leases.tenantId }).from(leases).where(eq(leases.id, inv.leaseId))
+  const [deposit] = await db
+    .select({ id: invoiceLines.id })
+    .from(invoiceLines)
+    .where(and(eq(invoiceLines.invoiceId, inv.id), eq(invoiceLines.type, 'deposit')))
+    .limit(1)
+  return {
+    amount: row.amount,
+    method: row.method,
+    walletBalance: lease ? await walletBalance(db, lease.tenantId) : 0,
+    hasDeposit: !!deposit,
+    canMistake: canDeleteAsMistake(ctx, row),
+  }
 }
 export async function listInvoices(
   db: DB,
@@ -1946,7 +2174,7 @@ export async function listInvoices(
         input.period ? like(invoices.periodStart, `${input.period}%`) : undefined,
       ),
     )
-    .orderBy(desc(invoices.periodStart), asc(invoices.code))
+    .orderBy(desc(invoices.createdAt), asc(invoices.code))
   const allowed = rows.filter(
     (r) => ctx.isAdmin || (ctx.permissions.has('billing') && ctx.facilityIds.has(r.inv.facilityId)),
   )
@@ -2029,7 +2257,7 @@ registerPdfLoader('receipt', async (db, ctx, id) => {
         invoiceCode: inv.code,
         paidOn: p.paidOn,
         amount: p.amount,
-        method: PAYMENT_METHOD_LABELS[p.method as PaymentMethod] ?? p.method,
+        method: PAYMENT_METHOD_DISPLAY_LABELS[p.method] ?? p.method,
         receivedBy: ctx.userId === p.receivedBy ? (ctx.fullName ?? '') : '',
         facility: { name: row.facility.name, address: row.facility.address },
         room: row.room.code,
@@ -2246,13 +2474,21 @@ export async function getInvoiceDetail(db: DB, ctx: AccessContext, id: string) {
     ...row,
   }
 }
-function pdfLine(line: typeof invoiceLines.$inferSelect) {
-  const meta = line.meta as { unit?: unknown; segments?: { start?: unknown; end?: unknown }[] } | null
+export function pdfLine(line: typeof invoiceLines.$inferSelect) {
+  const meta = line.meta as {
+    unit?: unknown
+    segments?: { start?: unknown; end?: unknown }[]
+    opening?: unknown
+    closing?: unknown
+  } | null
+  // Chỉ số điện nước in kèm tên khoản: theo từng đồng hồ (segments) hoặc số đầu, số cuối của dòng kỳ ký hợp đồng
   const segments = Array.isArray(meta?.segments)
     ? meta.segments
         .filter((segment) => typeof segment.start === 'number' && typeof segment.end === 'number')
         .map((segment) => `${segment.start} đến ${segment.end}`)
-    : []
+    : typeof meta?.opening === 'number' && typeof meta?.closing === 'number'
+      ? [`${meta.opening} đến ${meta.closing}`]
+      : []
   return {
     description: segments.length ? `${line.description} (${segments.join('; ')})` : line.description,
     quantity: line.quantity,

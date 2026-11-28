@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { eq, sql as dsql } from 'drizzle-orm'
+import { summarize } from '@/domain/cashbook'
+import { listCashbook } from '@/modules/cashbook/server/cashbook/service'
+import { walletBalance } from '@/modules/leasing/server/wallet/service'
 import {
   meters,
   meterReadings,
@@ -16,6 +19,7 @@ import {
   depositEntries,
   facilities,
   handovers,
+  invoiceLines,
   invoices,
   payments,
   oneOffCharges,
@@ -697,6 +701,56 @@ describe('sửa và xoá hợp đồng', () => {
           false,
         ),
       ).rejects.toThrow(ForbiddenError)
+    })
+  })
+
+  describe('xoá hợp đồng có khoản thu tiền thật', () => {
+    const setup = async () => {
+      const { lease } = await contracts.createLease(db, admin, input())
+      const [inv] = await db
+        .insert(invoices)
+        .values({
+          code: 'INV-9',
+          leaseId: lease.id,
+          facilityId,
+          kind: 'monthly',
+          periodStart: '2026-02-01',
+          periodEnd: '2026-02-28',
+          issueDate: '2026-02-01',
+          status: 'approved',
+        })
+        .returning()
+      await db.insert(invoiceLines).values({
+        invoiceId: inv.id,
+        type: 'rent',
+        description: 'Tiền phòng',
+        quantity: 1,
+        unitPrice: 9_000_000,
+        amount: 9_000_000,
+      })
+      await db.insert(payments).values({
+        invoiceId: inv.id,
+        paidOn: '2026-02-05',
+        amount: 9_000_000,
+        method: 'cash',
+        receivedBy: admin.userId,
+      })
+      return lease
+    }
+    const income = async () => summarize((await listCashbook(db, context(['billing'], [facilityId]), {})).rows).income
+    const allowed = () => context(['tenants_contracts', 'delete_contracts'], [facilityId])
+
+    it('chuyển vào ví: ví nhận 9.000.000, sổ quỹ vẫn thu 9.000.000', async () => {
+      const lease = await setup()
+      await contracts.deleteContract(db, allowed(), 'lease', lease.id, true, new MemoryStorage(), 'to_wallet')
+      expect(await walletBalance(db, tenantId)).toBe(9_000_000)
+      expect(await income()).toBe(9_000_000)
+    })
+    it('mặc định nhập nhầm: ví 0, sổ quỹ 0', async () => {
+      const lease = await setup()
+      await contracts.deleteContract(db, allowed(), 'lease', lease.id, true, new MemoryStorage())
+      expect(await walletBalance(db, tenantId)).toBe(0)
+      expect(await income()).toBe(0)
     })
   })
 })

@@ -1,4 +1,5 @@
 import type { TemplateStyle } from './doc-template'
+import type { InvoiceTemplateKind } from './invoice-template'
 import { TEMPLATE_FIELDS } from '@/domain/template-fields'
 
 const LABEL = new Map(TEMPLATE_FIELDS.invoice_termination.map((f) => [f.key, f.label]))
@@ -72,4 +73,28 @@ export const DEFAULT_INVOICE_TEMPLATES: Record<TemplateStyle, { name: string; ht
 export const DEFAULT_INVOICE_HTML: Record<TemplateStyle, string> = {
   formal: DEFAULT_INVOICE_TEMPLATES.formal.html,
   modern: DEFAULT_INVOICE_TEMPLATES.modern.html,
+}
+
+const KIND_TITLE: Record<Exclude<InvoiceTemplateKind, 'standard'>, string> = {
+  termination: 'HOÁ ĐƠN THANH LÝ',
+  room_change: 'HOÁ ĐƠN THANH LÝ - CHUYỂN PHÒNG',
+}
+const KIND_NAME: Record<InvoiceTemplateKind, string> = {
+  standard: '',
+  termination: 'Hoá đơn thanh lý',
+  room_change: 'Hoá đơn chuyển phòng',
+}
+const STYLE_NAME: Record<TemplateStyle, string> = { formal: 'Trang trọng', modern: 'Hiện đại' }
+
+/** Mẫu khởi đầu theo loại hoá đơn và kiểu trình bày; loại thanh lý, chuyển phòng giữ bố cục mẫu thường, đổi tiêu đề. */
+export function defaultInvoiceTemplateFor(
+  kind: InvoiceTemplateKind,
+  style: TemplateStyle,
+): { name: string; html: string } {
+  const base = DEFAULT_INVOICE_TEMPLATES[style]
+  if (kind === 'standard') return base
+  return {
+    name: `${KIND_NAME[kind]} (${STYLE_NAME[style]})`,
+    html: base.html.replace('>HOÁ ĐƠN</h1>', `>${KIND_TITLE[kind]}</h1>`),
+  }
 }

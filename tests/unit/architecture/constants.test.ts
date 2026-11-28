@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
+import { PAYMENT_METHOD_DISPLAY_LABELS, PAYMENT_METHOD_OPTIONS } from '@/domain/payment-labels'
 
 // Quét file nguồn bằng regex để chặn việc viết lại giá trị đã có một nguồn.
 const ROOT = process.cwd()
@@ -32,6 +33,12 @@ describe('hằng số chỉ có một nguồn', () => {
 
   it("nhãn thu tiền cash: 'Tiền mặt' chỉ định nghĩa một lần", () => {
     expect(countMatches(/cash: 'Tiền mặt'/g)).toBe(1)
+  })
+
+  it('ô chọn phương thức thu chỉ có tiền thật; nhãn hiển thị có thêm ví và gộp thanh lý', () => {
+    expect(PAYMENT_METHOD_OPTIONS.map((o) => o.value)).toEqual(['cash', 'transfer', 'other'])
+    expect(PAYMENT_METHOD_DISPLAY_LABELS.wallet).toBe('Trừ ví')
+    expect(PAYMENT_METHOD_DISPLAY_LABELS.carry).toBe('Gộp vào thanh lý')
   })
 
   it('thứ hạng trạng thái ký (draft: 0) chỉ định nghĩa một lần', () => {

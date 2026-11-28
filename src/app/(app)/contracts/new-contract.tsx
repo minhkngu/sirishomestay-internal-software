@@ -121,7 +121,9 @@ export async function NewContract({ sp, showHeading = true }: { sp: NewContractS
       }))
 
   const leaseFormProps = {
-    invoiceTemplates: invoiceTemplates.map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault })),
+    invoiceTemplates: invoiceTemplates
+      .filter((t) => t.kind === 'standard')
+      .map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault })),
     templates: templates.filter(isUsableTemplate).map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault })),
     feeDefaults,
     feeUnits: units.map((u) => ({ id: u.id, name: u.name })),

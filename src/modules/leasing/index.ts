@@ -1,5 +1,6 @@
 // Cổng phía server của module leasing: chỉ những gì nơi ngoài module đang dùng.
-export { INVOICE_STATUS_LABELS } from './domain/labels'
+export { INVOICE_STATUS_LABELS, WALLET_ENTRY_LABELS } from './domain/labels'
+export type { WalletEntryView } from './domain/wallet'
 export { listAddenda } from './server/addenda/service'
 export { referenceChanges } from './domain/extension-reference'
 export { listOneOffs } from './server/charges/service'
@@ -21,8 +22,19 @@ export {
   listInvoices,
   nextInvoiceCode,
   previewNewInvoice,
+  leaseWalletBalance,
+  previewPaymentRemoval,
   removePayment,
   tenantBalance,
   updatePayment,
 } from './server/invoices/service'
 export { computeDueDate } from './domain/due-date'
+export {
+  addWalletEntry,
+  type PaymentRemoval,
+  settleRemovedPayments,
+  listWalletCashEntries,
+  listWalletEntries,
+  listWalletView,
+  walletBalance,
+} from './server/wallet/service'

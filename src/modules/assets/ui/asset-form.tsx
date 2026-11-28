@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { MoneyInput } from '@/components/ui/money-input'
 import { createAssetAction } from '../server/assets/actions'
 import type { TreeFacility } from './location-types'
+import { OptionSelect } from '@/components/option-select'
 
 export function AssetForm({ facilities }: { facilities: TreeFacility[] }) {
   const [open, setOpen] = useState(false)
@@ -112,45 +113,37 @@ function AssetDialogForm({ facilities, onClose }: { facilities: TreeFacility[]; 
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="asset-condition">Tình trạng</Label>
-          <select id="asset-condition" value={v.condition} onChange={(e) => setV({ ...v, condition: e.target.value })}>
-            {ASSET_CONDITIONS.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+          <OptionSelect
+            id="asset-condition"
+            ariaLabel="Tình trạng"
+            value={v.condition}
+            onValueChange={(next) => setV({ ...v, condition: next })}
+            options={ASSET_CONDITIONS.map((c) => ({ value: c, label: c }))}
+          />
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="asset-facility">Cơ sở</Label>
-          <select
+          <OptionSelect
             id="asset-facility"
-            aria-label="Cơ sở"
+            ariaLabel="Cơ sở"
             value={v.facilityId}
-            onChange={(e) => setV({ ...v, facilityId: e.target.value, where: `warehouse:${e.target.value}` })}
-          >
-            {facilities.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </select>
+            onValueChange={(next) => setV({ ...v, facilityId: next, where: `warehouse:${next}` })}
+            options={facilities.map((f) => ({ value: f.id, label: f.name }))}
+          />
         </div>
         <div className="grid gap-1.5 sm:col-span-2">
           <Label htmlFor="asset-location">Vị trí</Label>
-          <select
+          <OptionSelect
             id="asset-location"
-            aria-label="Vị trí"
+            ariaLabel="Vị trí"
             value={v.where}
-            onChange={(e) => setV({ ...v, where: e.target.value })}
-          >
-            <option value={`warehouse:${v.facilityId}`}>Kho</option>
-            <option value={`common:${v.facilityId}`}>Khu chung</option>
-            {fac?.rooms.map((r) => (
-              <option key={r.id} value={`room:${r.id}`}>
-                Phòng {r.code}
-              </option>
-            ))}
-          </select>
+            onValueChange={(next) => setV({ ...v, where: next })}
+            options={[
+              { value: `warehouse:${v.facilityId}`, label: 'Kho' },
+              { value: `common:${v.facilityId}`, label: 'Khu chung' },
+              ...(fac?.rooms ?? []).map((r) => ({ value: `room:${r.id}`, label: `Phòng ${r.code}` })),
+            ]}
+          />
         </div>
         {error && (
           <p role="alert" className="text-sm text-destructive sm:col-span-2">

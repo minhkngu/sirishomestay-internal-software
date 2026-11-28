@@ -594,12 +594,9 @@ export async function ensureFeeMeter(
   if (busy) throw new ValidationError('Đồng hồ đang gắn với phí của hợp đồng khác')
   const readings = await tx.select().from(meterReadings).where(eq(meterReadings.meterId, meter.id))
   // Chỉ số ban đầu độc lập với mọi lần chốt khác: không ràng buộc với số trước hay số sau (cùng nguyên tắc với updateLeaseFeeMeter)
-  // Chỉ số bàn giao cùng ngày (vd. chốt khi thanh lý hợp đồng trước) được nhận lại nếu trùng giá trị
+  // Chỉ số bàn giao cùng ngày (vd. chốt khi thanh lý hợp đồng trước) là một con số duy nhất của đồng hồ: nhập số mới thì ghi đè.
+  // Hoá đơn đã lập không đổi theo.
   const sameDay = readings.find((r) => r.kind === 'handover' && r.readOn === input.installedOn)
-  if (sameDay && sameDay.value !== input.initialReading)
-    throw new ValidationError(`Đồng hồ đã có chỉ số bàn giao ${sameDay.value} trong ngày này`, {
-      initialReading: `Nhập đúng chỉ số đã chốt: ${sameDay.value}`,
-    })
   await recordAudit(tx, ctx, {
     action: 'update',
     entity: 'meter',
@@ -608,7 +605,10 @@ export async function ensureFeeMeter(
     summary: 'Dùng lại đồng hồ cho phí hợp đồng',
     after: { leaseFeeId: input.leaseFeeId, initialReading: input.initialReading, readOn: input.installedOn },
   })
-  if (!sameDay)
+  if (sameDay) {
+    if (sameDay.value !== input.initialReading)
+      await tx.update(meterReadings).set({ value: input.initialReading! }).where(eq(meterReadings.id, sameDay.id))
+  } else
     await tx.insert(meterReadings).values({
       meterId: meter.id,
       period: input.installedOn.slice(0, 7),
@@ -731,10 +731,9 @@ export async function updateLeaseFeeMeter(
   }
 
   // Đổi đồng hồ: giữ dòng chốt của đồng hồ cũ làm lịch sử, ghi/khớp chỉ số đầu cho đồng hồ mới tại cùng ngày chốt
+  // Chỉ số bàn giao cùng ngày là một con số duy nhất của đồng hồ: nhập số mới thì ghi đè, hoá đơn đã lập không đổi
   if (sameDay && sameDay.value !== input.initialReading)
-    throw new ValidationError(`Đồng hồ đã có chỉ số bàn giao ${sameDay.value} trong ngày này`, {
-      initialReading: `Nhập đúng chỉ số đã chốt: ${sameDay.value}`,
-    })
+    await tx.update(meterReadings).set({ value: input.initialReading }).where(eq(meterReadings.id, sameDay.id))
   if (link)
     await tx.update(leaseFeeMeters).set({ meterId: meter.id }).where(eq(leaseFeeMeters.leaseFeeId, input.leaseFeeId))
   else await tx.insert(leaseFeeMeters).values({ leaseFeeId: input.leaseFeeId, meterId: meter.id })

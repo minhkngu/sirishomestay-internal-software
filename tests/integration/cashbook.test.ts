@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { auditLogs, depositEntries, facilities, invoiceLines, leases, rooms, tenants } from '@/db'
+import { auditLogs, depositEntries, facilities, invoiceLines, leases, rooms, tenants, tenantWalletEntries } from '@/db'
 import type { DB } from '@/db/client'
 import type { AccessContext, Permission } from '@/domain/access'
 import { summarize } from '@/domain/cashbook'
@@ -94,6 +94,57 @@ describe('sổ quỹ thu chi', () => {
     expect(summarize(rows)).toEqual({ income: 13000000, expense: 500000, net: 12500000 })
     expect(depositHeld).toBe(8700000)
   })
+  it('thu vượt: tiền dư vào ví tính thu một lần; khoản dùng ví không tính thu', async () => {
+    const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-08' })
+    await approveInvoice(db, ctx(), inv.id, {})
+    await recordLeasePayment(db, ctx(), leaseId, { paidOn: '2026-08-10', amount: 21000000, method: 'cash' })
+    let { rows } = await listCashbook(db, ctx(), { month: '2026-08' })
+    // Hoá đơn đầu gồm cọc 9tr và tiền thuê 9tr = 18tr; 3tr còn lại vào ví
+    expect(rows.filter((r) => r.source === 'wallet').map((r) => r.amount)).toEqual([3000000])
+    expect(summarize(rows).income).toBe(21000000)
+    const [next] = await createDrafts(db, ctx(), { facilityId, period: '2026-09' })
+    await approveInvoice(db, ctx(), next.id, {})
+    await recordLeasePayment(db, ctx(), leaseId, {
+      paidOn: '2026-09-05',
+      amount: 0,
+      walletAmount: 3000000,
+      method: 'cash',
+    })
+    ;({ rows } = await listCashbook(db, ctx(), {}))
+    expect(summarize(rows).income).toBe(21000000)
+    expect(rows.some((r) => r.method === 'wallet')).toBe(false)
+  })
+  it('sổ quỹ đọc đúng các loại ví', async () => {
+    const [lease] = await db.select({ tenantId: leases.tenantId }).from(leases).where(eq(leases.id, leaseId))
+    const e = (
+      kind: 'overpay' | 'reallocate' | 'refund_out' | 'carry_surplus' | 'use_invoice',
+      amount: number,
+      date: string,
+    ) => ({
+      tenantId: lease.tenantId,
+      facilityId,
+      kind,
+      amount,
+      date,
+      sourceKey: `seed:${kind}`,
+    })
+    await db
+      .insert(tenantWalletEntries)
+      .values([
+        e('overpay', 3_000_000, '2026-09-01'),
+        e('reallocate', 9_000_000, '2026-09-02'),
+        e('refund_out', -9_000_000, '2026-09-05'),
+        e('carry_surplus', 5_900_000, '2026-09-06'),
+        e('use_invoice', -1_000_000, '2026-09-07'),
+      ])
+    const { rows } = await listCashbook(db, ctx(), {})
+    expect(summarize(rows)).toEqual({ income: 12_000_000, expense: 9_000_000, net: 3_000_000 })
+    expect(rows.find((r) => r.date === '2026-09-05')).toMatchObject({
+      direction: 'out',
+      amount: 9_000_000,
+      label: 'Trả lại khách',
+    })
+  })
   it('hoá đơn có dòng cọc: tiền thu trả cọc trước, sổ quỹ tách dòng thu cọc và thu tiền thuê, không tính hai lần', async () => {
     await db
       .insert(depositEntries)
@@ -108,6 +159,20 @@ describe('sổ quỹ thu chi', () => {
     ])
     expect(summarize(rows).income).toBe(10000000)
     expect(depositHeld).toBe(9000000)
+  })
+  it('gỡ phiếu từng gạch cọc, trả lại khách: cọc về chờ thu, ví không đổi, sổ quỹ thu rồi chi', async () => {
+    await db
+      .insert(depositEntries)
+      .values({ leaseId, date: '2026-08-01', type: 'collect', amount: 9000000, status: 'pending' })
+    const [inv] = await createDrafts(db, ctx(), { facilityId, period: '2026-08' })
+    await approveInvoice(db, ctx(), inv.id, {})
+    await recordLeasePayment(db, ctx(), leaseId, { paidOn: '2026-08-10', amount: 18000000, method: 'cash' })
+    const [pay] = (await listCashbook(db, ctx(), {})).rows.filter((r) => r.source === 'payment')
+    await removePayment(db, ctx(), pay.id, { kind: 'refund', refundOn: '2026-08-12' })
+    const [dep] = await db.select().from(depositEntries).where(eq(depositEntries.leaseId, leaseId))
+    expect(dep.status).toBe('pending')
+    const { rows } = await listCashbook(db, ctx(), {})
+    expect(summarize(rows)).toMatchObject({ income: 18000000, expense: 18000000 })
   })
   it('người chỉ có quyền cơ sở A không thấy cơ sở B', async () => {
     await addExpense(db, context(['billing'], [otherId]), expense({ facilityId: otherId }))

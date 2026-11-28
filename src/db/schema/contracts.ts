@@ -8,6 +8,7 @@ import type {
 } from '@/domain/statuses'
 import { sql } from 'drizzle-orm'
 import {
+  type AnyPgColumn,
   boolean,
   check,
   date,
@@ -88,6 +89,8 @@ export const leases = pgTable(
     dueRule: jsonb('due_rule'),
     proration: text('proration'),
     fromDepositContractId: uuid('from_deposit_contract_id').references(() => depositContracts.id),
+    /** Hợp đồng cũ khi hợp đồng này sinh ra từ "Chuyển phòng" (thanh lý hợp đồng cũ + tạo hợp đồng mới). */
+    transferFromLeaseId: uuid('transfer_from_lease_id').references((): AnyPgColumn => leases.id),
     status: text('status').$type<LeaseStatus>().notNull().default('active'),
     signStatus: text('sign_status').$type<SignStatus>().notNull().default('draft'),
     signedFileId: uuid('signed_file_id'),

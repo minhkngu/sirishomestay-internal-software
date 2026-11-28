@@ -28,7 +28,7 @@ export function InvoiceRowActions({
   const router = useRouter()
   const [pending, start] = useTransition()
   const [collecting, setCollecting] = useState(false)
-  const [confirm, setConfirm] = useState<'approve' | 'unapprove' | 'delete' | null>(null)
+  const [confirm, setConfirm] = useState<'delete' | null>(null)
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>, ok: string) =>
     start(async () => {
       const r = await fn()
@@ -45,23 +45,11 @@ export function InvoiceRowActions({
       onOpenChange={(o) => {
         if (!o) setConfirm(null)
       }}
-      title={
-        confirm === 'approve'
-          ? `Duyệt hoá đơn ${code}?`
-          : confirm === 'unapprove'
-            ? `Bỏ duyệt hoá đơn ${code}?`
-            : `Xoá hoá đơn ${code}?`
-      }
-      description={
-        confirm === 'unapprove' ? 'Hoá đơn về nháp để sửa.' : confirm === 'delete' ? 'Không thể hoàn tác.' : undefined
-      }
-      confirmLabel={confirm === 'approve' ? 'Duyệt' : confirm === 'unapprove' ? 'Bỏ duyệt' : 'Xoá'}
-      destructive={confirm === 'delete'}
-      onConfirm={() => {
-        if (confirm === 'approve') run(() => approveInvoiceAction(id, {}), 'Đã duyệt hoá đơn')
-        else if (confirm === 'unapprove') run(() => unapproveInvoiceAction(id), 'Đã bỏ duyệt, hoá đơn về nháp')
-        else if (confirm === 'delete') run(() => deleteInvoiceAction(id), 'Đã xoá hoá đơn')
-      }}
+      title={`Xoá hoá đơn ${code}?`}
+      description="Không thể hoàn tác."
+      confirmLabel="Xoá"
+      destructive
+      onConfirm={() => run(() => deleteInvoiceAction(id), 'Đã xoá hoá đơn')}
     />
   )
   if (!draft) {
@@ -89,7 +77,7 @@ export function InvoiceRowActions({
           disabled={pending || unapproveBlock !== null}
           aria-label={`Bỏ duyệt ${code}`}
           title={unapproveBlock ?? 'Bỏ duyệt'}
-          onClick={() => setConfirm('unapprove')}
+          onClick={() => run(() => unapproveInvoiceAction(id), 'Đã bỏ duyệt, hoá đơn về nháp')}
         >
           <Undo2 className="size-4" aria-hidden="true" />
         </Button>
@@ -105,7 +93,7 @@ export function InvoiceRowActions({
         disabled={pending}
         aria-label={`Duyệt ${code}`}
         title="Duyệt"
-        onClick={() => setConfirm('approve')}
+        onClick={() => run(() => approveInvoiceAction(id, {}), 'Đã duyệt hoá đơn')}
       >
         <Check className="size-4 text-primary" aria-hidden="true" />
       </Button>

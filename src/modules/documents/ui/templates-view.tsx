@@ -11,6 +11,7 @@ type InvoiceTemplate = {
   isDefault: boolean
   isSystem: boolean
   hasBody: boolean
+  kind: 'standard' | 'termination' | 'room_change'
   style: 'formal' | 'modern'
   body: string | null
   preview: string | null

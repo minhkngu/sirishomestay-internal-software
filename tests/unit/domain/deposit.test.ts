@@ -4,6 +4,7 @@ import {
   depositBalance,
   runningDepositBalances,
   splitPaymentsDepositFirst,
+  transferCredit,
 } from '@/domain/deposit'
 
 const entries = [
@@ -44,5 +45,25 @@ describe('chia tiền thu của hoá đơn có dòng cọc', () => {
     expect(r.get('a')).toEqual({ deposit: 4_000_000, rent: 0 })
     expect(r.get('b')).toEqual({ deposit: 5_000_000, rent: 2_000_000 })
     expect(r.get('c')).toEqual({ deposit: 0, rent: -500_000 })
+  })
+
+  it('khoản chuyển từ hợp đồng cũ trả cọc trước tiền thu', () => {
+    const r = splitPaymentsDepositFirst([{ id: 'a', amount: 5_000_000 }], 12_000_000, 10_000_000)
+    expect(r.get('a')).toEqual({ deposit: 2_000_000, rent: 3_000_000 })
+    expect(splitPaymentsDepositFirst([{ id: 'a', amount: 1 }], 12_000_000, 13_300_000).get('a')).toEqual({
+      deposit: 0,
+      rent: 1,
+    })
+  })
+
+  it('transferCredit chỉ cộng dòng âm có sourceKey transfer:', () => {
+    expect(
+      transferCredit([
+        { amount: -13_300_000, meta: { sourceKey: 'transfer:x' } },
+        { amount: 500_000, meta: { sourceKey: 'transfer:y' } },
+        { amount: -1_000, meta: null },
+        { amount: -2_000, meta: { sourceKey: 'other:z' } },
+      ]),
+    ).toBe(13_300_000)
   })
 })

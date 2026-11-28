@@ -8,3 +8,10 @@ export type PaymentMethod = keyof typeof PAYMENT_METHOD_LABELS
 
 /** Lựa chọn cho ô chọn phương thức, theo thứ tự của `PAYMENT_METHOD_LABELS`. */
 export const PAYMENT_METHOD_OPTIONS = Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => ({ value, label }))
+
+/** Nhãn hiển thị mọi phương thức, gồm hai loại nội bộ không phải tiền thật: trả bằng ví, gộp vào thanh lý. */
+export const PAYMENT_METHOD_DISPLAY_LABELS: Record<string, string> = {
+  ...PAYMENT_METHOD_LABELS,
+  wallet: 'Trừ ví',
+  carry: 'Gộp vào thanh lý',
+}

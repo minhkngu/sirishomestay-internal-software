@@ -1,11 +1,12 @@
-import { and, asc, eq, inArray, sql, type SQL } from 'drizzle-orm'
+import { and, asc, eq, inArray, notInArray, sql, type SQL } from 'drizzle-orm'
 import { depositEntries, expenses, invoiceLines, invoices, leases, payments, rooms, tenants } from '@/db'
 import type { DB } from '@/db/client'
 import { assertCan, can, type AccessContext } from '@/domain/access'
 import { depositHeld, depositMovement, expenseLabel, type LedgerRow } from '@/domain/cashbook'
-import { splitPaymentsDepositFirst } from '@/domain/deposit'
+import { splitPaymentsDepositFirst, transferCredit } from '@/domain/deposit'
 import { VN_TIME_ZONE } from '@/domain/dates'
 import { NotFoundError, ValidationError } from '@/domain/errors'
+import { listWalletCashEntries, WALLET_ENTRY_LABELS } from '@/modules/leasing'
 import { displayName } from '@/modules/tenants'
 import { recordAudit } from '@/modules/platform'
 import { expenseInput } from './schemas'
@@ -60,7 +61,14 @@ export async function listCashbook(
       .innerJoin(leases, eq(leases.id, invoices.leaseId))
       .innerJoin(rooms, eq(rooms.id, leases.roomId))
       .innerJoin(tenants, eq(tenants.id, leases.tenantId))
-      .where(and(inScope(invoices.facilityId, scope), inMonth(payments.paidOn, month))),
+      .where(
+        and(
+          inScope(invoices.facilityId, scope),
+          inMonth(payments.paidOn, month),
+          // Khoản dùng ví và khoản "carry" (chuyển nợ sang hợp đồng mới) không phải tiền mới thu
+          notInArray(payments.method, ['wallet', 'carry']),
+        ),
+      ),
     db
       .select({
         e: depositEntries,
@@ -97,6 +105,15 @@ export async function listCashbook(
         .groupBy(invoiceLines.invoiceId)
     : []
   const depositDueOf = new Map(depositLines.map((l) => [l.invoiceId, l.amount]))
+  // Khoản chuyển từ hợp đồng cũ đã trả cọc trước tiền thu
+  const creditOf = new Map<string, number>()
+  if (depositDueOf.size) {
+    const lineRows = await db
+      .select({ invoiceId: invoiceLines.invoiceId, amount: invoiceLines.amount, meta: invoiceLines.meta })
+      .from(invoiceLines)
+      .where(inArray(invoiceLines.invoiceId, [...depositDueOf.keys()]))
+    for (const id of depositDueOf.keys()) creditOf.set(id, transferCredit(lineRows.filter((l) => l.invoiceId === id)))
+  }
   const splitOf = new Map<string, { deposit: number; rent: number }>()
   if (depositDueOf.size) {
     const allPays = await db
@@ -108,6 +125,7 @@ export async function listCashbook(
       for (const [id, split] of splitPaymentsDepositFirst(
         allPays.filter((p) => p.invoiceId === invoiceId),
         depositDueOf.get(invoiceId)!,
+        creditOf.get(invoiceId) ?? 0,
       ))
         splitOf.set(id, split)
   }
@@ -138,8 +156,53 @@ export async function listCashbook(
         : []),
     ]
   })
+  // Biến động ví có tiền thật: thu dư, phiếu chuyển vào ví (thu), trả lại khách (chi)
+  const overpay = await listWalletCashEntries(db, { facilityIds: scope ?? 'all', month })
+  const overTenants = overpay.length
+    ? await db
+        .select()
+        .from(tenants)
+        .where(inArray(tenants.id, [...new Set(overpay.map((o) => o.tenantId))]))
+    : []
+  const overLeaseIds = [...new Set(overpay.flatMap((o) => (o.leaseId ? [o.leaseId] : [])))]
+  const overRooms = overLeaseIds.length
+    ? await db
+        .select({ leaseId: leases.id, roomCode: rooms.code })
+        .from(leases)
+        .innerJoin(rooms, eq(rooms.id, leases.roomId))
+        .where(inArray(leases.id, overLeaseIds))
+    : []
+  const overPayments = overpay.flatMap((o) => (o.paymentId ? [o.paymentId] : []))
+  const overMethods = overPayments.length
+    ? await db
+        .select({ id: payments.id, method: payments.method })
+        .from(payments)
+        .where(inArray(payments.id, overPayments))
+    : []
+  const walletRows = overpay.map((o): LedgerRow => {
+    const t = overTenants.find((x) => x.id === o.tenantId)
+    return {
+      key: `wallet:${o.id}`,
+      source: 'wallet',
+      id: o.id,
+      date: o.date,
+      direction: o.kind === 'refund_out' ? 'out' : 'in',
+      kind: 'rent',
+      label: WALLET_ENTRY_LABELS[o.kind],
+      amount: o.kind === 'refund_out' ? -o.amount : o.amount,
+      counted: true,
+      facilityId: o.facilityId,
+      roomCode: overRooms.find((r) => r.leaseId === o.leaseId)?.roomCode ?? null,
+      party: t ? displayName(t) : '',
+      method: overMethods.find((m) => m.id === o.paymentId)?.method ?? null,
+      note: o.note,
+      status: 'done',
+      ...when(o.createdAt),
+    }
+  })
   const rows: LedgerRow[] = [
     ...paymentRows,
+    ...walletRows,
     // Sổ quỹ chỉ ghi khi tiền đã thực nhận hoặc đã chi: bỏ cọc chờ thu/hoàn và bù trừ, mất cọc (không có tiền đi qua)
     ...dep
       // Cọc thu cùng hoá đơn đã hiện ở dòng thu cọc của khoản thu, không ghi lần nữa

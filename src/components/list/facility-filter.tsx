@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef } from 'react'
 import { Building, ChevronDown } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
 import { setListParams, useFacilitySelection } from './use-list-params'
 
 export function FacilityFilter({
@@ -54,33 +55,36 @@ export function FacilityFilter({
         <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
       </summary>
       <div
-        className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} z-30 mt-1.5 min-w-56 space-y-2 rounded-xl border border-border bg-popover p-3 shadow-md`}
+        className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} z-30 mt-1.5 w-60 rounded-xl border border-border bg-popover p-1.5 shadow-md`}
       >
-        <div className="flex items-center justify-between border-b border-border/50 pb-2">
-          <span className="text-xs font-semibold text-foreground">Chọn cơ sở</span>
+        <div className="flex items-center justify-between px-2 pt-1 pb-1.5">
+          <span className="text-[13px] font-medium text-muted-foreground">Toà</span>
           <button
             type="button"
-            className="text-xs text-primary hover:underline underline-offset-2"
+            disabled={!checked.length}
+            className="text-[13px] font-medium text-primary underline-offset-2 hover:underline disabled:pointer-events-none disabled:text-muted-foreground/60"
             onClick={() => update([])}
           >
-            Tất cả toà
+            Bỏ chọn
           </button>
         </div>
-        <div className="space-y-1.5 max-h-56 overflow-y-auto">
-          {facilities.map((f) => (
-            <label
-              key={f.id}
-              className="flex cursor-pointer items-center gap-2 rounded-lg p-1 text-xs text-foreground hover:bg-muted/60 transition-colors"
-            >
-              <input
-                type="checkbox"
-                checked={checked.includes(f.id)}
-                onChange={(e) => update(e.target.checked ? [...checked, f.id] : checked.filter((id) => id !== f.id))}
-                className="size-3.5 rounded border-border text-primary focus:ring-primary/30"
-              />
-              <span className="truncate">{f.name}</span>
-            </label>
-          ))}
+        <div className="max-h-60 overflow-y-auto border-t border-border/60 pt-1">
+          {facilities.map((f) => {
+            const on = checked.includes(f.id)
+            return (
+              <label
+                key={f.id}
+                className="flex h-9 cursor-pointer items-center gap-2.5 rounded-lg px-2 text-[13px] text-foreground transition-colors hover:bg-muted/60"
+              >
+                <Checkbox
+                  aria-label={f.name}
+                  checked={on}
+                  onCheckedChange={(next) => update(next ? [...checked, f.id] : checked.filter((id) => id !== f.id))}
+                />
+                <span className={`truncate ${on ? 'font-medium' : ''}`}>{f.name}</span>
+              </label>
+            )
+          })}
         </div>
       </div>
     </details>
