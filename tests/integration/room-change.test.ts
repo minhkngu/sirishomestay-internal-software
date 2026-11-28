@@ -26,7 +26,12 @@ import { cancelRoomChange, createRoomChange } from '@/modules/leasing/server/add
 import { previewContractRestore } from '@/modules/leasing/server/contracts/restore'
 import type { StorageAdapter } from '@/modules/platform'
 import { finalizeTermination } from '@/modules/leasing/server/addenda/finalize'
-import { approveInvoice, unapproveInvoice } from '@/modules/leasing/server/invoices/service'
+import {
+  approveInvoice,
+  createDraftForLease,
+  unapproveInvoice,
+  updateLines,
+} from '@/modules/leasing/server/invoices/service'
 import { addWalletEntry, walletBalance } from '@/modules/leasing/server/wallet/service'
 import { createTestDb } from '../helpers/db'
 
@@ -499,19 +504,62 @@ describe('thanh lý nối ví và chuyển phòng', () => {
           unitPrice: 1_000_000,
           amount: 1_000_000,
         })
-        await db
-          .insert(payments)
-          .values({
-            invoiceId: inv.id,
-            paidOn: '2026-12-02',
-            amount: 1_000_000,
-            method: 'cash',
-            receivedBy: crypto.randomUUID(),
-          })
+        await db.insert(payments).values({
+          invoiceId: inv.id,
+          paidOn: '2026-12-02',
+          amount: 1_000_000,
+          method: 'cash',
+          receivedBy: crypto.randomUUID(),
+        })
         await cancelRoomChange(db, admin(), leaseId, storage)
         expect(await db.select().from(invoices).where(eq(invoices.id, inv.id))).toHaveLength(0)
         expect((await db.select().from(leases).where(eq(leases.id, leaseId)))[0].status).toBe('active')
         expect(await walletBalance(db, tenantId, facilityId)).toBe(5_000_000)
+      })
+    })
+
+    describe('khoản chuyển từ hợp đồng cũ trong hoá đơn mới', () => {
+      // Hoá đơn tháng 12 của hợp đồng mới có dòng "Chuyển từ hợp đồng HD1" −3.300.000
+      const draftWithTransfer = async () => {
+        const r = await change()
+        await approveInvoice(db, ctx(), r.terminationInvoiceId, {})
+        const inv = await createDraftForLease(db, ctx(), { leaseId: r.newLeaseId, period: '2026-12' })
+        const lines = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, inv.id))
+        const asInput = (override?: { unitPrice: number }) =>
+          lines
+            .filter((l) => override || (l.meta as { pendingId?: string } | null)?.pendingId === undefined)
+            .map((l) => ({
+              id: l.id,
+              type: l.type,
+              description: l.description,
+              quantity: l.quantity,
+              unitPrice:
+                override && (l.meta as { pendingId?: string } | null)?.pendingId ? override.unitPrice : l.unitPrice,
+              meta: l.meta as Record<string, unknown> | null,
+            }))
+        return { r, inv, asInput }
+      }
+      const admin = (): AccessContext => ({ ...ctx(), isAdmin: true })
+
+      it('không phải admin: không xoá, không sửa được', async () => {
+        const { inv, asInput } = await draftWithTransfer()
+        await expect(updateLines(db, ctx(), inv.id, asInput())).rejects.toThrow(/chỉ admin/)
+        await expect(updateLines(db, ctx(), inv.id, asInput({ unitPrice: -1_000_000 }))).rejects.toThrow(/chỉ admin/)
+      })
+
+      it('admin xoá dòng: khoản chuyển bị bỏ hẳn, không dồn sang hoá đơn sau', async () => {
+        const { r, inv, asInput } = await draftWithTransfer()
+        await updateLines(db, admin(), inv.id, asInput())
+        expect(
+          await db.select().from(pendingAdjustments).where(eq(pendingAdjustments.leaseId, r.newLeaseId)),
+        ).toHaveLength(0)
+      })
+
+      it('admin sửa số tiền: khoản chuyển đổi theo', async () => {
+        const { r, inv, asInput } = await draftWithTransfer()
+        await updateLines(db, admin(), inv.id, asInput({ unitPrice: -1_000_000 }))
+        const adj = await db.select().from(pendingAdjustments).where(eq(pendingAdjustments.leaseId, r.newLeaseId))
+        expect(adj.map((a) => a.amount)).toEqual([-1_000_000])
       })
     })
 
