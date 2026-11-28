@@ -47,7 +47,7 @@ const context = (permissions: Permission[], facilityId: string): AccessContext =
 describe('thanh lý nối ví và chuyển phòng', () => {
   let db: DB, facilityId: string, leaseId: string, roomId: string, room2Id: string, tenantId: string
   const ctx = () => context(['tenants_contracts', 'billing', 'delete_contracts'], facilityId)
-  // Hoá đơn tháng 11 (9 triệu) đã duyệt, chưa thu; cọc 9 triệu đã thu
+  // Hoá đơn tháng 11 (9 triệu) đã duyệt và thu đủ (chuyển phòng yêu cầu hợp đồng cũ hết nợ); cọc 9 triệu đã thu
   beforeEach(async () => {
     db = await createTestDb()
     const [facility] = await db.insert(facilities).values({ code: 'TD', name: 'Thảo Điền' }).returning()
@@ -109,6 +109,13 @@ describe('thanh lý nối ví và chuyển phòng', () => {
       unitPrice: 9000000,
       amount: 9000000,
     })
+    await db.insert(payments).values({
+      invoiceId: inv.id,
+      paidOn: '2026-11-15',
+      amount: 9000000,
+      method: 'cash',
+      receivedBy: crypto.randomUUID(),
+    })
   })
   const terminate = (over: Record<string, unknown> = {}, opts: { transfer?: boolean } = {}) =>
     createTermination(
@@ -145,7 +152,7 @@ describe('thanh lý nối ví và chuyển phòng', () => {
       date: '2026-11-01',
       sourceKey: 'overpay:t1',
     })
-    // mất hết cọc: tổng = −3.000.000 (hoàn 10 ngày) + 9.000.000 (nợ cũ) = 6.000.000; ví 5.000.000 gạch vào
+    // mất hết cọc: tổng = −3.300.000 (hoàn 11 ngày), ví 5.000.000 gạch vào
     const r = await terminate({ forfeit: { mode: 'all' } })
     const lines = await linesOf(r.invoice!.id)
     expect(lines.find((l) => (l.meta as { wallet?: number } | null)?.wallet)?.amount).toBe(-5_000_000)
@@ -163,28 +170,31 @@ describe('thanh lý nối ví và chuyển phòng', () => {
     const nextId = await newLease()
     const r = await terminate({}, { transfer: true })
     const lines = await linesOf(r.invoice!.id)
-    // hoàn từ 20/11 đến 30/11 = 11 ngày = 3.300.000; T = −3.300.000 → dòng chuyển +3.300.000
+    // hoàn từ 20/11 đến 30/11 = 11 ngày = 3.300.000, hoàn cọc 9.000.000; T = −12.300.000 → dòng chuyển +12.300.000
     expect(lines.find((l) => l.type === 'refund')?.amount).toBe(-3_300_000)
-    expect(lines.find((l) => (l.meta as { transfer?: boolean } | null)?.transfer)?.amount).toBe(3_300_000)
+    expect(lines.find((l) => (l.meta as { transfer?: boolean } | null)?.transfer)?.amount).toBe(12_300_000)
     expect(lines.reduce((n, l) => n + l.amount, 0)).toBe(0)
     await approveInvoice(db, ctx(), r.invoice!.id, {})
     const adj = await db.select().from(pendingAdjustments).where(eq(pendingAdjustments.leaseId, nextId))
-    expect(adj.map((a) => [a.amount, a.sourceKey])).toEqual([[-3_300_000, `transfer:${leaseId}`]])
+    expect(adj.map((a) => [a.amount, a.sourceKey])).toEqual([[-12_300_000, `transfer:${leaseId}`]])
     await finalizeTermination(db, ctx(), { id: r.invoice!.id, leaseId, facilityId })
     expect(await db.select().from(pendingAdjustments).where(eq(pendingAdjustments.leaseId, nextId))).toHaveLength(1)
   })
 
   it('chuyển phòng, T dương: nợ sang hợp đồng mới', async () => {
     const nextId = await newLease()
-    const r = await terminate({ forfeit: { mode: 'all' } }, { transfer: true })
+    const r = await terminate(
+      { forfeit: { mode: 'all' }, penalties: [{ description: 'Hư hỏng', amount: 9_000_000 }] },
+      { transfer: true },
+    )
     await approveInvoice(db, ctx(), r.invoice!.id, {})
     const adj = await db.select().from(pendingAdjustments).where(eq(pendingAdjustments.leaseId, nextId))
-    expect(adj.map((a) => a.amount)).toEqual([5_700_000]) // −3.300.000 + 9.000.000 nợ cũ
+    expect(adj.map((a) => a.amount)).toEqual([5_700_000]) // −3.300.000 hoàn + 9.000.000 phạt
   })
 
   it('chuyển phòng, T = 0: không tạo điều chỉnh, không có dòng chuyển', async () => {
     const nextId = await newLease()
-    const r = await terminate({ forfeit: { mode: 'partial', amount: 3_300_000 } }, { transfer: true })
+    const r = await terminate({ forfeit: { mode: 'all' }, rentRefund: { mode: 'none' } }, { transfer: true })
     expect((await linesOf(r.invoice!.id)).some((l) => (l.meta as { transfer?: boolean } | null)?.transfer)).toBe(false)
     await approveInvoice(db, ctx(), r.invoice!.id, {})
     expect(await db.select().from(pendingAdjustments).where(eq(pendingAdjustments.leaseId, nextId))).toHaveLength(0)
@@ -239,7 +249,7 @@ describe('thanh lý nối ví và chuyển phòng', () => {
     expect(await walletBalance(db, tenantId)).toBe(0)
   })
 
-  it('chuyển phòng: sửa hoá đơn nháp thì dòng chuyển và điều chỉnh theo số cuối; nợ cũ được đóng bằng khoản carry', async () => {
+  it('chuyển phòng: sửa hoá đơn nháp thì dòng chuyển và điều chỉnh theo số cuối; không có khoản gộp vì hết nợ', async () => {
     const nextId = await newLease()
     const r = await terminate({}, { transfer: true })
     await db.insert(invoiceLines).values({
@@ -254,9 +264,8 @@ describe('thanh lý nối ví và chuyển phòng', () => {
     const lines = await linesOf(r.invoice!.id)
     expect(lines.reduce((n, l) => n + l.amount, 0)).toBe(0)
     const adj = await db.select().from(pendingAdjustments).where(eq(pendingAdjustments.leaseId, nextId))
-    expect(adj.map((a) => a.amount)).toEqual([-2_300_000]) // −3.300.000 + 1.000.000
-    const carry = await db.select().from(payments).where(eq(payments.method, 'carry'))
-    expect(carry.map((p) => p.amount)).toEqual([9_000_000])
+    expect(adj.map((a) => a.amount)).toEqual([-11_300_000]) // −12.300.000 + 1.000.000
+    expect(await db.select().from(payments).where(eq(payments.method, 'carry'))).toHaveLength(0)
   })
 
   it('khôi phục hợp đồng cũ bị chặn sau khi chuyển phòng', async () => {
@@ -295,6 +304,53 @@ describe('thanh lý nối ví và chuyển phòng', () => {
       expect(inv).toMatchObject({ kind: 'termination', status: 'draft' })
       expect((await linesOf(inv.id)).some((l) => (l.meta as { transfer?: boolean } | null)?.transfer)).toBe(true)
       expect((await db.select().from(handovers).where(eq(handovers.leaseId, r.newLeaseId))).length).toBeGreaterThan(0)
+    })
+
+    it('còn nợ ở hoá đơn tháng thì từ chối chuyển phòng: hợp đồng cũ vẫn hiệu lực, không có hợp đồng mới', async () => {
+      await db.delete(payments)
+      await expect(change()).rejects.toThrow('Còn nợ 9.000.000 ở hoá đơn tháng 11/2026')
+      expect((await db.select().from(leases)).map((l) => l.code)).toEqual(['HD1'])
+      expect((await db.select().from(leases))[0].status).toBe('active')
+    })
+
+    it('còn hoá đơn nháp thì từ chối chuyển phòng', async () => {
+      await db.insert(invoices).values({
+        code: 'TD-HD-202612-0001',
+        leaseId,
+        facilityId,
+        kind: 'monthly',
+        periodStart: '2026-12-01',
+        periodEnd: '2026-12-31',
+        issueDate: '2026-12-01',
+        status: 'draft',
+      })
+      await expect(change()).rejects.toThrow('còn nháp')
+    })
+
+    it('duyệt thanh lý chuyển phòng bị từ chối khi hợp đồng cũ lại phát sinh nợ', async () => {
+      const r = await change()
+      const [inv] = await db
+        .insert(invoices)
+        .values({
+          code: 'TD-HD-202610-0009',
+          leaseId,
+          facilityId,
+          kind: 'monthly',
+          periodStart: '2026-10-01',
+          periodEnd: '2026-10-31',
+          issueDate: '2026-10-01',
+          status: 'approved',
+        })
+        .returning()
+      await db.insert(invoiceLines).values({
+        invoiceId: inv.id,
+        type: 'rent',
+        description: 'Tiền phòng',
+        quantity: 1,
+        unitPrice: 1_000_000,
+        amount: 1_000_000,
+      })
+      await expect(approveInvoice(db, ctx(), r.terminationInvoiceId, {})).rejects.toThrow(ValidationError)
     })
 
     it('phòng mới khác cơ sở hoặc trùng phòng cũ bị từ chối', async () => {
@@ -444,7 +500,7 @@ describe('thanh lý nối ví và chuyển phòng', () => {
 
     describe('hoàn tác chuyển phòng đã duyệt (chỉ admin)', () => {
       const admin = (): AccessContext => ({ ...ctx(), isAdmin: true })
-      // Ví 5tr, chuyển phòng rồi duyệt hoá đơn thanh lý: ví bị gạch, khoản chuyển sang hợp đồng mới, nợ tháng 11 đóng bằng carry
+      // Ví 5tr, chuyển phòng rồi duyệt hoá đơn thanh lý: ví bị gạch, khoản chuyển sang hợp đồng mới
       const approvedChange = async () => {
         await addWalletEntry(db, {
           tenantId,
@@ -468,7 +524,6 @@ describe('thanh lý nối ví và chuyển phòng', () => {
       it('admin: hợp đồng cũ hiệu lực lại, hợp đồng mới và khoản chuyển bị xoá, ví và nợ cũ về như trước duyệt', async () => {
         const r = await approvedChange()
         expect(await walletBalance(db, tenantId)).toBe(0)
-        expect(await db.select().from(payments).where(eq(payments.method, 'carry'))).toHaveLength(1)
         await cancelRoomChange(db, admin(), leaseId, storage)
         expect((await db.select().from(leases).where(eq(leases.id, leaseId)))[0].status).toBe('active')
         expect(await db.select().from(leases).where(eq(leases.id, r.newLeaseId))).toHaveLength(0)
@@ -519,7 +574,7 @@ describe('thanh lý nối ví và chuyển phòng', () => {
     })
 
     describe('khoản chuyển từ hợp đồng cũ trong hoá đơn mới', () => {
-      // Hoá đơn tháng 12 của hợp đồng mới có dòng "Chuyển từ hợp đồng HD1" −3.300.000
+      // Hoá đơn tháng 12 của hợp đồng mới có dòng "Chuyển từ hợp đồng HD1" −12.300.000
       const draftWithTransfer = async () => {
         const r = await change()
         await approveInvoice(db, ctx(), r.terminationInvoiceId, {})
@@ -550,7 +605,7 @@ describe('thanh lý nối ví và chuyển phòng', () => {
           )
         }
         const adj = await db.select().from(pendingAdjustments).where(eq(pendingAdjustments.leaseId, r.newLeaseId))
-        expect(adj.map((a) => a.amount)).toEqual([-3_300_000])
+        expect(adj.map((a) => a.amount)).toEqual([-12_300_000])
       })
     })
 

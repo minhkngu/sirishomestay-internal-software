@@ -17,7 +17,7 @@ import {
   setAddendumSignStatus,
   type AddendumKind,
 } from './service'
-import { cancelRoomChange, createRoomChange } from './room-change'
+import { cancelRoomChange, createRoomChange, roomChangeBlockers } from './room-change'
 
 const refresh = () => {
   revalidatePath('/contracts', 'layout')
@@ -74,6 +74,10 @@ export async function createRoomChangeAction(leaseId: string, input: unknown) {
     refresh()
     return r
   })
+}
+export async function roomChangeBlockerAction(leaseId: string) {
+  const ctx = await getAccessContext()
+  return toActionResult(() => roomChangeBlockers(db, ctx, leaseId))
 }
 export async function cancelRoomChangeAction(oldLeaseId: string) {
   const ctx = await getAccessContext()

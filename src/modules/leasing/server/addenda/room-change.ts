@@ -21,6 +21,8 @@ import { deleteContract } from '../contracts/lifecycle'
 import { insertLease } from '../contracts/lease-insert'
 import type { LeaseFeeInput, LeaseInput } from '../contracts/lease-types'
 import { previewContractRestore, restoreContract, roomChangeNeedsAdmin } from '../contracts/restore'
+import { roomChangeBlockerMessage, type RoomChangeBlockers } from '../../domain/room-change-blockers'
+import { loadRoomChangeBlockers } from './finalize'
 import { createTermination } from './service'
 
 const roomChangeSchema = z.object({
@@ -94,6 +96,18 @@ async function copyFees(
   })
 }
 
+/** Hoá đơn của hợp đồng cũ cản việc chuyển phòng (nháp, còn nợ), để popup báo ngay khi mở. */
+export async function roomChangeBlockers(db: DB, ctx: AccessContext, leaseId: string): Promise<RoomChangeBlockers> {
+  const [row] = await db
+    .select({ facilityId: rooms.facilityId })
+    .from(leases)
+    .innerJoin(rooms, eq(rooms.id, leases.roomId))
+    .where(eq(leases.id, leaseId))
+  if (!row) throw new NotFoundError()
+  assertCan(ctx, 'tenants_contracts', row.facilityId)
+  return loadRoomChangeBlockers(db, leaseId)
+}
+
 /**
  * Chuyển phòng hai bước trong một giao dịch: thanh lý hợp đồng cũ (hoá đơn thanh lý nháp ở chế độ chuyển phòng)
  * rồi tạo hợp đồng mới cho phòng mới, gắn bằng `leases.transferFromLeaseId`. Duyệt hoá đơn thanh lý sẽ cộng dồn kết quả sang hợp đồng mới.
@@ -121,6 +135,9 @@ export async function createRoomChange(
     if (newRoom.facilityId !== oldRoom.facilityId) throw new ValidationError('Chỉ chuyển phòng trong cùng một cơ sở')
     if (newRoom.id === oldRoom.id) throw new ValidationError('Phòng mới trùng phòng hiện tại')
     if (data.moveDate <= old.startDate) throw new ValidationError('Ngày chuyển phải sau ngày bắt đầu hợp đồng cũ')
+    // Nợ cũ không đi theo hợp đồng mới: phải sạch nợ và không còn hoá đơn nháp trước khi chuyển
+    const blocked = roomChangeBlockerMessage(await loadRoomChangeBlockers(tx, leaseId))
+    if (blocked) throw new ValidationError(blocked)
 
     const occupantRows = await tx
       .select({ id: leaseOccupants.tenantId })
@@ -157,12 +174,12 @@ export async function createRoomChange(
       { ...data.termination, endDate: data.moveDate },
       { transfer: true },
     )
+    if (!term.invoice) throw new ValidationError('Không tạo được hoá đơn thanh lý')
     const created = await insertLease(tx, ctx, newInput, null)
     await tx
       .update(leases)
       .set({ transferFromLeaseId: leaseId, updatedAt: new Date() })
       .where(eq(leases.id, created.lease.id))
-    if (!term.invoice) throw new ValidationError('Không tạo được hoá đơn thanh lý')
     return {
       newLeaseId: created.lease.id,
       terminationInvoiceId: term.invoice.id,

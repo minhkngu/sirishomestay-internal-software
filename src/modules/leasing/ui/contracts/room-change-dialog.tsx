@@ -1,8 +1,9 @@
 'use client'
 import { DateField } from '@/components/date-field'
 import { MoneyInput } from '@/components/ui/money-input'
-import { useState } from 'react'
-import { createRoomChangeAction } from '../../server/addenda/actions'
+import { useEffect, useState } from 'react'
+import { createRoomChangeAction, roomChangeBlockerAction } from '../../server/addenda/actions'
+import { roomChangeBlockerMessage } from '../../domain/room-change-blockers'
 import { Field, inputCls, type MeterOption } from './addendum-shell'
 import { LeaseFees, type FeeDraft, type FeeOption, type RoomFeeMeter } from './lease-fees'
 import { meterFeeError, resolveMeterIds } from './lease-fee-meters'
@@ -97,10 +98,30 @@ export function RoomChangeWizard({
       )
       .find(Boolean) ?? null
 
-  const extraError = !newRoomId ? 'Chọn phòng mới' : !newEnd ? 'Chọn ngày kết thúc hợp đồng mới' : feeError
+  // Hợp đồng cũ còn hoá đơn nháp hoặc còn nợ thì chưa chuyển được: báo ngay khi mở popup
+  const [blocked, setBlocked] = useState<string | null>(null)
+  useEffect(() => {
+    let alive = true
+    void roomChangeBlockerAction(leaseId).then((r) => {
+      if (alive && r.ok) setBlocked(roomChangeBlockerMessage(r.data))
+    })
+    return () => {
+      alive = false
+    }
+  }, [leaseId])
+
+  const extraError = blocked ?? (!newRoomId ? 'Chọn phòng mới' : !newEnd ? 'Chọn ngày kết thúc hợp đồng mới' : feeError)
 
   const extra = (
     <section className="space-y-3 rounded-xl border border-border/80 bg-card p-3.5">
+      {blocked && (
+        <p
+          role="alert"
+          className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+        >
+          {blocked}
+        </p>
+      )}
       <h3 className="text-[13px] font-medium text-muted-foreground">Phòng mới & hợp đồng mới</h3>
       <p className="text-xs text-muted-foreground">
         Hợp đồng cũ kết thúc đúng ngày chuyển, hợp đồng mới bắt đầu ngày đó (ngày chuyển tính tiền phòng mới). Hoá đơn
@@ -170,7 +191,7 @@ export function RoomChangeWizard({
           onCreated={(fee) => setCreatedTypes((prev) => [...prev, fee])}
         />
       </div>
-      {extraError && newRoomId && (
+      {extraError && newRoomId && !blocked && (
         <p role="alert" className="text-xs text-destructive">
           {extraError}
         </p>

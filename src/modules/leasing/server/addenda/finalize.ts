@@ -22,6 +22,7 @@ import { addDays } from '@/domain/dates'
 import { depositBalance } from '@/domain/deposit'
 import type { DepositEntry, ForfeitInput } from '@/domain/types'
 import { recordAudit, getSettings } from '@/modules/platform'
+import { roomChangeBlockerMessage, type RoomChangeBlockers } from '../../domain/room-change-blockers'
 import { rebalanceTransferLine } from '../../domain/transfer-line'
 import { addWalletEntry, walletBalance } from '../wallet/service'
 
@@ -146,6 +147,29 @@ export async function applyTerminationClosure(
     before: { status: lease.status, endDate: lease.endDate },
     after: { status: 'ended', endDate },
   })
+}
+
+/** Hoá đơn tháng còn nháp hoặc còn nợ của hợp đồng (không tính hoá đơn thanh lý), cản việc chuyển phòng. */
+export async function loadRoomChangeBlockers(tx: DB, leaseId: string): Promise<RoomChangeBlockers> {
+  const rows = await tx
+    .select({
+      id: invoices.id,
+      code: invoices.code,
+      status: invoices.status,
+      periodStart: invoices.periodStart,
+      total: sql<number>`coalesce((select sum(${invoiceLines.amount}) from ${invoiceLines} where ${invoiceLines.invoiceId} = ${invoices.id}), 0)::float8`,
+      paid: sql<number>`coalesce((select sum(${payments.amount}) from ${payments} where ${payments.invoiceId} = ${invoices.id}), 0)::float8`,
+    })
+    .from(invoices)
+    .where(and(eq(invoices.leaseId, leaseId), ne(invoices.kind, 'termination')))
+    .orderBy(invoices.periodStart)
+  const period = (start: string) => `${start.slice(5, 7)}/${start.slice(0, 4)}`
+  return {
+    drafts: rows.filter((r) => r.status === 'draft').map((r) => ({ code: r.code, period: period(r.periodStart) })),
+    unpaid: rows
+      .filter((r) => r.status === 'approved' && r.total > 0 && r.total - r.paid > 0)
+      .map((r) => ({ code: r.code, period: period(r.periodStart), owed: r.total - r.paid })),
+  }
 }
 
 /**
@@ -303,6 +327,16 @@ export async function finalizeTermination(
       facilityId: invoice.facilityId,
       endDate,
     })
+  }
+  // Lưới an toàn: hoá đơn thanh lý chuyển phòng không còn dòng "Nợ cũ", nên hợp đồng cũ không được phát sinh nợ sau khi lập nháp
+  const [transferLine] = await tx
+    .select({ id: invoiceLines.id })
+    .from(invoiceLines)
+    .where(and(eq(invoiceLines.invoiceId, invoice.id), sql`${invoiceLines.meta} ->> 'transfer' = 'true'`))
+    .limit(1)
+  if (transferLine) {
+    const message = roomChangeBlockerMessage({ ...(await loadRoomChangeBlockers(tx, lease.id)), drafts: [] })
+    if (message) throw new ValidationError(message)
   }
   await settleWalletAndTransfer(tx, ctx, invoice, lease, endDate)
 
