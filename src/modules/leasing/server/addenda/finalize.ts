@@ -152,23 +152,35 @@ export async function applyTerminationClosure(
 /** Hoá đơn tháng còn nháp hoặc còn nợ của hợp đồng (không tính hoá đơn thanh lý), cản việc chuyển phòng. */
 export async function loadRoomChangeBlockers(tx: DB, leaseId: string): Promise<RoomChangeBlockers> {
   const rows = await tx
-    .select({
-      id: invoices.id,
-      code: invoices.code,
-      status: invoices.status,
-      periodStart: invoices.periodStart,
-      total: sql<number>`coalesce((select sum(${invoiceLines.amount}) from ${invoiceLines} where ${invoiceLines.invoiceId} = ${invoices.id}), 0)::float8`,
-      paid: sql<number>`coalesce((select sum(${payments.amount}) from ${payments} where ${payments.invoiceId} = ${invoices.id}), 0)::float8`,
-    })
+    .select({ id: invoices.id, code: invoices.code, status: invoices.status, periodStart: invoices.periodStart })
     .from(invoices)
     .where(and(eq(invoices.leaseId, leaseId), ne(invoices.kind, 'termination')))
     .orderBy(invoices.periodStart)
+  if (!rows.length) return { drafts: [], unpaid: [] }
+  const ids = rows.map((r) => r.id)
+  const [totals, paids] = await Promise.all([
+    tx
+      .select({ id: invoiceLines.invoiceId, n: sql<number>`sum(${invoiceLines.amount})::float8` })
+      .from(invoiceLines)
+      .where(inArray(invoiceLines.invoiceId, ids))
+      .groupBy(invoiceLines.invoiceId),
+    tx
+      .select({ id: payments.invoiceId, n: sql<number>`sum(${payments.amount})::float8` })
+      .from(payments)
+      .where(inArray(payments.invoiceId, ids))
+      .groupBy(payments.invoiceId),
+  ])
+  const sum = (list: { id: string; n: number }[], id: string) => list.find((x) => x.id === id)?.n ?? 0
   const period = (start: string) => `${start.slice(5, 7)}/${start.slice(0, 4)}`
   return {
     drafts: rows.filter((r) => r.status === 'draft').map((r) => ({ code: r.code, period: period(r.periodStart) })),
     unpaid: rows
-      .filter((r) => r.status === 'approved' && r.total > 0 && r.total - r.paid > 0)
-      .map((r) => ({ code: r.code, period: period(r.periodStart), owed: r.total - r.paid })),
+      .filter((r) => r.status === 'approved' && sum(totals, r.id) > 0 && sum(totals, r.id) - sum(paids, r.id) > 0)
+      .map((r) => ({
+        code: r.code,
+        period: period(r.periodStart),
+        owed: sum(totals, r.id) - sum(paids, r.id),
+      })),
   }
 }
 
