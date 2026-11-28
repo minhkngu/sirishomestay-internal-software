@@ -3,17 +3,17 @@
  *  1. Cọc giữ chỗ 3.000.000 → hợp đồng HD-A phòng 301 (01/09/2026, giá 9.000.000, cọc 9.000.000; còn thiếu 6.000.000).
  *  2. Hoá đơn 09/2026 = cọc còn thiếu 6.000.000 + tiền phòng 9.000.000 = 15.000.000; thu 10.000.000 (cọc trước) rồi 8.000.000 (dư 3.000.000 vào ví).
  *  3. Hoá đơn 10/2026 = 9.000.000; thu 2.000.000 từ ví + 7.000.000 tiền mặt → ví còn 1.000.000.
- *  4. Hoá đơn 11/2026 = 9.000.000 đã duyệt, chưa thu.
+ *  4. Hoá đơn 11/2026 = 9.000.000 đã duyệt; chuyển phòng lúc còn nợ bị từ chối; thu 9.000.000 tiền mặt ngày 15/11.
  *  5. Chuyển sang phòng 302 ngày 20/11/2026 (giá 12.000.000, cọc 12.000.000):
- *     T = hoàn 20–30/11 (11/30 × 9.000.000 = −3.300.000) + nợ cũ 9.000.000 − cọc 9.000.000 − ví 1.000.000 = −4.300.000.
- *  6. Hoá đơn 11/2026 của HD-B = cọc 12.000.000 + tiền phòng 20–30/11 (11/30 × 12.000.000 = 4.400.000) − 4.300.000 = 12.100.000.
+ *     T = hoàn 20–30/11 (11/30 × 9.000.000 = −3.300.000) − cọc 9.000.000 − ví 1.000.000 = −13.300.000 (không còn nợ cũ).
+ *  6. Hoá đơn 11/2026 của HD-B = cọc 12.000.000 + tiền phòng 20–30/11 (11/30 × 12.000.000 = 4.400.000) − 13.300.000 = 3.100.000.
  *  7. Hoá đơn 12/2026, 01/2027 = 12.000.000 mỗi kỳ, thu đủ.
  *  8. Thanh lý HD-B ngày 16/01/2027, mất cọc 2.000.000, phạt 500.000:
- *     hoàn 17–31/01 (15/31 × 12.000.000 = −5.806.452) + phạt 500.000 − hoàn cọc 10.000.000 = −15.306.452 (hoàn khách).
- *  9. Sổ quỹ: tiền thật vào = 3.000.000 + 10.000.000 + 5.000.000 + 3.000.000 + 7.000.000 + 12.100.000 + 12.000.000 + 12.000.000 = 64.100.000.
+ *     hoàn 16–31/01 (16/31 × 12.000.000 = −6.193.548) + phạt 500.000 − hoàn cọc 10.000.000 = −15.693.548 (hoàn khách).
+ *  9. Sổ quỹ: tiền thật vào = 3 + 10 + 5 + 3 + 7 + 9 + 3,1 + 12 + 12 triệu = 64.100.000.
  *
- * Mỗi bước kiểm cả các trường hợp bị từ chối ở thời điểm đó. Thanh lý thường hiện vẫn tính cả ngày trả phòng (hoàn từ hôm sau);
- * chỉ chuyển phòng tính đến hết ngày trước ngày chuyển.
+ * Mỗi bước kiểm cả các trường hợp bị từ chối ở thời điểm đó. Mọi thanh lý (thường và chuyển phòng) tính tiền đến hết hôm trước
+ * ngày trả và hoàn từ chính ngày trả.
  */
 import { and, eq } from 'drizzle-orm'
 import { beforeAll, describe, expect, it } from 'vitest'
@@ -89,6 +89,15 @@ describe('vòng đời một khách: cọc → hợp đồng → thu, ví → ch
     await approveInvoice(db, ctx(), inv.id, {})
     return inv.id
   }
+
+  const roomChange = (over: Record<string, unknown> = {}) =>
+    createRoomChange(db, ctx(), leaseA, {
+      newRoomId: room302,
+      moveDate: '2026-11-20',
+      lease: { endDate: '2027-11-19', monthlyRent: 12_000_000, depositAmount: 12_000_000 },
+      termination: { forfeit: { mode: 'none' }, readings: [] },
+      ...over,
+    })
 
   beforeAll(async () => {
     db = await createTestDb()
@@ -261,12 +270,14 @@ describe('vòng đời một khách: cọc → hợp đồng → thu, ví → ch
     expect(use.amount).toBe(-2_000_000)
   })
 
-  it('3.4 gỡ khoản thu đã sinh tiền dư mà tiền dư đã được dùng: từ chối (ví sẽ âm 2.000.000)', async () => {
+  it('3.4 gỡ khoản thu (nhập nhầm) đã sinh tiền dư mà tiền dư đã được dùng: từ chối (ví sẽ âm 2.000.000)', async () => {
     const [sepSecond] = await db
       .select()
       .from(payments)
       .where(and(eq(payments.invoiceId, sepInvoice), eq(payments.amount, 5_000_000)))
-    await expect(removePayment(db, ctx(), sepSecond.id)).rejects.toThrow('Tiền dư của khoản thu này đã được dùng')
+    await expect(removePayment(db, { ...ctx(), isAdmin: true }, sepSecond.id, { kind: 'mistake' })).rejects.toThrow(
+      'Tiền dư của khoản thu này đã được dùng',
+    )
     expect(await wallet()).toBe(1_000_000)
     expect((await db.select().from(payments).where(eq(payments.id, sepFirstPayment))).length).toBe(1)
   })
@@ -277,16 +288,18 @@ describe('vòng đời một khách: cọc → hợp đồng → thu, ví → ch
     expect(await leaseDebt(db, ctx(), leaseA)).toBe(9_000_000)
   })
 
-  // ------------------------------------------------------------------ 4. chuyển phòng
+  it('3.6 chuyển phòng lúc còn nợ bị từ chối, hợp đồng vẫn hiệu lực', async () => {
+    await expect(roomChange()).rejects.toThrow('Còn nợ 9.000.000 ở hoá đơn tháng 11/2026')
+    expect((await db.select().from(leases)).length).toBe(1)
+    expect((await db.select().from(leases).where(eq(leases.id, leaseA)))[0].status).toBe('active')
+  })
 
-  const roomChange = (over: Record<string, unknown> = {}) =>
-    createRoomChange(db, ctx(), leaseA, {
-      newRoomId: room302,
-      moveDate: '2026-11-20',
-      lease: { endDate: '2027-11-19', monthlyRent: 12_000_000, depositAmount: 12_000_000 },
-      termination: { forfeit: { mode: 'none' }, readings: [] },
-      ...over,
-    })
+  it('3.7 thu 9.000.000 tiền mặt ngày 15/11: hết nợ', async () => {
+    await pay(leaseA, '2026-11-15', 9_000_000)
+    expect(await leaseDebt(db, ctx(), leaseA)).toBe(0)
+  })
+
+  // ------------------------------------------------------------------ 4. chuyển phòng
 
   it('4.1 ngày chuyển không sau ngày bắt đầu hợp đồng cũ, hoặc trùng phòng cũ: từ chối, không đổi gì', async () => {
     await expect(roomChange({ moveDate: '2026-09-01' })).rejects.toThrow('Ngày chuyển phải sau ngày bắt đầu')
@@ -295,7 +308,7 @@ describe('vòng đời một khách: cọc → hợp đồng → thu, ví → ch
     expect((await db.select().from(leases).where(eq(leases.id, leaseA)))[0].status).toBe('active')
   })
 
-  it('4.2 chuyển ngày 20/11: HD-A kết thúc 20/11, HD-B bắt đầu 20/11, hoá đơn thanh lý nháp có T = −4.300.000', async () => {
+  it('4.2 chuyển ngày 20/11: HD-A kết thúc 20/11, HD-B bắt đầu 20/11, hoá đơn thanh lý nháp có T = −13.300.000', async () => {
     const r = await roomChange()
     leaseB = r.newLeaseId
     terminationA = r.terminationInvoiceId
@@ -315,10 +328,10 @@ describe('vòng đời một khách: cọc → hợp đồng → thu, ví → ch
     const lines = await linesOf(terminationA)
     // ngày chuyển thuộc phòng mới: hoàn từ chính ngày 20/11 → 11 ngày × 300.000
     expect(lines.find((l) => l.type === 'refund')?.amount).toBe(-3_300_000)
-    expect(lines.find((l) => l.description === 'Nợ cũ chưa thanh toán')?.amount).toBe(9_000_000)
+    expect(lines.some((l) => l.description === 'Nợ cũ chưa thanh toán')).toBe(false)
     expect(lines.filter((l) => l.type === 'deposit_offset').map((l) => l.amount)).toEqual([-9_000_000])
     expect(lines.find((l) => typeof metaOf(l).wallet === 'number')?.amount).toBe(-1_000_000)
-    expect(lines.find((l) => metaOf(l).transfer === true)?.amount).toBe(4_300_000)
+    expect(lines.find((l) => metaOf(l).transfer === true)?.amount).toBe(13_300_000)
     expect(await totalOf(terminationA)).toBe(0)
     // nháp: ví chưa trừ, cọc cũ chưa trừ, chưa có điều chỉnh ở HD-B
     expect(await wallet()).toBe(1_000_000)
@@ -330,15 +343,14 @@ describe('vòng đời một khách: cọc → hợp đồng → thu, ví → ch
     await expect(roomChange()).rejects.toThrow('Chỉ chuyển phòng cho hợp đồng đang hiệu lực')
   })
 
-  it('4.4 duyệt thanh lý: ví về 0, cọc cũ về 0, nợ 11/2026 đóng bằng carry, HD-B nhận điều chỉnh −4.300.000', async () => {
+  it('4.4 duyệt thanh lý: ví về 0, cọc cũ về 0, không có khoản gộp, HD-B nhận điều chỉnh −13.300.000', async () => {
     await approveInvoice(db, ctx(), terminationA, {})
     expect(await wallet()).toBe(0)
     expect(await depositOf(leaseA)).toBe(0)
     expect(await leaseDebt(db, ctx(), leaseA)).toBe(0)
-    const carry = await db.select().from(payments).where(eq(payments.method, 'carry'))
-    expect(carry.map((p) => [p.invoiceId, p.amount])).toEqual([[novInvoiceA, 9_000_000]])
+    expect(await db.select().from(payments).where(eq(payments.method, 'carry'))).toHaveLength(0)
     const adj = await db.select().from(pendingAdjustments).where(eq(pendingAdjustments.leaseId, leaseB))
-    expect(adj.map((x) => [x.amount, x.sourceKey, x.invoiceId])).toEqual([[-4_300_000, `transfer:${leaseA}`, null]])
+    expect(adj.map((x) => [x.amount, x.sourceKey, x.invoiceId])).toEqual([[-13_300_000, `transfer:${leaseA}`, null]])
     expect(adj[0].description).toContain('Chuyển từ hợp đồng')
   })
 
@@ -348,20 +360,20 @@ describe('vòng đời một khách: cọc → hợp đồng → thu, ví → ch
 
   // ------------------------------------------------------------------ 5. hợp đồng mới
 
-  it('5.1 hoá đơn 11/2026 của HD-B = cọc 12.000.000 + tiền phòng 4.400.000 − chuyển 4.300.000 = 12.100.000', async () => {
+  it('5.1 hoá đơn 11/2026 của HD-B = cọc 12.000.000 + tiền phòng 4.400.000 − chuyển 13.300.000 = 3.100.000', async () => {
     novInvoiceB = await bill(leaseB, '2026-11')
     const lines = await linesOf(novInvoiceB)
     expect(lines.find((l) => l.type === 'deposit')?.amount).toBe(12_000_000)
     expect(lines.find((l) => l.type === 'rent')?.amount).toBe(4_400_000)
     const carried = lines.find((l) => String(metaOf(l).sourceKey ?? '').startsWith('transfer:'))
-    expect(carried?.amount).toBe(-4_300_000)
-    expect(await totalOf(novInvoiceB)).toBe(12_100_000)
+    expect(carried?.amount).toBe(-13_300_000)
+    expect(await totalOf(novInvoiceB)).toBe(3_100_000)
     const [adj] = await db.select().from(pendingAdjustments).where(eq(pendingAdjustments.leaseId, leaseB))
     expect(adj.invoiceId).toBe(novInvoiceB)
   })
 
-  it('5.2 thu đủ 12.100.000: cọc HD-B đủ 12.000.000, hết nợ', async () => {
-    await pay(leaseB, '2026-11-25', 12_100_000)
+  it('5.2 thu đủ 3.100.000: hết nợ', async () => {
+    await pay(leaseB, '2026-11-25', 3_100_000)
     expect(await leaseDebt(db, ctx(), leaseB)).toBe(0)
     expect(await depositOf(leaseB)).toBe(12_000_000)
   })
@@ -389,24 +401,24 @@ describe('vòng đời một khách: cọc → hợp đồng → thu, ví → ch
       ...over,
     })
 
-  it('6.1 hoàn một phần vượt mức tính theo ngày (5.806.452) bị từ chối, hợp đồng vẫn hiệu lực', async () => {
-    await expect(terminateB({ rentRefund: { mode: 'partial', amount: 5_806_453 } })).rejects.toThrow(
+  it('6.1 hoàn một phần vượt mức tính theo ngày (6.193.548) bị từ chối, hợp đồng vẫn hiệu lực', async () => {
+    await expect(terminateB({ rentRefund: { mode: 'partial', amount: 6_193_549 } })).rejects.toThrow(
       'Số tiền hoàn vượt mức tính theo ngày',
     )
     expect((await db.select().from(leases).where(eq(leases.id, leaseB)))[0].status).toBe('active')
   })
 
-  it('6.2 thanh lý 16/01/2027: hoàn 17–31/01 = 5.806.452, phạt 500.000, hoàn cọc 10.000.000, mất cọc 2.000.000 → −15.306.452', async () => {
+  it('6.2 thanh lý 16/01/2027: hoàn 16–31/01 = 6.193.548, phạt 500.000, hoàn cọc 10.000.000, mất cọc 2.000.000 → −15.693.548', async () => {
     const r = await terminateB()
     terminationB = r.invoice!.id
     const lines = await linesOf(terminationB)
-    expect(lines.find((l) => l.type === 'refund')?.amount).toBe(-5_806_452)
+    expect(lines.find((l) => l.type === 'refund')?.amount).toBe(-6_193_548)
     expect(lines.find((l) => l.type === 'penalty')?.amount).toBe(500_000)
     const offset = lines.filter((l) => l.type === 'deposit_offset')
     expect(offset.map((l) => l.amount).sort((x, y) => x - y)).toEqual([-10_000_000, 0])
     expect(offset.find((l) => l.amount === 0)?.meta).toMatchObject({ forfeit: 2_000_000 })
     expect(lines.some((l) => typeof metaOf(l).wallet === 'number' || metaOf(l).transfer === true)).toBe(false)
-    expect(await totalOf(terminationB)).toBe(-15_306_452)
+    expect(await totalOf(terminationB)).toBe(-15_693_548)
     expect((await db.select().from(leases).where(eq(leases.id, leaseB)))[0]).toMatchObject({
       status: 'ended',
       endDate: '2027-01-16',
