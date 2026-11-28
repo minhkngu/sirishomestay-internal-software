@@ -10,6 +10,7 @@ import {
   listLeaseOccupants,
   listInvoices,
   listAddenda,
+  leaseWalletBalance,
   referenceChanges,
 } from '@/modules/leasing'
 import { DepositLedger, ExportMenu, SignStatus, AddendaList } from '@/modules/leasing/ui'
@@ -364,6 +365,8 @@ export default async function ContractDetail({ id }: { id: string }) {
     listLeaseMeterInitials(db, ctx, lease.id),
   ])
 
+  // Ví khách: chỉ hiện khi có quyền thu tiền ở cơ sở của hợp đồng
+  const walletBalance = await leaseWalletBalance(db, ctx, lease.id).catch(() => null)
   const isActive = lease.status === 'active'
   const today = todayVN()
   const progress = termProgress(lease.startDate, lease.terms.endDate, today)
@@ -457,6 +460,14 @@ export default async function ContractDetail({ id }: { id: string }) {
             <p className="mt-2 text-sm text-foreground">
               {lease.tenantName}
               <span className="text-muted-foreground"> · Phòng {lease.roomCode}</span>
+              {walletBalance !== null && (
+                <>
+                  <span className="text-muted-foreground"> · </span>
+                  <Link href={`/tenants/${lease.tenantId}`} className="text-primary hover:underline underline-offset-2">
+                    Ví khách: {formatVND(walletBalance)} đ
+                  </Link>
+                </>
+              )}
             </p>
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
               <Calendar className="size-3.5" />

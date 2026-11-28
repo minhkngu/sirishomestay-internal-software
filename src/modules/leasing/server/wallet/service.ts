@@ -1,10 +1,11 @@
 import { and, desc, eq, inArray, sql } from 'drizzle-orm'
-import { invoices, leases, payments, rooms, tenants, tenantWalletEntries } from '@/db'
+import { facilities, invoices, leases, payments, rooms, tenants, tenantWalletEntries } from '@/db'
 import type { DB } from '@/db/client'
 import { can, type AccessContext } from '@/domain/access'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/domain/errors'
 import type { WalletEntryKind } from '@/domain/statuses'
 import { recordAudit } from '@/modules/platform'
+import type { WalletEntryView } from '../../domain/wallet'
 
 export type WalletEntryInput = {
   tenantId: string
@@ -165,6 +166,47 @@ export async function listWalletEntries(db: DB, ctx: AccessContext, tenantId: st
     .from(tenantWalletEntries)
     .where(eq(tenantWalletEntries.tenantId, tenantId))
     .orderBy(desc(tenantWalletEntries.date), desc(tenantWalletEntries.createdAt))
+}
+
+/** Số dư và lịch sử ví của khách để hiển thị (kèm mã cơ sở, hoá đơn, hợp đồng liên quan); cùng quyền với `listWalletEntries`. */
+export async function listWalletView(
+  db: DB,
+  ctx: AccessContext,
+  tenantId: string,
+): Promise<{ balance: number; entries: WalletEntryView[] }> {
+  const rows = await listWalletEntries(db, ctx, tenantId)
+  const pick = <T>(ids: (string | null)[], load: (list: string[]) => Promise<T[]>) => {
+    const list = [...new Set(ids.filter((x): x is string => !!x))]
+    return list.length ? load(list) : Promise.resolve([])
+  }
+  const [facs, invs, lses] = await Promise.all([
+    pick(
+      rows.map((r) => r.facilityId),
+      (list) =>
+        db.select({ id: facilities.id, code: facilities.code }).from(facilities).where(inArray(facilities.id, list)),
+    ),
+    pick(
+      rows.map((r) => r.invoiceId),
+      (list) => db.select({ id: invoices.id, code: invoices.code }).from(invoices).where(inArray(invoices.id, list)),
+    ),
+    pick(
+      rows.map((r) => r.leaseId),
+      (list) => db.select({ id: leases.id, code: leases.code }).from(leases).where(inArray(leases.id, list)),
+    ),
+  ])
+  return {
+    balance: rows.reduce((n, r) => n + r.amount, 0),
+    entries: rows.map((r) => ({
+      id: r.id,
+      date: r.date,
+      kind: r.kind,
+      amount: r.amount,
+      facilityCode: facs.find((f) => f.id === r.facilityId)?.code ?? '',
+      invoice: invs.find((i) => i.id === r.invoiceId),
+      lease: lses.find((l) => l.id === r.leaseId),
+      note: r.note,
+    })),
+  }
 }
 
 /** Biến động ví có tiền thật đi qua (thu dư, phiếu chuyển vào ví, trả lại khách) trong phạm vi cơ sở và tháng, cho sổ quỹ. */
