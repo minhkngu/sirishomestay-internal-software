@@ -62,12 +62,6 @@ describe('lập hoá đơn tháng cũ', () => {
     const inv = await createDraftForLease(db, ctx(), { leaseId, period: '2026-10' })
     expect([inv.periodStart, inv.periodEnd]).toEqual(['2026-10-01', '2026-10-31'])
   })
-  it('hoá đơn lẻ chọn tháng sau khoảng trống: xem trước và lập đúng tháng chọn, không dồn tháng thiếu', async () => {
-    const preview = await previewNewInvoice(db, ctx(), { leaseId, period: '2027-03' })
-    expect(preview.period).toEqual({ start: '2027-03-01', end: '2027-03-31' })
-    const inv = await createDraftForLease(db, ctx(), { leaseId, period: '2027-03' })
-    expect([inv.periodStart, inv.periodEnd]).toEqual(['2027-03-01', '2027-03-31'])
-  })
   it('tháng đã có hoá đơn vẫn lập thêm được nhưng không cộng tiền phòng', async () => {
     const first = await createDraftForLease(db, ctx(), { leaseId, period: '2026-10' })
     const second = await createDraftForLease(db, ctx(), { leaseId, period: '2026-10' })

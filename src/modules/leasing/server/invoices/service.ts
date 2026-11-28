@@ -26,7 +26,7 @@ import { assertCan, type AccessContext } from '@/domain/access'
 import { syncDepositWithInvoice } from './deposit-sync'
 import { computeDueDate } from '../../domain/due-date'
 import { depositHeld } from '@/domain/cashbook'
-import { addDays, daysInMonth, formatDateVN, todayVN } from '@/domain/dates'
+import { daysInMonth, formatDateVN, todayVN } from '@/domain/dates'
 import { displayName } from '@/modules/tenants'
 import { NotFoundError, ValidationError } from '@/domain/errors'
 import { midPeriodAdjustments } from '../../domain/adjustments'
@@ -434,11 +434,9 @@ async function previewCore(db: DB, facilityId: string, period: string, onlyLease
     }
     // Chưa có hoá đơn nào: người dùng chọn kỳ đầu tiên, không dồn các tháng trước kỳ được chọn
     const first = `${period}-01`
-    // Hoá đơn lẻ chọn tháng sau một khoảng trống (chưa lập các tháng giữa): lập đúng tháng được chọn, không dồn tháng thiếu
-    const skipGap = !!onlyLeaseId && !!last && addDays(last, 1) < first
     const next = nextBillingPeriod(
-      (last && !skipGap) || lease.startDate >= first ? lease : { ...lease, startDate: first },
-      skipGap ? null : last,
+      last || lease.startDate >= first ? lease : { ...lease, startDate: first },
+      last,
       period,
     )
     if (!next)
